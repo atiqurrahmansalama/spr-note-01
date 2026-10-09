@@ -1,11 +1,15 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense, lazy } from "react";
 import { useLocation } from "react-router-dom";
-import DocLabQuickReportModal from "@/components/print/DocLabQuickReportModal";
 import {
   DAILY_PROGRESS_SCOPE_ID,
   buildDailyProgressReportData,
 } from "./dailyProgressDocLabKeys";
 import SkeletonLoader from "@/components/common/SkeletonLoader";
+
+// Lazy load DocLab Quick Report Modal to eliminate heavy print/editor bundle on initial mount
+const DocLabQuickReportModal = lazy(
+  () => import("@/components/print/DocLabQuickReportModal")
+);
 import { PageContainer } from "@/components/layout";
 import { useToast } from "@/context/ToastContext";
 import { useFont } from "@/context/useFont";
@@ -645,17 +649,21 @@ export default function DailyProgressView({
         />
       )}
 
-      {/* DocLab Quick Report Modal */}
-      <DocLabQuickReportModal
-        isOpen={isReportModalOpen}
-        onClose={() => setIsReportModalOpen(false)}
-        scopeId={DAILY_PROGRESS_SCOPE_ID}
-        scopeName="Daily Progress"
-        title="Daily Progress Report"
-        returnUrl="/studies/daily-progress"
-        dataRecord={dailyProgressReportData}
-        autoCopy={true}
-      />
+      {/* DocLab Quick Report Modal (Loaded on-demand only when triggered) */}
+      {isReportModalOpen && (
+        <Suspense fallback={null}>
+          <DocLabQuickReportModal
+            isOpen={isReportModalOpen}
+            onClose={() => setIsReportModalOpen(false)}
+            scopeId={DAILY_PROGRESS_SCOPE_ID}
+            scopeName="Daily Progress"
+            title="Daily Progress Report"
+            returnUrl="/studies/daily-progress"
+            dataRecord={dailyProgressReportData}
+            autoCopy={true}
+          />
+        </Suspense>
+      )}
     </PageContainer>
   );
 }

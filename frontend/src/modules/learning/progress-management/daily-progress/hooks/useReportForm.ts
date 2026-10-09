@@ -52,7 +52,22 @@ export function useReportForm() {
 
   const [studentDatabase, setStudentDatabase] = useState<any[]>(() => {
     try {
-      return studentStore.getAll() || [];
+      const fromStore = studentStore.getAll() || [];
+      if (fromStore.length > 0) return fromStore;
+      const tenantId = localStorage.getItem("spr_active_tenant_id") || "default";
+      const fromCache = JSON.parse(localStorage.getItem(`spr_students_cache_${tenantId}`) || "[]");
+      if (Array.isArray(fromCache) && fromCache.length > 0) {
+        return fromCache.map((s: any) => ({
+          ...(typeof s === "object" ? s : {}),
+          id: typeof s === "object" ? s.id : null,
+          label: typeof s === "object" ? (s.name_en || s.name || s.student_name || s.label || String(s)) : String(s),
+          sub: s?.section_name || s?.student_section_name || s?.sub || s?.group_name || "",
+          section_name: s?.section_name || s?.student_section_name || s?.sub || "",
+          student_section: s?.student_section || s?.section_id || s?.section,
+          student_class: s?.student_class || s?.class_id,
+        }));
+      }
+      return [];
     } catch {
       return [];
     }
@@ -64,14 +79,7 @@ export function useReportForm() {
       return [];
     }
   });
-  const [isLoading, setIsLoading] = useState<boolean>(() => {
-    try {
-      const cached = studentStore.getAll();
-      return !(cached && cached.length > 0);
-    } catch {
-      return false;
-    }
-  });
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingReport, setEditingReport] = useState<any | null>(null);
 

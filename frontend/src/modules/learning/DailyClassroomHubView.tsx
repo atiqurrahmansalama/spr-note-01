@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, Suspense, lazy } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { CollapsiblePageHeader } from '@/components/ui';
 import CustomButton from '@/components/ui/CustomButton';
@@ -12,19 +12,63 @@ import {
 import { useAcademicData } from './hooks/useAcademicData';
 import { useTenant } from '@/context/TenantContext';
 import { useRightSidebar, useDrawerRegistration } from '@/context/RightSidebarContext';
-import {
-  LessonDeliveryManagementView,
-  LessonPlanDrawer,
-  LessonAnalyticsView,
-  StudentAssessmentManagementView,
-  StudentAssessmentDrawer,
-  useDailyClassroomAssessment,
-} from './lesson-management';
+import { useDailyClassroomAssessment } from './lesson-management/lesson-assessments/hooks';
 import useDailyClassroomData from './hooks/useDailyClassroomData';
 import useDailyClassroomFilters from './hooks/useDailyClassroomFilters';
 import { getClassroomTodayDate } from '@/constants/calendarConstants';
 import { doesLessonMatchClass } from './utils/dailyClassroomUtils';
-import HifzReportBuilderModule, { ProgressAnalyticsView, StudentReportsView } from './progress-management';
+
+// ── Lazy-Loaded Feature Views & Drawers for Instant Sub-50ms Mounts ──────────
+const LessonDeliveryManagementView = lazy(
+  () => import('./lesson-management/daily-lessons/DailyLessonsView')
+);
+const LessonPlanDrawer = lazy(
+  () => import('./lesson-management/daily-lessons/LessonPlanDrawer')
+);
+const LessonAnalyticsView = lazy(
+  () => import('./lesson-management/analytics/LessonAnalyticsView')
+);
+const StudentAssessmentManagementView = lazy(
+  () => import('./lesson-management/lesson-assessments/LessonAssessmentsView')
+);
+const StudentAssessmentDrawer = lazy(
+  () => import('./lesson-management/lesson-assessments/StudentAssessmentDrawer')
+);
+const HifzReportBuilderModule = lazy(
+  () => import('./progress-management/daily-progress/DailyProgressView')
+);
+const StudentReportsView = lazy(
+  () => import('./progress-management/progress-reports/ProgressReportsView')
+);
+const ProgressAnalyticsView = lazy(
+  () => import('./progress-management/analytics/ProgressAnalyticsView')
+);
+
+// ── Lightweight Skeleton Fallback for Async Sub-views ────────────────────────
+function HubTabSkeletonLoader() {
+  return (
+    <div className="w-full space-y-4 animate-pulse">
+      <div className="h-14 rounded-xl theme-card theme-border border" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="h-20 rounded-xl theme-card theme-border border" />
+        <div className="h-20 rounded-xl theme-card theme-border border" />
+        <div className="h-20 rounded-xl theme-card theme-border border" />
+        <div className="h-20 rounded-xl theme-card theme-border border" />
+      </div>
+      <div className="h-96 rounded-xl theme-card theme-border border" />
+    </div>
+  );
+}
+
+function DrawerFallbackSkeleton() {
+  return (
+    <div className="p-4 space-y-4 animate-pulse">
+      <div className="h-8 rounded theme-card" />
+      <div className="h-24 rounded theme-card" />
+      <div className="h-32 rounded theme-card" />
+    </div>
+  );
+}
 
 const LESSON_MANAGEMENT_TABS = [
   { id: 'LESSON', label: 'Daily Lessons', icon: BookOpenIcon, path: '/studies/daily-lessons' },
@@ -116,7 +160,7 @@ export default function DailyClassroomHubView({
 
   const [searchParams] = useSearchParams();
 
-  // ── Tab State Resolution ──────────────────────────────────────────────────────
+  // ── Tab State Resolution & Keep-Alive Memory Tracking ─────────────────────────
   const [activeTab, setActiveTab] = useState(() => {
     const fromParam = searchParams.get('tab');
     if (fromParam) return normalizeTabId(fromParam, isProgressHub);
@@ -132,6 +176,17 @@ export default function DailyClassroomHubView({
       return 'LESSON';
     }
   });
+
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => new Set([activeTab]));
+
+  useEffect(() => {
+    setVisitedTabs((prev) => {
+      if (prev.has(activeTab)) return prev;
+      const next = new Set(prev);
+      next.add(activeTab);
+      return next;
+    });
+  }, [activeTab]);
 
   // Sync tab on URL / Prop changes
   useEffect(() => {
@@ -293,14 +348,14 @@ export default function DailyClassroomHubView({
   const effectiveClassId = selectedClassId;
 
   const { assessmentRows, assessmentMetrics, getSlotAssessmentCount } = useDailyClassroomAssessment({
-    enrolledStudents,
-    evaluations,
-    lessons,
-    classes,
+    enrolledStudents: isProgressHub ? [] : enrolledStudents,
+    evaluations: isProgressHub ? [] : evaluations,
+    lessons: isProgressHub ? [] : lessons,
+    classes: isProgressHub ? [] : classes,
     selectedDate,
     activePeriodId,
-    filteredLessons,
-    baseFilteredLessons,
+    filteredLessons: isProgressHub ? [] : filteredLessons,
+    baseFilteredLessons: isProgressHub ? [] : baseFilteredLessons,
   });
 
   // ── Lesson Metrics ────────────────────────────────────────────────────────────
@@ -451,17 +506,19 @@ export default function DailyClassroomHubView({
         size: 'md',
         width: 'md',
         content: (
-          <LessonPlanDrawer
-            key={`lesson-plan-drawer-${mode}-${lessonId || 'new'}-${targetDeptId}-${targetClassId}-${targetSectionId}-${targetPeriodId}-${selectedDate}-${effectiveLesson?.curriculum_book_id || 'none'}`}
-            lesson={effectiveLesson}
-            defaultDepartmentId={targetDeptId}
-            defaultClassId={targetClassId}
-            defaultSectionId={targetSectionId}
-            defaultPeriodId={targetPeriodId}
-            defaultDate={selectedDate}
-            onSaveSuccess={() => { loadData(); closeDrawer(); }}
-            onCancel={closeDrawer}
-          />
+          <Suspense fallback={<DrawerFallbackSkeleton />}>
+            <LessonPlanDrawer
+              key={`lesson-plan-drawer-${mode}-${lessonId || 'new'}-${targetDeptId}-${targetClassId}-${targetSectionId}-${targetPeriodId}-${selectedDate}-${effectiveLesson?.curriculum_book_id || 'none'}`}
+              lesson={effectiveLesson}
+              defaultDepartmentId={targetDeptId}
+              defaultClassId={targetClassId}
+              defaultSectionId={targetSectionId}
+              defaultPeriodId={targetPeriodId}
+              defaultDate={selectedDate}
+              onSaveSuccess={() => { loadData(); closeDrawer(); }}
+              onCancel={closeDrawer}
+            />
+          </Suspense>
         ),
       };
     },
@@ -510,19 +567,21 @@ export default function DailyClassroomHubView({
         size: 'md',
         width: 'md',
         content: (
-          <StudentAssessmentDrawer
-            key={`assessment-drawer-${studentId}-${date}-${effectiveAssignedLesson?.curriculum_book_name || 'none'}-${effectiveAssignedLesson?.lesson_title || 'none'}`}
-            studentId={studentId}
-            date={date}
-            evaluation={foundEval}
-            assignedLesson={effectiveAssignedLesson}
-            defaultDepartmentId={selectedDepartmentId || ''}
-            defaultClassId={effectiveClassId || ''}
-            defaultSectionId={selectedSectionId || ''}
-            defaultPeriodId={activePeriodId || '1'}
-            onSaveSuccess={() => { loadData(); closeDrawer(); }}
-            onCancel={closeDrawer}
-          />
+          <Suspense fallback={<DrawerFallbackSkeleton />}>
+            <StudentAssessmentDrawer
+              key={`assessment-drawer-${studentId}-${date}-${effectiveAssignedLesson?.curriculum_book_name || 'none'}-${effectiveAssignedLesson?.lesson_title || 'none'}`}
+              studentId={studentId}
+              date={date}
+              evaluation={foundEval}
+              assignedLesson={effectiveAssignedLesson}
+              defaultDepartmentId={selectedDepartmentId || ''}
+              defaultClassId={effectiveClassId || ''}
+              defaultSectionId={selectedSectionId || ''}
+              defaultPeriodId={activePeriodId || '1'}
+              onSaveSuccess={() => { loadData(); closeDrawer(); }}
+              onCancel={closeDrawer}
+            />
+          </Suspense>
         ),
       };
     },
@@ -721,74 +780,106 @@ export default function DailyClassroomHubView({
         }
       />
 
-      {/* Lesson Management — Tab 1: Daily Lessons */}
-      {!isProgressHub && activeTab === 'LESSON' && (
-        <LessonDeliveryManagementView
-          filterProps={sharedFilterProps}
-          filteredLessons={filteredLessons}
-          lessonMetrics={lessonMetrics}
-          getSlotLessonsCount={getSlotLessonsCount}
-          getBookNamesForPeriod={getBookNamesForPeriod}
-          selectedClassObj={selectedClassObj}
-          classes={classes}
-          tenantId={tenantId}
-          loadData={loadData}
-          onOpenAddLesson={handleOpenAddLesson}
-          onEditLesson={handleEditLesson}
-          onDuplicateLesson={handleDuplicateLesson}
-        />
-      )}
-
-      {/* Lesson Management — Tab 2: Lesson Assessments */}
-      {!isProgressHub && (activeTab === 'LESSON_ASSESSMENT' || activeTab === 'ASSESSMENT') && (
-        <StudentAssessmentManagementView
-          filterProps={sharedFilterProps}
-          assessmentRows={assessmentRows}
-          assessmentMetrics={assessmentMetrics}
-          getSlotAssessmentCount={getSlotAssessmentCount}
-          onOpenAssessmentDrawer={handleOpenAssessmentDrawer}
-          tenantId={tenantId}
-          loadData={loadData}
-        />
-      )}
-
-      {/* Lesson Management — Tab 3: Analytics */}
-      {!isProgressHub && activeTab === 'LESSON_ANALYTICS' && (
-        <LessonAnalyticsView
-          filterProps={sharedFilterProps}
-          filteredLessons={filteredLessons}
-          baseFilteredLessons={baseFilteredLessons}
-          lessons={lessons}
-          evaluations={evaluations}
-          assessmentRows={assessmentRows}
-          assessmentMetrics={assessmentMetrics}
-          enrolledStudents={enrolledStudents}
-          periodSlots={periodSlots}
-          getSlotLessonsCount={getSlotLessonsCount}
-          classes={classes}
-          tenantId={tenantId}
-          loadData={loadData}
-        />
-      )}
-
-      {/* Progress Management — Tab 1: Daily Progress */}
-      {isProgressHub && activeTab === 'PROGRESS' && (
-        <div className="w-full pt-1">
-          <HifzReportBuilderModule filterProps={sharedFilterProps} isEmbedded={true} />
+      {/* ── Lesson Management Tabs (with Keep-Alive Memory Retention) ── */}
+      {!isProgressHub && visitedTabs.has('LESSON') && (
+        <div
+          className={activeTab === 'LESSON' ? 'w-full' : 'hidden'}
+          aria-hidden={activeTab !== 'LESSON'}
+        >
+          <Suspense fallback={<HubTabSkeletonLoader />}>
+            <LessonDeliveryManagementView
+              filterProps={sharedFilterProps}
+              filteredLessons={filteredLessons}
+              lessonMetrics={lessonMetrics}
+              getSlotLessonsCount={getSlotLessonsCount}
+              getBookNamesForPeriod={getBookNamesForPeriod}
+              selectedClassObj={selectedClassObj}
+              classes={classes}
+              tenantId={tenantId}
+              loadData={loadData}
+              onOpenAddLesson={handleOpenAddLesson}
+              onEditLesson={handleEditLesson}
+              onDuplicateLesson={handleDuplicateLesson}
+            />
+          </Suspense>
         </div>
       )}
 
-      {/* Progress Management — Tab 2: Progress Assessments (Student Reports) */}
-      {isProgressHub && (activeTab === 'PROGRESS_ASSESSMENT' || activeTab === 'PROGRESS_ASSESSMENTS') && (
-        <div className="w-full pt-1">
-          <StudentReportsView isEmbedded={true} />
+      {!isProgressHub && (visitedTabs.has('LESSON_ASSESSMENT') || visitedTabs.has('ASSESSMENT')) && (
+        <div
+          className={(activeTab === 'LESSON_ASSESSMENT' || activeTab === 'ASSESSMENT') ? 'w-full' : 'hidden'}
+          aria-hidden={activeTab !== 'LESSON_ASSESSMENT' && activeTab !== 'ASSESSMENT'}
+        >
+          <Suspense fallback={<HubTabSkeletonLoader />}>
+            <StudentAssessmentManagementView
+              filterProps={sharedFilterProps}
+              assessmentRows={assessmentRows}
+              assessmentMetrics={assessmentMetrics}
+              getSlotAssessmentCount={getSlotAssessmentCount}
+              onOpenAssessmentDrawer={handleOpenAssessmentDrawer}
+              tenantId={tenantId}
+              loadData={loadData}
+            />
+          </Suspense>
         </div>
       )}
 
-      {/* Progress Management — Tab 3: Analytics */}
-      {isProgressHub && activeTab === 'PROGRESS_ANALYTICS' && (
-        <div className="w-full pt-1">
-          <ProgressAnalyticsView filterProps={sharedFilterProps} isEmbedded={true} />
+      {!isProgressHub && visitedTabs.has('LESSON_ANALYTICS') && (
+        <div
+          className={activeTab === 'LESSON_ANALYTICS' ? 'w-full' : 'hidden'}
+          aria-hidden={activeTab !== 'LESSON_ANALYTICS'}
+        >
+          <Suspense fallback={<HubTabSkeletonLoader />}>
+            <LessonAnalyticsView
+              filterProps={sharedFilterProps}
+              filteredLessons={filteredLessons}
+              baseFilteredLessons={baseFilteredLessons}
+              lessons={lessons}
+              evaluations={evaluations}
+              assessmentRows={assessmentRows}
+              assessmentMetrics={assessmentMetrics}
+              enrolledStudents={enrolledStudents}
+              periodSlots={periodSlots}
+              getSlotLessonsCount={getSlotLessonsCount}
+              classes={classes}
+              tenantId={tenantId}
+              loadData={loadData}
+            />
+          </Suspense>
+        </div>
+      )}
+
+      {/* ── Progress Management Tabs (with Keep-Alive Memory Retention) ── */}
+      {isProgressHub && visitedTabs.has('PROGRESS') && (
+        <div
+          className={activeTab === 'PROGRESS' ? 'w-full pt-1' : 'hidden'}
+          aria-hidden={activeTab !== 'PROGRESS'}
+        >
+          <Suspense fallback={<HubTabSkeletonLoader />}>
+            <HifzReportBuilderModule filterProps={sharedFilterProps} isEmbedded={true} />
+          </Suspense>
+        </div>
+      )}
+
+      {isProgressHub && (visitedTabs.has('PROGRESS_ASSESSMENT') || visitedTabs.has('PROGRESS_ASSESSMENTS')) && (
+        <div
+          className={(activeTab === 'PROGRESS_ASSESSMENT' || activeTab === 'PROGRESS_ASSESSMENTS') ? 'w-full pt-1' : 'hidden'}
+          aria-hidden={activeTab !== 'PROGRESS_ASSESSMENT' && activeTab !== 'PROGRESS_ASSESSMENTS'}
+        >
+          <Suspense fallback={<HubTabSkeletonLoader />}>
+            <StudentReportsView isEmbedded={true} />
+          </Suspense>
+        </div>
+      )}
+
+      {isProgressHub && visitedTabs.has('PROGRESS_ANALYTICS') && (
+        <div
+          className={activeTab === 'PROGRESS_ANALYTICS' ? 'w-full pt-1' : 'hidden'}
+          aria-hidden={activeTab !== 'PROGRESS_ANALYTICS'}
+        >
+          <Suspense fallback={<HubTabSkeletonLoader />}>
+            <ProgressAnalyticsView filterProps={sharedFilterProps} isEmbedded={true} />
+          </Suspense>
         </div>
       )}
     </PageContainer>
