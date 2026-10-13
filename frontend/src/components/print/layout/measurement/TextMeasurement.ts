@@ -53,6 +53,35 @@ export class TextMeasurement {
       sandbox.style.pointerEvents = 'none';
       sandbox.style.zIndex = '-9999';
       sandbox.style.overflow = 'hidden';
+
+      const style = document.createElement('style');
+      style.textContent = `
+        #spr-doclab-measurement-sandbox .doclab-token,
+        #spr-doclab-measurement-sandbox .doclab-token-chip,
+        #spr-doclab-measurement-sandbox [data-token] {
+          display: inline !important;
+          width: auto !important;
+          min-width: 0 !important;
+          max-width: none !important;
+          height: auto !important;
+          font-size: inherit !important;
+          line-height: inherit !important;
+          color: inherit !important;
+          background: none !important;
+          border: none !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          vertical-align: baseline !important;
+          border-radius: 0 !important;
+        }
+        #spr-doclab-measurement-sandbox .doclab-token::after,
+        #spr-doclab-measurement-sandbox .doclab-token-chip::after,
+        #spr-doclab-measurement-sandbox [data-token]::after {
+          display: none !important;
+          content: none !important;
+        }
+      `;
+      sandbox.appendChild(style);
       document.body.appendChild(sandbox);
     }
 

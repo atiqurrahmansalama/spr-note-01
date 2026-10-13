@@ -230,6 +230,32 @@ function extractTextRuns(node: Node, parentFormatting: InlineFormatting = {}): T
   const el = node as HTMLElement;
   if (shouldSkipElement(el)) return runs;
 
+  const isDocLabToken = Boolean(
+    el.classList?.contains('doclab-token') ||
+    el.classList?.contains('doclab-token-chip') ||
+    el.hasAttribute?.('data-token') ||
+    el.hasAttribute?.('data-token-key')
+  );
+
+  if (isDocLabToken) {
+    const rawText = el.textContent || '';
+    if (rawText.length > 0) {
+      runs.push(
+        new TextRun({
+          text: rawText,
+          bold: parentFormatting.bold,
+          italics: parentFormatting.italics,
+          underline: parentFormatting.underline ? {} : undefined,
+          strike: parentFormatting.strike,
+          color: parentFormatting.color,
+          size: parentFormatting.size || 20,
+          font: parentFormatting.font || FONT_PRIMARY,
+        })
+      );
+    }
+    return runs;
+  }
+
   const tag = el.tagName.toLowerCase();
 
   // Explicit line break (distinguishes intermediate line breaks from phantom trailing br)

@@ -188,5 +188,22 @@ export async function runSmartTokenChipsPopoverUnitTests(): Promise<{
     );
   }
 
+  // 10. Selection Parity: Token spans preserve pure inner text and exclude contenteditable="false"
+  {
+    const rawTokenHtml = '<p>Student: <span class="doclab-token" data-token="student_name" data-token-key="student_name">{{student_name}}</span></p>';
+    const sanitized = EditorSerializer.sanitize(rawTokenHtml);
+    assert(!sanitized.includes('contenteditable="false"'), 'Sanitized token span excludes contenteditable="false" for natural text selection');
+    assert(sanitized.includes('{{student_name}}'), 'Sanitized token span retains canonical Mustache text');
+  }
+
+  // 11. Engine & Export Parity: Canonical export produces clean text representation
+  {
+    const rawTokenHtml = '<p>Name: <span class="doclab-token" data-token="student_name">{{student_name}}</span></p>';
+    const doc = HtmlImporter.importFromHtml(rawTokenHtml);
+    const exportedText = HtmlExporter.exportToHtml(doc, { tokenFormat: 'mustache' });
+    assert(exportedText.includes('{{student_name}}'), 'Engine exports canonical Mustache token text');
+    assert(!exportedText.includes('contenteditable="false"'), 'Engine export contains zero contenteditable locks');
+  }
+
   return { passed, failed, suiteName };
 }

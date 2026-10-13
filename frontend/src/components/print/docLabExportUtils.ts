@@ -230,6 +230,29 @@ export async function exportToPDF({
             if (clonedPortal) {
               const hideEls = clonedPortal.querySelectorAll('.print\\:hidden, .print-studio-no-print, .paper-sheet-header');
               hideEls.forEach((el) => ((el as HTMLElement).style.display = 'none'));
+
+              // Render tokens as clean, natural plain text in PDF export
+              const tokens = clonedPortal.querySelectorAll('.doclab-token, .doclab-token-chip, [data-token]');
+              tokens.forEach((tok) => {
+                const el = tok as HTMLElement;
+                el.style.display = 'inline';
+                el.style.width = 'auto';
+                el.style.minWidth = '0';
+                el.style.maxWidth = 'none';
+                el.style.height = 'auto';
+                el.style.fontSize = 'inherit';
+                el.style.lineHeight = 'inherit';
+                el.style.color = 'inherit';
+                el.style.overflow = 'visible';
+                el.style.background = 'none';
+                el.style.border = 'none';
+                el.style.boxShadow = 'none';
+                el.style.padding = '0';
+                el.style.margin = '0';
+                el.style.verticalAlign = 'baseline';
+                el.style.borderRadius = '0';
+                el.classList.remove('doclab-token', 'doclab-token-chip');
+              });
             }
           },
         });

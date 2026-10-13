@@ -1342,7 +1342,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         targetEl.setAttribute('data-token-key', summary.baseKey);
         targetEl.setAttribute('data-display', summary.baseKey);
         targetEl.setAttribute('data-label', summary.baseKey);
-        targetEl.setAttribute('contenteditable', 'false');
+        // Kept selectable as ordinary text
         if (!targetEl.classList.contains('doclab-token')) {
           targetEl.classList.add('doclab-token');
         }
@@ -1446,6 +1446,64 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
   const handlePopoverMouseLeave = useCallback(() => {
     scheduleInspectorDismissal(300);
   }, [scheduleInspectorDismissal]);
+
+  // Live selection tracking: whenever tokens are encompassed by a selection, seamlessly reveal plain text
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const handleSelectionChange = () => {
+      const host = editorHostRef.current;
+      if (!host) return;
+
+      const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+      const tokenEls = host.querySelectorAll<HTMLElement>(
+        '.doclab-token, .doclab-token-chip, [data-token]'
+      );
+
+      if (!tokenEls.length) return;
+
+      const hasValidSelection =
+        sel &&
+        sel.rangeCount > 0 &&
+        !sel.isCollapsed &&
+        host.contains(sel.anchorNode);
+
+      if (!hasValidSelection) {
+        tokenEls.forEach((el) => {
+          if (el.classList.contains('doclab-token-selected')) {
+            el.classList.remove('doclab-token-selected');
+          }
+        });
+        return;
+      }
+
+      const range = sel.getRangeAt(0);
+
+      tokenEls.forEach((tokenEl) => {
+        let isIntersecting = false;
+        try {
+          isIntersecting = range.intersectsNode(tokenEl);
+        } catch {
+          isIntersecting = false;
+        }
+
+        if (isIntersecting) {
+          if (!tokenEl.classList.contains('doclab-token-selected')) {
+            tokenEl.classList.add('doclab-token-selected');
+          }
+        } else {
+          if (tokenEl.classList.contains('doclab-token-selected')) {
+            tokenEl.classList.remove('doclab-token-selected');
+          }
+        }
+      });
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+    };
+  }, []);
 
   // Click on empty canvas margin to focus editor at end without collapsing selection
   const handleSheetClick = useCallback(
@@ -1786,8 +1844,8 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
               box-shadow: none !important;
               vertical-align: middle !important;
               cursor: pointer !important;
-              user-select: none !important;
-              -webkit-user-select: none !important;
+              user-select: text !important;
+              -webkit-user-select: text !important;
               transition: background-color 0.15s ease-in-out !important;
             }
             .doclab-token::after, .doclab-token-chip::after {
@@ -1807,6 +1865,39 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
             }
             .doclab-token:hover::after, .doclab-token-chip:hover::after {
               opacity: 1 !important;
+            }
+            .doclab-token.doclab-token-selected,
+            .doclab-token-chip.doclab-token-selected,
+            [data-token].doclab-token-selected {
+              display: inline !important;
+              width: auto !important;
+              min-width: 0 !important;
+              max-width: none !important;
+              height: auto !important;
+              font-size: inherit !important;
+              line-height: inherit !important;
+              color: inherit !important;
+              overflow: visible !important;
+              background: transparent !important;
+              border: none !important;
+              box-shadow: none !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              vertical-align: baseline !important;
+              border-radius: 0 !important;
+              cursor: text !important;
+            }
+            .doclab-token.doclab-token-selected::after,
+            .doclab-token-chip.doclab-token-selected::after,
+            [data-token].doclab-token-selected::after {
+              display: none !important;
+              content: none !important;
+            }
+            .doclab-token::selection,
+            .doclab-token-chip::selection,
+            [data-token]::selection {
+              background: var(--accent-main, #6366f1) !important;
+              color: #ffffff !important;
             }
             @media print {
               .spr-page-break {
@@ -1828,11 +1919,28 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
               .doclab-token,
               .doclab-token-chip,
               [data-token] {
+                display: inline !important;
+                width: auto !important;
+                min-width: 0 !important;
+                max-width: none !important;
+                height: auto !important;
+                font-size: inherit !important;
+                line-height: inherit !important;
+                color: inherit !important;
+                overflow: visible !important;
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
                 padding: 0 !important;
                 margin: 0 !important;
+                vertical-align: baseline !important;
+                border-radius: 0 !important;
+              }
+              .doclab-token::after,
+              .doclab-token-chip::after,
+              [data-token]::after {
+                display: none !important;
+                content: none !important;
               }
             }
           `,

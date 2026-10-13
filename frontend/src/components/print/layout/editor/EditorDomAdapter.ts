@@ -428,7 +428,7 @@ export class EditorDomAdapter {
         span.setAttribute('data-token-key', baseKey || cleanKey);
         span.setAttribute('data-display', baseKey || cleanKey);
         span.setAttribute('data-label', baseKey || cleanKey);
-        span.setAttribute('contenteditable', 'false');
+        // Kept editable/selectable so user can highlight and select as ordinary text
         span.textContent = `{{${cleanKey}}}`;
 
         frag.appendChild(span);
