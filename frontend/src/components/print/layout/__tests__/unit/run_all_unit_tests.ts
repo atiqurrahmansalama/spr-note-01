@@ -57,6 +57,7 @@ import { runDocLabP6DynamicBatchPaginationUnitTests } from './doclab_p6_dynamic_
 import { runDocLabP7PerformanceTortureUnitTests } from './doclab_p7_performance_torture.test';
 import { runDocLabP0PaginationParagraphStabilityUnitTests } from './doclab_p0_pagination_paragraph_stability.test';
 import { runSmartTokenChipsPopoverUnitTests } from './smart_token_chips_popover_phase19.test';
+import { runDocLabReportPipelineUnitTests } from './doclab_report_pipeline.test';
 
 async function main() {
   console.log('================================================================');
@@ -114,6 +115,7 @@ async function main() {
     ['45. Performance & Torture Testing (P7)', runDocLabP7PerformanceTortureUnitTests],
     ['46. Pagination & Paragraph Stability (P0)', runDocLabP0PaginationParagraphStabilityUnitTests],
     ['47. Smart Token Chips & Popover (Phase 19)', runSmartTokenChipsPopoverUnitTests],
+    ['48. DocLab Report Pipeline & PlainText Continuity (Phase 20)', runDocLabReportPipelineUnitTests],
   ];
 
   const originalLog = console.log;

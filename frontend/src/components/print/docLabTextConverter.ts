@@ -100,6 +100,14 @@ function convertViaDOMParser(html: string, opts: Required<DocTextConvertOptions>
   }
 
   const lines: string[] = [];
+  let inlineBuffer = '';
+
+  const flushInline = () => {
+    if (inlineBuffer.length > 0) {
+      lines.push(inlineBuffer);
+      inlineBuffer = '';
+    }
+  };
 
   // Helper to check if a block element is an intentional blank line (e.g. <p><br></p>, <p>&nbsp;</p>, <p></p>)
   const isIntentionalEmptyBlock = (el: HTMLElement): boolean => {
@@ -111,6 +119,13 @@ function convertViaDOMParser(html: string, opts: Required<DocTextConvertOptions>
     return !hasOtherElements;
   };
 
+  const isBlockTag = (tag: string): boolean => {
+    return [
+      'P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+      'BLOCKQUOTE', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER'
+    ].includes(tag);
+  };
+
   // Recursive AST walker
   const walkElement = (element: Node) => {
     const children = Array.from(element.childNodes);
@@ -119,11 +134,7 @@ function convertViaDOMParser(html: string, opts: Required<DocTextConvertOptions>
       const node = children[i];
 
       if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent || '';
-        // If outside any block, or inside inline element, accumulate
-        if (text.trim().length > 0) {
-          lines.push(text);
-        }
+        inlineBuffer += node.textContent || '';
         continue;
       }
 
@@ -139,20 +150,26 @@ function convertViaDOMParser(html: string, opts: Required<DocTextConvertOptions>
         continue;
       }
 
-      // 1. Line Break
+      // 1. Line Break (<BR>)
       if (tag === 'BR') {
-        lines.push('');
+        flushInline();
+        // Preserve blank line if buffer was empty
+        if (lines.length === 0 || lines[lines.length - 1] !== '') {
+          lines.push('');
+        }
         continue;
       }
 
-      // 2. Horizontal Rule
+      // 2. Horizontal Rule (<HR>)
       if (tag === 'HR') {
+        flushInline();
         lines.push('---');
         continue;
       }
 
       // 3. Unordered / Ordered Lists
       if (tag === 'UL' || tag === 'OL') {
+        flushInline();
         const isOrdered = tag === 'OL';
         const listItems = Array.from(el.children).filter((c) => c.tagName.toUpperCase() === 'LI');
         listItems.forEach((li, idx) => {
@@ -167,6 +184,7 @@ function convertViaDOMParser(html: string, opts: Required<DocTextConvertOptions>
 
       // 4. Tables
       if (tag === 'TABLE' && opts.formatTables) {
+        flushInline();
         const rows = Array.from(el.querySelectorAll('tr'));
         rows.forEach((tr) => {
           const cells = Array.from(tr.querySelectorAll('td, th')).map((td) => (td.textContent || '').trim());
@@ -177,41 +195,22 @@ function convertViaDOMParser(html: string, opts: Required<DocTextConvertOptions>
         continue;
       }
 
-      // 5. Paragraphs & Block Containers (P, DIV, H1-H6, BLOCKQUOTE, etc.)
-      const isBlock = [
-        'P',
-        'DIV',
-        'H1',
-        'H2',
-        'H3',
-        'H4',
-        'H5',
-        'H6',
-        'BLOCKQUOTE',
-        'SECTION',
-        'ARTICLE',
-        'HEADER',
-        'FOOTER',
-      ].includes(tag);
-
-      if (isBlock) {
+      // 5. Paragraphs & Block Containers (P, DIV, H1-H6, etc.)
+      if (isBlockTag(tag)) {
+        flushInline();
         if (isIntentionalEmptyBlock(el)) {
-          // Intentional blank line
           lines.push('');
         } else {
-          // Check if this block has child block elements
           const hasChildBlocks = Array.from(el.children).some((c) =>
-            ['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'TABLE', 'BLOCKQUOTE'].includes(
-              c.tagName.toUpperCase()
-            )
+            isBlockTag(c.tagName.toUpperCase()) || ['UL', 'OL', 'TABLE'].includes(c.tagName.toUpperCase())
           );
 
           if (hasChildBlocks) {
             walkElement(el);
+            flushInline();
           } else {
             // Leaf block: extract inner text preserving <br> line breaks
             const blockContent = extractLeafBlockText(el);
-            // blockContent may contain newlines (e.g. from <br> or multi-line placeholder like {{detail-mis}})
             const blockLines = blockContent.split('\n');
             blockLines.forEach((bl) => lines.push(bl));
           }
@@ -219,12 +218,14 @@ function convertViaDOMParser(html: string, opts: Required<DocTextConvertOptions>
         continue;
       }
 
-      // Fallback for inline elements
-      walkElement(el);
+      // 6. Inline elements (SPAN, STRONG, B, EM, I, U, FONT, A, etc.)
+      // Accumulate text of inline element directly into inlineBuffer
+      inlineBuffer += extractLeafBlockText(el);
     }
   };
 
   walkElement(body);
+  flushInline();
 
   return postProcessLines(lines, opts);
 }
@@ -326,9 +327,9 @@ function postProcessLines(rawLines: string[], opts: Required<DocTextConvertOptio
     // Trim trailing whitespace on all lines
     line = line.trimEnd();
 
-    // Eliminate single orphaned leading space caused by empty placeholders (e.g. " John")
-    // Strictly preserve multi-space intentional indentation (e.g. "     Page 14 Ayah 5" from indent filter)
-    if (line.startsWith(' ') && !line.startsWith('  ')) {
+    // Eliminate 1 or 2 orphaned leading spaces caused by empty placeholders at line start (e.g. " He's Student of...")
+    // Strictly preserve multi-space intentional indentation (e.g. "   Page 14 Ayah 5" from indent filter, which is >= 3 spaces)
+    if (line.startsWith(' ') && !line.startsWith('   ')) {
       line = line.trimStart();
     }
 

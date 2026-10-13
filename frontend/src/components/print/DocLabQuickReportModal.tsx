@@ -6,7 +6,7 @@ import {
   setDefaultTemplateForScope,
   type CustomDocxTemplate,
 } from './scopeTemplateStore';
-import { mergeTemplateWithData } from './docxTemplateEngine';
+import { mergeTemplateWithData, fetchCloudDocxTemplates } from './docxTemplateEngine';
 import { convertDocumentToPlainText } from './docLabTextConverter';
 import {
   CopyIcon,
@@ -107,6 +107,22 @@ export default function DocLabQuickReportModal({
     }
 
     setCopied(false);
+
+    // Asynchronously synchronize latest templates from cloud backend (for seamless multi-device / online sync)
+    fetchCloudDocxTemplates()
+      .then(() => {
+        const fresh = getSavedTemplatesForScope(scopeId);
+        if (fresh.length > 0) {
+          setSavedTemplates(fresh);
+          const defId = getDefaultTemplateIdForScope(scopeId);
+          if (defId && fresh.some((t) => t.id === defId)) {
+            setSelectedTemplateId(defId);
+          } else if (fresh.length > 0) {
+            setSelectedTemplateId((prev) => (prev && fresh.some((t) => t.id === prev) ? prev : fresh[0].id));
+          }
+        }
+      })
+      .catch(() => {});
   }, [isOpen, scopeId]);
 
   // 2. Active Template derivation

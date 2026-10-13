@@ -1447,12 +1447,6 @@ export function sanitizeDocxPlaceholders(html: string): string {
         if (dirMatch) {
           return `{{${cleanKey} | direction: ${dirMatch[1]}}}`;
         }
-        if (cleanKey === 'juz-page' || cleanKey === 'juz_page') {
-          return `{{${cleanKey} | indent: 11}}`;
-        }
-        if (cleanKey === 'detail-mis' || cleanKey === 'detail_mis' || cleanKey === 'detail-stuck' || cleanKey === 'detail_stuck') {
-          return `{{${cleanKey} | indent: 5}}`;
-        }
         return `{{${cleanKey}}}`;
       }
     }

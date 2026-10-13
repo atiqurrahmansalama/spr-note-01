@@ -1342,10 +1342,10 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         targetEl.setAttribute('data-token-key', summary.baseKey);
         targetEl.setAttribute('data-display', summary.baseKey);
         targetEl.setAttribute('data-label', summary.baseKey);
-        // Kept selectable as ordinary text
         if (!targetEl.classList.contains('doclab-token')) {
           targetEl.classList.add('doclab-token');
         }
+        targetEl.setAttribute('contenteditable', 'false');
         targetEl.textContent = `{{${cleanKey}}}`;
 
         const cleanBody = EditorSerializer.sanitize(editorHostRef.current.innerHTML);

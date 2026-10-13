@@ -295,6 +295,7 @@ export class EditorDomAdapter {
       span.setAttribute('data-format', tokenPayload.format);
     }
 
+    span.setAttribute('contenteditable', 'false');
     span.textContent = isDirective ? cleanKey : `{{${cleanKey}}}`;
 
     // Apply inline marks if present
@@ -428,7 +429,7 @@ export class EditorDomAdapter {
         span.setAttribute('data-token-key', baseKey || cleanKey);
         span.setAttribute('data-display', baseKey || cleanKey);
         span.setAttribute('data-label', baseKey || cleanKey);
-        // Kept editable/selectable so user can highlight and select as ordinary text
+        span.setAttribute('contenteditable', 'false');
         span.textContent = `{{${cleanKey}}}`;
 
         frag.appendChild(span);
