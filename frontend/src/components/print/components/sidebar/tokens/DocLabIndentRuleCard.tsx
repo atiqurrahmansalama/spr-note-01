@@ -50,8 +50,7 @@ export const DocLabIndentRuleCard: React.FC<DocLabIndentRuleCardProps> = ({ onIn
       titleClassName="text-xs font-bold theme-text-primary"
       description={descriptionText}
       collapsible={true}
-      defaultExpanded={true}
-      storageKey="spr_doclab_tokens_rule_indent"
+      defaultExpanded={false}
     >
       <div className="space-y-2.5 pt-1 text-left">
         {/* Responsive 3-Column Parameters Grid using project standard CustomInput */}

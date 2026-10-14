@@ -6,3 +6,7 @@ export * from './DocLabDirectionRuleCard';
 export { default as DocLabDirectionRuleCard } from './DocLabDirectionRuleCard';
 export * from './DocLabIndentRuleCard';
 export { default as DocLabIndentRuleCard } from './DocLabIndentRuleCard';
+export * from './DocLabSkipRuleCard';
+export { default as DocLabSkipRuleCard } from './DocLabSkipRuleCard';
+export * from './DocLabFallbackRuleCard';
+export { default as DocLabFallbackRuleCard } from './DocLabFallbackRuleCard';

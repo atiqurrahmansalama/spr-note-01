@@ -27,7 +27,7 @@ export interface TokenInspectorPopoverProps {
   /** Whether the popover was opened via click (pinned) or hover */
   isPinned?: boolean;
   /** Callback fired when the user applies updated token changes */
-  onApply?: (newRawToken: string) => void;
+  onApply?: (newRawToken: string, closeAfterApply?: boolean) => void;
   /** Callback fired when user deletes the token */
   onDelete?: () => void;
   /** Callback fired when popover is closed/dismissed */
@@ -44,7 +44,8 @@ export interface TokenInspectorPopoverProps {
 function formatMustacheDisplay(token: string): string {
   const clean = (token || '').trim();
   if (clean.startsWith('{{') && clean.endsWith('}}')) return clean;
-  return `{{${clean.replace(/^\{+/, '').replace(/\}+$/, '').trim()}}`;
+  const inner = clean.replace(/^\{+/, '').replace(/\}+$/, '').trim();
+  return `{{${inner}}}`;
 }
 
 /** Extracts the inner key / expression without surrounding double brackets */
@@ -65,14 +66,14 @@ export const TokenInspectorPopover: React.FC<TokenInspectorPopoverProps> = ({
   onPinChange,
 }) => {
   const popoverRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [isLocalPinned, setIsLocalPinned] = useState<boolean>(isPinned);
-  const [editValue, setEditValue] = useState<string>(() => formatMustacheDisplay(rawToken));
+  const [editValue, setEditValue] = useState<string>(() => stripMustacheBrackets(rawToken));
   const [copied, setCopied] = useState<boolean>(false);
 
   // Sync internal editValue whenever rawToken prop changes
   useEffect(() => {
-    setEditValue(formatMustacheDisplay(rawToken));
+    setEditValue(stripMustacheBrackets(rawToken));
   }, [rawToken]);
 
   // Sync pinned state when isPinned prop changes
@@ -91,8 +92,8 @@ export const TokenInspectorPopover: React.FC<TokenInspectorPopoverProps> = ({
 
     if (!rect) return;
 
-    const popoverWidth = Math.min(320, typeof window !== 'undefined' ? window.innerWidth - 16 : 300);
-    const popoverHeight = 36;
+    const popoverWidth = Math.min(340, typeof window !== 'undefined' ? window.innerWidth - 16 : 320);
+    const popoverHeight = popoverRef.current.offsetHeight || 36;
     const margin = 3;
 
     let top = rect.bottom + margin;
@@ -116,6 +117,20 @@ export const TokenInspectorPopover: React.FC<TokenInspectorPopoverProps> = ({
     popoverRef.current.style.left = `${Math.round(left)}px`;
     popoverRef.current.style.width = `${popoverWidth}px`;
   }, [targetElement, anchorRect]);
+
+  // Auto-resize textarea height dynamically based on scrollHeight
+  const adjustTextareaHeight = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const newHeight = Math.min(Math.max(el.scrollHeight, 22), 140);
+    el.style.height = `${newHeight}px`;
+    updatePosition();
+  }, [updatePosition]);
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [editValue, adjustTextareaHeight]);
 
   // Live dynamic positioning tracking on scroll, resize, and canvas pan/zoom
   useEffect(() => {
@@ -148,7 +163,7 @@ export const TokenInspectorPopover: React.FC<TokenInspectorPopoverProps> = ({
       };
     }
 
-    const popoverWidth = Math.min(320, typeof window !== 'undefined' ? window.innerWidth - 16 : 300);
+    const popoverWidth = Math.min(340, typeof window !== 'undefined' ? window.innerWidth - 16 : 320);
     const popoverHeight = 36;
     const margin = 3;
 
@@ -179,11 +194,41 @@ export const TokenInspectorPopover: React.FC<TokenInspectorPopoverProps> = ({
     };
   }, [targetElement, anchorRect]);
 
+  // Listen for native input events and injected directive updates from CaretInsertManager
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const handleValueInjected = (e: any) => {
+      const val = e.detail?.value ?? input.value;
+      setEditValue(val);
+      const cleanKey = stripMustacheBrackets(val);
+      if (cleanKey && onApply) {
+        onApply(cleanKey, false);
+      }
+    };
+
+    const handleNativeInput = () => {
+      setEditValue(input.value);
+    };
+
+    input.addEventListener('spr_popover_value_injected' as any, handleValueInjected);
+    input.addEventListener('input', handleNativeInput);
+    input.addEventListener('change', handleNativeInput);
+
+    return () => {
+      input.removeEventListener('spr_popover_value_injected' as any, handleValueInjected);
+      input.removeEventListener('input', handleNativeInput);
+      input.removeEventListener('change', handleNativeInput);
+    };
+  }, [onApply]);
+
   const handleSaveAndClose = useCallback(() => {
-    const cleanKey = stripMustacheBrackets(editValue);
+    const valueToSave = inputRef.current ? inputRef.current.value : editValue;
+    const cleanKey = stripMustacheBrackets(valueToSave);
     const originalKey = stripMustacheBrackets(rawToken);
     if (cleanKey && cleanKey !== originalKey && onApply) {
-      onApply(cleanKey);
+      onApply(cleanKey, true);
     }
     onClose();
   }, [editValue, rawToken, onApply, onClose]);
@@ -197,7 +242,19 @@ export const TokenInspectorPopover: React.FC<TokenInspectorPopoverProps> = ({
     };
 
     const handlePointerDownOutside = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      // Do NOT close or dismiss if clicking inside the sidebar, drawer, ribbon, or toolbars
+      if (
+        target.closest(
+          '.print-sidebar-control, .doclab-sidebar, .doclab-ribbon, [data-sidebar-panel="true"], .theme-drawer, [role="dialog"]'
+        )
+      ) {
+        return;
+      }
+
+      if (popoverRef.current && !popoverRef.current.contains(target)) {
         handleSaveAndClose();
       }
     };
@@ -212,8 +269,9 @@ export const TokenInspectorPopover: React.FC<TokenInspectorPopoverProps> = ({
 
   const handleCopy = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
+    const tokenToCopy = formatMustacheDisplay(editValue);
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(editValue);
+      navigator.clipboard.writeText(tokenToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     }
@@ -223,6 +281,28 @@ export const TokenInspectorPopover: React.FC<TokenInspectorPopoverProps> = ({
     setIsLocalPinned(true);
     onPinChange?.(true);
   }, [onPinChange]);
+
+  const handleAppendOrUpdateDirective = (directiveStr: string) => {
+    let current = editValue.trim();
+    if (directiveStr.startsWith('default:')) {
+      if (/\b(?:default|fallback)\s*:\s*["'][^"']*["']/i.test(current)) {
+        current = current.replace(/\b(?:default|fallback)\s*:\s*["'][^"']*["']/i, directiveStr);
+      } else if (/\b(?:default|fallback)\s*:\s*[^,|]+/i.test(current)) {
+        current = current.replace(/\b(?:default|fallback)\s*:\s*[^,|]+/i, directiveStr);
+      } else {
+        current = `${current} | ${directiveStr}`;
+      }
+    } else if (directiveStr.startsWith('removeLine:')) {
+      if (/\bremoveLine\s*:\s*[^,|]+/i.test(current)) {
+        current = current.replace(/\bremoveLine\s*:\s*[^,|]+/i, directiveStr);
+      } else {
+        current = `${current} | ${directiveStr}`;
+      }
+    } else {
+      current = `${current} | ${directiveStr}`;
+    }
+    setEditValue(current);
+  };
 
   const popoverContent = (
     <div
@@ -236,93 +316,167 @@ export const TokenInspectorPopover: React.FC<TokenInspectorPopoverProps> = ({
         handlePin();
       }}
       data-token-popover="true"
-      className="doclab-token-popover theme-bg-elevated/95 backdrop-blur-md border theme-border rounded-lg shadow-xl p-1 flex items-center gap-1 text-xs theme-text-primary animate-in fade-in-0 zoom-in-95 duration-100 text-left z-[99999]"
+      className="doclab-token-popover theme-bg-elevated/95 backdrop-blur-md border theme-border rounded-lg shadow-xl p-1.5 flex flex-col gap-1 text-xs theme-text-primary animate-in fade-in-0 zoom-in-95 duration-100 text-left z-[99999]"
     >
-      <input
-        ref={inputRef}
-        type="text"
-        value={editValue}
-        onChange={(e) => setEditValue(e.target.value)}
-        onFocus={handlePin}
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          handlePin();
-        }}
-        onKeyDown={(e) => {
-          e.stopPropagation();
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            handleSaveAndClose();
-          } else if (e.key === 'Escape') {
-            e.preventDefault();
-            onClose();
-          }
-        }}
-        onKeyUp={(e) => e.stopPropagation()}
-        onKeyPress={(e) => e.stopPropagation()}
-        placeholder="{{variable_name}}"
-        className="flex-1 px-2 py-1 rounded bg-transparent border-0 font-mono text-[11.5px] font-medium text-[var(--accent-main)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-main)]/40 min-w-0 select-text leading-tight cursor-text"
-      />
+      <div className="flex items-start gap-1.5 w-full">
+        {/* Decorative Token Indicator Badge */}
+        <span
+          className="shrink-0 mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--accent-main)]/15 text-[var(--accent-main)] select-none pointer-events-none"
+          title="Dynamic Template Token"
+        >
+          {'{ }'}
+        </span>
 
-      {/* Save / Apply Button */}
-      <button
-        type="button"
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          handleSaveAndClose();
-        }}
-        className="p-1 rounded hover:bg-[var(--accent-main)]/10 text-[var(--accent-main)] transition-colors cursor-pointer shrink-0 active:scale-95"
-        title="Save Key (Enter)"
-      >
-        <CheckIcon className="w-3.5 h-3.5" />
-      </button>
-
-      {/* Copy Button */}
-      <button
-        type="button"
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={handleCopy}
-        className="p-1 rounded hover:theme-bg-sub theme-text-secondary hover:theme-text-primary transition-colors cursor-pointer shrink-0 active:scale-95"
-        title={copied ? 'Copied' : 'Copy Key'}
-      >
-        {copied ? (
-          <CheckIcon className="w-3.5 h-3.5 text-emerald-500" />
-        ) : (
-          <CopyIcon className="w-3.5 h-3.5" />
-        )}
-      </button>
-
-      {/* Delete Button */}
-      {onDelete && (
-        <button
-          type="button"
+        <textarea
+          ref={inputRef}
+          rows={1}
+          value={editValue}
+          onChange={(e) => {
+            setEditValue(e.target.value);
+          }}
+          onInput={(e) => {
+            setEditValue((e.target as HTMLTextAreaElement).value);
+          }}
+          onFocus={handlePin}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
-            onDelete();
+            handlePin();
           }}
-          className="p-1 rounded hover:bg-red-500/10 text-red-500 hover:text-red-600 transition-colors cursor-pointer shrink-0 active:scale-95"
-          title="Delete Key"
-        >
-          <TrashIcon className="w-3.5 h-3.5" />
-        </button>
-      )}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleSaveAndClose();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              onClose();
+            }
+          }}
+          onKeyUp={(e) => e.stopPropagation()}
+          onKeyPress={(e) => e.stopPropagation()}
+          placeholder="variable_name | directives"
+          className="flex-1 px-1.5 py-0.5 rounded bg-transparent border-0 font-mono text-[11.5px] font-medium text-[var(--accent-main)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-main)]/40 min-w-0 select-text leading-snug cursor-text resize-none overflow-y-auto break-words whitespace-pre-wrap transition-[height] duration-75"
+          style={{ height: '22px', minHeight: '22px', maxHeight: '140px' }}
+        />
 
-      {/* Close Button */}
-      <button
-        type="button"
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
-        className="p-1 rounded hover:theme-bg-sub theme-text-secondary hover:theme-text-primary transition-colors cursor-pointer shrink-0 active:scale-95"
-        title="Close (Esc)"
-      >
-        <CloseIcon className="w-3.5 h-3.5" />
-      </button>
+        {/* Action Buttons Toolbar */}
+        <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
+          {/* Save / Apply Button */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSaveAndClose();
+            }}
+            className="p-1 rounded hover:bg-[var(--accent-main)]/10 text-[var(--accent-main)] transition-colors cursor-pointer shrink-0 active:scale-95"
+            title="Save Key (Enter)"
+          >
+            <CheckIcon className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Copy Button */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={handleCopy}
+            className="p-1 rounded hover:theme-bg-sub theme-text-secondary hover:theme-text-primary transition-colors cursor-pointer shrink-0 active:scale-95"
+            title={copied ? 'Copied' : 'Copy Key'}
+          >
+            {copied ? (
+              <CheckIcon className="w-3.5 h-3.5 text-emerald-500" />
+            ) : (
+              <CopyIcon className="w-3.5 h-3.5" />
+            )}
+          </button>
+
+          {/* Delete Button */}
+          {onDelete && (
+            <button
+              type="button"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="p-1 rounded hover:bg-red-500/10 text-red-500 hover:text-red-600 transition-colors cursor-pointer shrink-0 active:scale-95"
+              title="Delete Key"
+            >
+              <TrashIcon className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {/* Close Button */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="p-1 rounded hover:theme-bg-sub theme-text-secondary hover:theme-text-primary transition-colors cursor-pointer shrink-0 active:scale-95"
+            title="Close (Esc)"
+          >
+            <CloseIcon className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Fallback & Directive Modifiers Toolbar (when Pinned / Focused) */}
+      {isLocalPinned && (
+        <div className="w-full flex items-center gap-1 pt-1 mt-0.5 border-t theme-border-subtle flex-wrap select-none">
+          <span className="text-[9px] uppercase font-bold theme-text-muted mr-0.5">Quick:</span>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAppendOrUpdateDirective('default: "N/A"');
+            }}
+            className="px-1.5 py-0.5 rounded text-[10px] font-mono theme-bg-sub hover:theme-bg-accent-soft theme-text-secondary hover:theme-accent border theme-border-subtle transition-all cursor-pointer active:scale-95"
+            title="Insert fallback default: &quot;N/A&quot;"
+          >
+            + def: &quot;N/A&quot;
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAppendOrUpdateDirective('default: "---"');
+            }}
+            className="px-1.5 py-0.5 rounded text-[10px] font-mono theme-bg-sub hover:theme-bg-accent-soft theme-text-secondary hover:theme-accent border theme-border-subtle transition-all cursor-pointer active:scale-95"
+            title="Insert fallback default: &quot;---&quot;"
+          >
+            + def: &quot;---&quot;
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAppendOrUpdateDirective('default: ""');
+            }}
+            className="px-1.5 py-0.5 rounded text-[10px] font-mono theme-bg-sub hover:theme-bg-accent-soft theme-text-secondary hover:theme-accent border theme-border-subtle transition-all cursor-pointer active:scale-95"
+            title="Insert fallback default: &quot;&quot; (blank)"
+          >
+            + def: &quot;&quot;
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAppendOrUpdateDirective('removeLine: self');
+            }}
+            className="px-1.5 py-0.5 rounded text-[10px] font-mono theme-bg-sub hover:theme-bg-accent-soft theme-text-secondary hover:theme-accent border theme-border-subtle transition-all cursor-pointer active:scale-95"
+            title="Insert line removal: removeLine: self"
+          >
+            + removeLine: self
+          </button>
+        </div>
+      )}
     </div>
   );
 

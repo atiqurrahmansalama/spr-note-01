@@ -100,14 +100,14 @@ export const DAILY_PROGRESS_DOCLAB_KEYS: KeyTaxonomyItem[] = [
     label: 'Mistake Details',
     category: 'hifz',
     example: 'Page 13 Ayah 3',
-    description: 'Detailed list of mistakes (or "No Mistake" if none)',
+    description: 'Detailed list of mistakes (empty if none)',
   },
   {
     key: 'detail-stuck',
     label: 'Stuck Details',
     category: 'hifz',
     example: 'Page 13 Ayah 3',
-    description: 'Detailed list of stuck points (or "No Stuck" if none)',
+    description: 'Detailed list of stuck points (empty if none)',
   },
   {
     key: 'mention-teacher-name',
@@ -351,10 +351,10 @@ export function buildDailyProgressReportData(
   const totalStuckStr = String(totalStuckCount);
 
   const rawDetailMis = formatDetailLines(mistakeData, sessionJuzs, isMultiJuz);
-  const detailMisStr = rawDetailMis.trim() ? rawDetailMis : 'No Mistake';
+  const detailMisStr = rawDetailMis.trim() ? rawDetailMis : '';
 
   const rawDetailStuck = formatDetailLines(stuckData, sessionJuzs, isMultiJuz);
-  const detailStuckStr = rawDetailStuck.trim() ? rawDetailStuck : 'No Stuck';
+  const detailStuckStr = rawDetailStuck.trim() ? rawDetailStuck : '';
 
   let resolvedTeacher = (propTeacherName || academicContext.teacherName || '').trim();
   if (!resolvedTeacher && typeof window !== 'undefined') {

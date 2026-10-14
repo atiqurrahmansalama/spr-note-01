@@ -58,6 +58,7 @@ import { runDocLabP7PerformanceTortureUnitTests } from './doclab_p7_performance_
 import { runDocLabP0PaginationParagraphStabilityUnitTests } from './doclab_p0_pagination_paragraph_stability.test';
 import { runSmartTokenChipsPopoverUnitTests } from './smart_token_chips_popover_phase19.test';
 import { runDocLabReportPipelineUnitTests } from './doclab_report_pipeline.test';
+import { runSkipDataRemoveLineDirectivesUnitTests } from './doclab_skip_data_remove_line_directives.test';
 
 async function main() {
   console.log('================================================================');
@@ -116,6 +117,7 @@ async function main() {
     ['46. Pagination & Paragraph Stability (P0)', runDocLabP0PaginationParagraphStabilityUnitTests],
     ['47. Smart Token Chips & Popover (Phase 19)', runSmartTokenChipsPopoverUnitTests],
     ['48. DocLab Report Pipeline & PlainText Continuity (Phase 20)', runDocLabReportPipelineUnitTests],
+    ['49. Conditional Skip & Line Removal Directives (Phase 21)', runSkipDataRemoveLineDirectivesUnitTests],
   ];
 
   const originalLog = console.log;

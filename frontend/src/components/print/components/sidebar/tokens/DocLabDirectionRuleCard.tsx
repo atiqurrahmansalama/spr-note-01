@@ -156,8 +156,7 @@ export const DocLabDirectionRuleCard: React.FC<DocLabDirectionRuleCardProps> = (
       titleClassName="text-xs font-bold theme-text-primary"
       description={descriptionText}
       collapsible={true}
-      defaultExpanded={true}
-      storageKey="spr_doclab_tokens_rule_direction"
+      defaultExpanded={false}
     >
       <div className="space-y-2.5 pt-1 text-left">
         {/* Row 1: Direction & Flow Order */}

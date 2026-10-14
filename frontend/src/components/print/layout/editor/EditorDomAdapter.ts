@@ -20,6 +20,8 @@ import {
   sanitizeLogicalDocumentHtml,
 } from '../logicalDocument';
 import { ClipboardSanitizer } from './ClipboardSanitizer';
+import { parseTokenDirective, TokenDirectiveOptions } from '../../docLabDirectiveEngine';
+import { buildTokenString, extractTokenSummary } from '../../components/tokens/tokenChipRenderer';
 
 export class EditorDomAdapter {
   /**
@@ -184,27 +186,101 @@ export class EditorDomAdapter {
       this.setSelectionRange(range);
     }
 
-    // 1. Direct Directive Merging: If selection is inside or directly targeting an existing TokenNode
-    const existingTokenEl = (
+    // 1. Resolve target existingTokenEl robustly across all selection and tracking scenarios
+    let existingTokenEl = (
       range.startContainer.nodeType === (typeof Node !== 'undefined' ? Node.ELEMENT_NODE : 1)
         ? (range.startContainer as HTMLElement)
         : range.startContainer.parentElement
-    )?.closest('.doclab-token, [data-token-key], [data-token]') as HTMLElement | null;
+    )?.closest('.doclab-token, .doclab-token-chip, [data-token-key], [data-token]') as HTMLElement | null;
 
+    // Check adjacent siblings if caret is at a text node immediately next to a token (e.g. non-breaking space)
+    if (!existingTokenEl && range.startContainer.nodeType === (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3)) {
+      const prev = range.startContainer.previousSibling as HTMLElement | null;
+      if (
+        prev &&
+        prev.nodeType === (typeof Node !== 'undefined' ? Node.ELEMENT_NODE : 1) &&
+        prev.matches?.('.doclab-token, .doclab-token-chip, [data-token], [data-token-key]')
+      ) {
+        existingTokenEl = prev;
+      }
+    }
+
+    if (!existingTokenEl && range.startContainer.nodeType === (typeof Node !== 'undefined' ? Node.ELEMENT_NODE : 1)) {
+      const parent = range.startContainer as HTMLElement;
+      const childBefore = parent.childNodes[range.startOffset - 1] as HTMLElement | null;
+      if (
+        childBefore &&
+        childBefore.nodeType === (typeof Node !== 'undefined' ? Node.ELEMENT_NODE : 1) &&
+        childBefore.matches?.('.doclab-token, .doclab-token-chip, [data-token], [data-token-key]')
+      ) {
+        existingTokenEl = childBefore;
+      }
+    }
+
+    // Check global last active/hovered/inspected token
+    if (!existingTokenEl && typeof window !== 'undefined') {
+      const globalActive = (window as any).__spr_doclab_last_active_token as HTMLElement | null;
+      if (globalActive && host.contains(globalActive) && globalActive.isConnected) {
+        existingTokenEl = globalActive;
+      }
+    }
+
+    // Check explicitly selected token class
+    if (!existingTokenEl) {
+      existingTokenEl = host.querySelector('.doclab-token.doclab-token-selected, .doclab-token-chip.doclab-token-selected');
+    }
+
+    // 2. Direct Directive Merging: If selection targets an existing TokenNode
     if (isDirective && existingTokenEl && host.contains(existingTokenEl)) {
-      const currentKey =
-        existingTokenEl.getAttribute('data-token-key') ||
+      const currentRaw =
         existingTokenEl.getAttribute('data-token') ||
+        existingTokenEl.getAttribute('data-token-key') ||
         existingTokenEl.textContent?.replace(/[{}]/g, '').trim() ||
         '';
-      const baseKey = currentKey.replace(/\s*(?:\||<\|)[^}>]+>?\s*$/, '').trim();
-      const newKey = `${baseKey} ${cleanKey}`.trim();
 
-      existingTokenEl.setAttribute('data-token', newKey);
-      existingTokenEl.setAttribute('data-token-key', newKey);
-      existingTokenEl.setAttribute('data-display', newKey);
-      existingTokenEl.setAttribute('data-label', newKey);
-      existingTokenEl.textContent = `{{${newKey}}}`;
+      const currentClean = currentRaw.replace(/^\{+/, '').replace(/\}+$/, '').trim();
+      const currentParsed = parseTokenDirective(currentClean);
+      const incomingParsed = parseTokenDirective(cleanKey.replace(/^[|<]+/, '').replace(/[>]+$/, '').trim());
+
+      const baseKey = currentParsed.baseKey || 'variable';
+
+      // Merge options cleanly (incoming overrides matching keys, preserves others)
+      const mergedOptions: TokenDirectiveOptions = {
+        ...(currentParsed.options || {}),
+        ...(incomingParsed.options || {}),
+      };
+
+      // Merge legacy filter specs if any
+      const existingFilters = currentParsed.legacyFilterSpecs || [];
+      const incomingFilters = incomingParsed.legacyFilterSpecs || [];
+      const mergedFilters = Array.from(new Set([...existingFilters, ...incomingFilters]));
+
+      // Build canonical token string: e.g. {{student_name | indent: 5, skipData: "MI Tawfiq", removeLine: b}}
+      const fullTokenStr = buildTokenString(baseKey, {
+        ...mergedOptions,
+        filters: mergedFilters,
+      });
+
+      const updatedRawToken = fullTokenStr.replace(/^\{+/, '').replace(/\}+$/, '').trim();
+
+      existingTokenEl.setAttribute('data-token', updatedRawToken);
+      existingTokenEl.setAttribute('data-token-key', baseKey);
+      existingTokenEl.setAttribute('data-display', baseKey);
+      existingTokenEl.setAttribute('data-label', baseKey);
+      existingTokenEl.textContent = `{{${updatedRawToken}}}`;
+
+      if (typeof window !== 'undefined') {
+        (window as any).__spr_doclab_last_active_token = existingTokenEl;
+        window.dispatchEvent(
+          new CustomEvent('spr_doclab_token_updated', {
+            detail: {
+              element: existingTokenEl,
+              rawToken: updatedRawToken,
+              baseKey,
+            },
+          })
+        );
+      }
 
       let nextNode = existingTokenEl.nextSibling;
       if (!nextNode || nextNode.nodeType !== (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3)) {
@@ -217,13 +293,59 @@ export class EditorDomAdapter {
         nextNode = space;
       }
       const newRange = document.createRange();
-      newRange.setStart(nextNode, 1);
+      newRange.setStart(nextNode, 0);
       newRange.collapse(true);
       this.setSelectionRange(newRange);
       return true;
     }
 
-    // 2. Direct Directive Merging: If cursor is inside Mustache text brackets {{ ... }}
+    // 3. Existing Token In-Place Key/Expression Update: If a token is targeted and user inserts a new key
+    if (!isDirective && existingTokenEl && host.contains(existingTokenEl)) {
+      const incomingParsed = parseTokenDirective(cleanKey);
+      const currentRaw =
+        existingTokenEl.getAttribute('data-token') ||
+        existingTokenEl.getAttribute('data-token-key') ||
+        existingTokenEl.textContent?.replace(/[{}]/g, '').trim() ||
+        '';
+      const currentParsed = parseTokenDirective(currentRaw.replace(/^\{+/, '').replace(/\}+$/, '').trim());
+
+      const targetBaseKey = incomingParsed.baseKey || cleanKey;
+      const mergedOptions: TokenDirectiveOptions = {
+        ...(currentParsed.options || {}),
+        ...(incomingParsed.options || {}),
+      };
+      const mergedFilters = Array.from(
+        new Set([...(currentParsed.legacyFilterSpecs || []), ...(incomingParsed.legacyFilterSpecs || [])])
+      );
+
+      const fullTokenStr = buildTokenString(targetBaseKey, {
+        ...mergedOptions,
+        filters: mergedFilters,
+      });
+      const updatedRawToken = fullTokenStr.replace(/^\{+/, '').replace(/\}+$/, '').trim();
+
+      existingTokenEl.setAttribute('data-token', updatedRawToken);
+      existingTokenEl.setAttribute('data-token-key', targetBaseKey);
+      existingTokenEl.setAttribute('data-display', targetBaseKey);
+      existingTokenEl.setAttribute('data-label', targetBaseKey);
+      existingTokenEl.textContent = `{{${updatedRawToken}}}`;
+
+      if (typeof window !== 'undefined') {
+        (window as any).__spr_doclab_last_active_token = existingTokenEl;
+        window.dispatchEvent(
+          new CustomEvent('spr_doclab_token_updated', {
+            detail: {
+              element: existingTokenEl,
+              rawToken: updatedRawToken,
+              baseKey: targetBaseKey,
+            },
+          })
+        );
+      }
+      return true;
+    }
+
+    // 4. Direct Directive Merging: If cursor is inside Mustache text brackets {{ ... }}
     if (isDirective && range.startContainer.nodeType === (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3)) {
       const text = range.startContainer.textContent || '';
       const startOffset = range.startOffset;
@@ -273,12 +395,19 @@ export class EditorDomAdapter {
 
     const span = document.createElement('span');
     span.className = 'doclab-token';
-    const tokenId = tokenPayload.id || `tok_${cleanKey}`;
-    span.setAttribute('data-token-id', tokenId);
-    span.setAttribute('data-token', cleanKey);
-    span.setAttribute('data-token-key', cleanKey);
 
-    const display = tokenPayload.display || tokenPayload.label || cleanKey;
+    // If an orphan directive is being inserted standalone, ensure it forms a valid token expression
+    const effectiveTokenStr = isDirective
+      ? (cleanKey.startsWith('{{') ? cleanKey.replace(/^\{+/, '').replace(/\}+$/, '') : `variable ${cleanKey}`)
+      : cleanKey;
+
+    const summary = extractTokenSummary(effectiveTokenStr);
+    const tokenId = tokenPayload.id || `tok_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    span.setAttribute('data-token-id', tokenId);
+    span.setAttribute('data-token', effectiveTokenStr);
+    span.setAttribute('data-token-key', summary.baseKey);
+
+    const display = tokenPayload.display || tokenPayload.label || summary.baseKey;
     span.setAttribute('data-display', display);
     span.setAttribute('data-label', display);
 
@@ -296,7 +425,7 @@ export class EditorDomAdapter {
     }
 
     span.setAttribute('contenteditable', 'false');
-    span.textContent = isDirective ? cleanKey : `{{${cleanKey}}}`;
+    span.textContent = `{{${effectiveTokenStr}}}`;
 
     // Apply inline marks if present
     const marks = tokenPayload.formatting || tokenPayload.marks;
@@ -312,6 +441,10 @@ export class EditorDomAdapter {
     }
 
     range.insertNode(span);
+
+    if (typeof window !== 'undefined') {
+      (window as any).__spr_doclab_last_active_token = span;
+    }
 
     // Trailing non-breaking space for smooth ongoing typing
     const trailingSpace = document.createTextNode('\u00A0');

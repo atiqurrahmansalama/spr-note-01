@@ -7,6 +7,7 @@ import {
 import SkeletonLoader from "@/components/common/SkeletonLoader";
 
 // Lazy load DocLab Quick Report Modal to eliminate heavy print/editor bundle on initial mount
+// Refreshed dailyProgressReportData pipeline with clean empty detail-mis & detail-stuck support
 const DocLabQuickReportModal = lazy(
   () => import("@/components/print/DocLabQuickReportModal")
 );

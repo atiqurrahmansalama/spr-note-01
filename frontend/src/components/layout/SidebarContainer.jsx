@@ -8,20 +8,15 @@ import {
   AppearanceIcon, 
   SettingsIcon, 
   GroupsIcon, 
-  SessionsIcon, 
   ShortcutsIcon, 
   AppGuideIcon, 
   AboutIcon,
   ChevronIcon,
   CalendarIcon,
-  CopyIcon,
   CloudIcon,
   GlobeIcon,
-  SavedMessagesIcon,
   SectionControlIcon,
-  DepartmentIcon,
   ClassIcon,
-  GroupIcon,
   StudentIcon,
   AdmissionIcon,
   SparklesIcon,
@@ -29,22 +24,14 @@ import {
   TeacherIcon,
   AttendanceIcon,
   DutyIcon,
-  LeaveIcon,
-  GateIcon,
-  FingerprintIcon,
   MatrixIcon,
-  ChecklistIcon,
   TimerIcon,
   BellIcon,
   HomeIcon,
   BookOpenIcon,
   TrendingUpIcon,
-  TargetIcon,
-  ClipboardDocumentCheckIcon,
   AcademicCapIcon,
   ChartBarIcon,
-  DocumentIcon,
-  EditIcon,
   IdentificationIcon,
   PrinterIcon,
   BanknotesIcon,
@@ -69,26 +56,19 @@ export default function SidebarContainer({
   const { t } = useTranslation('navigation');
 
   const { isMultiTenantAdmin } = useTenant();
-  const [openSubMenus, setOpenSubMenus] = useState({
-    "Academy": true,
-    "Academic Institution": true,
-    "Daily Classroom": true,
-    "Academic Activities": true,
-    "Academic Studies": true,
-    "Examination & Results": true,
-    "Student": true,
-    "Staff Management": false,
-    "Finance & Accounts": true,
-    "Settings & Devices": false,
-    "App Management": false,
-    Settings: false,
-  });
+  // Parent options are collapsed by default
+  const [openSubMenus, setOpenSubMenus] = useState({});
 
-  const toggleSubMenu = (menuName) => {
-    setOpenSubMenus((prev) => ({
-      ...prev,
-      [menuName]: !prev[menuName],
-    }));
+  const toggleSubMenu = (menuName, currentEffectiveOpen) => {
+    setOpenSubMenus((prev) => {
+      const isCurrentlyOpen = currentEffectiveOpen !== undefined 
+        ? currentEffectiveOpen 
+        : Boolean(prev[menuName]);
+      return {
+        ...prev,
+        [menuName]: !isCurrentlyOpen,
+      };
+    });
   };
 
   const { isSectionEnabled } = useFeatureControl();
@@ -423,14 +403,16 @@ export default function SidebarContainer({
             const isParentActive = checkIsActive(item.path, item);
             const ItemIcon = item.Icon;
             const isAnySubActive = item.hasSub ? item.subItems.some((sub) => checkIsActive(sub.path, sub)) : false;
-            const isSubOpen = openSubMenus[item.id] || isAnySubActive || false;
+            const isSubOpen = openSubMenus[item.id] !== undefined
+              ? openSubMenus[item.id]
+              : isAnySubActive;
 
             if (item.hasSub) {
               return (
                 <div key={item.id} className="space-y-1">
                   <button
                     type="button"
-                    onClick={() => toggleSubMenu(item.id)}
+                    onClick={() => toggleSubMenu(item.id, isSubOpen)}
                     title={t(item.i18nKey, item.name)}
                     className={`w-full flex items-center ${isCollapsed ? "justify-center p-2.5" : "justify-between px-3 sm:px-3.5 py-2.5 sm:py-2.5"} rounded-xl transition-all cursor-pointer select-none ${
                       isParentActive || isAnySubActive
@@ -521,9 +503,7 @@ export default function SidebarContainer({
             } rounded-xl theme-bg-sub/60 hover:theme-bg-elevated border theme-border theme-text-primary transition-all cursor-pointer shadow-xs group`}
           >
             <div className="w-7 h-7 rounded-lg theme-bg-accent-soft text-[var(--accent-main)] flex items-center justify-center shrink-0">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-              </svg>
+              <GlobeIcon className="w-4 h-4" />
             </div>
             {!isCollapsed && (
               <div className="flex flex-col text-left rtl:text-right min-w-0">

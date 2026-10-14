@@ -9,6 +9,7 @@
  */
 
 import { extractTokenSummary, buildTokenString } from '../../../components/tokens/tokenChipRenderer';
+import { parseTokenDirective } from '../../../docLabDirectiveEngine';
 import { EditorSerializer } from '../../editor/EditorSerializer';
 import { DocumentFactory } from '../../../model/documentFactory';
 import { HtmlExporter } from '../../../model/serialization/htmlExporter';
@@ -203,6 +204,98 @@ export async function runSmartTokenChipsPopoverUnitTests(): Promise<{
     const exportedText = HtmlExporter.exportToHtml(doc, { tokenFormat: 'mustache' });
     assert(exportedText.includes('{{student_name}}'), 'Engine exports canonical Mustache token text');
     assert(!exportedText.includes('contenteditable="false"'), 'Engine export contains zero contenteditable locks');
+  }
+
+  // 12. Sequential Directive Composition & Merging (Zero Loss & Clean Options Overwrite)
+  {
+    // Step 1: Base token
+    const initialToken = 'student_name';
+
+    // Step 2: Apply Indent directive
+    const indentDirective = 'indent: 5';
+    const parsedIndent = parseTokenDirective(indentDirective);
+    const tokenStep1 = buildTokenString(initialToken, parsedIndent.options);
+    assert(tokenStep1 === '{{student_name | indent: 5}}', 'Step 1: Composes indent: 5 correctly');
+
+    // Step 3: Sequentially apply SkipData & RemoveLine directive without losing indent
+    const parsedStep1 = parseTokenDirective(tokenStep1.replace(/^\{+/, '').replace(/\}+$/, ''));
+    const skipDirective = 'skipData: "MI Tawfiq", removeLine: b';
+    const parsedSkip = parseTokenDirective(skipDirective);
+
+    const mergedOptionsStep2 = {
+      ...parsedStep1.options,
+      ...parsedSkip.options,
+    };
+    const tokenStep2 = buildTokenString(parsedStep1.baseKey, mergedOptionsStep2);
+    assert(
+      tokenStep2 === '{{student_name | indent: 5, skipData: "MI Tawfiq", removeLine: b}}',
+      'Step 2: Merges skipData and removeLine while strictly preserving indent: 5'
+    );
+
+    // Step 4: Update indent to 8 spaces (preserves skipData and removeLine)
+    const parsedStep2 = parseTokenDirective(tokenStep2.replace(/^\{+/, '').replace(/\}+$/, ''));
+    const updateIndentDirective = 'indent: 8';
+    const parsedUpdateIndent = parseTokenDirective(updateIndentDirective);
+
+    const mergedOptionsStep3 = {
+      ...parsedStep2.options,
+      ...parsedUpdateIndent.options,
+    };
+    const tokenStep3 = buildTokenString(parsedStep2.baseKey, mergedOptionsStep3);
+    assert(
+      tokenStep3 === '{{student_name | indent: 8, skipData: "MI Tawfiq", removeLine: b}}',
+      'Step 3: Updates indent to 8 without stripping skipData or removeLine'
+    );
+
+    // Step 5: Duplicate click does not corrupt or duplicate options
+    const parsedStep3 = parseTokenDirective(tokenStep3.replace(/^\{+/, '').replace(/\}+$/, ''));
+    const mergedOptionsStep4 = {
+      ...parsedStep3.options,
+      ...parsedUpdateIndent.options,
+    };
+    const tokenStep4 = buildTokenString(parsedStep3.baseKey, mergedOptionsStep4);
+    assert(
+      tokenStep4 === '{{student_name | indent: 8, skipData: "MI Tawfiq", removeLine: b}}',
+      'Step 4: Repeated click produces identical, pristine output without duplication'
+    );
+  }
+
+  // 13. Popover Input Mustache Bracket Handling
+  {
+    function stripMustache(token: string): string {
+      return (token || '').replace(/^\{+/, '').replace(/\}+$/, '').trim();
+    }
+    function formatMustache(token: string): string {
+      const clean = (token || '').trim();
+      if (clean.startsWith('{{') && clean.endsWith('}}')) return clean;
+      const inner = clean.replace(/^\{+/, '').replace(/\}+$/, '').trim();
+      return `{{${inner}}}`;
+    }
+
+    const raw = '{{student_name | indent: 5, skipData: "MI Tawfiq"}}';
+    const insideCapsuleDisplay = stripMustache(raw);
+    assert(
+      insideCapsuleDisplay === 'student_name | indent: 5, skipData: "MI Tawfiq"',
+      'Inside capsule displays clean key and directives without double brackets'
+    );
+
+    const onClipboardCopy = formatMustache(insideCapsuleDisplay);
+    assert(
+      onClipboardCopy === '{{student_name | indent: 5, skipData: "MI Tawfiq"}}',
+      'Clipboard copy restores canonical {{...}} wrapper'
+    );
+  }
+
+  // 14. Long Directive Auto-Wrapping & Multiline Normalization
+  {
+    const longDirectiveExpr = '{{hifz_daily_progress | direction: horizontal, separator: cell, indent: 5, skipData: "MI Tawfiq", removeLine: b1-5}}';
+    const summary = extractTokenSummary(longDirectiveExpr);
+    assert(summary.baseKey === 'hifz_daily_progress', 'Extracts base key for long expression');
+    assert(summary.direction === 'horizontal', 'Extracts horizontal direction');
+    assert(summary.indent === 5, 'Extracts indent 5');
+    assert(summary.skipData === 'MI Tawfiq', 'Extracts skipData');
+    assert(summary.removeLine === 'b1-5', 'Extracts removeLine rule');
+    assert(summary.directiveBadges.length >= 3, 'Generates multiple directive badges for wrapped display');
   }
 
   return { passed, failed, suiteName };

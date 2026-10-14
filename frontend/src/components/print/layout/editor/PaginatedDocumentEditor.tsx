@@ -35,6 +35,7 @@ import {
 } from '../chrome';
 import { TokenInspectorPopover } from '../../components/tokens/TokenInspectorPopover';
 import { extractTokenSummary } from '../../components/tokens/tokenChipRenderer';
+import { captureActiveCaret } from '../../caretInsertManager';
 
 export interface PaginatedDocumentEditorProps {
   /** Initial canonical HTML content or template body */
@@ -1330,7 +1331,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
 
   // Apply token updates from TokenInspectorPopover
   const handleApplyTokenUpdate = useCallback(
-    (newRawToken: string) => {
+    (newRawToken: string, closeAfterApply = true) => {
       if (!activeInspectorToken || !editorHostRef.current) return;
       const targetEl = activeInspectorToken.element;
       if (targetEl && editorHostRef.current.contains(targetEl)) {
@@ -1358,9 +1359,19 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
           selection: buildTransactionSelection(editorHostRef.current, savedSelectionBookmarkRef.current),
           timestamp: Date.now(),
         });
+
+        if (closeAfterApply) {
+          clearTokenHoverTimer();
+          setActiveInspectorToken(null);
+        } else {
+          setActiveInspectorToken((prev) => (prev ? { ...prev, rawToken: cleanKey } : null));
+        }
+      } else {
+        if (closeAfterApply) {
+          clearTokenHoverTimer();
+          setActiveInspectorToken(null);
+        }
       }
-      clearTokenHoverTimer();
-      setActiveInspectorToken(null);
     },
     [activeInspectorToken, dispatchTransaction, clearTokenHoverTimer]
   );
@@ -1409,13 +1420,18 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
 
       if (tokenEl && editorHostRef.current.contains(tokenEl)) {
         clearTokenHoverTimer();
-        if (activeInspectorToken?.element === tokenEl) return;
-
         const raw =
           tokenEl.getAttribute('data-token') ||
           tokenEl.getAttribute('data-token-key') ||
           tokenEl.textContent?.replace(/[{}]/g, '').trim() ||
           '';
+
+        if (activeInspectorToken?.element === tokenEl && activeInspectorToken?.rawToken === raw) return;
+
+        if (typeof window !== 'undefined') {
+          (window as any).__spr_doclab_last_active_token = tokenEl;
+        }
+
         const rect = tokenEl.getBoundingClientRect();
         const label = tokenEl.getAttribute('data-label') || tokenEl.getAttribute('data-display') || undefined;
         const cat = tokenEl.getAttribute('data-category') || undefined;
@@ -1536,6 +1552,30 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         const rect = tokenEl.getBoundingClientRect();
         const label = tokenEl.getAttribute('data-label') || tokenEl.getAttribute('data-display') || undefined;
         const cat = tokenEl.getAttribute('data-category') || undefined;
+
+        if (typeof window !== 'undefined') {
+          (window as any).__spr_doclab_last_active_token = tokenEl;
+        }
+
+        // Visual selection indicator
+        editorHostRef.current.querySelectorAll('.doclab-token-selected').forEach((el) => {
+          if (el !== tokenEl) el.classList.remove('doclab-token-selected');
+        });
+        tokenEl.classList.add('doclab-token-selected');
+
+        // Capture active caret pointing to tokenEl
+        try {
+          const selRange = document.createRange();
+          selRange.selectNode(tokenEl);
+          const currentSel = window.getSelection();
+          if (currentSel) {
+            currentSel.removeAllRanges();
+            currentSel.addRange(selRange);
+          }
+          captureActiveCaret();
+        } catch {
+          // ignore selection errors
+        }
 
         setActiveInspectorToken({
           element: tokenEl,
@@ -1747,10 +1787,27 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
       }
     };
 
+    const handleTokenUpdatedEvent = (e: CustomEvent) => {
+      const updatedEl = e.detail?.element;
+      const updatedRaw = e.detail?.rawToken;
+      if (updatedEl && updatedRaw) {
+        setActiveInspectorToken((prev) => {
+          if (prev && (prev.element === updatedEl || prev.element?.isEqualNode?.(updatedEl))) {
+            return {
+              ...prev,
+              rawToken: updatedRaw,
+            };
+          }
+          return prev;
+        });
+      }
+    };
+
     if (typeof window !== 'undefined') {
       window.addEventListener('spr_doclab_editor_command' as any, handleCommandEvent);
       window.addEventListener('spr_doclab_insert_page_break' as any, handlePageBreakEvent);
       window.addEventListener('spr_doclab_insert_token' as any, handleTokenInsertEvent);
+      window.addEventListener('spr_doclab_token_updated' as any, handleTokenUpdatedEvent);
     }
 
     return () => {
@@ -1758,6 +1815,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
         window.removeEventListener('spr_doclab_editor_command' as any, handleCommandEvent);
         window.removeEventListener('spr_doclab_insert_page_break' as any, handlePageBreakEvent);
         window.removeEventListener('spr_doclab_insert_token' as any, handleTokenInsertEvent);
+        window.removeEventListener('spr_doclab_token_updated' as any, handleTokenUpdatedEvent);
       }
     };
   }, [isEditable, dispatchTransaction]);
@@ -2143,9 +2201,9 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
             key={
               activeInspectorToken.element
                 ? (activeInspectorToken.element.getAttribute('data-token-id') ||
-                   activeInspectorToken.element.getAttribute('data-token') ||
-                   activeInspectorToken.rawToken)
-                : activeInspectorToken.rawToken
+                   (activeInspectorToken.element as any).__spr_stable_popover_id ||
+                   ((activeInspectorToken.element as any).__spr_stable_popover_id = `pop_${Date.now()}_${Math.random()}`))
+                : 'active_token_inspector'
             }
             rawToken={activeInspectorToken.rawToken}
             anchorRect={activeInspectorToken.rect}

@@ -16,6 +16,9 @@ export interface TokenSummaryInfo {
   fromLine?: number;
   toLine?: number;
   filters: string[];
+  skipData?: string;
+  removeLine?: string;
+  fallback?: string;
   displayBadgeText: string;
   directiveBadges: Array<{ icon: string; text: string; title: string }>;
 }
@@ -80,11 +83,49 @@ export function extractTokenSummary(rawTokenStr: string): TokenSummaryInfo {
     });
   }
 
+  // 3.5. Skip Data & Line Removal
+  if (options.skipData) {
+    const isSpecialEmpty = ['empty', 'blank', 'null'].includes(options.skipData.toLowerCase());
+    const displayTarget = isSpecialEmpty ? 'Empty' : `"${options.skipData}"`;
+    const removeLineSuffix = options.removeLine ? ` (${options.removeLine})` : '';
+    directiveBadges.push({
+      icon: 'Skip',
+      text: isSpecialEmpty ? `If Empty${removeLineSuffix}` : `Skip ${displayTarget}${removeLineSuffix}`,
+      title: isSpecialEmpty
+        ? `Remove line when data is empty${options.removeLine ? ` (Rule: ${options.removeLine})` : ''}`
+        : `Skip Data: "${options.skipData}"${options.removeLine ? ` (Remove lines: ${options.removeLine})` : ''}`,
+    });
+  } else if (options.removeLine) {
+    directiveBadges.push({
+      icon: 'Cut',
+      text: `Line: ${options.removeLine}`,
+      title: `Remove line rule: ${options.removeLine}`,
+    });
+  }
+
+  // 3.6. Default / Fallback when data missing
+  if (options.fallback !== undefined) {
+    const cleanDef = String(options.fallback).replace(/^['"]|['"]$/g, '');
+    directiveBadges.push({
+      icon: 'Def',
+      text: cleanDef === '' ? 'Empty Def' : `Def: "${cleanDef}"`,
+      title: `Fallback value when data is missing: "${cleanDef}"`,
+    });
+  }
+
   // 4. Formatting Filters (Upper, Lower, Cap, Date, Currency, Bengali)
   const allFilters: string[] = [];
   filterSpecs.forEach((f) => {
     const low = f.toLowerCase().trim();
-    if (low.startsWith('indent')) return;
+    if (
+      low.startsWith('indent') ||
+      low.startsWith('skip') ||
+      low.startsWith('removeline') ||
+      low.startsWith('default') ||
+      low.startsWith('fallback')
+    ) {
+      return;
+    }
 
     allFilters.push(f.trim());
 
@@ -114,6 +155,9 @@ export function extractTokenSummary(rawTokenStr: string): TokenSummaryInfo {
     fromLine,
     toLine,
     filters: allFilters,
+    skipData: options.skipData,
+    removeLine: options.removeLine,
+    fallback: options.fallback,
     displayBadgeText: directiveBadges.map((b) => b.text).join(' | '),
     directiveBadges,
   };
@@ -131,6 +175,8 @@ export function buildTokenString(
     fromLine?: number;
     toLine?: number;
     filters?: string[];
+    skipData?: string;
+    removeLine?: string;
   } = {}
 ): string {
   const cleanKey = (baseKey || '').trim().replace(/^\{+/, '').replace(/\}+$/, '');
@@ -138,23 +184,19 @@ export function buildTokenString(
 
   const directiveParts: string[] = [];
 
-  // Layout directives
-  const layoutParts: string[] = [];
+  // Group all key-value directive options (layout, indentation, conditional skip) into one directive segment
+  const directiveOptionsParts: string[] = [];
   if (options.direction) {
-    layoutParts.push(`direction: ${options.direction}`);
+    directiveOptionsParts.push(`direction: ${options.direction}`);
   }
   if (options.separator) {
     if (['cell', 'newline', 'comma', 'tab'].includes(options.separator)) {
-      layoutParts.push(`separator: ${options.separator}`);
+      directiveOptionsParts.push(`separator: ${options.separator}`);
     } else if (options.separator === ', ') {
-      layoutParts.push(`separator: ', '`);
+      directiveOptionsParts.push(`separator: ', '`);
     } else {
-      layoutParts.push(`separator: "${options.separator}"`);
+      directiveOptionsParts.push(`separator: "${options.separator}"`);
     }
-  }
-
-  if (layoutParts.length > 0) {
-    directiveParts.push(layoutParts.join(', '));
   }
 
   // Indentation directive
@@ -166,10 +208,22 @@ export function buildTokenString(
     if (options.toLine && options.toLine > 0) {
       indentSpec += `, to: ${options.toLine}`;
     }
-    directiveParts.push(indentSpec);
+    directiveOptionsParts.push(indentSpec);
   }
 
-  // Legacy formatting filters
+  // Skip Data & Remove Line directives
+  if (options.skipData) {
+    directiveOptionsParts.push(`skipData: "${options.skipData}"`);
+  }
+  if (options.removeLine) {
+    directiveOptionsParts.push(`removeLine: ${options.removeLine}`);
+  }
+
+  if (directiveOptionsParts.length > 0) {
+    directiveParts.push(directiveOptionsParts.join(', '));
+  }
+
+  // Legacy formatting filters (e.g. uppercase, date, etc.)
   if (Array.isArray(options.filters)) {
     options.filters.forEach((f) => {
       if (f && f.trim()) directiveParts.push(f.trim());

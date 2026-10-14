@@ -789,8 +789,8 @@ export class HtmlImporter {
         return;
       }
 
-      // Mustache token: {{key}}
-      const tokenMatch = segment.match(/^\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}$/);
+      // Mustache token: {{key}} or {{key | directive...}}
+      const tokenMatch = segment.match(/^\{\{\s*([a-zA-Z0-9_.-]+(?:\s*[|<][^}]+)?)\s*\}\}$/);
       const activeMarks = marksStack[marksStack.length - 1];
       const marks = Object.keys(activeMarks).length > 0 ? activeMarks : undefined;
 

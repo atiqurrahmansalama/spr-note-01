@@ -11,7 +11,12 @@ import type {
   CustomDocxTemplate,
   DocLabCanvasDraft,
 } from './types';
-import { parseTokenDirective, formatMultiValueData } from './docLabDirectiveEngine';
+import {
+  parseTokenDirective,
+  formatMultiValueData,
+  applySkipDataAndRemoveLines,
+  applyDocumentSkipAndRemoveLines,
+} from './docLabDirectiveEngine';
 import { separateDocxStylesAndBody, sanitizeDocxStyles } from './docxStyleUtils';
 import { PageGeometryCalculator } from './layout/geometry/PageGeometry';
 import { sanitizeLogicalDocumentHtml } from './layout/logicalDocument';
@@ -1675,6 +1680,24 @@ export function applyFilter(
       const prefix = rawArgs.replace(/^['"]|['"]$/g, '');
       return `${prefix}${value}`;
     }
+    case 'skipdata':
+    case 'skip':
+    case 'skip_data': {
+      const skipTargetMatch = rawArgs.match(/^['"]?([^,'"]+)['"]?(?:,\s*removeLine:\s*['"]?([a-zA-Z0-9_-]+)['"]?)?/i);
+      const target = skipTargetMatch ? skipTargetMatch[1].trim() : rawArgs.trim();
+      const removeLine = skipTargetMatch && skipTargetMatch[2] ? skipTargetMatch[2].trim() : undefined;
+      
+      const rawLines = value.includes('<br>') || value.includes('<br/>') || value.includes('<br />')
+        ? value.split(/<br\s*[\/]?>/gi)
+        : value.split(/\r?\n/);
+      
+      const filtered = applySkipDataAndRemoveLines(rawLines, target, removeLine);
+      return mode === 'html' ? filtered.join('<br>') : filtered.join('\n');
+    }
+    case 'removeline':
+    case 'remove_line': {
+      return value;
+    }
     default:
       return value;
   }
@@ -1704,14 +1727,59 @@ export function resolveTokenValue(
     value = lookup.get(rawKey);
   }
 
-  if (value === undefined) {
-    return null; // Value not found, keep fullMatch
+  // Helper to extract default / fallback if value is missing or empty
+  const getFallbackValue = (): string | null => {
+    if (directiveParsed.options.fallback !== undefined) {
+      return String(directiveParsed.options.fallback).replace(/^['"]|['"]$/g, '');
+    }
+    if (filterSpecs && filterSpecs.length > 0) {
+      for (const spec of filterSpecs) {
+        const colonIdx = spec.indexOf(':');
+        const filterName = (colonIdx > -1 ? spec.slice(0, colonIdx) : spec).trim().toLowerCase();
+        if (filterName === 'default' || filterName === 'fallback') {
+          const rawArgs = colonIdx > -1 ? spec.slice(colonIdx + 1).trim() : '';
+          return rawArgs.replace(/^['"]|['"]$/g, '');
+        }
+      }
+    }
+    return null;
+  };
+
+  const isMissingOrEmpty = value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
+  if (isMissingOrEmpty) {
+    const fallbackVal = getFallbackValue();
+    if (fallbackVal !== null) {
+      return fallbackVal;
+    }
+    if (value === undefined) {
+      return null; // Value not found and no fallback provided, keep fullMatch
+    }
+  }
+
+  // Check if any registered interceptor will handle 'indent'
+  let willInterceptIndent = false;
+  if (directiveParsed.options.indent && directiveParsed.options.indent > 0) {
+    for (const interceptor of tokenFilterInterceptors) {
+      const testRes = interceptor(norm, 'indent', String(directiveParsed.options.indent), String(value), lookup, mode);
+      if (testRes && (testRes.handled || testRes.skipFilter)) {
+        willInterceptIndent = true;
+        break;
+      }
+    }
   }
 
   // 1. If modern <...> directive is present, format multi-value or single value data
   let processed: any = value;
+  let indentAppliedByDirective = false;
+
   if (directiveParsed.hasDirective) {
-    processed = formatMultiValueData(value, directiveParsed.options, mode);
+    const effectiveOptions = willInterceptIndent
+      ? { ...directiveParsed.options, indent: 0 }
+      : directiveParsed.options;
+    processed = formatMultiValueData(value, effectiveOptions, mode);
+    if (!willInterceptIndent && directiveParsed.options.indent && directiveParsed.options.indent > 0) {
+      indentAppliedByDirective = true;
+    }
   } else if (Array.isArray(value)) {
     processed = value
       .map((it) => (it && typeof it === 'object' ? (it.name || it.title || it.subjectName || JSON.stringify(it)) : String(it)))
@@ -1744,6 +1812,9 @@ export function resolveTokenValue(
     }
 
     if (!intercepted) {
+      if (filterName === 'indent' && indentAppliedByDirective) {
+        continue;
+      }
       processed = applyFilter(String(processed), filterSpec, mode);
     }
   }
@@ -2494,6 +2565,9 @@ export function mergeTemplateWithData(
   sanitized = expandNestedArraysAndTables(sanitized, dataRecord);
 
   const lookup = buildEnrichedLookup(dataRecord);
+
+  // Apply Document-Level Skip & Line Removal for tokens matching skipData + removeLine
+  sanitized = applyDocumentSkipAndRemoveLines(sanitized, lookup);
 
   // Match any {{placeholder}} or {placeholder}
   const merged = sanitized.replace(/\{\{([\s\S]*?)\}\}/g, (fullMatch, token) => {

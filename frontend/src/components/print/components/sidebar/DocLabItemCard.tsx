@@ -48,7 +48,7 @@ export const DocLabItemCard: React.FC<DocLabItemCardProps> = ({
   isActive = false,
   isClickable,
   collapsible = false,
-  defaultExpanded = true,
+  defaultExpanded = false,
   expanded,
   storageKey,
   onToggle,

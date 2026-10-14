@@ -53,8 +53,15 @@ import {
 import { DocumentFactory } from '../documentFactory';
 import { HtmlImporter } from '../serialization/htmlImporter';
 import { HtmlExporter } from '../serialization/htmlExporter';
+import {
+  parseTokenDirective,
+  formatMultiValueData,
+  applySkipDataAndRemoveLines,
+  applyDocumentSkipAndRemoveLines,
+  parseRemoveLineSpec,
+  TokenDirectiveOptions,
+} from '../../docLabDirectiveEngine';
 import { TokenResolver } from '../tokens/tokenResolver';
-import { parseTokenDirective, formatMultiValueData, TokenDirectiveOptions } from '../../docLabDirectiveEngine';
 import { ErpDataProvider } from './ErpDataProvider';
 import {
   TemplateMergeOptions,
@@ -361,6 +368,57 @@ export class TemplateMergeEngine {
           continue;
         }
 
+        // Check if paragraph contains skipData + removeLine directive that matches current data
+        const tokenMatches = [...textSummary.matchAll(/\{\{([\s\S]*?)\}\}/g)];
+        let skipThisParagraph = false;
+        let removeBefore = 0;
+        let removeAfter = 0;
+
+        for (const tm of tokenMatches) {
+          const directive = parseTokenDirective(tm[1].trim());
+          const hasSkip = Boolean(directive.options.skipData);
+          const hasRemoveLine = Boolean(directive.options.removeLine);
+
+          if (hasSkip || hasRemoveLine) {
+            const rawKey = directive.baseKey;
+            const val =
+              lookup.get(rawKey) ??
+              lookup.get(rawKey.toLowerCase()) ??
+              lookup.get(rawKey.toLowerCase().replace(/[^a-z0-9]/g, '')) ??
+              ErpDataProvider.getValue(context, rawKey);
+
+            const target = (directive.options.skipData || 'empty').trim().toLowerCase();
+            const cleanVal = val !== undefined && val !== null ? String(val).replace(/<[^>]*>/g, '').trim().toLowerCase() : '';
+
+            let isMatch = false;
+            if (['empty', 'blank', 'null', '""', "''"].includes(target)) {
+              isMatch = cleanVal === '' || val === undefined || val === null;
+            } else if (target === '*' || target === 'all' || target === 'any' || target === 'self') {
+              isMatch = true;
+            } else if (val !== undefined && val !== null) {
+              isMatch = cleanVal === target || (cleanVal.length > 0 && cleanVal.includes(target));
+            }
+
+            if (isMatch) {
+              skipThisParagraph = true;
+              const { beforeCount, afterCount } = parseRemoveLineSpec(directive.options.removeLine || 'self');
+              removeBefore = Math.max(removeBefore, beforeCount);
+              removeAfter = Math.max(removeAfter, afterCount);
+            }
+          }
+        }
+
+        if (skipThisParagraph) {
+          if (removeBefore > 0 && resultBlocks.length > 0) {
+            const spliceCount = Math.min(removeBefore, resultBlocks.length);
+            resultBlocks.splice(resultBlocks.length - spliceCount, spliceCount);
+          }
+          if (removeAfter > 0) {
+            i += removeAfter;
+          }
+          continue;
+        }
+
         // Standard Paragraph
         resultBlocks.push({
           ...para,
@@ -651,7 +709,8 @@ export class TemplateMergeEngine {
     }
 
     // Handle missing value with fallback filters
-    if (value === undefined || value === null) {
+    const isMissingOrEmpty = value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
+    if (isMissingOrEmpty) {
       if (filterSpecs && filterSpecs.length > 0) {
         for (const spec of filterSpecs) {
           const colonIdx = spec.indexOf(':');
@@ -663,9 +722,11 @@ export class TemplateMergeEngine {
         }
       }
       if (directiveParsed.hasDirective && directiveParsed.options.fallback !== undefined) {
-        return directiveParsed.options.fallback;
+        return String(directiveParsed.options.fallback).replace(/^['"]|['"]$/g, '');
       }
-      return null;
+      if (value === undefined || value === null) {
+        return null;
+      }
     }
 
     // 1. If modern <...> directive is present, format multi-value or single value data
@@ -1076,6 +1137,19 @@ export class TemplateMergeEngine {
         return `${cleanArg}${value}`;
       case 'suffix':
         return `${value}${cleanArg}`;
+      case 'skipdata':
+      case 'skip':
+      case 'skip_data': {
+        const skipTargetMatch = rawArgs.match(/^['"]?([^,'"]+)['"]?(?:,\s*removeLine:\s*['"]?([a-zA-Z0-9_-]+)['"]?)?/i);
+        const target = skipTargetMatch ? skipTargetMatch[1].trim() : rawArgs.trim();
+        const removeLine = skipTargetMatch && skipTargetMatch[2] ? skipTargetMatch[2].trim() : undefined;
+        const rawLines = value.split(/\r?\n|<br\s*\/?>/gi);
+        const filtered = applySkipDataAndRemoveLines(rawLines, target, removeLine);
+        return filtered.join('\n');
+      }
+      case 'removeline':
+      case 'remove_line':
+        return value;
       default:
         return value;
     }
@@ -1135,6 +1209,9 @@ export class TemplateMergeEngine {
           .join('\n');
       }
     );
+
+    // 3. Document-level Skip & Line Removal for tokens matching skipData + removeLine
+    processed = applyDocumentSkipAndRemoveLines(processed, lookup);
 
     return processed;
   }

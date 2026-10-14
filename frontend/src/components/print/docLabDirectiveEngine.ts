@@ -27,8 +27,16 @@ export interface TokenDirectiveOptions {
   limit?: number;
   from?: number;
   to?: number;
+  fromLine?: number;
+  toLine?: number;
+  all?: boolean;
+  force?: boolean;
+  sliceFrom?: number;
+  sliceTo?: number;
   indent?: number;
   fallback?: string;
+  skipData?: string;
+  removeLine?: string;
   [key: string]: any;
 }
 
@@ -61,6 +69,8 @@ function parseKeyValuePairs(directiveStr: string): TokenDirectiveOptions {
     .replace(/\bo\s*r\s*d\s*e\s*r\s*:/gi, 'order:')
     .replace(/\bg\s*a\s*p\s*:/gi, 'gap:')
     .replace(/\bl\s*i\s*m\s*i\s*t\s*:/gi, 'limit:')
+    .replace(/\bs\s*k\s*i\s*p\s*d\s*a\s*t\s*a\s*:/gi, 'skipData:')
+    .replace(/\br\s*e\s*m\s*o\s*v\s*e\s*l\s*i\s*n\s*e\s*:/gi, 'removeLine:')
     .replace(/\b([a-zA-Z0-9_-]+)\s*:\s*/g, '$1: ')
     .trim();
 
@@ -155,18 +165,72 @@ function parseKeyValuePairs(directiveStr: string): TokenDirectiveOptions {
         if (!isNaN(num)) options.to = num;
         break;
       }
+      case 'fromline':
+      case 'indentfrom': {
+        const num = parseInt(rawVal, 10);
+        if (!isNaN(num)) options.fromLine = num;
+        break;
+      }
+      case 'toline':
+      case 'indentto': {
+        const num = parseInt(rawVal, 10);
+        if (!isNaN(num)) options.toLine = num;
+        break;
+      }
+      case 'slicefrom':
+      case 'itemfrom': {
+        const num = parseInt(rawVal, 10);
+        if (!isNaN(num)) options.sliceFrom = num;
+        break;
+      }
+      case 'sliceto':
+      case 'itemto': {
+        const num = parseInt(rawVal, 10);
+        if (!isNaN(num)) options.sliceTo = num;
+        break;
+      }
+      case 'all':
+      case 'force': {
+        if (rawVal.toLowerCase() === 'true' || rawVal === '1' || rawVal === '') {
+          options.all = true;
+        }
+        break;
+      }
       case 'indent':
       case 'indentation':
       case 'pad':
       case 'padding': {
-        const num = parseInt(rawVal, 10);
-        if (!isNaN(num)) options.indent = num;
+        // Can be a simple number e.g. "5" or positional like "5:2:4" or "5:2"
+        if (rawVal.includes(':')) {
+          const parts = rawVal.split(':').map((p) => parseInt(p.trim(), 10));
+          if (!isNaN(parts[0])) options.indent = parts[0];
+          if (parts.length > 1 && !isNaN(parts[1])) options.from = parts[1];
+          if (parts.length > 2 && !isNaN(parts[2])) options.to = parts[2];
+        } else {
+          const num = parseInt(rawVal, 10);
+          if (!isNaN(num)) options.indent = num;
+        }
         break;
       }
       case 'default':
       case 'fallback':
       case 'empty': {
-        options.fallback = rawVal;
+        options.fallback = rawVal.replace(/^['"]|['"]$/g, '');
+        break;
+      }
+      case 'skipdata':
+      case 'skip_data':
+      case 'skip':
+      case 'ignore':
+      case 'exclude': {
+        options.skipData = rawVal;
+        break;
+      }
+      case 'removeline':
+      case 'remove_line':
+      case 'removelines':
+      case 'deleteline': {
+        options.removeLine = rawVal;
         break;
       }
       default: {
@@ -275,7 +339,38 @@ export function parseTokenDirective(tokenContent: string): ParsedTokenDirective 
     };
   }
 
-  // 2. Standard unified pipe syntax: {{key | direction: vertical, separator: ', ' | indent: 5 | uppercase}}
+  // 2. Pure Directive expressions: e.g. '| indent: 5' or 'indent: 5' or '| skipData: "..."'
+  const isPureDirective =
+    normalized.startsWith('|') ||
+    normalized.startsWith('<') ||
+    (/\b(direction|dir|layout|orient|orientation|separator|sep|order|flow|prefix|list|gap|limit|from|to|skipdata|skip|skip_data|removeline|remove_line|indent|default|fallback|empty)\s*:/i.test(
+      normalized
+    ) &&
+      !normalized.includes('|'));
+
+  if (isPureDirective) {
+    const directiveStr = normalized.replace(/^[|<]+/, '').replace(/[>]+$/, '').trim();
+    const options = parseKeyValuePairs(directiveStr);
+    const legacyFilterSpecs: string[] = [];
+    if (options.indent !== undefined) {
+      let indentSpec = `indent: ${options.indent}`;
+      const fromVal = options.fromLine !== undefined ? options.fromLine : options.from;
+      if (fromVal !== undefined) indentSpec += `, from: ${fromVal}`;
+      const toVal = options.toLine !== undefined ? options.toLine : options.to;
+      if (toVal !== undefined) indentSpec += `, to: ${toVal}`;
+      if (options.all) indentSpec += `, all: true`;
+      legacyFilterSpecs.push(indentSpec);
+    }
+    return {
+      rawToken: normalized,
+      baseKey: '',
+      options,
+      hasDirective: Object.keys(options).length > 0,
+      legacyFilterSpecs,
+    };
+  }
+
+  // 3. Standard unified pipe syntax: {{key | direction: vertical, separator: ', ' | indent: 5 | uppercase}}
   const pipeParts = normalized.split('|').map((p) => p.trim()).filter(Boolean);
   const baseKey = (pipeParts[0] || '').replace(/[\s]/g, '');
   const remainingParts = pipeParts.slice(1);
@@ -286,11 +381,20 @@ export function parseTokenDirective(tokenContent: string): ParsedTokenDirective 
 
   remainingParts.forEach((part) => {
     // Check if this pipe part contains layout/direction keywords
-    const isDirectivePart = /\b(direction|dir|layout|orient|orientation|separator|sep|delimiter|delim|order|flow|sort|prefix|list|gap|spacing|limit|count|max|from|to)\s*:/i.test(part);
+    const isDirectivePart = /\b(direction|dir|layout|orient|orientation|separator|sep|delimiter|delim|order|flow|sort|prefix|list|gap|spacing|limit|count|max|from|to|skipdata|skip|skip_data|removeline|remove_line|deleteline|indent|default|fallback|empty)\s*:/i.test(part);
     if (isDirectivePart) {
       hasDirective = true;
       const parsedOpts = parseKeyValuePairs(part);
       Object.assign(options, parsedOpts);
+      if (parsedOpts.indent !== undefined && !legacyFilterSpecs.some((f) => f.toLowerCase().startsWith('indent'))) {
+        let indentSpec = `indent: ${parsedOpts.indent}`;
+        const fromVal = parsedOpts.fromLine !== undefined ? parsedOpts.fromLine : parsedOpts.from;
+        if (fromVal !== undefined) indentSpec += `, from: ${fromVal}`;
+        const toVal = parsedOpts.toLine !== undefined ? parsedOpts.toLine : parsedOpts.to;
+        if (toVal !== undefined) indentSpec += `, to: ${toVal}`;
+        if (parsedOpts.all) indentSpec += `, all: true`;
+        legacyFilterSpecs.push(indentSpec);
+      }
     } else {
       legacyFilterSpecs.push(part);
     }
@@ -303,6 +407,385 @@ export function parseTokenDirective(tokenContent: string): ParsedTokenDirective 
     hasDirective,
     legacyFilterSpecs,
   };
+}
+
+export interface RemoveLineRule {
+  beforeCount: number;
+  afterCount: number;
+}
+
+/**
+ * Parses removeLine arguments:
+ * - 'b' or 'b1' -> Before 1 line
+ * - 'a' or 'a1' -> After 1 line
+ * - 'b1-5' -> Before 1 to 5 lines
+ * - 'a1-5' -> After 1 to 5 lines
+ * - 'bN' -> Before N lines
+ * - 'aN' -> After N lines
+ */
+export function parseRemoveLineSpec(spec: string): RemoveLineRule {
+  const result: RemoveLineRule = { beforeCount: 0, afterCount: 0 };
+  if (!spec) return result;
+
+  const clean = spec.toLowerCase().trim();
+  if (['self', 'current', 'none', '0', 'only', 'this', 'line'].includes(clean)) {
+    return result;
+  }
+
+  // 1. Before pattern: b, b1, b1-5, b5, before 1-5, before 1, etc.
+  const bRange = clean.match(/\bb(?:efore)?\s*(?:1\s*-\s*|\s*-\s*)(\d+)/);
+  if (bRange) {
+    result.beforeCount = parseInt(bRange[1], 10) || 1;
+  } else {
+    const bNum = clean.match(/\bb(?:efore)?\s*(\d+)/);
+    if (bNum) {
+      result.beforeCount = parseInt(bNum[1], 10) || 1;
+    } else if (/\bb(?:efore)?\b/.test(clean)) {
+      result.beforeCount = 1;
+    }
+  }
+
+  // 2. After pattern: a, a1, a1-5, a5, after 1-5, after 1, etc.
+  const aRange = clean.match(/\ba(?:fter)?\s*(?:1\s*-\s*|\s*-\s*)(\d+)/);
+  if (aRange) {
+    result.afterCount = parseInt(aRange[1], 10) || 1;
+  } else {
+    const aNum = clean.match(/\ba(?:fter)?\s*(\d+)/);
+    if (aNum) {
+      result.afterCount = parseInt(aNum[1], 10) || 1;
+    } else if (/\ba(?:fter)?\b/.test(clean)) {
+      result.afterCount = 1;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Scans an array of data lines / multi-value items.
+ * If an item matches skipTarget, it skips that item and removes adjacent lines as configured.
+ */
+export function applySkipDataAndRemoveLines(
+  lines: string[],
+  skipTarget: string,
+  removeLineSpec?: string
+): string[] {
+  if (!lines || lines.length === 0 || !skipTarget) return lines;
+
+  const target = skipTarget.trim().toLowerCase();
+  if (!target) return lines;
+
+  const { beforeCount, afterCount } = parseRemoveLineSpec(removeLineSpec || '');
+  const dropIndices = new Set<number>();
+
+  lines.forEach((line, idx) => {
+    const cleanText = line.replace(/<[^>]*>/g, '').trim().toLowerCase();
+    const isMatch = cleanText === target || cleanText.includes(target);
+
+    if (isMatch) {
+      dropIndices.add(idx);
+
+      if (beforeCount > 0) {
+        for (let i = 1; i <= beforeCount; i++) {
+          const targetIdx = idx - i;
+          if (targetIdx >= 0) dropIndices.add(targetIdx);
+        }
+      }
+
+      if (afterCount > 0) {
+        for (let i = 1; i <= afterCount; i++) {
+          const targetIdx = idx + i;
+          if (targetIdx < lines.length) dropIndices.add(targetIdx);
+        }
+      }
+    }
+  });
+
+  return lines.filter((_, idx) => !dropIndices.has(idx));
+}
+
+/**
+ * Scans a document HTML string or text template for tokens configured with `skipData` and optional `removeLine`.
+ * When a token's evaluated data matches its `skipData` condition:
+ * - The line/block containing the token is removed.
+ * - If `removeLine` specifies beforeCount (e.g. `b`, `b1`, `b3`), preceding lines/blocks are removed.
+ * - If `removeLine` specifies afterCount (e.g. `a`, `a1`, `a2`), succeeding lines/blocks are removed.
+ *
+ * Supports all document formats:
+ * 1. Block elements: `<p>`, `<div>`, `<li>`, `<tr>`, `<h1-6>`
+ * 2. Nested `<br>` lines within blocks
+ * 3. Flat HTML separated by `<br>` or `<br/>`
+ * 4. Plain text lines separated by `\r?\n`
+ */
+export function applyDocumentSkipAndRemoveLines(
+  html: string,
+  dataLookup: Map<string, any> | Record<string, any>
+): string {
+  if (!html || typeof html !== 'string' || !html.includes('{{')) {
+    return html;
+  }
+
+  const getVal = (key: string): any => {
+    if (!key) return undefined;
+    const cleanKey = key.trim();
+    const norm = cleanKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    if (dataLookup instanceof Map) {
+      if (dataLookup.has(norm)) return dataLookup.get(norm);
+      if (dataLookup.has(cleanKey.toLowerCase())) return dataLookup.get(cleanKey.toLowerCase());
+      if (dataLookup.has(cleanKey)) return dataLookup.get(cleanKey);
+      for (const [k, v] of dataLookup.entries()) {
+        if (k.toLowerCase().replace(/[^a-z0-9]/g, '') === norm) return v;
+      }
+      return undefined;
+    }
+
+    if (dataLookup && typeof dataLookup === 'object') {
+      if (dataLookup[cleanKey] !== undefined) return dataLookup[cleanKey];
+      if (dataLookup[cleanKey.toLowerCase()] !== undefined) return dataLookup[cleanKey.toLowerCase()];
+      if (dataLookup[norm] !== undefined) return dataLookup[norm];
+      for (const k of Object.keys(dataLookup)) {
+        if (k.toLowerCase().replace(/[^a-z0-9]/g, '') === norm) return dataLookup[k];
+      }
+    }
+    return undefined;
+  };
+
+  const tokenRegex = /\{\{([\s\S]*?)\}\}/g;
+  let match: RegExpExecArray | null;
+  const activeRules: Array<{
+    fullToken: string;
+    beforeCount: number;
+    afterCount: number;
+  }> = [];
+
+  while ((match = tokenRegex.exec(html)) !== null) {
+    const fullMatch = match[0];
+    const innerToken = match[1].trim();
+    const directive = parseTokenDirective(innerToken);
+
+    const hasSkip = Boolean(directive.options.skipData);
+    const hasRemoveLine = Boolean(directive.options.removeLine);
+
+    if (hasSkip || hasRemoveLine) {
+      const val = getVal(directive.baseKey);
+      const target = (directive.options.skipData || 'empty').trim().toLowerCase();
+      const cleanVal = val !== undefined && val !== null ? String(val).replace(/<[^>]*>/g, '').trim().toLowerCase() : '';
+
+      let isMatch = false;
+      if (['empty', 'blank', 'null', '""', "''"].includes(target)) {
+        isMatch = cleanVal === '' || val === undefined || val === null;
+      } else if (target === '*' || target === 'all' || target === 'any') {
+        isMatch = true;
+      } else if (target === 'self' || target === 'this' || target === 'line') {
+        isMatch = true;
+      } else if (val !== undefined && val !== null) {
+        isMatch = cleanVal === target || (cleanVal.length > 0 && cleanVal.includes(target));
+      }
+
+      if (isMatch) {
+        const { beforeCount, afterCount } = parseRemoveLineSpec(directive.options.removeLine || 'self');
+        activeRules.push({
+          fullToken: fullMatch,
+          beforeCount,
+          afterCount,
+        });
+      }
+    }
+  }
+
+  if (activeRules.length === 0) {
+    return html;
+  }
+
+  let result = html;
+
+  for (const rule of activeRules) {
+    const { fullToken, beforeCount, afterCount } = rule;
+    if (!result.includes(fullToken)) continue;
+
+    // Strategy 1: Table rows <tr>...</tr>
+    if (/<tr\b/i.test(result)) {
+      const trPattern = /(<tr\b[^>]*>[\s\S]*?<\/tr>)/gi;
+      const parts = result.split(trPattern);
+      const allTrs: number[] = [];
+      const matchingTrs: number[] = [];
+
+      parts.forEach((p, idx) => {
+        if (/^<tr\b/i.test(p)) {
+          allTrs.push(idx);
+          if (p.includes(fullToken)) {
+            matchingTrs.push(idx);
+          }
+        }
+      });
+
+      if (matchingTrs.length > 0) {
+        const dropIndices = new Set<number>();
+        matchingTrs.forEach((trIdx) => {
+          const posInTrs = allTrs.indexOf(trIdx);
+          dropIndices.add(trIdx);
+          for (let b = 1; b <= beforeCount; b++) {
+            if (posInTrs - b >= 0) dropIndices.add(allTrs[posInTrs - b]);
+          }
+          for (let a = 1; a <= afterCount; a++) {
+            if (posInTrs + a < allTrs.length) dropIndices.add(allTrs[posInTrs + a]);
+          }
+        });
+        result = parts.filter((_, idx) => !dropIndices.has(idx)).join('');
+        continue;
+      }
+    }
+
+    // Strategy 2: Block elements: <p>, <div>, <li>, <h1-6>
+    const blockPattern = /(<(?:p|div|li|h[1-6])\b[^>]*>[\s\S]*?<\/(?:p|div|li|h[1-6])>)/gi;
+    const parts = result.split(blockPattern);
+    const allBlocks: number[] = [];
+    const matchingBlocks: number[] = [];
+
+    parts.forEach((p, idx) => {
+      if (/^<(?:p|div|li|h[1-6])\b/i.test(p)) {
+        allBlocks.push(idx);
+        if (p.includes(fullToken)) {
+          matchingBlocks.push(idx);
+        }
+      }
+    });
+
+    if (matchingBlocks.length > 0) {
+      let handledByInnerBr = false;
+
+      for (const blkIdx of matchingBlocks) {
+        const blkContent = parts[blkIdx];
+        if (/<br\s*\/?>/i.test(blkContent)) {
+          const openMatch = blkContent.match(/^(<(?:p|div|li|h[1-6])\b[^>]*>)/i);
+          const closeMatch = blkContent.match(/(<\/(?:p|div|li|h[1-6])>)$/i);
+          if (openMatch && closeMatch) {
+            const openTag = openMatch[1];
+            const closeTag = closeMatch[1];
+            const inner = blkContent.slice(openTag.length, -closeTag.length);
+
+            const segments = inner.split(/(<br\s*\/?>)/gi);
+            const lineUnits: string[] = [];
+            let curr = '';
+            for (const seg of segments) {
+              if (/^<br\s*\/?>$/i.test(seg)) {
+                lineUnits.push(curr);
+                curr = '';
+              } else {
+                curr += seg;
+              }
+            }
+            if (curr || lineUnits.length > 0) {
+              lineUnits.push(curr);
+            }
+
+            const matchingUnits = lineUnits
+              .map((u, i) => (u.includes(fullToken) ? i : -1))
+              .filter((i) => i >= 0);
+
+            if (matchingUnits.length > 0) {
+              const dropUnits = new Set<number>();
+              matchingUnits.forEach((mu) => {
+                dropUnits.add(mu);
+                for (let b = 1; b <= beforeCount; b++) {
+                  if (mu - b >= 0) dropUnits.add(mu - b);
+                }
+                for (let a = 1; a <= afterCount; a++) {
+                  if (mu + a < lineUnits.length) dropUnits.add(mu + a);
+                }
+              });
+
+              const surviving = lineUnits.filter((_, i) => !dropUnits.has(i));
+              parts[blkIdx] = surviving.length > 0 ? `${openTag}${surviving.join('<br>')}${closeTag}` : '';
+              handledByInnerBr = true;
+            }
+          }
+        }
+      }
+
+      if (handledByInnerBr) {
+        result = parts.join('');
+        continue;
+      }
+
+      const dropBlocks = new Set<number>();
+      matchingBlocks.forEach((blkIdx) => {
+        const posInBlocks = allBlocks.indexOf(blkIdx);
+        dropBlocks.add(blkIdx);
+        for (let b = 1; b <= beforeCount; b++) {
+          if (posInBlocks - b >= 0) dropBlocks.add(allBlocks[posInBlocks - b]);
+        }
+        for (let a = 1; a <= afterCount; a++) {
+          if (posInBlocks + a < allBlocks.length) dropBlocks.add(allBlocks[posInBlocks + a]);
+        }
+      });
+
+      result = parts.filter((_, idx) => !dropBlocks.has(idx)).join('');
+      continue;
+    }
+
+    // Strategy 3: Loose lines separated by <br> in HTML
+    if (/<br\s*\/?>/i.test(result)) {
+      const segments = result.split(/(<br\s*\/?>)/gi);
+      const lineUnits: string[] = [];
+      let curr = '';
+      for (const seg of segments) {
+        if (/^<br\s*\/?>$/i.test(seg)) {
+          lineUnits.push(curr);
+          curr = '';
+        } else {
+          curr += seg;
+        }
+      }
+      if (curr || lineUnits.length > 0) lineUnits.push(curr);
+
+      const matchingUnits = lineUnits
+        .map((u, i) => (u.includes(fullToken) ? i : -1))
+        .filter((i) => i >= 0);
+
+      if (matchingUnits.length > 0) {
+        const dropUnits = new Set<number>();
+        matchingUnits.forEach((mu) => {
+          dropUnits.add(mu);
+          for (let b = 1; b <= beforeCount; b++) {
+            if (mu - b >= 0) dropUnits.add(mu - b);
+          }
+          for (let a = 1; a <= afterCount; a++) {
+            if (mu + a < lineUnits.length) dropUnits.add(mu + a);
+          }
+        });
+
+        const surviving = lineUnits.filter((_, i) => !dropUnits.has(i));
+        result = surviving.join('<br>');
+        continue;
+      }
+    }
+
+    // Strategy 4: Raw text lines separated by \n
+    const lines = result.split(/\r?\n/);
+    const matchingLines = lines
+      .map((l, i) => (l.includes(fullToken) ? i : -1))
+      .filter((i) => i >= 0);
+
+    if (matchingLines.length > 0) {
+      const dropLines = new Set<number>();
+      matchingLines.forEach((ml) => {
+        dropLines.add(ml);
+        for (let b = 1; b <= beforeCount; b++) {
+          if (ml - b >= 0) dropLines.add(ml - b);
+        }
+        for (let a = 1; a <= afterCount; a++) {
+          if (ml + a < lines.length) dropLines.add(ml + a);
+        }
+      });
+
+      const surviving = lines.filter((_, i) => !dropLines.has(i));
+      result = surviving.join('\n');
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -340,6 +823,11 @@ export function formatMultiValueData(
     items = [String(rawValue).trim()];
   }
 
+  // 1b. Apply Skip Data and Line Removal condition
+  if (options.skipData) {
+    items = applySkipDataAndRemoveLines(items, options.skipData, options.removeLine);
+  }
+
   if (items.length === 0) {
     return options.fallback !== undefined ? options.fallback : '';
   }
@@ -350,12 +838,25 @@ export function formatMultiValueData(
   }
 
   // 3. Apply Range Filtering (from, to, limit)
-  if (options.from !== undefined && options.from > 0) {
-    const startIdx = Math.max(0, options.from - 1);
-    const endIdx = options.to !== undefined && options.to >= options.from ? options.to : items.length;
-    items = items.slice(startIdx, endIdx);
-  } else if (options.to !== undefined && options.to > 0) {
-    items = items.slice(0, options.to);
+  // When options.indent is active, options.from and options.to denote indentation boundaries (fromLine, toLine), NOT item array slicing.
+  const hasIndent = options.indent !== undefined && options.indent > 0;
+  if (!hasIndent) {
+    if (options.from !== undefined && options.from > 0) {
+      const startIdx = Math.max(0, options.from - 1);
+      const endIdx = options.to !== undefined && options.to >= options.from ? options.to : items.length;
+      items = items.slice(startIdx, endIdx);
+    } else if (options.to !== undefined && options.to > 0) {
+      items = items.slice(0, options.to);
+    }
+  } else {
+    // If explicit sliceFrom / sliceTo is provided alongside indent
+    if (options.sliceFrom !== undefined && options.sliceFrom > 0) {
+      const startIdx = Math.max(0, options.sliceFrom - 1);
+      const endIdx = options.sliceTo !== undefined && options.sliceTo >= options.sliceFrom ? options.sliceTo : items.length;
+      items = items.slice(startIdx, endIdx);
+    } else if (options.sliceTo !== undefined && options.sliceTo > 0) {
+      items = items.slice(0, options.sliceTo);
+    }
   }
 
   if (options.limit !== undefined && options.limit > 0) {
@@ -381,21 +882,43 @@ export function formatMultiValueData(
   }
 
   // 5. Apply Indentation (if specified)
+  // Multi-line continuation / hanging indent standard:
+  // By default, indentation starts from line 2 (fromLine = 2) so line 1 aligns flush with the template label prefix.
+  // Explicit `all: true`, `force: true`, or `from: 1` indents all lines including line 1.
   const indentCount = options.indent && options.indent > 0 ? options.indent : 0;
   const spaceChar = mode === 'html' ? '&nbsp;' : ' ';
   const indentStr = indentCount > 0 ? spaceChar.repeat(indentCount) : '';
 
+  const forceAllLines = options.all === true || options.force === true || options.from === 1 || options.fromLine === 1;
+  const effectiveFrom = forceAllLines
+    ? 1
+    : (options.fromLine !== undefined ? options.fromLine : (options.from !== undefined ? options.from : 2));
+  const effectiveTo = options.toLine !== undefined && options.toLine > 0
+    ? options.toLine
+    : (options.to !== undefined && options.to > 0 ? options.to : Infinity);
+
+  const applyLineIndent = (lines: string[]): string[] => {
+    if (!indentStr) return lines;
+    return lines.map((line, idx) => {
+      const lineNum = idx + 1; // 1-indexed
+      if (lineNum >= effectiveFrom && lineNum <= effectiveTo) {
+        return `${indentStr}${line}`;
+      }
+      return line;
+    });
+  };
+
   // 6. Apply Direction & Separator Layout
-  const direction = options.direction || 'horizontal';
+  const isMultiLineInput = typeof rawValue === 'string' && (rawValue.includes('\n') || /<br\s*\/?>/i.test(rawValue));
+  const direction = options.direction || (isMultiLineInput && !options.separator ? 'vertical' : 'horizontal');
   const sep = options.separator !== undefined ? String(options.separator).trim().toLowerCase() : '';
 
   // 6a. Table Cell Flow (Populate consecutive table cells / rows)
   if (sep === 'cell' || sep === 'table-cell' || sep === 'next-cell' || sep === 'td') {
+    const indentedLines = applyLineIndent(items);
     if (direction === 'vertical') {
-      const indentedLines = items.map((line) => `${indentStr}${line}`);
       return mode === 'html' ? indentedLines.join('<!-- spr-row-cell-split -->') : indentedLines.join('\n');
     } else {
-      const indentedLines = items.map((line) => `${indentStr}${line}`);
       return mode === 'html' ? indentedLines.join('<!-- spr-cell-split -->') : indentedLines.join('\t');
     }
   }
@@ -406,7 +929,7 @@ export function formatMultiValueData(
     const baseBreak = mode === 'html' ? '<br>' : '\n';
     const lineBreak = baseBreak.repeat(1 + gap);
 
-    const indentedLines = items.map((line) => `${indentStr}${line}`);
+    const indentedLines = applyLineIndent(items);
     return indentedLines.join(lineBreak);
   } else {
     // Horizontal layout with custom separator
@@ -419,7 +942,7 @@ export function formatMultiValueData(
       separatorStr = ' ';
     }
     const joined = items.join(separatorStr);
-    return indentStr ? `${indentStr}${joined}` : joined;
+    return (indentStr && effectiveFrom <= 1) ? `${indentStr}${joined}` : joined;
   }
 }
 

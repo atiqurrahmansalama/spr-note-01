@@ -15,6 +15,8 @@ import {
 import { DocLabItemCard } from '../DocLabItemCard';
 import { DocLabDirectionRuleCard } from './DocLabDirectionRuleCard';
 import { DocLabIndentRuleCard } from './DocLabIndentRuleCard';
+import { DocLabSkipRuleCard } from './DocLabSkipRuleCard';
+import { DocLabFallbackRuleCard } from './DocLabFallbackRuleCard';
 
 export interface KeyPaletteExplorerProps {
   onInsertKey?: (keyToken: string) => void;
@@ -146,6 +148,11 @@ export default function KeyPaletteExplorer({
     }
   };
 
+  // Extract clean key names for directive rule dropdowns
+  const availableKeyNames = useMemo(() => {
+    return allKeys.map((k) => k.key);
+  }, [allKeys]);
+
   return (
     <div className={`space-y-4 ${className}`}>
       {/* ─── 1. Template Required Keys Section ─── */}
@@ -157,7 +164,6 @@ export default function KeyPaletteExplorer({
           groupedKeys.map((group) => (
             <DocLabItemCard
               key={group.categoryKey}
-              storageKey={`spr_doclab_tokens_cat_${group.categoryKey}`}
               title={group.label}
               titleClassName="text-xs font-bold theme-text-primary"
               description={group.description}
@@ -167,7 +173,7 @@ export default function KeyPaletteExplorer({
                 </span>
               }
               collapsible={true}
-              defaultExpanded={true}
+              defaultExpanded={false}
             >
               <div className="space-y-1.5 pt-1">
                 {group.items.map((item) => {
@@ -237,6 +243,8 @@ export default function KeyPaletteExplorer({
       >
         <DocLabDirectionRuleCard onInsertKey={onInsertKey} />
         <DocLabIndentRuleCard onInsertKey={onInsertKey} />
+        <DocLabSkipRuleCard onInsertKey={onInsertKey} availableKeys={availableKeyNames} />
+        <DocLabFallbackRuleCard onInsertKey={onInsertKey} />
       </DrawerSection>
     </div>
   );

@@ -225,11 +225,22 @@ export function insertTokenAtActiveCaret(
   const { element, range, isInput, selectionStart, selectionEnd } = lastActiveCaret;
 
   // 1. If target is an <input> or <textarea>
-  if (isInput && element && (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA')) {
+  if (
+    isInput &&
+    element &&
+    element.isConnected &&
+    (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA')
+  ) {
     const inputEl = element as HTMLInputElement | HTMLTextAreaElement;
     let start = selectionStart ?? inputEl.value.length;
     let end = selectionEnd ?? inputEl.value.length;
     const val = inputEl.value || '';
+
+    // Smart spacing before directive pipe:
+    let formattedTokenString = tokenString;
+    if (isDirective && start > 0 && !val.slice(0, start).endsWith(' ') && !tokenString.startsWith(' ')) {
+      formattedTokenString = ` ${tokenString}`;
+    }
 
     // Smart deduplication for standard placeholder tokens only:
     if (!isDirective) {
@@ -248,17 +259,42 @@ export function insertTokenAtActiveCaret(
       }
     }
 
-    const nextVal = val.slice(0, start) + tokenString + val.slice(end);
-    inputEl.value = nextVal;
+    const nextVal = val.slice(0, start) + formattedTokenString + val.slice(end);
+
+    // Use native prototype setter so React 16/17/18 synthetic event trackers detect the value change
+    const tracker = (inputEl as any)._valueTracker;
+    if (tracker) {
+      tracker.setValue(val);
+    }
+    const proto =
+      typeof HTMLTextAreaElement !== 'undefined' && inputEl instanceof HTMLTextAreaElement
+        ? window.HTMLTextAreaElement.prototype
+        : window.HTMLInputElement.prototype;
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    if (nativeInputValueSetter) {
+      nativeInputValueSetter.call(inputEl, nextVal);
+    } else {
+      inputEl.value = nextVal;
+    }
 
     // Reposition cursor right after inserted token
-    const nextPos = start + tokenString.length;
+    const nextPos = start + formattedTokenString.length;
     inputEl.focus();
     inputEl.setSelectionRange(nextPos, nextPos);
 
     // Trigger synthetic input/change events for React form synchronization
     inputEl.dispatchEvent(new Event('input', { bubbles: true }));
     inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+
+    // Notify popover input if inside TokenInspectorPopover
+    if (inputEl.closest('[data-token-popover="true"]')) {
+      inputEl.dispatchEvent(
+        new CustomEvent('spr_popover_value_injected', {
+          detail: { value: nextVal },
+          bubbles: true,
+        })
+      );
+    }
 
     lastActiveCaret.selectionStart = nextPos;
     lastActiveCaret.selectionEnd = nextPos;
