@@ -62,16 +62,21 @@ export function getJuzPageBounds(
       let minFound = Infinity;
       let maxFound = -Infinity;
 
+      // Safe guards for Quran page limits:
+      // Even the largest South Asian prints never exceed 1,000 pages, and standard Madinah is 604.
+      const MAX_SAFE_PAGE = 1000;
+      const MAX_PAGE_SPAN = 604;
+
       matchingRows.forEach((row) => {
         (row.ranges || []).forEach((r: any) => {
           const s = parseInt(String(r.start), 10);
           const e = parseInt(String(r.end), 10);
-          const validStart = !isNaN(s) && s > 0;
-          const validEnd = !isNaN(e) && e > 0;
+          const validStart = !isNaN(s) && s > 0 && s <= MAX_SAFE_PAGE;
+          const validEnd = !isNaN(e) && e > 0 && e <= MAX_SAFE_PAGE;
 
           if (validStart && validEnd) {
             const rangeMin = Math.min(s, e);
-            const rangeMax = Math.max(s, e);
+            const rangeMax = Math.min(Math.max(s, e), rangeMin + MAX_PAGE_SPAN, MAX_SAFE_PAGE);
             if (rangeMin < minFound) minFound = rangeMin;
             if (rangeMax > maxFound) maxFound = rangeMax;
             for (let p = rangeMin; p <= rangeMax; p++) {
