@@ -393,17 +393,25 @@ export function useDrawerRegistration(drawerKey, rendererFn, dependencies = []) 
   // Update open drawer content when asynchronous dependencies (e.g. classes/teachers) resolve
   // ONLY if this specific drawer is actively open right now
   const activeDrawerKey = rightSidebarConfig?.drawerKey;
+  const isUpdatingRef = useRef(false);
+
   useEffect(() => {
     if (!drawerKey) return;
     if (activeDrawerKey === drawerKey) {
+      if (isUpdatingRef.current) return;
       const currentParams = getUrlParams();
       if (drawerKey === 'notifications' && !currentParams.get('id')) return;
       const config = rendererRef.current ? rendererRef.current(currentParams) : null;
       if (config) {
+        isUpdatingRef.current = true;
         openRightSidebar({
           ...config,
           drawerKey,
         });
+        const timer = setTimeout(() => {
+          isUpdatingRef.current = false;
+        }, 100);
+        return () => clearTimeout(timer);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

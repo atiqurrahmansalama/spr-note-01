@@ -15,9 +15,22 @@ import {
 } from './constants';
 import { LOCALES } from './locales';
 import { formatLocalizedNumber, formatLocalizedDate } from './formatters';
-import { getLanguageFromPath, buildLocalizedPath } from './routing';
+import { getLanguageFromPath, buildLocalizedPath, stripLanguagePrefix } from './routing';
 
 const I18nContext = createContext<I18nContextType | null>(null);
+
+// Module-level dynamic translation registry for colocated module locales
+const MODULE_LOCALES: Record<string, Partial<Record<LanguageCode, any>>> = {};
+
+export function registerModuleLocales(
+  namespace: string,
+  locales: Partial<Record<LanguageCode, any>>
+) {
+  MODULE_LOCALES[namespace] = {
+    ...MODULE_LOCALES[namespace],
+    ...locales,
+  };
+}
 
 function resolveInitialLanguage(): LanguageCode {
   if (typeof window === 'undefined') return DEFAULT_LANGUAGE;
@@ -25,8 +38,15 @@ function resolveInitialLanguage(): LanguageCode {
   // 1. URL Path Priority (e.g. /bn/..., /ar/...)
   const pathLang = getLanguageFromPath(window.location.pathname);
   if (pathLang && LANGUAGE_MAP[pathLang]) {
+    try {
+      const cleanPath = stripLanguagePrefix(window.location.pathname);
+      window.history.replaceState(null, '', cleanPath + window.location.search + window.location.hash);
+    } catch {
+      // Ignore history errors
+    }
     return pathLang;
   }
+
 
   // 2. LocalStorage Persistence
   try {
@@ -129,11 +149,13 @@ export function I18nProvider({ children }: I18nProviderProps) {
       }
 
       const keys = key.split('.');
+      const rootNs = keys[0];
+      const subKeys = keys.slice(1);
 
-      const getNested = (dict: any): string | null => {
+      const getNested = (dict: any, pathKeys: string[]): string | null => {
         if (!dict) return null;
         let curr = dict;
-        for (const k of keys) {
+        for (const k of pathKeys) {
           if (curr && typeof curr === 'object' && k in curr) {
             curr = curr[k];
           } else {
@@ -143,22 +165,36 @@ export function I18nProvider({ children }: I18nProviderProps) {
         return typeof curr === 'string' ? curr : null;
       };
 
-      // 1. Try active language dictionary
-      let translation = getNested(LOCALES[language]);
+      // 1. Try active language in module-level registry
+      let translation: string | null = MODULE_LOCALES[rootNs]?.[language]
+        ? getNested(MODULE_LOCALES[rootNs]![language], subKeys)
+        : null;
 
-      // 2. Fallback to English dictionary if missing in active language
-      if (!translation && language !== DEFAULT_LANGUAGE) {
-        translation = getNested(LOCALES[DEFAULT_LANGUAGE]);
+      // 2. Try active language in global LOCALES dictionary
+      if (!translation) {
+        translation = getNested(LOCALES[language], keys);
       }
 
-      // 3. Fallback to provided default text or raw key
+      // 3. Fallback to English in module-level registry
+      if (!translation && language !== DEFAULT_LANGUAGE) {
+        translation = MODULE_LOCALES[rootNs]?.[DEFAULT_LANGUAGE]
+          ? getNested(MODULE_LOCALES[rootNs]![DEFAULT_LANGUAGE], subKeys)
+          : null;
+      }
+
+      // 4. Fallback to English dictionary if missing in active language
+      if (!translation && language !== DEFAULT_LANGUAGE) {
+        translation = getNested(LOCALES[DEFAULT_LANGUAGE], keys);
+      }
+
+      // 5. Fallback to provided default text or raw key
       if (!translation) {
         translation = defaultText || keys[keys.length - 1] || key;
       }
 
-      // 4. Interpolate variables (e.g. {name}, {count})
+      // 6. Interpolate variables (supports both {name} and {{name}})
       if (interpolatedParams && Object.keys(interpolatedParams).length > 0) {
-        return translation.replace(/\{(\w+)\}/g, (_, varName) => {
+        return translation.replace(/\{\{?(\w+)\}?\}/g, (_, varName) => {
           return varName in interpolatedParams ? String(interpolatedParams[varName]) : `{${varName}}`;
         });
       }

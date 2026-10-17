@@ -62,7 +62,7 @@ export const navigation = {
   shortcuts: 'কিবোর্ড শর্টকাট',
   developerTools: 'অ্যাডমিন ও ডেভেলপার টুলস',
   userManagement: 'ব্যবহারকারী ব্যবস্থাপনা',
-  roleManagement: 'ভূমিকা ও পারমিশন',
+  roleManagement: 'রোল ব্যবস্থাপনা',
   activityAnalytics: 'অ্যাক্টিভিটি লগ',
   notificationGateways: 'নোটিফিকেশন গেটওয়ে',
   roleInvites: 'ইনভাইটেশন লিংক',

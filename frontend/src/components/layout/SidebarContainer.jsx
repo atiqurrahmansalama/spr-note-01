@@ -282,7 +282,6 @@ export default function SidebarContainer({
         { id: "User Management", name: "User Management", i18nKey: "userManagement", path: "/user-management", matchPaths: ["/user-management"], Icon: SectionControlIcon, key: "app_user_management" },
         { id: "Role Management", name: "Role Management", i18nKey: "roleManagement", path: "/role-management", matchPaths: ["/role-management"], Icon: SectionControlIcon, key: "app_role_management" },
         { id: "Activity Analytics", name: "Activity Analytics", i18nKey: "activityAnalytics", path: "/activity-analytics", matchPaths: ["/activity-analytics"], Icon: DashboardIcon, key: "app_activity_analytics" },
-        { id: "Role QR & Invites", name: "Role QR & Invites", i18nKey: "roleInvites", path: "/app-management/role-invites", matchPaths: ["/app-management/role-invites"], Icon: SectionControlIcon, key: "app_role_invites" },
         { id: "Notification Management", name: "Notification Management", i18nKey: "notificationGateways", path: "/app-management/notifications", matchPaths: ["/app-management/notifications", "/notifications"], Icon: BellIcon, key: "notification_management" },
       ]
     },

@@ -1,21 +1,23 @@
 import React from 'react';
 
+export interface DataViewFooterProps {
+  filteredCount?: number;
+  totalCount?: number;
+  itemLabel?: string;
+  extraContent?: React.ReactNode;
+  className?: string;
+}
+
 /**
  * Reusable Footer Strip for Data Tables & Card Grids
- *
- * @param {number} filteredCount
- * @param {number} totalCount
- * @param {string} itemLabel
- * @param {React.ReactNode} extraContent
- * @param {string} className
  */
-export default function DataViewFooter({
+export const DataViewFooter: React.FC<DataViewFooterProps> = ({
   filteredCount = 0,
   totalCount = 0,
   itemLabel = 'items',
   extraContent = null,
   className = '',
-}) {
+}) => {
   return (
     <div
       className={`pt-3.5 border-t theme-border flex flex-col sm:flex-row items-center justify-between gap-2 text-xs theme-text-secondary ${className}`}
@@ -34,4 +36,6 @@ export default function DataViewFooter({
       )}
     </div>
   );
-}
+};
+
+export default DataViewFooter;

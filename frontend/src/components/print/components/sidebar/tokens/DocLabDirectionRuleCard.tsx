@@ -21,7 +21,6 @@ export const DocLabDirectionRuleCard: React.FC<DocLabDirectionRuleCardProps> = (
   const [separator, setSeparator] = useState<string>('newline');
   const [prefix, setPrefix] = useState<string>('none');
   const [limit, setLimit] = useState<string>('');
-  const [indent, setIndent] = useState<number>(0);
   const [copied, setCopied] = useState<boolean>(false);
 
   // When switching direction, set smart default separator
@@ -60,16 +59,12 @@ export const DocLabDirectionRuleCard: React.FC<DocLabDirectionRuleCardProps> = (
       parts.push(`prefix: ${prefix}`);
     }
 
-    if (indent > 0) {
-      parts.push(`indent: ${indent}`);
-    }
-
     if (limit && Number(limit) > 0) {
       parts.push(`limit: ${limit}`);
     }
 
     return `| ${parts.join(', ')}`;
-  }, [direction, separator, order, prefix, limit, indent]);
+  }, [direction, separator, order, prefix, limit]);
 
   // Dynamic user-friendly description:
   const descriptionText = useMemo(() => {
@@ -80,18 +75,17 @@ export const DocLabDirectionRuleCard: React.FC<DocLabDirectionRuleCardProps> = (
     }
     const pfxText = prefix !== 'none' ? `, ${prefix} list` : '';
     const limitText = limit ? `, max ${limit}` : '';
-    const indentText = indent > 0 ? `, ${indent}sp indent` : '';
 
     if (direction === 'vertical') {
       const orderText = order === 'desc' ? 'Bottom-to-Top' : 'Top-to-Bottom';
       const sepDesc = separator === 'newline' ? 'lines' : `separated by "${separator}"`;
-      return `Vertical ${sepDesc} (${orderText})${pfxText}${limitText}${indentText}`;
+      return `Vertical ${sepDesc} (${orderText})${pfxText}${limitText}`;
     } else {
       const sepDesc = separator === ', ' ? 'comma' : separator === ' • ' ? 'bullet (•)' : separator === ' - ' ? 'dash (-)' : separator === 'newline' ? 'new line' : `"${separator}"`;
       const orderDesc = order === 'desc' ? ' (Reverse)' : '';
-      return `Horizontal inline separated by ${sepDesc}${orderDesc}${pfxText}${limitText}${indentText}`;
+      return `Horizontal inline separated by ${sepDesc}${orderDesc}${pfxText}${limitText}`;
     }
-  }, [direction, separator, order, prefix, limit, indent]);
+  }, [direction, separator, order, prefix, limit]);
 
   const handleInsertAndCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -158,9 +152,9 @@ export const DocLabDirectionRuleCard: React.FC<DocLabDirectionRuleCardProps> = (
       collapsible={true}
       defaultExpanded={false}
     >
-      <div className="space-y-2.5 pt-1 text-left">
+      <div className="space-y-2.5 pt-1 text-left @container">
         {/* Row 1: Direction & Flow Order */}
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 @[380px]:grid-cols-2 gap-2.5">
           <CustomSelect
             label="Direction"
             options={directionOptions}
@@ -177,8 +171,8 @@ export const DocLabDirectionRuleCard: React.FC<DocLabDirectionRuleCardProps> = (
           />
         </div>
 
-        {/* Row 2: Separator & Limit Items */}
-        <div className="grid grid-cols-2 gap-2.5">
+        {/* Row 2: Separator & Prefix Style */}
+        <div className="grid grid-cols-1 @[380px]:grid-cols-2 gap-2.5">
           <CustomSelect
             label="Separator"
             options={separatorOptions}
@@ -186,6 +180,17 @@ export const DocLabDirectionRuleCard: React.FC<DocLabDirectionRuleCardProps> = (
             onChange={(val: any) => setSeparator(val !== undefined ? String(val) : (direction === 'vertical' ? 'newline' : ', '))}
             size="xs"
           />
+          <CustomSelect
+            label="Prefix Style"
+            options={prefixOptions}
+            value={prefix}
+            onChange={(val: any) => setPrefix(val || 'none')}
+            size="xs"
+          />
+        </div>
+
+        {/* Row 3: Limit Items */}
+        <div className="grid grid-cols-1 @[380px]:grid-cols-2 gap-2.5">
           <CustomInput
             label="Limit Items"
             type="number"
@@ -206,33 +211,6 @@ export const DocLabDirectionRuleCard: React.FC<DocLabDirectionRuleCardProps> = (
               if (!isNaN(num) && num >= 1 && num <= 99) setLimit(String(num));
             }}
             title="Max items to include (empty for all)"
-          />
-        </div>
-
-        {/* Row 3: Prefix Style & Indent */}
-        <div className="grid grid-cols-2 gap-2.5">
-          <CustomSelect
-            label="Prefix Style"
-            options={prefixOptions}
-            value={prefix}
-            onChange={(val: any) => setPrefix(val || 'none')}
-            size="xs"
-          />
-          <CustomInput
-            label="Indent"
-            type="number"
-            size="xs"
-            min={0}
-            max={30}
-            allowDecimals={false}
-            scrollable={true}
-            value={indent}
-            onChange={(val: any) => {
-              const rawStr = typeof val === 'string' ? val : val?.target?.value;
-              const num = parseInt(rawStr, 10);
-              if (!isNaN(num) && num >= 0 && num <= 30) setIndent(num);
-            }}
-            title="Number of indent spaces (0-30)"
           />
         </div>
 

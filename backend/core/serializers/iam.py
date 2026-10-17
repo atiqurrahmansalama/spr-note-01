@@ -297,6 +297,8 @@ class UserAdminSerializer(serializers.ModelSerializer):
     role = serializers.SerializerMethodField()
     role_info = serializers.SerializerMethodField()
     formatted_created_at = serializers.SerializerMethodField()
+    is_online = serializers.SerializerMethodField()
+    last_activity = serializers.SerializerMethodField()
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
@@ -320,11 +322,13 @@ class UserAdminSerializer(serializers.ModelSerializer):
             'assigned_group',
             'is_active',
             'is_deactivated',
+            'is_online',
+            'last_activity',
             'date_joined',
             'formatted_created_at',
             'password',
         ]
-        read_only_fields = ['id', 'formatted_created_at', 'institution_name']
+        read_only_fields = ['id', 'formatted_created_at', 'institution_name', 'is_online', 'last_activity']
         extra_kwargs = {
             'password': {'write_only': True, 'required': False},
             'phone_number': {'required': False, 'allow_null': True, 'allow_blank': True},
@@ -367,11 +371,25 @@ class UserAdminSerializer(serializers.ModelSerializer):
     def get_role_info(self, obj):
         return self.get_role(obj)
 
+    @extend_schema_field(OpenApiTypes.BOOL)
+    def get_is_online(self, obj):
+        online_ids = self.context.get('online_user_ids')
+        if online_ids is not None:
+            return obj.id in online_ids
+        threshold = timezone.now() - timedelta(minutes=5)
+        return UserSession.objects.filter(user=obj, is_active=True, last_activity__gte=threshold).exists()
+
+    @extend_schema_field(OpenApiTypes.DATETIME)
+    def get_last_activity(self, obj):
+        latest_session = UserSession.objects.filter(user=obj).order_by('-last_activity').first()
+        return latest_session.last_activity if latest_session else None
+
     @extend_schema_field(OpenApiTypes.STR)
     def get_formatted_created_at(self, obj):
         if hasattr(obj, 'date_joined') and obj.date_joined:
             return obj.date_joined.strftime("%b %d, %Y")
         return "--"
+
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)

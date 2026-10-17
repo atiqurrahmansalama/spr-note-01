@@ -14,6 +14,7 @@ import { EditorSerializer } from '../../editor/EditorSerializer';
 import { DocumentFactory } from '../../../model/documentFactory';
 import { HtmlExporter } from '../../../model/serialization/htmlExporter';
 import { HtmlImporter } from '../../../model/serialization/htmlImporter';
+import { EditorDomAdapter } from '../../editor/EditorDomAdapter';
 
 export async function runSmartTokenChipsPopoverUnitTests(): Promise<{
   passed: number;
@@ -296,6 +297,144 @@ export async function runSmartTokenChipsPopoverUnitTests(): Promise<{
     assert(summary.skipData === 'MI Tawfiq', 'Extracts skipData');
     assert(summary.removeLine === 'b1-5', 'Extracts removeLine rule');
     assert(summary.directiveBadges.length >= 3, 'Generates multiple directive badges for wrapped display');
+  }
+
+  // 15. Dynamic Caret Proximity Reveal for Token Chips
+  {
+    // A. Caret in text node immediately after token
+    const mockTokenEl: any = {
+      nodeType: 1,
+      tagName: 'SPAN',
+      className: 'doclab-token',
+      nextSibling: null,
+      previousSibling: null,
+      contains: () => false,
+    };
+    const mockAfterTextNode: any = {
+      nodeType: 3,
+      nodeValue: ' world',
+      previousSibling: mockTokenEl,
+      nextSibling: null,
+    };
+    mockTokenEl.nextSibling = mockAfterTextNode;
+
+    // Caret at offset 0 (touching token from after) -> true
+    const rangeAfter0: any = {
+      startContainer: mockAfterTextNode,
+      startOffset: 0,
+      collapsed: true,
+    };
+    assert(
+      EditorDomAdapter.isCaretAdjacentToToken(mockTokenEl, rangeAfter0),
+      'Proximity Reveal: Caret at offset 0 of following text node is adjacent'
+    );
+
+    // Caret at offset 1 with leading space -> true
+    const rangeAfter1: any = {
+      startContainer: mockAfterTextNode,
+      startOffset: 1,
+      collapsed: true,
+    };
+    assert(
+      EditorDomAdapter.isCaretAdjacentToToken(mockTokenEl, rangeAfter1),
+      'Proximity Reveal: Caret at offset 1 (trailing space) of following text node is adjacent'
+    );
+
+    // Caret at offset 4 (inside "world") -> false
+    const rangeAfter4: any = {
+      startContainer: mockAfterTextNode,
+      startOffset: 4,
+      collapsed: true,
+    };
+    assert(
+      !EditorDomAdapter.isCaretAdjacentToToken(mockTokenEl, rangeAfter4),
+      'Proximity Reveal: Caret inside word 4 chars away is NOT adjacent'
+    );
+
+    // B. Caret in text node immediately before token
+    const mockBeforeTextNode: any = {
+      nodeType: 3,
+      nodeValue: 'Hello ',
+      previousSibling: null,
+      nextSibling: mockTokenEl,
+    };
+    mockTokenEl.previousSibling = mockBeforeTextNode;
+
+    // Caret at offset 6 (at end of 'Hello ') -> true
+    const rangeBefore6: any = {
+      startContainer: mockBeforeTextNode,
+      startOffset: 6,
+      collapsed: true,
+    };
+    assert(
+      EditorDomAdapter.isCaretAdjacentToToken(mockTokenEl, rangeBefore6),
+      'Proximity Reveal: Caret at end of preceding text node is adjacent'
+    );
+
+    // Caret at offset 5 (before space in 'Hello ') -> true
+    const rangeBefore5: any = {
+      startContainer: mockBeforeTextNode,
+      startOffset: 5,
+      collapsed: true,
+    };
+    assert(
+      EditorDomAdapter.isCaretAdjacentToToken(mockTokenEl, rangeBefore5),
+      'Proximity Reveal: Caret immediately before boundary space is adjacent'
+    );
+
+    // Caret at offset 2 (inside 'Hello') -> false
+    const rangeBefore2: any = {
+      startContainer: mockBeforeTextNode,
+      startOffset: 2,
+      collapsed: true,
+    };
+    assert(
+      !EditorDomAdapter.isCaretAdjacentToToken(mockTokenEl, rangeBefore2),
+      'Proximity Reveal: Caret deep inside preceding word is NOT adjacent'
+    );
+
+    // C. Caret inside container element at child index
+    const mockParent: any = {
+      nodeType: 1,
+      childNodes: [mockBeforeTextNode, mockTokenEl, mockAfterTextNode],
+    };
+
+    // Offset 1 (index of mockTokenEl, right before it) -> true
+    const rangeParent1: any = {
+      startContainer: mockParent,
+      startOffset: 1,
+      collapsed: true,
+    };
+    assert(
+      EditorDomAdapter.isCaretAdjacentToToken(mockTokenEl, rangeParent1),
+      'Proximity Reveal: Element child offset before token is adjacent'
+    );
+
+    // Offset 2 (index right after mockTokenEl) -> true
+    const rangeParent2: any = {
+      startContainer: mockParent,
+      startOffset: 2,
+      collapsed: true,
+    };
+    assert(
+      EditorDomAdapter.isCaretAdjacentToToken(mockTokenEl, rangeParent2),
+      'Proximity Reveal: Element child offset after token is adjacent'
+    );
+
+    // D. Caret directly inside token element
+    const mockInsideToken: any = {
+      nodeType: 1,
+      contains: (n: any) => n === mockInsideToken,
+    };
+    const rangeInside: any = {
+      startContainer: mockInsideToken,
+      startOffset: 0,
+      collapsed: true,
+    };
+    assert(
+      EditorDomAdapter.isCaretAdjacentToToken(mockInsideToken, rangeInside),
+      'Proximity Reveal: Caret inside token itself is adjacent'
+    );
   }
 
   return { passed, failed, suiteName };

@@ -170,13 +170,18 @@ export function buildTokenString(
   baseKey: string,
   options: {
     direction?: 'vertical' | 'horizontal';
+    order?: 'asc' | 'desc';
     separator?: string;
+    prefix?: string;
+    limit?: number;
     indent?: number;
     fromLine?: number;
     toLine?: number;
     filters?: string[];
     skipData?: string;
     removeLine?: string;
+    fallback?: string;
+    default?: string;
   } = {}
 ): string {
   const cleanKey = (baseKey || '').trim().replace(/^\{+/, '').replace(/\}+$/, '');
@@ -184,7 +189,7 @@ export function buildTokenString(
 
   const directiveParts: string[] = [];
 
-  // Group all key-value directive options (layout, indentation, conditional skip) into one directive segment
+  // Group all key-value directive options (layout, indentation, conditional skip, fallback) into one directive segment
   const directiveOptionsParts: string[] = [];
   if (options.direction) {
     directiveOptionsParts.push(`direction: ${options.direction}`);
@@ -197,6 +202,12 @@ export function buildTokenString(
     } else {
       directiveOptionsParts.push(`separator: "${options.separator}"`);
     }
+  }
+  if (options.order && options.order === 'desc') {
+    directiveOptionsParts.push(`order: ${options.order}`);
+  }
+  if (options.prefix && options.prefix !== 'none') {
+    directiveOptionsParts.push(`prefix: ${options.prefix}`);
   }
 
   // Indentation directive
@@ -211,12 +222,23 @@ export function buildTokenString(
     directiveOptionsParts.push(indentSpec);
   }
 
+  // Limit directive
+  if (options.limit && options.limit > 0) {
+    directiveOptionsParts.push(`limit: ${options.limit}`);
+  }
+
   // Skip Data & Remove Line directives
   if (options.skipData) {
     directiveOptionsParts.push(`skipData: "${options.skipData}"`);
   }
   if (options.removeLine) {
     directiveOptionsParts.push(`removeLine: ${options.removeLine}`);
+  }
+
+  // Fallback / Default directive
+  const fallbackVal = options.fallback !== undefined ? options.fallback : options.default;
+  if (fallbackVal !== undefined && fallbackVal !== null) {
+    directiveOptionsParts.push(`default: "${fallbackVal}"`);
   }
 
   if (directiveOptionsParts.length > 0) {

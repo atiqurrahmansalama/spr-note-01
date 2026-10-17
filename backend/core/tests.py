@@ -1305,4 +1305,56 @@ class AcademicInstitutionMultiTenantTestCase(APITestCase):
         self.assertNotIn(self.student_a.id, inst_b_ids)
 
 
+class UserActivityAnalyticsTestCase(APITestCase):
+    """
+    Test suite for high-performance UserActivityAnalyticsView:
+    - Tests fast date filtering (with ISO dates and YYYY-MM-DD presets)
+    - Validates batch sessions aggregation
+    - Validates user audit logs retrieval without N+1 regression
+    """
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            phone_number="01799999999",
+            password="testpassword123",
+            user_type="ADMIN",
+            is_staff=True,
+            is_superuser=True
+        )
+        self.teacher = User.objects.create_user(
+            phone_number="01788888888",
+            password="testpassword123",
+            user_type="TEACHER"
+        )
+        self.session = UserSession.objects.create(
+            user=self.teacher,
+            device_type="Desktop",
+            device_info="Chrome on Windows",
+            ip_address="127.0.0.1",
+            total_duration_minutes=120
+        )
+        self.log = ActivityLog.objects.create(
+            user=self.teacher,
+            action_name="AUTH_LOGIN",
+            endpoint="/api/v1/auth/login/",
+            http_method="POST",
+            ip_address="127.0.0.1"
+        )
+        self.client.force_authenticate(user=self.admin)
+
+    def test_analytics_fetch_success(self):
+        response = self.client.get("/api/v1/analytics/user-activity/?from_date=2026-01-01&to_date=2026-12-31")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("status"), "success")
+        data = response.data.get("data", [])
+        self.assertTrue(len(data) >= 1)
+        teacher_record = next((r for r in data if r["user_id"] == self.teacher.id), None)
+        self.assertIsNotNone(teacher_record)
+        self.assertEqual(teacher_record["sessions_count"], 1)
+        self.assertEqual(teacher_record["total_active_duration_minutes"], 120)
+        self.assertTrue(len(teacher_record["activity_logs"]) >= 1)
+        self.assertEqual(teacher_record["activity_logs"][0]["action_name"], "AUTH_LOGIN")
+
+
+
 

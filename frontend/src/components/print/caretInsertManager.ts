@@ -17,6 +17,7 @@ import { TokenInsertPayload, Mark } from './model/types';
 import { EditorCommands } from './layout/editor/EditorCommands';
 import { EditorDomAdapter } from './layout/editor/EditorDomAdapter';
 import { EditorTransaction } from './layout/editor/editorTypes';
+import { formatDirectiveForInsertion } from './docLabDirectiveEngine';
 
 export interface ActiveCaretState {
   range: Range | null;
@@ -236,14 +237,22 @@ export function insertTokenAtActiveCaret(
     let end = selectionEnd ?? inputEl.value.length;
     const val = inputEl.value || '';
 
-    // Smart spacing before directive pipe:
-    let formattedTokenString = tokenString;
-    if (isDirective && start > 0 && !val.slice(0, start).endsWith(' ') && !tokenString.startsWith(' ')) {
-      formattedTokenString = ` ${tokenString}`;
-    }
+    // Intelligent directive formatting and deduplication / in-place updating:
+    let nextVal = val;
+    let nextPos = start;
 
-    // Smart deduplication for standard placeholder tokens only:
-    if (!isDirective) {
+    if (isDirective) {
+      const beforeText = val.slice(0, start);
+      const afterText = val.slice(end);
+      const result = formatDirectiveForInsertion(beforeText, tokenString, afterText);
+
+      const replaceStart = Math.max(0, start - result.replaceCharsBefore);
+      const replaceEnd = Math.min(val.length, end + (result.replaceCharsAfter || 0));
+
+      nextVal = val.slice(0, replaceStart) + result.textToInsert + val.slice(replaceEnd);
+      nextPos = replaceStart + result.textToInsert.length;
+    } else {
+      // Smart deduplication for standard placeholder tokens only:
       const beforeText = val.slice(0, start);
       if (beforeText.endsWith('{{')) {
         start -= 2;
@@ -257,9 +266,10 @@ export function insertTokenAtActiveCaret(
       } else if (afterText.startsWith('}')) {
         end += 1;
       }
-    }
 
-    const nextVal = val.slice(0, start) + formattedTokenString + val.slice(end);
+      nextVal = val.slice(0, start) + tokenString + val.slice(end);
+      nextPos = start + tokenString.length;
+    }
 
     // Use native prototype setter so React 16/17/18 synthetic event trackers detect the value change
     const tracker = (inputEl as any)._valueTracker;
@@ -278,7 +288,6 @@ export function insertTokenAtActiveCaret(
     }
 
     // Reposition cursor right after inserted token
-    const nextPos = start + formattedTokenString.length;
     inputEl.focus();
     inputEl.setSelectionRange(nextPos, nextPos);
 

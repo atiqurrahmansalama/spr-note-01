@@ -803,6 +803,15 @@ class UserViewSet(viewsets.ModelViewSet):
             )
         return qs
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        threshold = timezone.now() - timedelta(minutes=5)
+        context['online_user_ids'] = set(
+            UserSession.objects.filter(is_active=True, last_activity__gte=threshold).values_list('user_id', flat=True)
+        )
+        return context
+
+
     def perform_create(self, serializer):
         user_type = self.request.data.get('user_type') or self.request.data.get('role') or self.request.data.get('role_code')
         role_obj = None
@@ -832,6 +841,41 @@ class UserViewSet(viewsets.ModelViewSet):
             serializer.save(role=role_obj)
         else:
             serializer.save()
+
+    @action(detail=True, methods=['post'], url_path='reset-password')
+    def reset_password(self, request, pk=None):
+        user = self.get_object()
+        new_password = request.data.get('new_password') or request.data.get('password')
+        if not new_password or len(str(new_password).strip()) < 8:
+            return Response({'error': 'Password must be at least 8 characters long.'}, status=status.HTTP_400_BAD_REQUEST)
+        user.set_password(str(new_password).strip())
+        user.save()
+        return Response({'success': True, 'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='bulk-actions')
+    def bulk_actions(self, request):
+        action_name = request.data.get('action')
+        user_ids = request.data.get('user_ids', [])
+        if not user_ids or not isinstance(user_ids, list):
+            return Response({'error': 'No user IDs provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        target_users = self.get_queryset().filter(id__in=user_ids)
+        count = target_users.count()
+        if action_name == 'activate':
+            target_users.update(is_active=True, is_deactivated=False)
+            return Response({'success': True, 'count': count, 'message': f'{count} users activated successfully.'})
+        elif action_name == 'deactivate':
+            safe_targets = target_users.exclude(id=request.user.id).exclude(is_superuser=True)
+            deactivated_count = safe_targets.update(is_active=False, is_deactivated=True)
+            return Response({'success': True, 'count': deactivated_count, 'message': f'{deactivated_count} users deactivated successfully.'})
+        elif action_name == 'assign_role':
+            role_code = request.data.get('role_code')
+            role_obj = UserRole.objects.filter(code__iexact=role_code).first()
+            if not role_obj:
+                return Response({'error': 'Invalid role specified.'}, status=status.HTTP_400_BAD_REQUEST)
+            target_users.update(role=role_obj, user_type=role_obj.code)
+            return Response({'success': True, 'count': count, 'message': f'Role updated for {count} users.'})
+        return Response({'error': 'Unsupported bulk action.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserNotificationPreferenceView(APIView):
@@ -1435,8 +1479,9 @@ class UserRoleListCreateView(APIView):
     required_section_key = 'app_role_management'
 
     def get(self, request):
-        from core.services import seed_system_roles
-        seed_system_roles()
+        if not UserRole.objects.filter(code='SUPER_ADMIN').exists():
+            from core.services import seed_system_roles
+            seed_system_roles()
         default_google_role = SystemSetting.get_val('DEFAULT_GOOGLE_ROLE', 'GUARDIAN')
         roles = UserRole.objects.all().prefetch_related('action_permissions').order_by('hierarchy_level', 'name')
         
@@ -1457,7 +1502,7 @@ class UserRoleListCreateView(APIView):
                 'description': role.description,
                 'hierarchy_level': role.hierarchy_level,
                 'color_theme': role.color_theme,
-                'is_system_role': role.is_system_role or role.code == 'SUPER_ADMIN',
+                'is_system_role': role.code == 'SUPER_ADMIN',
                 'is_google_default': role.code == default_google_role,
                 'user_count': user_count,
                 'action_permissions': {
@@ -1525,7 +1570,7 @@ class UserRoleDetailView(APIView):
             'description': role.description,
             'hierarchy_level': role.hierarchy_level,
             'color_theme': role.color_theme,
-            'is_system_role': role.is_system_role or role.code == 'SUPER_ADMIN',
+            'is_system_role': role.code == 'SUPER_ADMIN',
             'is_google_default': role.code == default_google_role,
             'user_count': user_count,
             'action_permissions': {
@@ -1568,8 +1613,8 @@ class UserRoleDetailView(APIView):
         if not role:
             return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        if role.code == 'SUPER_ADMIN' or role.is_system_role:
-            return Response({'error': 'System role cannot be deleted'}, status=status.HTTP_400_BAD_REQUEST)
+        if role.code == 'SUPER_ADMIN':
+            return Response({'error': 'Super Admin role cannot be deleted'}, status=status.HTTP_400_BAD_REQUEST)
 
         user_count = User.objects.filter(Q(role=role) | Q(user_type=role.code)).count()
         if user_count > 0:

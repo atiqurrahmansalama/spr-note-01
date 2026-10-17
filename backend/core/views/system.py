@@ -285,19 +285,21 @@ class UserActivityAnalyticsView(APIView):
         }
     )
     def get(self, request):
+        from collections import defaultdict
+
         from_time_param = request.query_params.get('from_time') or request.query_params.get('from_date')
         to_time_param = request.query_params.get('to_time') or request.query_params.get('to_date')
         user_id_param = request.query_params.get('user_id') or request.query_params.get('teacher_id')
         user_type_param = request.query_params.get('user_type') or request.query_params.get('role')
         device_type_param = request.query_params.get('device_type')
 
-        users_qs = User.objects.all()
+        users_qs = User.objects.all().select_related('teacher_profile')
         if user_id_param:
             users_qs = users_qs.filter(id=user_id_param)
         if user_type_param:
             users_qs = users_qs.filter(user_type__iexact=user_type_param)
 
-        sessions_qs = UserSession.objects.all().select_related('user')
+        sessions_qs = UserSession.objects.all()
         if device_type_param:
             sessions_qs = sessions_qs.filter(device_type__iexact=device_type_param)
 
@@ -306,29 +308,37 @@ class UserActivityAnalyticsView(APIView):
 
         if from_time_param:
             try:
-                from_dt = timezone.datetime.fromisoformat(from_time_param.replace('Z', '+00:00'))
-            except Exception:
-                try:
+                if len(from_time_param) == 10 and '-' in from_time_param:
                     from_dt = timezone.make_aware(timezone.datetime.strptime(from_time_param, '%Y-%m-%d'))
-                except Exception:
-                    pass
+                else:
+                    from_dt = timezone.datetime.fromisoformat(from_time_param.replace('Z', '+00:00'))
+                    if timezone.is_naive(from_dt):
+                        from_dt = timezone.make_aware(from_dt)
+            except Exception:
+                pass
 
         if to_time_param:
             try:
-                to_dt = timezone.datetime.fromisoformat(to_time_param.replace('Z', '+00:00'))
-            except Exception:
-                try:
+                if len(to_time_param) == 10 and '-' in to_time_param:
                     dt = timezone.datetime.strptime(to_time_param, '%Y-%m-%d')
-                    to_dt = timezone.make_aware(dt.replace(hour=23, minute=59, second=59))
-                except Exception:
-                    pass
+                    to_dt = timezone.make_aware(dt.replace(hour=23, minute=59, second=59, microsecond=999999))
+                else:
+                    to_dt = timezone.datetime.fromisoformat(to_time_param.replace('Z', '+00:00'))
+                    if timezone.is_naive(to_dt):
+                        to_dt = timezone.make_aware(to_dt)
+            except Exception:
+                pass
 
         if from_dt:
             sessions_qs = sessions_qs.filter(last_activity__gte=from_dt)
         if to_dt:
             sessions_qs = sessions_qs.filter(login_at__lte=to_dt)
 
-        logs_qs = ActivityLog.objects.all().select_related('user')
+        sessions_by_user = defaultdict(list)
+        for s in sessions_qs.order_by('-login_at'):
+            sessions_by_user[s.user_id].append(s)
+
+        logs_qs = ActivityLog.objects.all()
         if from_dt:
             logs_qs = logs_qs.filter(timestamp__gte=from_dt)
         if to_dt:
@@ -338,7 +348,7 @@ class UserActivityAnalyticsView(APIView):
         grand_total_minutes = 0
 
         for user in users_qs:
-            user_sessions = list(sessions_qs.filter(user=user))
+            user_sessions = sessions_by_user.get(user.id, [])
             if not user_sessions and not user_id_param and not user_type_param:
                 continue
 
@@ -357,20 +367,19 @@ class UserActivityAnalyticsView(APIView):
                 formatted_parts.append(f"{mins}m")
             formatted_duration = " ".join(formatted_parts)
 
-            windows = []
-            for s in user_sessions[:50]:
-                windows.append({
-                    "session_id": s.id,
-                    "device_type": s.device_type,
-                    "device_info": s.device_info,
-                    "ip_address": s.ip_address,
-                    "from_time": s.login_at,
-                    "to_time": s.logout_at or s.last_activity,
-                    "duration_minutes": s.total_duration_minutes,
-                    "is_active": s.is_active
-                })
+            windows = [{
+                "session_id": s.id,
+                "device_type": s.device_type,
+                "device_info": s.device_info,
+                "ip_address": s.ip_address,
+                "from_time": s.login_at,
+                "to_time": s.logout_at or s.last_activity,
+                "duration_minutes": s.total_duration_minutes,
+                "is_active": s.is_active
+            } for s in user_sessions[:50]]
 
-            user_logs = list(logs_qs.filter(user=user)[:20])
+            # Fast query using indexed user_id and primary key order
+            user_logs = list(logs_qs.filter(user_id=user.id).order_by('-id')[:20])
             logs_data = [{
                 "id": l.id,
                 "action_name": l.action_name,

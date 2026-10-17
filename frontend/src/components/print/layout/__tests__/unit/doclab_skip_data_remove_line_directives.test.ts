@@ -14,6 +14,7 @@ import {
   applySkipDataAndRemoveLines,
   formatMultiValueData,
   parseTokenDirective,
+  formatDirectiveForInsertion,
 } from '../../../docLabDirectiveEngine';
 import {
   extractTokenSummary,
@@ -436,6 +437,102 @@ export async function runSkipDataRemoveLineDirectivesUnitTests(): Promise<{
       mergedProgress.includes('Stuck: None'),
       'Clean empty detail-mis allows removeLine: self to remove mistake line and default: "None" on detail-stuck'
     );
+
+    // Case 13: formatDirectiveForInsertion - intelligent deduplication & comma chaining
+    // 13a. No pipe before caret -> standard pipe insertion
+    const noPipeRes = formatDirectiveForInsertion('student_name', '| indent: 5');
+    assert(noPipeRes.textToInsert === ' | indent: 5', 'Inserts " | indent: 5" when no pipe exists before caret');
+    assert(noPipeRes.replaceCharsBefore === 0, 'replaceCharsBefore is 0');
+
+    // 13b. Trailing space with no pipe -> pipe insertion without extra space
+    const noPipeSpaceRes = formatDirectiveForInsertion('student_name ', '| indent: 5');
+    assert(noPipeSpaceRes.textToInsert === '| indent: 5', 'Inserts "| indent: 5" when trailing space exists with no pipe');
+
+    // 13c. Pipe already exists without directive content -> appends directive directly without pipe or comma
+    const pipeRes1 = formatDirectiveForInsertion('student_name |', '| indent: 5');
+    assert(pipeRes1.textToInsert === ' indent: 5', 'Appends " indent: 5" after bare pipe without duplicate pipe');
+
+    const pipeRes2 = formatDirectiveForInsertion('student_name | ', '| indent: 5');
+    assert(pipeRes2.textToInsert === 'indent: 5', 'Appends "indent: 5" after pipe with trailing space without duplicate pipe');
+
+    // 13d. Existing directive after pipe -> inserts comma and directive, strips pipe
+    const existingDirRes = formatDirectiveForInsertion('student_name | direction: vertical', '| indent: 5');
+    assert(existingDirRes.textToInsert === ', indent: 5', 'Appends ", indent: 5" when directive already exists after pipe');
+    assert(existingDirRes.replaceCharsBefore === 0, 'No replacement needed when no trailing space');
+
+    // 13e. Existing directive with trailing space -> cleanly replaces trailing space with comma
+    const existingDirSpaceRes = formatDirectiveForInsertion('student_name | direction: vertical ', '| indent: 5');
+    assert(existingDirSpaceRes.textToInsert === ', indent: 5', 'Appends ", indent: 5"');
+    assert(existingDirSpaceRes.replaceCharsBefore === 1, 'Replaces 1 trailing space before caret so comma attaches cleanly');
+
+    // 13f. Existing directive already ending with comma -> appends directive with space, no duplicate comma
+    const commaRes = formatDirectiveForInsertion('student_name | direction: vertical,', '| indent: 5');
+    assert(commaRes.textToInsert === ' indent: 5', 'Appends " indent: 5" after existing comma without duplicate comma');
+
+    const commaSpaceRes = formatDirectiveForInsertion('student_name | direction: vertical, ', '| indent: 5');
+    assert(commaSpaceRes.textToInsert === 'indent: 5', 'Appends "indent: 5" after existing comma and space');
+
+    // 13g. Inside mustache brackets -> properly isolates token context
+    const mustacheRes = formatDirectiveForInsertion('Hello {{student_name | direction: vertical', '| indent: 5');
+    assert(mustacheRes.textToInsert === ', indent: 5', 'Correctly chains with comma inside {{ ... }}');
+
+    // 13h. Multiple tokens in text -> ignores pipe from earlier closed token
+    const multiTokenRes = formatDirectiveForInsertion('{{prev_token | dir: v}} some text {{current_token', '| indent: 5');
+    assert(multiTokenRes.textToInsert === ' | indent: 5', 'Ignores pipe from closed earlier token when current token has no pipe');
+
+    // 13i. Chained multi-rule integration
+    const chainedRes = formatDirectiveForInsertion('exam_date | direction: horizontal, separator: cell', '| skipData: "empty", removeLine: self');
+    assert(chainedRes.textToInsert === ', skipData: "empty", removeLine: self', 'Chains skipData cleanly after existing directives');
+
+    // Case 14: In-place directive update & deduplication (re-using directive domain)
+    // 14a. Re-inserting same domain (indent) updates in-place instead of duplicating
+    const reIndentRes = formatDirectiveForInsertion('student_name | indent: 5', '| indent: 10');
+    assert(reIndentRes.isTokenUpdate === true, 're-inserting indent marks isTokenUpdate: true');
+    assert(reIndentRes.textToInsert === 'student_name | indent: 10', 'Updates indent from 5 to 10 in-place');
+    assert(reIndentRes.replaceCharsBefore === 'student_name | indent: 5'.length, 'Spans full token before caret');
+
+    // 14b. Updating direction preserves non-conflicting directives (indent)
+    const updateDirRes = formatDirectiveForInsertion(
+      'student_name | direction: vertical, indent: 5',
+      '| direction: horizontal, separator: cell'
+    );
+    assert(updateDirRes.isTokenUpdate === true, 'Updating direction marks isTokenUpdate: true');
+    assert(
+      updateDirRes.textToInsert === 'student_name | direction: horizontal, separator: cell, indent: 5',
+      'Updates direction & separator while seamlessly preserving existing indent: 5'
+    );
+
+    // 14c. Updating fallback / default in-place
+    const updateFallbackRes = formatDirectiveForInsertion('blood_group | default: "N/A"', '| default: "---"');
+    assert(updateFallbackRes.isTokenUpdate === true, 'Updating default marks isTokenUpdate: true');
+    assert(updateFallbackRes.textToInsert === 'blood_group | default: "---"', 'Updates default to "---"');
+
+    // 14d. Updating skipData and removeLine in-place
+    const updateSkipRes = formatDirectiveForInsertion(
+      'student_name | skipData: "empty", removeLine: self',
+      '| skipData: "MI Tawfiq", removeLine: b'
+    );
+    assert(updateSkipRes.isTokenUpdate === true, 'Updating skipData marks isTokenUpdate: true');
+    assert(
+      updateSkipRes.textToInsert === 'student_name | skipData: "MI Tawfiq", removeLine: b',
+      'Updates skipData and removeLine in-place'
+    );
+
+    // 14e. Non-conflicting directive does NOT trigger in-place update (falls back to clean comma chaining)
+    const freshDirectiveRes = formatDirectiveForInsertion('student_name | direction: vertical', '| indent: 5');
+    assert(freshDirectiveRes.isTokenUpdate === false, 'Fresh non-conflicting directive isTokenUpdate is false');
+    assert(freshDirectiveRes.textToInsert === ', indent: 5', 'Appends fresh directive with comma chaining');
+
+    // 14f. In-place update inside mustache brackets {{ ... }}
+    const mustacheUpdateRes = formatDirectiveForInsertion(
+      'Hello {{student_name | indent: 5',
+      '| indent: 10',
+      '}} world'
+    );
+    assert(mustacheUpdateRes.isTokenUpdate === true, 'Inside mustache brackets isTokenUpdate: true');
+    assert(mustacheUpdateRes.textToInsert === 'student_name | indent: 10', 'Replaces token content inside {{ ... }}');
+    assert(mustacheUpdateRes.replaceCharsBefore === 'student_name | indent: 5'.length, 'Spans beforeText inside {{');
+    assert(mustacheUpdateRes.replaceCharsAfter === 0, 'replaceCharsAfter is 0 so }} world is preserved');
   }
 
   return { passed, failed, suiteName };

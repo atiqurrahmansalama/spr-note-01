@@ -40,17 +40,14 @@ export function stripLanguagePrefix(pathname: string): string {
 
 /**
  * Constructs a localized URL pathname for a target language.
- * Example: buildLocalizedPath('/students', 'bn') -> '/bn/students'
+ * In SPR Note (pure SPA architecture with persistent context storage),
+ * routes are standard paths without locale prefixes.
  */
 export function buildLocalizedPath(
   pathname: string,
-  targetLang: LanguageCode,
-  includeDefaultPrefix = false
+  _targetLang?: LanguageCode,
+  _includeDefaultPrefix = false
 ): string {
-  const cleanPath = stripLanguagePrefix(pathname);
-  if (targetLang === DEFAULT_LANGUAGE && !includeDefaultPrefix) {
-    return cleanPath;
-  }
-  const prefix = `/${targetLang}`;
-  return cleanPath === '/' ? prefix : `${prefix}${cleanPath}`;
+  return stripLanguagePrefix(pathname);
 }
+

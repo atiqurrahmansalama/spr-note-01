@@ -20,7 +20,11 @@ import {
   sanitizeLogicalDocumentHtml,
 } from '../logicalDocument';
 import { ClipboardSanitizer } from './ClipboardSanitizer';
-import { parseTokenDirective, TokenDirectiveOptions } from '../../docLabDirectiveEngine';
+import {
+  parseTokenDirective,
+  TokenDirectiveOptions,
+  formatDirectiveForInsertion,
+} from '../../docLabDirectiveEngine';
 import { buildTokenString, extractTokenSummary } from '../../components/tokens/tokenChipRenderer';
 
 export class EditorDomAdapter {
@@ -203,6 +207,15 @@ export class EditorDomAdapter {
       ) {
         existingTokenEl = prev;
       }
+      const next = range.startContainer.nextSibling as HTMLElement | null;
+      if (
+        !existingTokenEl &&
+        next &&
+        next.nodeType === (typeof Node !== 'undefined' ? Node.ELEMENT_NODE : 1) &&
+        next.matches?.('.doclab-token, .doclab-token-chip, [data-token], [data-token-key]')
+      ) {
+        existingTokenEl = next;
+      }
     }
 
     if (!existingTokenEl && range.startContainer.nodeType === (typeof Node !== 'undefined' ? Node.ELEMENT_NODE : 1)) {
@@ -214,6 +227,15 @@ export class EditorDomAdapter {
         childBefore.matches?.('.doclab-token, .doclab-token-chip, [data-token], [data-token-key]')
       ) {
         existingTokenEl = childBefore;
+      }
+      const childAfter = parent.childNodes[range.startOffset] as HTMLElement | null;
+      if (
+        !existingTokenEl &&
+        childAfter &&
+        childAfter.nodeType === (typeof Node !== 'undefined' ? Node.ELEMENT_NODE : 1) &&
+        childAfter.matches?.('.doclab-token, .doclab-token-chip, [data-token], [data-token-key]')
+      ) {
+        existingTokenEl = childAfter;
       }
     }
 
@@ -345,7 +367,7 @@ export class EditorDomAdapter {
       return true;
     }
 
-    // 4. Direct Directive Merging: If cursor is inside Mustache text brackets {{ ... }}
+    // 4. Direct Directive Merging: If cursor is inside Mustache text brackets {{ ... }} or preceded by pipe
     if (isDirective && range.startContainer.nodeType === (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3)) {
       const text = range.startContainer.textContent || '';
       const startOffset = range.startOffset;
@@ -354,13 +376,31 @@ export class EditorDomAdapter {
 
       const lastOpen = beforeText.lastIndexOf('{{');
       const lastClose = beforeText.lastIndexOf('}}');
-      if (lastOpen !== -1 && (lastClose === -1 || lastOpen > lastClose) && afterText.includes('}}')) {
-        const prefix = beforeText.endsWith(' ') ? '' : ' ';
-        const inserted = `${prefix}${cleanKey}`;
-        range.startContainer.textContent = beforeText + inserted + afterText;
+      const isInsideBrackets = lastOpen !== -1 && (lastClose === -1 || lastOpen > lastClose);
+
+      if (isInsideBrackets || beforeText.includes('|')) {
+        const result = formatDirectiveForInsertion(beforeText, cleanKey, afterText);
+
+        if (result.isTokenUpdate) {
+          const replaceStart = Math.max(0, startOffset - result.replaceCharsBefore);
+          const replaceEnd = Math.min(text.length, range.endOffset + (result.replaceCharsAfter || 0));
+          range.startContainer.textContent = text.slice(0, replaceStart) + result.textToInsert + text.slice(replaceEnd);
+
+          const newRange = document.createRange();
+          newRange.setStart(range.startContainer, replaceStart + result.textToInsert.length);
+          newRange.collapse(true);
+          this.setSelectionRange(newRange);
+          return true;
+        }
+
+        const effectiveStart = Math.max(0, startOffset - (result.replaceCharsBefore || 0));
+        const nextBeforeText = text.slice(0, effectiveStart);
+        const closing = isInsideBrackets && !afterText.includes('}}') ? '}}' : '';
+        const fullInsert = `${result.textToInsert}${closing}`;
+        range.startContainer.textContent = nextBeforeText + fullInsert + afterText;
 
         const newRange = document.createRange();
-        newRange.setStart(range.startContainer, startOffset + inserted.length);
+        newRange.setStart(range.startContainer, effectiveStart + result.textToInsert.length);
         newRange.collapse(true);
         this.setSelectionRange(newRange);
         return true;
@@ -614,6 +654,134 @@ export class EditorDomAdapter {
     }
 
     return modified;
+  }
+
+  /**
+   * High-precision Caret Proximity Detector for DocLab Token Pills.
+   * Determines if the active selection/caret is immediately adjacent to or within a token element.
+   * Used for Dynamic Proximity Reveal (expanding token pill to readable plain text when caret approaches).
+   */
+  public static isCaretAdjacentToToken(
+    tokenEl: HTMLElement,
+    selOrRange: Selection | Range | null
+  ): boolean {
+    if (!tokenEl || !selOrRange) return false;
+
+    let range: Range | null = null;
+    let isCollapsed = true;
+
+    if (typeof Selection !== 'undefined' && selOrRange instanceof Selection) {
+      if (selOrRange.rangeCount === 0) return false;
+      range = selOrRange.getRangeAt(0);
+      isCollapsed = selOrRange.isCollapsed;
+    } else {
+      range = selOrRange as Range;
+      isCollapsed = range.collapsed;
+    }
+
+    if (!range) return false;
+
+    // 1. Text Range Selection (highlighted span covering the token)
+    if (!isCollapsed) {
+      try {
+        return range.intersectsNode(tokenEl);
+      } catch {
+        return false;
+      }
+    }
+
+    // 2. Collapsed Caret Proximity
+    const container = range.startContainer;
+    const offset = range.startOffset;
+
+    // A. Caret is directly inside the token element
+    if (tokenEl.contains(container)) {
+      return true;
+    }
+
+    // B. Caret is in a Text Node
+    if (container.nodeType === (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3)) {
+      const textNode = container as Text;
+      const textVal = textNode.nodeValue || '';
+      const textLen = textVal.length;
+
+      // Caret is in the text node immediately following tokenEl (after token)
+      if (tokenEl.nextSibling === textNode) {
+        if (offset === 0) return true;
+        // Allow for 1 leading whitespace or non-breaking space
+        if (offset === 1 && (textVal.startsWith(' ') || textVal.startsWith('\u00A0'))) {
+          return true;
+        }
+      }
+
+      // Caret is in the text node immediately preceding tokenEl (before token)
+      if (tokenEl.previousSibling === textNode) {
+        if (offset === textLen) return true;
+        // Allow for 1 trailing whitespace or non-breaking space
+        if (offset === textLen - 1 && (textVal.endsWith(' ') || textVal.endsWith('\u00A0'))) {
+          return true;
+        }
+      }
+
+      // Caret is separated by an empty or whitespace-only text node
+      const prev = textNode.previousSibling;
+      if (
+        prev &&
+        prev.nodeType === (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3) &&
+        (!prev.nodeValue || prev.nodeValue === ' ' || prev.nodeValue === '\u00A0') &&
+        prev.previousSibling === tokenEl &&
+        offset === 0
+      ) {
+        return true;
+      }
+
+      const next = textNode.nextSibling;
+      if (
+        next &&
+        next.nodeType === (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3) &&
+        (!next.nodeValue || next.nodeValue === ' ' || next.nodeValue === '\u00A0') &&
+        next.nextSibling === tokenEl &&
+        offset === textLen
+      ) {
+        return true;
+      }
+    }
+
+    // C. Container is an Element (offset indexes childNodes)
+    if (container.nodeType === (typeof Node !== 'undefined' ? Node.ELEMENT_NODE : 1)) {
+      const parentEl = container as HTMLElement;
+      const children = parentEl.childNodes;
+
+      // Directly before tokenEl
+      if (children[offset] === tokenEl) return true;
+
+      // Directly after tokenEl
+      if (offset > 0 && children[offset - 1] === tokenEl) return true;
+
+      // After tokenEl with a single separator whitespace node in between
+      if (offset > 1 && children[offset - 2] === tokenEl) {
+        const mid = children[offset - 1];
+        if (
+          mid.nodeType === (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3) &&
+          (!mid.nodeValue || mid.nodeValue === ' ' || mid.nodeValue === '\u00A0')
+        ) {
+          return true;
+        }
+      }
+
+      // Before tokenEl with a single separator whitespace node in between
+      if (offset < children.length - 1 && children[offset + 1] === tokenEl) {
+        const mid = children[offset];
+        if (
+          mid.nodeType === (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3) &&
+          (!mid.nodeValue || mid.nodeValue === ' ' || mid.nodeValue === '\u00A0')
+        ) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   /**

@@ -62,7 +62,7 @@ export const navigation = {
   shortcuts: 'Keyboard Shortcuts',
   developerTools: 'Developer & Admin Tools',
   userManagement: 'User Management',
-  roleManagement: 'Role Permissions',
+  roleManagement: 'Role Management',
   activityAnalytics: 'Activity Logs',
   notificationGateways: 'Notification Gateways',
   roleInvites: 'Role Invites',

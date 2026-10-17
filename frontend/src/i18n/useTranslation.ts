@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { useI18n } from './I18nContext';
-import type { TranslationNamespace, TranslationParams } from './types';
+import { useI18n, registerModuleLocales } from './I18nContext';
+import type { LanguageCode, TranslationNamespace, TranslationParams } from './types';
 
 /**
  * Reusable Translation Hook with optional namespace scoping.
@@ -27,6 +27,25 @@ export function useTranslation(namespace?: TranslationNamespace) {
   return {
     ...i18n,
     t: scopedT,
+  };
+}
+
+/**
+ * Enterprise Helper to create a dedicated, colocated module translation hook.
+ * Automatically registers the module's localized dictionaries into the i18n registry.
+ *
+ * Example:
+ *   // inside your module:
+ *   export const useUserTranslation = createModuleTranslation('userManagement', userManagementLocales);
+ */
+export function createModuleTranslation<T extends Record<LanguageCode, any>>(
+  namespace: string,
+  locales: T
+) {
+  registerModuleLocales(namespace, locales);
+
+  return function useScopedModuleTranslation() {
+    return useTranslation(namespace);
   };
 }
 

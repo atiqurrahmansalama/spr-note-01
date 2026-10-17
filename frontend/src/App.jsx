@@ -65,9 +65,9 @@ const DailyClassroomHubView = lazy(() => import("./modules/learning/DailyClassro
 const ExaminationsHubView = lazy(() => import("./modules/examinations/ExaminationsHubView"));
 
 // ─── Protected Admin & Role Views (Lazy Loaded) ─────────────────────────────
-const UserManagementModule = lazy(() => import("./modules/admin/UserManagementModule"));
-const RoleManagementPanel = lazy(() => import("./modules/admin/RoleManagementPanel"));
-const ActivityAnalyticsView = lazy(() => import("./modules/admin/ActivityAnalyticsView"));
+const UserManagementModule = lazy(() => import("./modules/admin/user-management"));
+const RoleManagementView = lazy(() => import("./modules/admin/role-management"));
+const ActivityAnalyticsView = lazy(() => import("./modules/admin/activity-analytics"));
 const TrashRestorationView = lazy(() => import("./modules/admin/TrashRestorationView"));
 
 // ─── Protected Settings & Personalization Views (Lazy Loaded) ───────────────
@@ -83,7 +83,6 @@ const AboutAppView = lazy(() => import("./modules/settings/components/AboutAppVi
 const SectionToggleControlPanel = lazy(() => import("./modules/settings/components/SectionToggleControlPanel"));
 
 // ─── Protected Developer & App Management Views (Lazy Loaded) ───────────────
-const RoleInviteManagerView = lazy(() => import("./modules/app-management/invites/RoleInviteManagerView"));
 const NotificationManagementView = lazy(() => import("./modules/app-management/notifications/NotificationManagementView"));
 const InstitutionListView = lazy(() => import("./modules/academy/campus-structure/academies/InstitutionListView"));
 const DeveloperToolsHubView = lazy(() => import("./modules/app-management/developer-tools/DeveloperToolsHubView"));
@@ -189,7 +188,7 @@ export default function App() {
                 <Route path="/students/:id/profile" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentProfileHubView /></FeatureGuard>} />
                 <Route path="/sessions-comments" element={<FeatureGuard sectionKey="report_sessions_comments" fallback={<Navigate to="/dashboard" replace />}><SessionManager /></FeatureGuard>} />
                 <Route path="/user-management" element={<FeatureGuard sectionKey="app_user_management" fallback={<Navigate to="/dashboard" replace />}><UserManagementModule /></FeatureGuard>} />
-                <Route path="/role-management" element={<FeatureGuard sectionKey="app_role_management" fallback={<Navigate to="/dashboard" replace />}><RoleManagementPanel showHeaderCard={true} /></FeatureGuard>} />
+                <Route path="/role-management" element={<FeatureGuard sectionKey="app_role_management" fallback={<Navigate to="/dashboard" replace />}><RoleManagementView showHeaderCard={true} /></FeatureGuard>} />
                 <Route path="/activity-analytics" element={<FeatureGuard sectionKey="app_activity_analytics" fallback={<Navigate to="/dashboard" replace />}><ActivityAnalyticsView /></FeatureGuard>} />
                 <Route path="/trash-restoration" element={<FeatureGuard sectionKey="nav_trash" fallback={<Navigate to="/dashboard" replace />}><TrashRestorationView /></FeatureGuard>} />
                 <Route path="/profile-settings" element={<FeatureGuard sectionKey="settings_profile" fallback={<Navigate to="/dashboard" replace />}><ProfileSettingsView /></FeatureGuard>} />
@@ -303,7 +302,7 @@ export default function App() {
                 <Route path="/developer-tools/:sectionId" element={<DeveloperToolsHubView />} />
                 <Route path="/sp-management" element={<DeveloperToolsHubView />} />
                 <Route path="/sp-management/:sectionId" element={<DeveloperToolsHubView />} />
-                <Route path="/app-management/role-invites" element={<RoleInviteManagerView />} />
+                <Route path="/app-management/role-invites" element={<Navigate to="/user-management?tab=invites" replace />} />
                 <Route path="/app-management/notifications" element={<NotificationManagementView />} />
                 <Route path="/notifications" element={<NotificationManagementView />} />
                 {/* Enterprise Finance, Accounts, Billing & Payroll Hub Routes */}

@@ -391,12 +391,16 @@ class ActivityLog(models.Model):
     endpoint = models.CharField(max_length=255)
     http_method = models.CharField(max_length=10)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
-    timestamp = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
         ordering = ['-timestamp']
         verbose_name = "Activity Log"
         verbose_name_plural = "Activity Logs"
+        indexes = [
+            models.Index(fields=['user', '-id']),
+            models.Index(fields=['user', '-timestamp']),
+        ]
 
     def __str__(self):
         user_str = self.user.phone_number if self.user else "Anonymous"

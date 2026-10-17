@@ -1,13 +1,13 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useCallback } from 'react';
 import { useI18n } from './I18nContext';
-import { buildLocalizedPath, getLanguageFromPath } from './routing';
+import { stripLanguagePrefix } from './routing';
 import type { LanguageCode } from './types';
 
 /**
- * Reusable Locale-Aware Navigation Hook.
- * Wraps react-router's useNavigate to automatically preserve or update
- * the active language prefix.
+ * Enterprise Reusable Locale-Aware Navigation Hook.
+ * Provides safe in-app navigation and instant, jitter-free language switching
+ * without disruptive route bounces or unmounting of layout containers.
  */
 export function useLocaleNavigate() {
   const navigate = useNavigate();
@@ -21,25 +21,19 @@ export function useLocaleNavigate() {
         return;
       }
 
-      // If to is a path starting with /, preserve current language prefix if currently on a prefixed path
-      const currentPrefix = getLanguageFromPath(location.pathname);
-      if (currentPrefix) {
-        const localizedTo = buildLocalizedPath(to, currentPrefix, true);
-        navigate(localizedTo, options);
-      } else {
-        navigate(to, options);
-      }
+      // Ensure any legacy or stray locale prefix is stripped to match pure SPA routes
+      const cleanTo = typeof to === 'string' ? stripLanguagePrefix(to) : to;
+      navigate(cleanTo as any, options);
     },
-    [navigate, location.pathname]
+    [navigate]
   );
 
   const switchLanguage = useCallback(
     (newLang: LanguageCode) => {
+      // Seamless in-memory state transition without route bounce or unmounting
       setLanguage(newLang);
-      const newPath = buildLocalizedPath(location.pathname + location.search, newLang);
-      navigate(newPath, { replace: true });
     },
-    [location.pathname, location.search, navigate, setLanguage]
+    [setLanguage]
   );
 
   return {
@@ -50,3 +44,4 @@ export function useLocaleNavigate() {
 }
 
 export default useLocaleNavigate;
+

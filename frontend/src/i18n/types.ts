@@ -38,6 +38,7 @@ export type TranslationNamespace =
   | 'learning'
   | 'print'
   | 'residential'
+  | 'userManagement'
   | (string & {});
 
 export type TranslationDictionary = Record<string, any>;

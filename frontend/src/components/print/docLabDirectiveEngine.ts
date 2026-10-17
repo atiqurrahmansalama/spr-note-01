@@ -946,3 +946,297 @@ export function formatMultiValueData(
   }
 }
 
+export interface FormattedDirectiveInsertion {
+  textToInsert: string;
+  replaceCharsBefore: number;
+  replaceCharsAfter: number;
+  isTokenUpdate: boolean;
+  updatedFullToken?: string;
+}
+
+/**
+ * Serializes structured TokenDirectiveOptions into standard HTML-safe pipe syntax.
+ */
+export function serializeDirectiveOptions(options: TokenDirectiveOptions): string {
+  const parts: string[] = [];
+
+  if (options.direction) {
+    parts.push(`direction: ${options.direction}`);
+  }
+  if (options.separator) {
+    if (['cell', 'newline', 'comma', 'tab'].includes(options.separator)) {
+      parts.push(`separator: ${options.separator}`);
+    } else if (options.separator === ', ') {
+      parts.push(`separator: ', '`);
+    } else {
+      parts.push(`separator: "${options.separator}"`);
+    }
+  }
+  if (options.order && options.order === 'desc') {
+    parts.push(`order: ${options.order}`);
+  }
+  if (options.prefix && options.prefix !== 'none') {
+    parts.push(`prefix: ${options.prefix}`);
+  }
+  if (options.indent && options.indent > 0) {
+    let indentSpec = `indent: ${options.indent}`;
+    const fromLine = options.fromLine !== undefined ? options.fromLine : options.from;
+    if (fromLine !== undefined && fromLine > 1) {
+      indentSpec += `, from: ${fromLine}`;
+    }
+    const toLine = options.toLine !== undefined ? options.toLine : options.to;
+    if (toLine !== undefined && toLine > 0) {
+      indentSpec += `, to: ${toLine}`;
+    }
+    parts.push(indentSpec);
+  }
+  if (options.limit && options.limit > 0) {
+    parts.push(`limit: ${options.limit}`);
+  }
+  if (options.skipData) {
+    parts.push(`skipData: "${options.skipData}"`);
+  }
+  if (options.removeLine) {
+    parts.push(`removeLine: ${options.removeLine}`);
+  }
+  const fallbackVal = options.fallback !== undefined ? options.fallback : (options as any).default;
+  if (fallbackVal !== undefined && fallbackVal !== null) {
+    parts.push(`default: "${fallbackVal}"`);
+  }
+
+  return parts.join(', ');
+}
+
+/**
+ * Intelligent directive insertion & in-place update formatter.
+ *
+ * Examines the active token context around the caret:
+ * 1. If an active token is identified (inside `{{...}}` or in a token input field):
+ *    - Parses existing directives vs incoming directives.
+ *    - If any directive key/domain (e.g. `direction`, `indent`, `skipData`, `default`) was ALREADY USED,
+ *      it UPDATES that directive in-place with new values instead of creating duplicate keys!
+ *    - Preserves all other non-conflicting existing directives cleanly.
+ *    - Automatically handles clean comma chaining when appending fresh directive types.
+ * 2. If NO active token scope is present:
+ *    - Inserts with the standard leading pipe (' | ' or '| ') as a fresh directive.
+ */
+export function formatDirectiveForInsertion(
+  beforeText: string,
+  rawDirective: string,
+  afterText: string = ''
+): FormattedDirectiveInsertion {
+  const isDirective = rawDirective.startsWith('|') || rawDirective.startsWith('<');
+  if (!isDirective) {
+    return {
+      textToInsert: rawDirective,
+      replaceCharsBefore: 0,
+      replaceCharsAfter: 0,
+      isTokenUpdate: false,
+    };
+  }
+
+  // Extract clean directive content (strip leading '|', '<', and trailing '>')
+  const directiveBody = rawDirective
+    .replace(/^[|<]\s*/, '')
+    .replace(/[>]$/, '')
+    .trim();
+
+  const incomingParsed = parseTokenDirective(rawDirective);
+  const incomingOpts = incomingParsed.options;
+
+  // Determine if caret is inside mustache brackets {{ ... }}
+  const lastOpenBrace = beforeText.lastIndexOf('{{');
+  const lastCloseBrace = beforeText.lastIndexOf('}}');
+  const isInsideMustache =
+    lastOpenBrace !== -1 && (lastCloseBrace === -1 || lastOpenBrace > lastCloseBrace);
+
+  let fullTokenText = '';
+  let replaceCharsBefore = 0;
+  let replaceCharsAfter = 0;
+  let isTokenScopeFound = false;
+
+  if (isInsideMustache) {
+    const tokenBefore = beforeText.slice(lastOpenBrace + 2);
+    const afterCloseBrace = afterText ? afterText.indexOf('}}') : -1;
+    const tokenAfter = afterCloseBrace !== -1 ? afterText.slice(0, afterCloseBrace) : afterText;
+
+    fullTokenText = `${tokenBefore}${tokenAfter}`.trim();
+    replaceCharsBefore = tokenBefore.length;
+    replaceCharsAfter = afterCloseBrace !== -1 ? afterCloseBrace : 0;
+    isTokenScopeFound = true;
+  } else {
+    // Check if whole beforeText/afterText represents a token in a raw input (e.g. TokenInspectorPopover)
+    const combined = `${beforeText}${afterText}`.trim();
+    const hasPipe = combined.includes('|');
+    const isSingleTokenKey = /^[a-zA-Z0-9_\-\.]+$/.test(combined);
+
+    if (hasPipe || isSingleTokenKey) {
+      fullTokenText = combined;
+      replaceCharsBefore = beforeText.length;
+      replaceCharsAfter = afterText.length;
+      isTokenScopeFound = true;
+    }
+  }
+
+  if (isTokenScopeFound && fullTokenText) {
+    const existingParsed = parseTokenDirective(fullTokenText);
+    const existingOpts = existingParsed.options;
+
+    // Check if any directive domain in incomingOpts was already used in existingOpts
+    const hasDirectionConflict =
+      incomingOpts.direction !== undefined &&
+      (existingOpts.direction !== undefined ||
+        existingOpts.order !== undefined ||
+        existingOpts.separator !== undefined ||
+        existingOpts.prefix !== undefined ||
+        existingOpts.limit !== undefined);
+
+    const hasIndentConflict =
+      incomingOpts.indent !== undefined && existingOpts.indent !== undefined;
+
+    const hasSkipConflict =
+      incomingOpts.skipData !== undefined &&
+      (existingOpts.skipData !== undefined || existingOpts.removeLine !== undefined);
+
+    const hasFallbackConflict =
+      (incomingOpts.fallback !== undefined || (incomingOpts as any).default !== undefined) &&
+      (existingOpts.fallback !== undefined || (existingOpts as any).default !== undefined);
+
+    const isUsed =
+      hasDirectionConflict || hasIndentConflict || hasSkipConflict || hasFallbackConflict;
+
+    if (isUsed) {
+      // In-place update of the already used directive!
+      const mergedOpts: TokenDirectiveOptions = {
+        ...existingOpts,
+      };
+
+      if (incomingOpts.direction !== undefined) {
+        mergedOpts.direction = incomingOpts.direction;
+        if (incomingOpts.separator !== undefined) mergedOpts.separator = incomingOpts.separator;
+        if (incomingOpts.order !== undefined) mergedOpts.order = incomingOpts.order;
+        if (incomingOpts.prefix !== undefined) mergedOpts.prefix = incomingOpts.prefix;
+        if (incomingOpts.limit !== undefined) mergedOpts.limit = incomingOpts.limit;
+      }
+
+      if (incomingOpts.indent !== undefined) {
+        mergedOpts.indent = incomingOpts.indent;
+        if (incomingOpts.fromLine !== undefined || incomingOpts.from !== undefined) {
+          mergedOpts.fromLine = incomingOpts.fromLine ?? incomingOpts.from;
+        } else {
+          delete mergedOpts.fromLine;
+          delete mergedOpts.from;
+        }
+        if (incomingOpts.toLine !== undefined || incomingOpts.to !== undefined) {
+          mergedOpts.toLine = incomingOpts.toLine ?? incomingOpts.to;
+        } else {
+          delete mergedOpts.toLine;
+          delete mergedOpts.to;
+        }
+      }
+
+      if (incomingOpts.skipData !== undefined) {
+        mergedOpts.skipData = incomingOpts.skipData;
+        if (incomingOpts.removeLine !== undefined) {
+          mergedOpts.removeLine = incomingOpts.removeLine;
+        }
+      }
+
+      const incomingFallback = incomingOpts.fallback !== undefined ? incomingOpts.fallback : (incomingOpts as any).default;
+      if (incomingFallback !== undefined) {
+        mergedOpts.fallback = incomingFallback;
+      }
+
+      const directiveStr = serializeDirectiveOptions(mergedOpts);
+      const baseKey = existingParsed.baseKey || '';
+      const updatedFullToken = baseKey
+        ? (directiveStr ? `${baseKey} | ${directiveStr}` : baseKey)
+        : (directiveStr ? `| ${directiveStr}` : '');
+
+      return {
+        textToInsert: updatedFullToken,
+        replaceCharsBefore,
+        replaceCharsAfter,
+        isTokenUpdate: true,
+        updatedFullToken,
+      };
+    }
+  }
+
+  // Fallback for caret in text where no active token scope was detected:
+  // Standard pipe insertion or chaining based on beforeText:
+  const tokenContext = isInsideMustache ? beforeText.slice(lastOpenBrace + 2) : beforeText;
+  const pipeIndex = tokenContext.lastIndexOf('|');
+  const hasPipe = pipeIndex !== -1;
+
+  if (hasPipe) {
+    const afterPipe = tokenContext.slice(pipeIndex + 1);
+    const hasExistingDirectiveAfterPipe = afterPipe.trim().length > 0;
+
+    if (hasExistingDirectiveAfterPipe) {
+      if (beforeText.endsWith(', ') || beforeText.endsWith(',')) {
+        const needsSpace = beforeText.endsWith(',') && !beforeText.endsWith(', ');
+        return {
+          textToInsert: needsSpace ? ` ${directiveBody}` : directiveBody,
+          replaceCharsBefore: 0,
+          replaceCharsAfter: 0,
+          isTokenUpdate: false,
+        };
+      }
+
+      if (beforeText.endsWith(' ')) {
+        let trailingSpaceCount = 0;
+        for (let i = beforeText.length - 1; i >= 0 && beforeText[i] === ' '; i--) {
+          trailingSpaceCount++;
+        }
+        return {
+          textToInsert: `, ${directiveBody}`,
+          replaceCharsBefore: trailingSpaceCount,
+          replaceCharsAfter: 0,
+          isTokenUpdate: false,
+        };
+      }
+
+      return {
+        textToInsert: `, ${directiveBody}`,
+        replaceCharsBefore: 0,
+        replaceCharsAfter: 0,
+        isTokenUpdate: false,
+      };
+    } else {
+      if (beforeText.endsWith(' ')) {
+        return {
+          textToInsert: directiveBody,
+          replaceCharsBefore: 0,
+          replaceCharsAfter: 0,
+          isTokenUpdate: false,
+        };
+      } else {
+        return {
+          textToInsert: ` ${directiveBody}`,
+          replaceCharsBefore: 0,
+          replaceCharsAfter: 0,
+          isTokenUpdate: false,
+        };
+      }
+    }
+  }
+
+  if (beforeText.endsWith(' ')) {
+    return {
+      textToInsert: `| ${directiveBody}`,
+      replaceCharsBefore: 0,
+      replaceCharsAfter: 0,
+      isTokenUpdate: false,
+    };
+  }
+
+  return {
+    textToInsert: ` | ${directiveBody}`,
+    replaceCharsBefore: 0,
+    replaceCharsAfter: 0,
+    isTokenUpdate: false,
+  };
+}
+
+

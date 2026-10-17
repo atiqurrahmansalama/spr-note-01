@@ -804,6 +804,8 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     category?: string;
     isPinned?: boolean;
   } | null>(null);
+  const activeInspectorTokenRef = useRef(activeInspectorToken);
+  activeInspectorTokenRef.current = activeInspectorToken;
   const tokenHoverTimerRef = useRef<any>(null);
 
   const clearTokenHoverTimer = useCallback(() => {
@@ -1463,7 +1465,7 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
     scheduleInspectorDismissal(300);
   }, [scheduleInspectorDismissal]);
 
-  // Live selection tracking: whenever tokens are encompassed by a selection, seamlessly reveal plain text
+  // Live selection tracking: dynamically reveal plain text whenever caret is adjacent or token is selected
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
@@ -1478,32 +1480,25 @@ export const PaginatedDocumentEditorComponent: React.FC<PaginatedDocumentEditorP
 
       if (!tokenEls.length) return;
 
-      const hasValidSelection =
+      const hasHostFocus =
         sel &&
         sel.rangeCount > 0 &&
-        !sel.isCollapsed &&
-        host.contains(sel.anchorNode);
+        (host.contains(sel.anchorNode) || host.contains(sel.focusNode));
 
-      if (!hasValidSelection) {
+      if (!hasHostFocus) {
         tokenEls.forEach((el) => {
-          if (el.classList.contains('doclab-token-selected')) {
+          if (activeInspectorTokenRef.current?.element !== el && el.classList.contains('doclab-token-selected')) {
             el.classList.remove('doclab-token-selected');
           }
         });
         return;
       }
 
-      const range = sel.getRangeAt(0);
-
       tokenEls.forEach((tokenEl) => {
-        let isIntersecting = false;
-        try {
-          isIntersecting = range.intersectsNode(tokenEl);
-        } catch {
-          isIntersecting = false;
-        }
+        const isPinned = activeInspectorTokenRef.current?.element === tokenEl;
+        const isAdjacentOrSelected = isPinned || EditorDomAdapter.isCaretAdjacentToToken(tokenEl, sel);
 
-        if (isIntersecting) {
+        if (isAdjacentOrSelected) {
           if (!tokenEl.classList.contains('doclab-token-selected')) {
             tokenEl.classList.add('doclab-token-selected');
           }

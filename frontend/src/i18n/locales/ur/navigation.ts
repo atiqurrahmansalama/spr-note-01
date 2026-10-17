@@ -62,7 +62,7 @@ export const navigation = {
   shortcuts: 'کی بورڈ شارٹ کٹس',
   developerTools: 'ایڈمن اور ڈویلپر ٹولز',
   userManagement: 'صارفین کا انتظام',
-  roleManagement: 'اختیارات اور کردار',
+  roleManagement: 'کردار کا انتظام',
   activityAnalytics: 'سرگرمی لاگز',
   notificationGateways: 'اطلاعاتی گیٹ ویز',
   roleInvites: 'دعوتی لنکس',

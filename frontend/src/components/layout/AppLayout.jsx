@@ -88,7 +88,6 @@ export const ROUTE_TITLE_MAP = {
   "/group-roster": { title: "Group", category: "Academy" },
   "/admission": { title: "Admission", category: "Student" },
 
-  "/app-management/role-invites": { title: "Role QR & Invites", category: "App Management" },
   "/app-management/notifications": { title: "Notification Management", category: "App Management" },
   "/app-management/institutions": { title: "Academies", category: "Academy" },
   "/institutions": { title: "Academies", category: "Academy" },
@@ -428,16 +427,17 @@ export default function AppLayout() {
     }
   }, [location.pathname, location.search]);
 
-  // Close right sidebar drawer when navigating to a different page route
+  // Close right sidebar drawer when navigating to a different page route if the new route does not request a drawer
   const prevPathnameRef = useRef(location.pathname);
   useEffect(() => {
     if (prevPathnameRef.current !== location.pathname) {
       prevPathnameRef.current = location.pathname;
-      if (isRightSidebarOpen) {
+      const searchParams = new URLSearchParams(location.search);
+      if (!searchParams.get("drawer") && isRightSidebarOpen) {
         closeRightSidebar();
       }
     }
-  }, [location.pathname, isRightSidebarOpen, closeRightSidebar]);
+  }, [location.pathname, location.search, isRightSidebarOpen, closeRightSidebar]);
 
   // 📱 Mobile Touch Edge-Swipe gesture to open sidebar (and swipe left to close)
   useEffect(() => {
@@ -532,17 +532,6 @@ export default function AppLayout() {
     };
   }, []);
 
-  // Auto-close right sidebar drawer on route navigation if new URL does not specify a drawer
-  const prevPathRef = useRef(location.pathname);
-  useEffect(() => {
-    if (prevPathRef.current !== location.pathname) {
-      prevPathRef.current = location.pathname;
-      const searchParams = new URLSearchParams(location.search);
-      if (!searchParams.get("drawer")) {
-        closeRightSidebar();
-      }
-    }
-  }, [location.pathname, location.search, closeRightSidebar]);
 
   const lastBackTimeRef = useRef(0);
 
