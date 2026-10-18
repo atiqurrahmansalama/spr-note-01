@@ -36,7 +36,28 @@ class HasSectionAccess(BasePermission):
             return any(flags.get(k, False) for k in section_key)
             
         if section_key in ('staff_attendance', 'staff_daily_attendance'):
-            return flags.get('staff_attendance', False) or flags.get('staff_daily_attendance', False) or flags.get('staff_management', False)
+            return flags.get('staff_daily_attendance', flags.get('staff_roster', False))
+
+        if section_key in ('staff_management', 'staff_leaves'):
+            return flags.get('staff_roster', flags.get('nav_staff_management', False))
+
+        if section_key in ('app_role_invites', 'app_role_management'):
+            return flags.get('app_role_management', flags.get('app_user_management', False))
+
+        if section_key == 'report_builder':
+            return flags.get('progress_tab_daily_progress', flags.get('progress_management', False))
+
+        if section_key == 'student_departments':
+            return flags.get('campus_tab_departments', flags.get('campus_profile', False))
+
+        if section_key == 'student_groups':
+            return flags.get('classes_tab_groups', flags.get('student_classes', False))
+
+        if section_key == 'academic_branches':
+            return flags.get('campus_tab_branches', flags.get('campus_profile', False))
+
+        if section_key == 'class_sections':
+            return flags.get('classes_tab_sections', flags.get('student_classes', False))
 
         return flags.get(section_key, False)
 

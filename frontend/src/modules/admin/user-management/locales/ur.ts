@@ -157,6 +157,7 @@ export const ur = {
     generateInvite: 'دعوت نامہ بنائیں',
     generateInviteDesc: 'خودکار کردار کی تفویض کے لیے ٹوکن یا QR لنک بنائیں',
     totalInvitesBadge: '{{count}} کل دعوت نامے',
+    searchInvites: 'دعوت نامے تلاش کریں',
     searchPlaceholder: 'عنوان، کردار یا ٹوکن کے ذریعے تلاش کریں...',
     allStatuses: 'تمام حالتیں',
     statusActive: 'فعال اور درست',

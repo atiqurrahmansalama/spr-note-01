@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CollapsiblePageHeader } from '@/components/ui';
 import CustomButton from '@/components/ui/CustomButton';
@@ -15,6 +15,7 @@ import { residentialStore } from '@/stores/residentialStore';
 import { useTenant } from '@/context/TenantContext';
 import { useToast } from '@/context/ToastContext';
 import { useRightSidebar, useDrawerRegistration } from '@/context/RightSidebarContext';
+import { useFeatureControl } from '@/context/FeatureControlContext';
 import {
   ResidentialBuildingsTab,
   ResidentialBuildingDrawer,
@@ -60,9 +61,33 @@ export default function ResidentialHubView() {
   const { activeTenantId } = useTenant();
   const { showToast } = useToast();
   const { openDrawer, closeDrawer } = useRightSidebar();
+  const { isSectionEnabled } = useFeatureControl();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const activeTab = searchParams.get('tab') || 'BUILDINGS';
+  const isBuildingsEnabled = isSectionEnabled('residential_tab_buildings');
+  const isRoomsEnabled = isSectionEnabled('residential_tab_rooms');
+  const isBedsEnabled = isSectionEnabled('residential_tab_beds');
+  const isSupervisorsEnabled = isSectionEnabled('residential_tab_supervisors');
+
+  const visibleTabs = useMemo(() => {
+    const list = [];
+    if (isBuildingsEnabled) {
+      list.push({ id: 'BUILDINGS', label: 'Residential Buildings', icon: BuildingOfficeIcon });
+    }
+    if (isRoomsEnabled) {
+      list.push({ id: 'ROOMS', label: 'Rooms & Quarters', icon: HomeIcon });
+    }
+    if (isBedsEnabled) {
+      list.push({ id: 'BEDS', label: 'Bed Allocations', icon: ChecklistIcon });
+    }
+    if (isSupervisorsEnabled) {
+      list.push({ id: 'SUPERVISORS', label: 'Supervisors & Wardens', icon: TeacherIcon });
+    }
+    return list.length > 0 ? list : [{ id: 'BUILDINGS', label: 'Residential Buildings', icon: BuildingOfficeIcon }];
+  }, [isBuildingsEnabled, isRoomsEnabled, isBedsEnabled, isSupervisorsEnabled]);
+
+  const rawTab = searchParams.get('tab') || 'BUILDINGS';
+  const activeTab = visibleTabs.some((t) => t.id === rawTab) ? rawTab : (visibleTabs[0]?.id || 'BUILDINGS');
 
   const setActiveTab = (tabId: string) => {
     setSearchParams(
@@ -232,9 +257,9 @@ export default function ResidentialHubView() {
       <div className="print:hidden">
         <CollapsiblePageHeader
           icon={HomeIcon}
-          title="Residential Quarters & Dormitory"
+          title="Residential & Quarters"
           storageKey="residential_hub_header"
-          tabs={TABS}
+          tabs={visibleTabs}
           activeTab={activeTab}
           onChange={setActiveTab}
           tabsRightContent={

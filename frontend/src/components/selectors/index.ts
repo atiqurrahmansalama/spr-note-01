@@ -38,6 +38,7 @@ export { default as RoleSelector } from './RoleSelect';
 
 export { default as DateRangePicker } from './DateRangePicker';
 export { default as DateRangeSelector } from './DateRangePicker';
+export type { DateRangePickerProps } from './DateRangePicker';
 
 export { default as TimezoneSelect } from './TimezoneSelect';
 export { default as TimezoneSelector } from './TimezoneSelect';

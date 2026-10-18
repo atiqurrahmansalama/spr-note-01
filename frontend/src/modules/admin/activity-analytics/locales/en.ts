@@ -28,6 +28,9 @@ export const en = {
     role: 'Role',
     device: 'Device',
     timeHorizon: 'Time Frame',
+    searchLabel: 'Search Activity',
+    dateRange: 'Date Range',
+    selectDateRange: 'Select Date Range...',
   },
 
   table: {

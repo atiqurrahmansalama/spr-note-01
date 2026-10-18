@@ -12,9 +12,16 @@ import { useActivityTranslation } from './useActivityTranslation';
 
 const STORAGE_KEY_ACTIVITY_VIEW_MODE = 'spr_activity_analytics_view_mode';
 
+const formatLocalDate = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const computePresetDates = (preset: DatePreset): { from_date: string; to_date: string } => {
   const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
+  const todayStr = formatLocalDate(now);
 
   if (preset === 'today') {
     return { from_date: todayStr, to_date: todayStr };
@@ -22,12 +29,12 @@ const computePresetDates = (preset: DatePreset): { from_date: string; to_date: s
   if (preset === '7d') {
     const past = new Date();
     past.setDate(past.getDate() - 7);
-    return { from_date: past.toISOString().split('T')[0], to_date: todayStr };
+    return { from_date: formatLocalDate(past), to_date: todayStr };
   }
   if (preset === '30d') {
     const past = new Date();
     past.setDate(past.getDate() - 30);
-    return { from_date: past.toISOString().split('T')[0], to_date: todayStr };
+    return { from_date: formatLocalDate(past), to_date: todayStr };
   }
   if (preset === 'all') {
     return { from_date: '', to_date: '' };

@@ -178,7 +178,7 @@ class UserActivityMiddleware:
 
             if session:
                 delta_sec = (now - session.last_activity).total_seconds()
-                if delta_sec > 43200:
+                if delta_sec > 1800:  # 30 minutes of inactivity closes session
                     session.is_active = False
                     session.logout_at = session.last_activity
                     session.save()
@@ -190,7 +190,7 @@ class UserActivityMiddleware:
                         ip_address=ip_address,
                         is_active=True
                     )
-                elif delta_sec > 300:  # Throttle updates to max once per 5 minutes
+                elif delta_sec > 60:  # Throttle updates to max once per minute
                     session.device_info = device_info
                     session.ip_address = ip_address
                     session.save()

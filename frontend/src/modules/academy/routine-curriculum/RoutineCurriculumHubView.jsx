@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   TimerIcon,
   PlusIcon,
@@ -17,22 +17,36 @@ import { fetchWithAuth } from '../../../utils/authService';
 import { useToast } from '../../../context/ToastContext';
 import { useTenant } from '../../../context/TenantContext';
 import { useRightSidebar, useDrawerRegistration } from '../../../context/RightSidebarContext';
+import { useFeatureControl } from '../../../context/FeatureControlContext';
 import { periodCategoriesStore, periodSequencesStore } from '../../../utils/localStore';
-
-const TABS = [
-  { id: 'periods', label: 'Daily Period Slots', icon: TimerIcon },
-  { id: 'curriculum', label: 'Curriculum & Syllabus', icon: BookOpenIcon },
-];
 
 export default function RoutineCurriculumHubView({
   hideHeader = false,
   isEmbedded = false,
 }) {
   const { showToast } = useToast();
+  const { isSectionEnabled } = useFeatureControl();
   const { activeTenantId, activeTenant, currentInstitution } = useTenant();
   const effectiveTenantId = activeTenantId || (activeTenant?.id ? String(activeTenant.id) : (currentInstitution?.id ? String(currentInstitution.id) : 'default'));
 
+  const isPeriodsFeatureEnabled = isSectionEnabled('routine_tab_periods');
+  const isCurriculumFeatureEnabled = isSectionEnabled('routine_tab_curriculum');
+
+  const visibleTabs = useMemo(() => {
+    const list = [];
+    if (isPeriodsFeatureEnabled) {
+      list.push({ id: 'periods', label: 'Daily Period Slots', icon: TimerIcon });
+    }
+    if (isCurriculumFeatureEnabled) {
+      list.push({ id: 'curriculum', label: 'Curriculum & Syllabus', icon: BookOpenIcon });
+    }
+    return list.length > 0 ? list : [{ id: 'periods', label: 'Daily Period Slots', icon: TimerIcon }];
+  }, [isPeriodsFeatureEnabled, isCurriculumFeatureEnabled]);
+
   const [activeTab, setActiveTab] = useState('periods');
+  const effectiveActiveTab = visibleTabs.some((t) => t.id === activeTab)
+    ? activeTab
+    : (visibleTabs[0]?.id || 'periods');
   const [periodSlots, setPeriodSlots] = useState([]);
   const [periodCategories, setPeriodCategories] = useState(() =>
     periodCategoriesStore.getCategories(effectiveTenantId)
@@ -222,11 +236,11 @@ export default function RoutineCurriculumHubView({
       {/* 1. Collapsible Header & Tab Switcher */}
       <CollapsiblePageHeader
         hideHeader={hideHeader}
-        title="Period Schedules & Curriculum Console"
+        title="Routine & Curriculum"
         icon={TimerIcon}
         storageKey="routine_curriculum_header"
-        tabs={TABS}
-        activeTab={activeTab}
+        tabs={visibleTabs}
+        activeTab={effectiveActiveTab}
         onChange={setActiveTab}
         actionsPlacement="tabs"
         actions={
@@ -235,9 +249,9 @@ export default function RoutineCurriculumHubView({
             variant="primary"
             size="sm"
             icon={PlusIcon}
-            onClick={activeTab === 'periods' ? handleOpenAddSlot : handleOpenAddSyllabus}
+            onClick={effectiveActiveTab === 'periods' ? handleOpenAddSlot : handleOpenAddSyllabus}
           >
-            {activeTab === 'periods' ? 'Add Period' : 'Add Book'}
+            {effectiveActiveTab === 'periods' ? 'Add Period' : 'Add Book'}
           </CustomButton>
         }
       />

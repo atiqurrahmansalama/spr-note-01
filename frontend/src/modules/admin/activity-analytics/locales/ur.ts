@@ -28,6 +28,9 @@ export const ur = {
     role: 'کردار',
     device: 'ڈیوائس',
     timeHorizon: 'وقت کی حد',
+    searchLabel: 'سرگرمی تلاش کریں',
+    dateRange: 'تاریخ کی حد',
+    selectDateRange: 'تاریخ کا انتخاب کریں...',
   },
 
   table: {

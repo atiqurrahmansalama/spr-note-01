@@ -51,9 +51,11 @@ export const ActivityAnalyticsTable: React.FC<ActivityAnalyticsTableProps> = ({
                 {record.name}
               </button>
               {hasLiveSession && (
-                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  {t('table.live', 'Live')}
+                <span
+                  className="relative flex h-2 w-2 shrink-0"
+                  title={t('table.live', 'Online Now')}
+                >
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                 </span>
               )}
             </div>
@@ -111,7 +113,9 @@ export const ActivityAnalyticsTable: React.FC<ActivityAnalyticsTableProps> = ({
       headerClassName: 'min-w-[140px]',
       render: (record) => (
         <div className="text-left font-mono text-xs theme-text-secondary">
-          {record.last_active ? formatDate(record.last_active) : '—'}
+          {record.last_active
+            ? formatDate(record.last_active, { dateStyle: 'medium', timeStyle: 'short' })
+            : '—'}
         </div>
       ),
     },

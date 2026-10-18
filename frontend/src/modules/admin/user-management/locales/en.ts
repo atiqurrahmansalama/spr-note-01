@@ -157,6 +157,7 @@ export const en = {
     generateInvite: 'Generate Invite',
     generateInviteDesc: 'Create token or QR link for auto-assignment',
     totalInvitesBadge: '{{count}} Total Invites',
+    searchInvites: 'Search Invites',
     searchPlaceholder: 'Search invites by title, role, or token...',
     allStatuses: 'All Statuses',
     statusActive: 'Active & Valid',

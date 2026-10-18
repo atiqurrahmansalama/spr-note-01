@@ -12,6 +12,7 @@ import {
 import { useAcademicData } from './hooks/useAcademicData';
 import { useTenant } from '@/context/TenantContext';
 import { useRightSidebar, useDrawerRegistration } from '@/context/RightSidebarContext';
+import { useFeatureControl } from '@/context/FeatureControlContext';
 import { useDailyClassroomAssessment } from './lesson-management/lesson-assessments/hooks';
 import useDailyClassroomData from './hooks/useDailyClassroomData';
 import useDailyClassroomFilters from './hooks/useDailyClassroomFilters';
@@ -46,15 +47,15 @@ const ProgressAnalyticsView = lazy(
 );
 
 const LESSON_MANAGEMENT_TABS = [
-  { id: 'LESSON', label: 'Daily Lessons', icon: BookOpenIcon, path: '/studies/daily-lessons' },
-  { id: 'LESSON_ASSESSMENT', label: 'Lesson Assessments', icon: ChecklistIcon, path: '/studies/lesson-assessments' },
-  { id: 'LESSON_ANALYTICS', label: 'Analytics', icon: TrendingUpIcon, path: '/studies/lesson-analytics' },
+  { id: 'LESSON', label: 'Daily Lessons', icon: BookOpenIcon, path: '/studies/daily-lessons', featureKey: 'lesson_tab_daily_lessons' },
+  { id: 'LESSON_ASSESSMENT', label: 'Lesson Assessments', icon: ChecklistIcon, path: '/studies/lesson-assessments', featureKey: 'lesson_tab_assessments' },
+  { id: 'LESSON_ANALYTICS', label: 'Analytics', icon: TrendingUpIcon, path: '/studies/lesson-analytics', featureKey: 'lesson_tab_analytics' },
 ];
 
 const PROGRESS_MANAGEMENT_TABS = [
-  { id: 'PROGRESS', label: 'Daily Progress', icon: TrendingUpIcon, path: '/studies/daily-progress' },
-  { id: 'PROGRESS_ASSESSMENT', label: 'Progress Reports', icon: ChecklistIcon, path: '/studies/progress-reports' },
-  { id: 'PROGRESS_ANALYTICS', label: 'Analytics', icon: TrendingUpIcon, path: '/studies/progress-analytics' },
+  { id: 'PROGRESS', label: 'Daily Progress', icon: TrendingUpIcon, path: '/studies/daily-progress', featureKey: 'progress_tab_daily_progress' },
+  { id: 'PROGRESS_ASSESSMENT', label: 'Progress Reports', icon: ChecklistIcon, path: '/studies/progress-reports', featureKey: 'progress_tab_reports' },
+  { id: 'PROGRESS_ANALYTICS', label: 'Analytics', icon: TrendingUpIcon, path: '/studies/progress-analytics', featureKey: 'progress_tab_analytics' },
 ];
 
 const normalizeTabId = (tab: string | null, isProgress: boolean) => {
@@ -105,6 +106,7 @@ export default function DailyClassroomHubView({
 }: DailyClassroomHubViewProps) {
   const { activeTenantId } = useTenant();
   const { openDrawer, closeDrawer } = useRightSidebar();
+  const { isSectionEnabled } = useFeatureControl();
   const tenantId = activeTenantId || 'default';
 
   const location = useLocation();
@@ -129,7 +131,11 @@ export default function DailyClassroomHubView({
     return false;
   }, [hubType, path, defaultTab]);
 
-  const activeTabs = isProgressHub ? PROGRESS_MANAGEMENT_TABS : LESSON_MANAGEMENT_TABS;
+  const rawTabs = isProgressHub ? PROGRESS_MANAGEMENT_TABS : LESSON_MANAGEMENT_TABS;
+  const activeTabs = useMemo(() => {
+    return rawTabs.filter((tab) => !tab.featureKey || isSectionEnabled(tab.featureKey));
+  }, [rawTabs, isSectionEnabled]);
+
   const hubTitle = isProgressHub ? 'Progress Management' : 'Lesson Management';
   const HubIcon = isProgressHub ? TrendingUpIcon : BookOpenIcon;
 
@@ -196,6 +202,13 @@ export default function DailyClassroomHubView({
       }
     }
   }, [path, defaultTab, searchParams, isProgressHub]);
+
+  // Auto-fallback if the currently selected tab is disabled
+  useEffect(() => {
+    if (activeTabs.length > 0 && !activeTabs.some((t) => t.id === activeTab)) {
+      setActiveTab(activeTabs[0].id);
+    }
+  }, [activeTabs, activeTab]);
 
   // ── Global Academic Data ──────────────────────────────────────────────────────
   const {

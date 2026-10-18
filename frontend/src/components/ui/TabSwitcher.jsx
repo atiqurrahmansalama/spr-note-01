@@ -24,12 +24,20 @@ export default function TabSwitcher({
   const tabsContainerRef = useHorizontalScroll();
   const handleTabSelect = onChange || onTabChange;
 
-  // Auto-scroll active tab into view
+  // Auto-scroll active tab into view horizontally within container only
   useEffect(() => {
-    if (tabsContainerRef.current) {
-      const activeEl = tabsContainerRef.current.querySelector('[data-active="true"]');
+    const container = tabsContainerRef.current;
+    if (container) {
+      const activeEl = container.querySelector('[data-active="true"]');
       if (activeEl) {
-        activeEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        const containerRect = container.getBoundingClientRect();
+        const elRect = activeEl.getBoundingClientRect();
+        // Only scroll if active element is partially or completely outside the container horizontally
+        if (elRect.left < containerRect.left || elRect.right > containerRect.right) {
+          const scrollLeft =
+            activeEl.offsetLeft - container.clientWidth / 2 + activeEl.clientWidth / 2;
+          container.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
+        }
       }
     }
   }, [activeTab]);

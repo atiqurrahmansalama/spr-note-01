@@ -28,6 +28,9 @@ export const bn = {
     role: 'ভূমিকা',
     device: 'ডিভাইস',
     timeHorizon: 'সময়কাল',
+    searchLabel: 'অনুসন্ধান',
+    dateRange: 'তারিখের পরিসীমা',
+    selectDateRange: 'তারিখ নির্বাচন করুন...',
   },
 
   table: {

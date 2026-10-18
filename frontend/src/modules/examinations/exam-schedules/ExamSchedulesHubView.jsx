@@ -17,6 +17,7 @@ import {
   PrinterIcon,
 } from '../../../components/ui/Icons';
 import { useRightSidebar } from '../../../context/RightSidebarContext';
+import { useFeatureControl } from '../../../context/FeatureControlContext';
 import { getSavedTemplatesForScope } from '../../../components/print/scopeTemplateStore';
 import { SUBJECT_ROUTINE_SCOPE_ID } from './subject-routine/subjectRoutineDocLabKeys';
 
@@ -42,6 +43,7 @@ export default function ExamSchedulesHubView({
   onNavigateToTranscripts = null,
 }) {
   const { openDrawer } = useRightSidebar();
+  const { isSectionEnabled } = useFeatureControl();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -83,11 +85,21 @@ export default function ExamSchedulesHubView({
     setActiveTab(resolveActiveTab());
   }, [location.pathname, searchParams, defaultTab]);
 
-  const tabs = [
-    { id: 'SCHEDULES', label: 'Exam Details', icon: CalendarIcon },
-    { id: 'SUBJECT_MATRIX', label: 'Subject Routine', icon: BookOpenIcon },
-    { id: 'INVIGILATION_SCHEDULE', label: 'Invigilation Schedule', icon: UserCheckIcon },
-  ];
+  const allTabs = useMemo(() => [
+    { id: 'SCHEDULES', label: 'Exam Details', icon: CalendarIcon, featureKey: 'exam_tab_details' },
+    { id: 'SUBJECT_MATRIX', label: 'Subject Routine', icon: BookOpenIcon, featureKey: 'exam_tab_routine' },
+    { id: 'INVIGILATION_SCHEDULE', label: 'Invigilation Schedule', icon: UserCheckIcon, featureKey: 'exam_tab_invigilation' },
+  ], []);
+
+  const tabs = useMemo(() => {
+    return allTabs.filter(tab => !tab.featureKey || isSectionEnabled(tab.featureKey));
+  }, [allTabs, isSectionEnabled]);
+
+  useEffect(() => {
+    if (tabs.length > 0 && !tabs.some(t => t.id === activeTab)) {
+      setActiveTab(tabs[0].id);
+    }
+  }, [tabs, activeTab]);
 
   const handleTabChange = (newTab) => {
     setActiveTab(newTab);

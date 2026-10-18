@@ -157,6 +157,7 @@ export const bn = {
     generateInvite: 'ইনভাইট তৈরি করুন',
     generateInviteDesc: 'অটো রোল অ্যাসাইনমেন্টের জন্য কিউআর বা লিঙ্ক তৈরি করুন',
     totalInvitesBadge: '{{count}} টি মোট ইনভাইট',
+    searchInvites: 'আমন্ত্রণ অনুসন্ধান',
     searchPlaceholder: 'শিরোনাম, ভূমিকা বা টোকেন দিয়ে ইনভাইট খুঁজুন...',
     allStatuses: 'সকল স্ট্যাটাস',
     statusActive: 'সক্রিয় ও বৈধ',

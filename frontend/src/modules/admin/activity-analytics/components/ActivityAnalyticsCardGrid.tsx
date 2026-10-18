@@ -54,9 +54,12 @@ export const ActivityAnalyticsCardGrid: React.FC<ActivityAnalyticsCardGridProps>
                 {record.name}
               </button>
               {hasLiveSession && (
-                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  {t('table.live', 'Live')}
+                <span
+                  className="relative flex h-2 w-2 shrink-0"
+                  title={t('table.live', 'Online Now')}
+                >
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                 </span>
               )}
             </div>
@@ -99,7 +102,9 @@ export const ActivityAnalyticsCardGrid: React.FC<ActivityAnalyticsCardGridProps>
           </div>
 
           <div className="text-[11px] theme-text-secondary">
-            {record.last_active ? formatDate(record.last_active) : '—'}
+            {record.last_active
+              ? formatDate(record.last_active, { dateStyle: 'medium', timeStyle: 'short' })
+              : '—'}
           </div>
         </div>
       </div>

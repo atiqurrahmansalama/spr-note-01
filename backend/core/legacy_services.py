@@ -102,22 +102,25 @@ def sync_feature_registry_to_db():
     from core.models import AppSectionCategory, AppSection
     from .feature_registry import FEATURE_REGISTRY
 
-    # Automatically map categories keys to titles
+    # Automatically map categories keys to titles in exact sidebar order
     category_titles = {
-        "NAVIGATION": "Navigation",
-        "INSTITUTIONS": "Academic Institution",
-        "ADMIN": "Admin Tools",
-        "STUDENTS": "Student Management",
-        "STAFF": "Teacher & Staff Management",
-        "REPORTS": "Report Generator",
+        "NAVIGATION": "Dashboard",
+        "INSTITUTIONS": "Academy Structure",
+        "ACADEMIC": "Daily Classroom",
+        "EXAMINATIONS": "Examination & Results",
+        "STUDENTS": "Student",
+        "STAFF": "Staff Management",
+        "PRINT": "Print Studio",
+        "FINANCE": "Finance & Accounts",
+        "ADMIN": "App Management",
         "SETTINGS": "Settings",
         "SYSTEM": "System & Standalone",
     }
 
-    # Ensure all baseline categories exist
+    # Ensure all baseline categories exist with proper ordering
     cat_map = {}
     for idx, (cat_key, cat_title) in enumerate(category_titles.items(), 1):
-        c, _ = AppSectionCategory.objects.get_or_create(
+        c, _ = AppSectionCategory.objects.update_or_create(
             key=cat_key,
             defaults={"title": cat_title, "order": idx}
         )
@@ -150,6 +153,9 @@ def sync_feature_registry_to_db():
 
     # Delete any AppSection rows in database that are NOT in FEATURE_REGISTRY
     AppSection.objects.exclude(section_key__in=registry_keys).delete()
+
+    # Delete any AppSectionCategory rows in database that are NOT in category_titles
+    AppSectionCategory.objects.exclude(key__in=category_titles.keys()).delete()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -240,19 +246,37 @@ def evaluate_section_config_for_user(user=None):
             resolved_raw[key] = global_val
             origins[key] = "GLOBAL"
 
-    # Apply strict Top-Down cascading rule:
-    # Child is active ONLY if parent is ON and child is ON
+    # Apply strict Top-Down cascading rule (Supports N-tier recursive hierarchy):
+    # Child is active ONLY if all its ancestors are ON and child is ON
+    parent_map = {sec.section_key: sec.parent_key for sec in sections}
+
+    def is_ancestor_active(k):
+        p_key = parent_map.get(k)
+        if not p_key:
+            return True
+        if not resolved_raw.get(p_key, True):
+            return False
+        return is_ancestor_active(p_key)
+
+    def get_disabled_ancestor(k):
+        p_key = parent_map.get(k)
+        if not p_key:
+            return None
+        if not resolved_raw.get(p_key, True):
+            return p_key
+        return get_disabled_ancestor(p_key)
+
     resolved = {}
     for sec in sections:
         key = sec.section_key
-        if sec.parent_key:
-            parent_state = resolved_raw.get(sec.parent_key, True)
-            child_state = resolved_raw.get(key, True)
-            resolved[key] = parent_state and child_state
-            if not parent_state and child_state:
-                origins[key] = f"PARENT_DISABLED ({sec.parent_key})"
-        else:
-            resolved[key] = resolved_raw.get(key, True)
+        child_state = resolved_raw.get(key, True)
+        ancestor_ok = is_ancestor_active(key)
+        resolved[key] = ancestor_ok and child_state
+        if not ancestor_ok and child_state:
+            disabled_parent = get_disabled_ancestor(key) or sec.parent_key
+            origins[key] = f"PARENT_DISABLED ({disabled_parent})"
+        elif not sec.parent_key:
+            resolved[key] = child_state
 
     return resolved, origins
 

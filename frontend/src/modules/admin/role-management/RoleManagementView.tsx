@@ -11,7 +11,6 @@ import IconButton from '../../../components/ui/IconButton';
 import {
   KeyIcon,
   PlusIcon,
-  RefreshIcon,
   DownloadIcon,
   ArrowLeftIcon,
 } from '../../../components/ui/Icons';
@@ -183,17 +182,6 @@ export const RoleManagementView: React.FC<RoleManagementViewProps> = ({
                   ariaLabel="Back"
                 />
               )}
-
-              <IconButton
-                icon={RefreshIcon}
-                size="md"
-                variant="sub"
-                loading={loading}
-                disabled={loading}
-                onClick={handleRefreshAll}
-                title={t('refresh', 'Refresh Data')}
-                ariaLabel={t('refresh', 'Refresh Data')}
-              />
 
               <button
                 type="button"

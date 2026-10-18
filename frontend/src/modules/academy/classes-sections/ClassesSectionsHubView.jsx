@@ -18,6 +18,7 @@ import MetricsGrid from '../../../components/ui/MetricsGrid';
 import { PageContainer } from '../../../components/layout';
 import { fetchWithAuth } from '../../../utils/authService';
 import { useRightSidebar } from '../../../context/RightSidebarContext';
+import { useFeatureControl } from '../../../context/FeatureControlContext';
 import { ClassManagementView } from './classes';
 import { SectionManagementView } from './sections';
 import { GroupManagementView } from './groups';
@@ -26,6 +27,7 @@ import { getSectionMetrics } from '../../../api/academy';
 export default function ClassesSectionsHubView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { openDrawer } = useRightSidebar();
+  const { isSectionEnabled } = useFeatureControl();
   const rawTab = searchParams.get('tab');
 
   // Metrics for tabs
@@ -165,30 +167,38 @@ export default function ClassesSectionsHubView() {
     };
   }, [loadAllMetrics]);
 
-  // Determine whether 'Sections' and 'Groups' tabs should be shown
+  // Determine whether 'Classes', 'Sections' and 'Groups' tabs should be shown
   const isSectionDrawer = searchParams.get('drawer') === 'section';
   const isGroupDrawer = searchParams.get('drawer') === 'group';
-  const showSectionsTab = rawTab === 'sections' || isSectionDrawer || hasSectionsEnabledInClasses || (sectionMetrics.total_sections > 0);
-  const showGroupsTab = rawTab === 'groups' || isGroupDrawer || hasGroupsEnabledInClasses || (groupMetrics.total_groups > 0);
+
+  const isClassesFeatureEnabled = isSectionEnabled('classes_tab_classes');
+  const isSectionsFeatureEnabled = isSectionEnabled('classes_tab_sections');
+  const isGroupsFeatureEnabled = isSectionEnabled('classes_tab_groups');
+
+  const showSectionsTab = isSectionsFeatureEnabled && (rawTab === 'sections' || isSectionDrawer || hasSectionsEnabledInClasses || (sectionMetrics.total_sections > 0));
+  const showGroupsTab = isGroupsFeatureEnabled && (rawTab === 'groups' || isGroupDrawer || hasGroupsEnabledInClasses || (groupMetrics.total_groups > 0));
 
   // Fallback if current tab query parameter is hidden
   useEffect(() => {
     if (!showSectionsTab && rawTab === 'sections') {
       const nextParams = new URLSearchParams(searchParams);
-      nextParams.set('tab', 'classes');
+      nextParams.set('tab', isClassesFeatureEnabled ? 'classes' : (showGroupsTab ? 'groups' : 'classes'));
       setSearchParams(nextParams, { replace: true });
     } else if (!showGroupsTab && rawTab === 'groups') {
       const nextParams = new URLSearchParams(searchParams);
-      nextParams.set('tab', 'classes');
+      nextParams.set('tab', isClassesFeatureEnabled ? 'classes' : (showSectionsTab ? 'sections' : 'classes'));
       setSearchParams(nextParams, { replace: true });
     }
-  }, [showSectionsTab, showGroupsTab, rawTab, searchParams, setSearchParams]);
+  }, [showSectionsTab, showGroupsTab, isClassesFeatureEnabled, rawTab, searchParams, setSearchParams]);
 
   const activeTab = useMemo(() => {
     if ((rawTab === 'sections' || isSectionDrawer) && showSectionsTab) return 'sections';
     if ((rawTab === 'groups' || isGroupDrawer) && showGroupsTab) return 'groups';
+    if (isClassesFeatureEnabled) return 'classes';
+    if (showSectionsTab) return 'sections';
+    if (showGroupsTab) return 'groups';
     return 'classes';
-  }, [rawTab, isSectionDrawer, isGroupDrawer, showSectionsTab, showGroupsTab]);
+  }, [rawTab, isSectionDrawer, isGroupDrawer, showSectionsTab, showGroupsTab, isClassesFeatureEnabled]);
 
   const handleTabChange = (tabId) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -207,13 +217,15 @@ export default function ClassesSectionsHubView() {
   };
 
   const TABS = useMemo(() => {
-    const tabsList = [
-      {
+    const tabsList = [];
+
+    if (isClassesFeatureEnabled) {
+      tabsList.push({
         id: 'classes',
         label: 'Classes',
         icon: ClassIcon,
-      },
-    ];
+      });
+    }
 
     if (showSectionsTab) {
       tabsList.push({
@@ -231,8 +243,8 @@ export default function ClassesSectionsHubView() {
       });
     }
 
-    return tabsList;
-  }, [showSectionsTab, showGroupsTab]);
+    return tabsList.length > 0 ? tabsList : [{ id: 'classes', label: 'Classes', icon: ClassIcon }];
+  }, [isClassesFeatureEnabled, showSectionsTab, showGroupsTab]);
 
   const pageTitle = useMemo(() => {
     if (showSectionsTab && showGroupsTab) return "Classes & Sections";

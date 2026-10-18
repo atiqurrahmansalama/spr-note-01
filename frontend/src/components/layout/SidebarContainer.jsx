@@ -77,24 +77,24 @@ export default function SidebarContainer({
     { id: "Dashboard", name: "Dashboard", i18nKey: "dashboard", path: "/dashboard", Icon: DashboardIcon, key: "nav_dashboard" },
     {
       id: "Academy",
-      name: "Academy",
+      name: "Academy Structure",
       i18nKey: "academy",
       Icon: BuildingOfficeIcon,
       hasSub: true,
       key: "nav_institution",
       subItems: [
-        { id: "Profile", name: "Profile & Branding", i18nKey: "institutionProfile", path: "/academy-profile", matchPaths: ["/academy-profile", "/academy/profile", "/settings/institution", "/institution-profile"], Icon: BuildingOfficeIcon, key: "settings_institution" },
-        { id: "Academies & Departments", name: "Campus Structure", i18nKey: "campusProfile", path: "/academy/campus-profile", matchPaths: ["/academy/campus-profile", "/campus-profile", "/academy/branches", "/academy/departments", "/student-management/departments"], Icon: BuildingOfficeIcon, key: "campus_profile" },
-        { id: "Classes & Groups", name: "Classes & Sections", i18nKey: "classesGroups", path: "/academy/classes-groups", matchPaths: ["/academy/classes-groups", "/classes-groups", "/academy/classes", "/academy/groups", "/student-management/classes", "/student-management/groups"], Icon: ClassIcon, key: "student_classes" },
-        { id: "Period Schedules", name: "Routine & Curriculum", i18nKey: "routineCurriculum", path: "/academy/periods", matchPaths: ["/academy/periods"], Icon: TimerIcon, key: "class_period_slots" },
+        { id: "Profile & Branding", name: "Profile & Branding", i18nKey: "institutionProfile", path: "/academy-profile", matchPaths: ["/academy-profile", "/academy/profile", "/settings/institution", "/institution-profile"], Icon: BuildingOfficeIcon, key: "settings_institution" },
+        { id: "Campus Structure", name: "Campus Structure", i18nKey: "campusProfile", path: "/academy/campus-profile", matchPaths: ["/academy/campus-profile", "/campus-profile", "/academy/branches", "/academy/departments", "/student-management/departments"], Icon: BuildingOfficeIcon, key: "campus_profile" },
+        { id: "Classes & Sections", name: "Classes & Sections", i18nKey: "classesGroups", path: "/academy/classes-groups", matchPaths: ["/academy/classes-groups", "/classes-groups", "/academy/classes", "/academy/groups", "/student-management/classes", "/student-management/groups"], Icon: ClassIcon, key: "student_classes" },
+        { id: "Routine & Curriculum", name: "Routine & Curriculum", i18nKey: "routineCurriculum", path: "/academy/periods", matchPaths: ["/academy/periods"], Icon: TimerIcon, key: "class_period_slots" },
         { id: "Calendar & Events", name: "Calendar & Events", i18nKey: "calendarSchedule", path: "/academy/calendar-events", matchPaths: ["/academy/calendar-events", "/academy/calendar-schedule", "/academy/working-hours"], Icon: CalendarIcon, key: "academy_calendar_events" },
-        { id: "Residential Quarters", name: "Residential & Quarters", i18nKey: "residentialDormitory", path: "/academy/residential-quarters", matchPaths: ["/academy/residential-quarters", "/academy/residential", "/academy/dormitory", "/residential-quarters"], Icon: HomeIcon, key: "residential_quarters" },
+        { id: "Residential & Quarters", name: "Residential & Quarters", i18nKey: "residentialDormitory", path: "/academy/residential-quarters", matchPaths: ["/academy/residential-quarters", "/academy/residential", "/academy/dormitory", "/residential-quarters"], Icon: HomeIcon, key: "residential_quarters" },
       ]
     },
     {
-      id: "Academic Activities",
-      name: "Academic Activities",
-      i18nKey: "academicActivities",
+      id: "Daily Classroom",
+      name: "Daily Classroom",
+      i18nKey: "dailyClassroom",
       Icon: BookOpenIcon,
       hasSub: true,
       key: "nav_academic_studies",
@@ -249,8 +249,8 @@ export default function SidebarContainer({
       key: "nav_staff_management",
       subItems: [
         { id: "Teacher & Staff Roster", name: "Teacher & Staff Roster", i18nKey: "staffRoster", path: "/staff/roster", matchPaths: ["/staff/roster"], Icon: TeacherIcon, key: "staff_roster" },
-        { id: "Teacher Class Attendance", name: "Teacher Class Attendance", i18nKey: "teacherAttendance", path: "/staff/teacher-attendance", matchPaths: ["/staff/teacher-attendance"], Icon: ClassIcon, key: "staff_roster" },
-        { id: "Staff Daily Attendance", name: "Staff Daily Attendance", i18nKey: "staffDailyAttendance", path: "/staff/attendance", matchPaths: ["/staff/attendance"], Icon: DutyIcon, key: "staff_roster" },
+        { id: "Teacher Class Attendance", name: "Teacher Class Attendance", i18nKey: "teacherAttendance", path: "/staff/teacher-attendance", matchPaths: ["/staff/teacher-attendance"], Icon: ClassIcon, key: "teacher_class_attendance" },
+        { id: "Staff Daily Attendance", name: "Staff Daily Attendance", i18nKey: "staffDailyAttendance", path: "/staff/attendance", matchPaths: ["/staff/attendance"], Icon: DutyIcon, key: "staff_daily_attendance" },
         { id: "Staff Onboarding", name: "Staff Onboarding", i18nKey: "staffOnboarding", path: "/staff/onboarding", matchPaths: ["/staff/onboarding"], Icon: AdmissionIcon, key: "staff_onboarding" },
       ]
     },
@@ -278,7 +278,7 @@ export default function SidebarContainer({
       hasSub: true,
       key: "nav_app_management",
       subItems: [
-        { id: "Section Control", name: "Section Control", i18nKey: "sectionControl", path: "/section-control", matchPaths: ["/section-control"], Icon: SectionControlIcon, key: "app_section_control" },
+        { id: "Feature & Module Control", name: "Feature & Module Control", i18nKey: "sectionControl", path: "/section-control", matchPaths: ["/section-control"], Icon: SectionControlIcon, key: "app_section_control" },
         { id: "User Management", name: "User Management", i18nKey: "userManagement", path: "/user-management", matchPaths: ["/user-management"], Icon: SectionControlIcon, key: "app_user_management" },
         { id: "Role Management", name: "Role Management", i18nKey: "roleManagement", path: "/role-management", matchPaths: ["/role-management"], Icon: SectionControlIcon, key: "app_role_management" },
         { id: "Activity Analytics", name: "Activity Analytics", i18nKey: "activityAnalytics", path: "/activity-analytics", matchPaths: ["/activity-analytics"], Icon: DashboardIcon, key: "app_activity_analytics" },

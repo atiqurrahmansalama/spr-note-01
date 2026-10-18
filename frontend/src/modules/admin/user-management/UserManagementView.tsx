@@ -10,14 +10,12 @@ import DataViewToolbar from '../../../components/ui/DataViewToolbar';
 import DataViewFooter from '../../../components/ui/DataViewFooter';
 import CustomSelect from '../../../components/ui/CustomSelect';
 import ActionMenu from '../../../components/ui/ActionMenu';
-import IconButton from '../../../components/ui/IconButton';
 import Modal from '../../../components/ui/Modal';
 import TabSwitcher from '../../../components/ui/TabSwitcher';
 import { RoleSelect } from '../../../components/selectors';
 import {
   UsersIcon,
   PlusIcon,
-  RefreshIcon,
   BuildingOfficeIcon,
   AlertTriangleIcon,
   QrCodeIcon,
@@ -168,7 +166,7 @@ export const UserManagementView: React.FC = () => {
       },
       {
         id: 'invites',
-        label: t('tabs.invites', 'Role Invites & QR Tokens'),
+        label: t('tabs.invites', 'User Invites & QR Tokens'),
         icon: QrCodeIcon,
         badge: formatNumber(inviteMetrics.totalInvites),
       },
@@ -344,79 +342,54 @@ export const UserManagementView: React.FC = () => {
     <PageContainer maxWidth="7xl">
       {/* 1. Page Header Overview & Actions */}
       <PageHeader
-        icon={activeTab === 'invites' ? QrCodeIcon : UsersIcon}
-        title={activeTab === 'invites' ? t('invites.title', 'Role Invites & Tokens') : t('title', 'User Management')}
-        badge={
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold theme-bg-sub border theme-border theme-text-secondary tracking-wide">
-            {activeTab === 'invites'
-              ? t('invites.totalInvitesBadge', `${formatNumber(invites.length)} Total Invites`, {
-                  count: formatNumber(invites.length),
-                })
-              : t('totalUsersBadge', `${formatNumber(users.length)} Total Users`, {
-                  count: formatNumber(users.length),
-                })}
-          </span>
-        }
-        subtitle={
-          activeTab === 'invites'
-            ? t('invites.subtitle', 'Generate and manage batch QR codes and invitation links for automatic role assignments')
-            : t('subtitle', 'Manage user accounts, authority roles, authentication credentials, and institutions')
-        }
-        actions={
-          <div className="flex items-center gap-2">
-            <IconButton
-              icon={RefreshIcon}
-              size="md"
-              variant="sub"
-              loading={activeTab === 'invites' ? invitesLoading : usersLoading}
-              disabled={activeTab === 'invites' ? invitesLoading : usersLoading}
-              onClick={activeTab === 'invites' ? loadInvites : loadUsersAndRoles}
-              title={t('refresh', 'Refresh Data')}
-              ariaLabel={t('refresh', 'Refresh Data')}
-            />
-
-            {activeTab === 'users' ? (
-              <ActionMenu
-                label={t('addUser', 'Add User')}
-                icon={PlusIcon}
-                size="md"
-                variant="primary"
-                buttonClassName="px-4 py-2.5 rounded-xl font-bold shadow-sm"
-                align="right"
-                items={[
-                  {
-                    label: t('addUser', 'Add User'),
-                    title: t('createAccountSubtitle', 'Create individual user account'),
-                    icon: UsersIcon,
-                    onClick: () => openDrawer('user', { mode: 'add' }),
-                  },
-                  {
-                    label: t('onboardAcademy', 'Onboard Academy'),
-                    title: t('onboardAcademySubtitle', 'Register new campus or institution'),
-                    icon: BuildingOfficeIcon,
-                    onClick: () => openDrawer('institution', { mode: 'add' }),
-                  },
-                ]}
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => openDrawer('invite')}
-                className="px-4 py-2.5 rounded-xl font-bold text-xs theme-bg-accent text-white hover:opacity-90 transition flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0"
-              >
-                <PlusIcon className="w-4 h-4" />
-                <span>{t('invites.generateInvite', 'Generate Invite')}</span>
-              </button>
-            )}
-          </div>
-        }
+        icon={UsersIcon}
+        title={t('title', 'User Management')}
+        subtitle={t(
+          'subtitle',
+          'Manage user accounts, authority roles, authentication credentials, and institutions'
+        )}
       />
 
-      {/* 2. Unified TabSwitcher Navigation */}
+      {/* 2. Unified TabSwitcher Navigation with Right-Aligned Action */}
       <TabSwitcher
         tabs={tabs}
         activeTab={activeTab}
         onChange={handleTabChange}
+        rightContent={
+          activeTab === 'users' ? (
+            <ActionMenu
+              label={t('addUser', 'Add User')}
+              icon={PlusIcon}
+              size="sm"
+              variant="primary"
+              buttonClassName="font-bold shadow-xs shrink-0"
+              align="right"
+              items={[
+                {
+                  label: t('addUser', 'Add User'),
+                  title: t('createAccountSubtitle', 'Create individual user account'),
+                  icon: UsersIcon,
+                  onClick: () => openDrawer('user', { mode: 'add' }),
+                },
+                {
+                  label: t('onboardAcademy', 'Onboard Academy'),
+                  title: t('onboardAcademySubtitle', 'Register new campus or institution'),
+                  icon: BuildingOfficeIcon,
+                  onClick: () => openDrawer('institution', { mode: 'add' }),
+                },
+              ]}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => openDrawer('invite')}
+              className="px-3 py-1.5 rounded-xl font-bold text-xs theme-bg-accent theme-accent-text hover:opacity-95 transition flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0"
+            >
+              <PlusIcon className="w-3.5 h-3.5" />
+              <span>{t('invites.generateInvite', 'Generate Invite')}</span>
+            </button>
+          )
+        }
       />
 
       {/* 3. Conditional Tab Views */}
@@ -432,8 +405,8 @@ export const UserManagementView: React.FC = () => {
             onSearchChange={(val) => updateUserFilters({ search: val })}
             searchPlaceholder={t('searchPlaceholder', 'Search users by name, email, or phone...')}
             stackedSwitcher={true}
-            filterGridClassName="grid-cols-1 sm:grid-cols-2 md:grid-cols-4"
-            searchSpanClassName="col-span-1"
+            filterGridClassName="grid-cols-1 sm:grid-cols-2 md:grid-cols-4 @[640px]:grid-cols-2 @[900px]:grid-cols-4"
+            searchSpanClassName="col-span-1 min-w-0"
             filterElement={
               <>
                 {/* Role Filter */}
@@ -565,40 +538,44 @@ export const UserManagementView: React.FC = () => {
 
           {/* Invites Search & Multi-Filters Toolbar */}
           <DataViewToolbar
-            searchLabel={t('invites.searchPlaceholder', 'Search Invites')}
+            searchLabel={t('invites.searchInvites', 'Search Invites')}
             searchQuery={inviteFilters.search}
             onSearchChange={(val) => updateInviteFilters({ search: val })}
             searchPlaceholder={t('invites.searchPlaceholder', 'Search invites by title, role, or token...')}
             stackedSwitcher={true}
-            filterGridClassName="grid-cols-1 sm:grid-cols-2"
-            searchSpanClassName="col-span-1"
+            filterGridClassName="grid-cols-1 sm:grid-cols-2 md:grid-cols-4 @[640px]:grid-cols-2 @[900px]:grid-cols-4"
+            searchSpanClassName="col-span-1 sm:col-span-2 md:col-span-2 @[640px]:col-span-2 @[900px]:col-span-2 min-w-0"
             filterElement={
               <>
                 {/* Role Filter */}
-                <RoleSelect
-                  value={inviteFilters.role === 'ALL' ? '' : inviteFilters.role}
-                  onChange={(val: any) => updateInviteFilters({ role: val || 'ALL' })}
-                  roles={roles}
-                  valueKey="code"
-                  allowAll={true}
-                  allLabel={t('allRoles', 'All Roles')}
-                  placeholder={t('allRoles', 'All Roles')}
-                  label={t('role', 'Role')}
-                  size="md"
-                  compactMode={false}
-                />
+                <div className="col-span-1 min-w-0">
+                  <RoleSelect
+                    value={inviteFilters.role === 'ALL' ? '' : inviteFilters.role}
+                    onChange={(val: any) => updateInviteFilters({ role: val || 'ALL' })}
+                    roles={roles}
+                    valueKey="code"
+                    allowAll={true}
+                    allLabel={t('allRoles', 'All Roles')}
+                    placeholder={t('allRoles', 'All Roles')}
+                    label={t('role', 'Role')}
+                    size="md"
+                    compactMode={false}
+                  />
+                </div>
 
                 {/* Status Filter */}
-                <CustomSelect
-                  label={t('status', 'Status')}
-                  value={inviteFilters.status}
-                  onChange={(val: any) =>
-                    updateInviteFilters({ status: val as RoleInviteStatusFilter })
-                  }
-                  options={inviteStatusOptions}
-                  placeholder={t('allStatuses', 'All Statuses')}
-                  size="md"
-                />
+                <div className="col-span-1 min-w-0">
+                  <CustomSelect
+                    label={t('status', 'Status')}
+                    value={inviteFilters.status}
+                    onChange={(val: any) =>
+                      updateInviteFilters({ status: val as RoleInviteStatusFilter })
+                    }
+                    options={inviteStatusOptions}
+                    placeholder={t('allStatuses', 'All Statuses')}
+                    size="md"
+                  />
+                </div>
               </>
             }
             viewMode={inviteViewMode}

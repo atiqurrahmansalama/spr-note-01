@@ -80,7 +80,7 @@ const DataBackupView = lazy(() => import("./modules/settings/components/DataBack
 const ShortcutsGuide = lazy(() => import("./modules/settings/components/ShortcutsGuide"));
 const AppGuideView = lazy(() => import("./modules/settings/components/AppGuideView"));
 const AboutAppView = lazy(() => import("./modules/settings/components/AboutAppView"));
-const SectionToggleControlPanel = lazy(() => import("./modules/settings/components/SectionToggleControlPanel"));
+const SectionControlView = lazy(() => import("./modules/admin/section-control"));
 
 // ─── Protected Developer & App Management Views (Lazy Loaded) ───────────────
 const NotificationManagementView = lazy(() => import("./modules/app-management/notifications/NotificationManagementView"));
@@ -157,8 +157,8 @@ export default function App() {
                 <Route path="/student-reports" element={<Navigate to="/studies/progress-reports" replace />} />
                 <Route path="/students" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
                 <Route path="/staff/roster" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><TeacherStaffRosterView /></FeatureGuard>} />
-                <Route path="/staff/teacher-attendance" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><TeacherAttendanceView /></FeatureGuard>} />
-                <Route path="/staff/attendance" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><StaffDailyAttendanceView /></FeatureGuard>} />
+                <Route path="/staff/teacher-attendance" element={<FeatureGuard sectionKey="teacher_class_attendance" fallback={<Navigate to="/dashboard" replace />}><TeacherAttendanceView /></FeatureGuard>} />
+                <Route path="/staff/attendance" element={<FeatureGuard sectionKey="staff_daily_attendance" fallback={<Navigate to="/dashboard" replace />}><StaffDailyAttendanceView /></FeatureGuard>} />
                 <Route path="/staff/daily-attendance" element={<Navigate to="/staff/attendance" replace />} />
                 <Route path="/staff/onboarding" element={<FeatureGuard sectionKey="staff_onboarding" fallback={<Navigate to="/dashboard" replace />}><StaffOnboardingView /></FeatureGuard>} />
                 <Route path="/staff-onboarding" element={<Navigate to="/staff/onboarding" replace />} />
@@ -293,7 +293,7 @@ export default function App() {
                 <Route path="/shortcuts" element={<FeatureGuard sectionKey="nav_shortcuts" fallback={<Navigate to="/dashboard" replace />}><ShortcutsGuide /></FeatureGuard>} />
                 <Route path="/guide" element={<FeatureGuard sectionKey="nav_app_guide" fallback={<Navigate to="/dashboard" replace />}><AppGuideView /></FeatureGuard>} />
                 <Route path="/about" element={<FeatureGuard sectionKey="nav_about" fallback={<Navigate to="/dashboard" replace />}><AboutAppView /></FeatureGuard>} />
-                <Route path="/section-control" element={<FeatureGuard sectionKey="app_section_control" fallback={<Navigate to="/dashboard" replace />}><SectionToggleControlPanel /></FeatureGuard>} />
+                <Route path="/section-control" element={<FeatureGuard sectionKey="app_section_control" fallback={<Navigate to="/dashboard" replace />}><SectionControlView /></FeatureGuard>} />
                 <Route path="/app-management/institutions" element={<FeatureGuard sectionKey="app_institutions" fallback={<Navigate to="/dashboard" replace />}><InstitutionListView /></FeatureGuard>} />
                 <Route path="/institutions" element={<FeatureGuard sectionKey="app_institutions" fallback={<Navigate to="/dashboard" replace />}><InstitutionListView /></FeatureGuard>} />
                 <Route path="/admin-tools" element={<DeveloperToolsHubView />} />

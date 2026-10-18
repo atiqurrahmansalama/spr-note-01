@@ -335,7 +335,7 @@ class UserActivityAnalyticsView(APIView):
             sessions_qs = sessions_qs.filter(login_at__lte=to_dt)
 
         sessions_by_user = defaultdict(list)
-        for s in sessions_qs.order_by('-login_at'):
+        for s in sessions_qs.order_by('-last_activity'):
             sessions_by_user[s.user_id].append(s)
 
         logs_qs = ActivityLog.objects.all()
@@ -346,13 +346,57 @@ class UserActivityAnalyticsView(APIView):
 
         user_reports = []
         grand_total_minutes = 0
+        now = timezone.now()
+        current_tz = timezone.get_current_timezone()
 
         for user in users_qs:
             user_sessions = sessions_by_user.get(user.id, [])
             if not user_sessions and not user_id_param and not user_type_param:
                 continue
 
-            user_total_mins = sum(s.total_duration_minutes for s in user_sessions)
+            user_total_mins = 0
+            valid_windows = []
+
+            for s in user_sessions:
+                sess_start = s.login_at
+                sess_end = s.logout_at or s.last_activity or sess_start
+
+                # Auto-close sessions that are marked active but idle for > 30 minutes
+                if s.is_active:
+                    last_act = s.last_activity or s.login_at
+                    if (now - last_act).total_seconds() > 1800:
+                        s.is_active = False
+                        s.logout_at = last_act
+                        s.save(update_fields=['is_active', 'logout_at', 'total_duration_minutes'])
+                        sess_end = last_act
+                    else:
+                        sess_end = last_act
+
+                # Clip session bounds to the requested filter window [from_dt, to_dt]
+                win_start = max(sess_start, from_dt) if from_dt else sess_start
+                win_end = min(sess_end, to_dt) if to_dt else sess_end
+
+                # If this session does not fall within the window, skip it
+                if win_end <= win_start:
+                    continue
+
+                dur_mins = max(1, int((win_end - win_start).total_seconds() // 60))
+                user_total_mins += dur_mins
+
+                valid_windows.append({
+                    "session_id": s.id,
+                    "device_type": s.device_type,
+                    "device_info": s.device_info,
+                    "ip_address": s.ip_address,
+                    "from_time": win_start.astimezone(current_tz),
+                    "to_time": win_end.astimezone(current_tz),
+                    "duration_minutes": dur_mins,
+                    "is_active": s.is_active and (now - (s.last_activity or s.login_at)).total_seconds() <= 1800
+                })
+
+            if not valid_windows and not user_id_param and not user_type_param:
+                continue
+
             grand_total_minutes += user_total_mins
 
             days = user_total_mins // 1440
@@ -367,17 +411,6 @@ class UserActivityAnalyticsView(APIView):
                 formatted_parts.append(f"{mins}m")
             formatted_duration = " ".join(formatted_parts)
 
-            windows = [{
-                "session_id": s.id,
-                "device_type": s.device_type,
-                "device_info": s.device_info,
-                "ip_address": s.ip_address,
-                "from_time": s.login_at,
-                "to_time": s.logout_at or s.last_activity,
-                "duration_minutes": s.total_duration_minutes,
-                "is_active": s.is_active
-            } for s in user_sessions[:50]]
-
             # Fast query using indexed user_id and primary key order
             user_logs = list(logs_qs.filter(user_id=user.id).order_by('-id')[:20])
             logs_data = [{
@@ -386,7 +419,7 @@ class UserActivityAnalyticsView(APIView):
                 "endpoint": l.endpoint,
                 "http_method": l.http_method,
                 "ip_address": l.ip_address,
-                "timestamp": l.timestamp
+                "timestamp": l.timestamp.astimezone(current_tz) if l.timestamp else None
             } for l in user_logs]
 
             name = user.phone_number
@@ -395,6 +428,8 @@ class UserActivityAnalyticsView(APIView):
             elif user.email:
                 name = user.email
 
+            last_act_val = user_sessions[0].last_activity if user_sessions else None
+
             user_reports.append({
                 "user_id": user.id,
                 "phone_number": user.phone_number,
@@ -402,17 +437,17 @@ class UserActivityAnalyticsView(APIView):
                 "name": name,
                 "total_active_duration_minutes": user_total_mins,
                 "formatted_active_duration": formatted_duration,
-                "sessions_count": len(user_sessions),
-                "last_active": user_sessions[0].last_activity if user_sessions else None,
-                "time_windows": windows,
+                "sessions_count": len(valid_windows),
+                "last_active": last_act_val.astimezone(current_tz) if last_act_val else None,
+                "time_windows": valid_windows[:50],
                 "activity_logs": logs_data
             })
 
         return Response({
             "status": "success",
             "time_frame": {
-                "from_time": from_dt,
-                "to_time": to_dt,
+                "from_time": from_dt.astimezone(current_tz) if from_dt else None,
+                "to_time": to_dt.astimezone(current_tz) if to_dt else None,
             },
             "summary": {
                 "total_users_tracked": len(user_reports),
@@ -611,18 +646,34 @@ class ControlPanelSectionTreeView(APIView):
                 resolved_raw[key] = global_val
                 origins[key] = "GLOBAL"
 
-        # 4. Resolve effective values with Top-Down cascading
+        # 4. Resolve effective values with Top-Down cascading (Supports N-tier recursive hierarchy)
+        parent_map = {sec.section_key: sec.parent_key for sec in sections}
+
+        def is_ancestor_active(k):
+            p_key = parent_map.get(k)
+            if not p_key:
+                return True
+            if not resolved_raw.get(p_key, True):
+                return False
+            return is_ancestor_active(p_key)
+
+        def get_disabled_ancestor(k):
+            p_key = parent_map.get(k)
+            if not p_key:
+                return None
+            if not resolved_raw.get(p_key, True):
+                return p_key
+            return get_disabled_ancestor(p_key)
+
         resolved_effective = {}
         for sec in sections:
             key = sec.section_key
-            if sec.parent_key:
-                parent_state = resolved_raw.get(sec.parent_key, True)
-                child_state = resolved_raw.get(key, True)
-                resolved_effective[key] = parent_state and child_state
-                if not parent_state and child_state:
-                    origins[key] = f"PARENT_DISABLED ({sec.parent_key})"
-            else:
-                resolved_effective[key] = resolved_raw.get(key, True)
+            child_state = resolved_raw.get(key, True)
+            ancestor_ok = is_ancestor_active(key)
+            resolved_effective[key] = ancestor_ok and child_state
+            if not ancestor_ok and child_state:
+                disabled_parent = get_disabled_ancestor(key) or sec.parent_key
+                origins[key] = f"PARENT_DISABLED ({disabled_parent})"
 
         # 5. Build hierarchical tree: Category -> Parent Section -> Child Sections
         categories_dict = {}
@@ -865,7 +916,20 @@ class ControlPanelAuditLogView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        logs = FeatureFlagAuditLog.objects.all().select_related('changed_by').order_by('-timestamp')[:100]
+        qs = FeatureFlagAuditLog.objects.all().select_related('changed_by')
+        scope = request.query_params.get('scope') or request.GET.get('scope')
+        if scope and scope.upper() != 'ALL':
+            qs = qs.filter(scope_type__iexact=scope)
+        search = request.query_params.get('search') or request.GET.get('search')
+        if search:
+            search = search.strip()
+            qs = qs.filter(
+                Q(section_key__icontains=search) |
+                Q(target_identifier__icontains=search) |
+                Q(changed_by__name__icontains=search) |
+                Q(changed_by__phone_number__icontains=search)
+            )
+        logs = qs.order_by('-timestamp')[:250]
         data = []
         for log in logs:
             data.append({
@@ -877,6 +941,7 @@ class ControlPanelAuditLogView(APIView):
                 'previous_state': log.previous_state,
                 'new_state': log.new_state,
                 'timestamp': log.timestamp.strftime("%Y-%m-%d %I:%M:%S %p"),
+                'raw_timestamp': log.timestamp.isoformat(),
             })
         return Response({
             'status': 'success',

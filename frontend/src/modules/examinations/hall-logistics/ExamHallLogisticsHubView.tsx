@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageContainer } from '../../../components/layout';
 import { TabSwitcher, PageHeader } from '../../../components/ui';
+import { useFeatureControl } from '../../../context/FeatureControlContext';
 import {
   AcademicCapIcon,
   IdentificationIcon,
@@ -32,6 +33,7 @@ export default function ExamHallLogisticsHubView({
   hideHeader = false,
   isEmbedded = false,
 }: ExamHallLogisticsHubViewProps) {
+  const { isSectionEnabled } = useFeatureControl();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -126,25 +128,38 @@ export default function ExamHallLogisticsHubView({
     }
   };
 
-  const tabs = [
+  const allTabs = useMemo(() => [
     {
-      id: 'ADMIT_CARDS',
+      id: 'ADMIT_CARDS' as HallLogisticsTab,
       label: 'Admit Cards Generator',
       icon: IdentificationIcon,
       badge: admitCardList.length > 0 ? String(admitCardList.length) : undefined,
+      featureKey: 'hall_tab_admit_cards',
     },
     {
-      id: 'SEAT_PLAN',
+      id: 'SEAT_PLAN' as HallLogisticsTab,
       label: 'Seat Plan & Desk Slips',
       icon: BuildingIcon,
       badge: deskSlipsList.length > 0 ? String(deskSlipsList.length) : undefined,
+      featureKey: 'hall_tab_seat_plan',
     },
     {
-      id: 'ATTENDANCE_SHEETS',
+      id: 'ATTENDANCE_SHEETS' as HallLogisticsTab,
       label: 'Hall Attendance Sheets',
       icon: DocumentTextIcon,
+      featureKey: 'hall_tab_attendance_sheets',
     },
-  ];
+  ], [admitCardList.length, deskSlipsList.length]);
+
+  const tabs = useMemo(() => {
+    return allTabs.filter(tab => !tab.featureKey || isSectionEnabled(tab.featureKey));
+  }, [allTabs, isSectionEnabled]);
+
+  useEffect(() => {
+    if (tabs.length > 0 && !tabs.some(t => t.id === activeTab)) {
+      setActiveTab(tabs[0].id);
+    }
+  }, [tabs, activeTab]);
 
   const content = (
     <div className="space-y-4 sm:space-y-6 text-left animate-fade-in">

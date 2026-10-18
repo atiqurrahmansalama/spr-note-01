@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/Icons';
 import useExamData from '../hooks/useExamData';
 import useTabulationData from '../hooks/useTabulationData';
+import { useFeatureControl } from '@/context/FeatureControlContext';
 import { MarkSheetLedgerViewProps, OptionItem } from './types';
 
 /**
@@ -29,6 +30,7 @@ export default function MarkSheetLedgerView({
   defaultSubTab = null,
   isEmbedded = false,
 }: MarkSheetLedgerViewProps) {
+  const { isSectionEnabled } = useFeatureControl();
   const {
     tenantId,
     exams,
@@ -616,26 +618,39 @@ export default function MarkSheetLedgerView({
     return (subjects || []).reduce((acc: number, sub: any) => acc + (Number(sub.fullMarks) || 0), 0);
   }, [subjects]);
 
-  const subTabs = useMemo(
+  const allSubTabs = useMemo(
     () => [
       {
         id: 'entry' as const,
         label: 'Mark Entry Desk',
         icon: EditIcon,
+        featureKey: 'marksheet_tab_entry',
       },
       {
         id: 'ledger' as const,
         label: 'Academic MarkSheet',
         icon: AcademicCapIcon,
+        featureKey: 'marksheet_tab_ledger',
       },
       {
         id: 'transcripts' as const,
         label: 'Student MarkSheet',
         icon: DocumentIcon,
+        featureKey: 'marksheet_tab_transcripts',
       },
     ],
     []
   );
+
+  const subTabs = useMemo(() => {
+    return allSubTabs.filter((tab) => !tab.featureKey || isSectionEnabled(tab.featureKey));
+  }, [allSubTabs, isSectionEnabled]);
+
+  useEffect(() => {
+    if (subTabs.length > 0 && !subTabs.some((t) => t.id === activeSubTab)) {
+      setActiveSubTab(subTabs[0].id);
+    }
+  }, [subTabs, activeSubTab]);
 
   return (
     <PageContainer maxWidth="7xl" isEmbedded={isEmbedded}>

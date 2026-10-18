@@ -28,6 +28,9 @@ export const ar = {
     role: 'الدور',
     device: 'الجهاز',
     timeHorizon: 'الإطار الزمني',
+    searchLabel: 'بحث النشاط',
+    dateRange: 'النطاق الزمني',
+    selectDateRange: 'اختر النطاق الزمني...',
   },
 
   table: {

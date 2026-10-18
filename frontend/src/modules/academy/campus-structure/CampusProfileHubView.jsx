@@ -33,6 +33,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useTenant } from '../../../context/TenantContext';
 import { useRightSidebar, useDrawerRegistration } from '../../../context/RightSidebarContext';
 import { useToast } from '../../../context/ToastContext';
+import { useFeatureControl } from '../../../context/FeatureControlContext';
 
 export default function CampusProfileHubView() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -42,6 +43,7 @@ export default function CampusProfileHubView() {
   const { refreshInstitutions, activeTenantId, currentInstitution, isMultiTenantAdmin } = useTenant();
   const { openDrawer, closeDrawer } = useRightSidebar();
   const { showToast } = useToast();
+  const { isSectionEnabled } = useFeatureControl();
 
   const isSuperAdmin = Boolean(
     isMultiTenantAdmin ||
@@ -49,16 +51,21 @@ export default function CampusProfileHubView() {
     (user?.user_type && user.user_type.toUpperCase() === 'SUPER_ADMIN')
   );
 
-  // Dynamic Tabs Resolution based on institutional capacity quotas
+  // Dynamic Tabs Resolution based on feature control flags and capacity quotas
   const visibleTabs = useMemo(() => {
-    // Super Admin has 100% full visibility into all tabs unconditionally
+    const allCandidateTabs = [
+      { id: 'academies', label: 'Academies', icon: BuildingOfficeIcon, featureKey: 'campus_tab_academies' },
+      { id: 'branches', label: 'Branches', icon: BuildingOfficeIcon, featureKey: 'campus_tab_branches' },
+      { id: 'academic_years', label: 'Academic Years', icon: SessionsIcon, featureKey: 'campus_tab_academic_years' },
+      { id: 'departments', label: 'Departments', icon: DepartmentIcon, featureKey: 'campus_tab_departments' },
+    ];
+
+    // Filter by feature control flag first
+    const featureAllowedTabs = allCandidateTabs.filter((tab) => isSectionEnabled(tab.featureKey));
+
+    // Super Admin has full visibility into all feature-enabled tabs
     if (isSuperAdmin) {
-      return [
-        { id: 'academies', label: 'Academies', icon: BuildingOfficeIcon },
-        { id: 'branches', label: 'Branches', icon: BuildingOfficeIcon },
-        { id: 'academic_years', label: 'Academic Years', icon: SessionsIcon },
-        { id: 'departments', label: 'Departments', icon: DepartmentIcon },
-      ];
+      return featureAllowedTabs.map(({ featureKey, ...t }) => t);
     }
 
     const maxInst = currentInstitution?.max_institutions ?? 1;
@@ -68,25 +75,27 @@ export default function CampusProfileHubView() {
     const tabs = [];
 
     // Academies tab is only visible for institutional users if Multi-Academy (>1)
-    if (maxInst > 1) {
+    if (maxInst > 1 && isSectionEnabled('campus_tab_academies')) {
       tabs.push({ id: 'academies', label: 'Academies', icon: BuildingOfficeIcon });
     }
 
     // Branches tab is only visible for institutional users if Multi-Branch (>1)
-    if (maxBranch > 1) {
+    if (maxBranch > 1 && isSectionEnabled('campus_tab_branches')) {
       tabs.push({ id: 'branches', label: 'Branches', icon: BuildingOfficeIcon });
     }
 
     // Departments tab is only visible for institutional users if Multi-Department (>1)
-    if (maxDept > 1) {
+    if (maxDept > 1 && isSectionEnabled('campus_tab_departments')) {
       tabs.push({ id: 'departments', label: 'Departments', icon: DepartmentIcon });
     }
 
-    // Academic Years tab is always visible
-    tabs.push({ id: 'academic_years', label: 'Academic Years', icon: SessionsIcon });
+    // Academic Years tab
+    if (isSectionEnabled('campus_tab_academic_years')) {
+      tabs.push({ id: 'academic_years', label: 'Academic Years', icon: SessionsIcon });
+    }
 
-    return tabs;
-  }, [currentInstitution, isSuperAdmin]);
+    return tabs.length > 0 ? tabs : featureAllowedTabs.map(({ featureKey, ...t }) => t);
+  }, [currentInstitution, isSuperAdmin, isSectionEnabled]);
 
   const defaultTab = visibleTabs[0]?.id || 'academic_years';
 
@@ -469,7 +478,7 @@ export default function CampusProfileHubView() {
     <PageContainer>
       {/* 1. Header Overview with Reusable PageHeader */}
       <PageHeader
-        title="Academies & Departments"
+        title="Campus Structure"
         subtitle="Unified central console for institutional academies, multi-campus branches, and academic departments."
         icon={BuildingOfficeIcon}
       />

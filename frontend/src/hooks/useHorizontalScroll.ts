@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 
 export interface UseHorizontalScrollOptions {
   /** Speed multiplier for mouse wheel scrolling (default: 1.5) */
@@ -27,7 +27,7 @@ export interface UseHorizontalScrollOptions {
  */
 export function useHorizontalScroll<T extends HTMLElement = HTMLDivElement>(
   options: UseHorizontalScrollOptions = {}
-): React.RefObject<T | null> {
+): React.RefCallback<T> & React.RefObject<T | null> {
   const {
     wheelSpeedMultiplier = 1.5,
     dragSpeedMultiplier = 1.2,
@@ -37,10 +37,26 @@ export function useHorizontalScroll<T extends HTMLElement = HTMLDivElement>(
     disabled = false,
   } = options;
 
-  const elRef = useRef<T | null>(null);
+  const [node, setNode] = React.useState<T | null>(null);
+  const nodeRef = React.useRef<T | null>(null);
+
+  const refCallback = React.useCallback((element: T | null) => {
+    nodeRef.current = element;
+    setNode(element);
+  }, []);
+
+  // Expose .current on the callback ref for backward compatibility with RefObject callers
+  Object.defineProperty(refCallback, 'current', {
+    get: () => nodeRef.current,
+    set: (val: T | null) => {
+      nodeRef.current = val;
+      setNode(val);
+    },
+    configurable: true,
+  });
 
   useEffect(() => {
-    const el = elRef.current;
+    const el = node;
     if (!el || disabled) return;
 
     // Apply touch & overscroll containment styles to disable vertical bounce/interference
@@ -142,9 +158,9 @@ export function useHorizontalScroll<T extends HTMLElement = HTMLDivElement>(
         el.removeEventListener('click', onClickCapture, true);
       }
     };
-  }, [wheelSpeedMultiplier, dragSpeedMultiplier, enableWheel, enableDrag, dragThreshold, disabled]);
+  }, [node, wheelSpeedMultiplier, dragSpeedMultiplier, enableWheel, enableDrag, dragThreshold, disabled]);
 
-  return elRef;
+  return refCallback as unknown as React.RefCallback<T> & React.RefObject<T | null>;
 }
 
 export default useHorizontalScroll;

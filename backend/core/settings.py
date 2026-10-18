@@ -219,6 +219,8 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Dhaka'
+TIME_ZONE = os.getenv("TIME_ZONE", "Asia/Dhaka")
+USE_TZ = True
 # When CELERY_ALWAYS_EAGER is True (or in local dev/tests without Redis), tasks run synchronously in-process
 CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_ALWAYS_EAGER", "False").lower() in ("true", "1", "t") or DEBUG
 

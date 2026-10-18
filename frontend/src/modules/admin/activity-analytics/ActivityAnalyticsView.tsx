@@ -11,6 +11,7 @@ import {
   RefreshIcon,
   DownloadIcon,
 } from '../../../components/ui/Icons';
+import { DateRangePicker } from '../../../components/selectors';
 import { useActivityAnalytics, useActivityTranslation } from './hooks';
 import {
   ActivityMetricsGrid,
@@ -18,7 +19,7 @@ import {
   ActivityAnalyticsCardGrid,
   ActivityUserDetailDrawer,
 } from './components';
-import { DatePreset, DeviceTypeFilter } from './types';
+import { DeviceTypeFilter } from './types';
 
 export const ActivityAnalyticsView: React.FC = () => {
   const { t, formatNumber } = useActivityTranslation();
@@ -38,18 +39,6 @@ export const ActivityAnalyticsView: React.FC = () => {
     loadAnalytics,
     exportCsv,
   } = useActivityAnalytics();
-
-  // Preset Date Options
-  const datePresetOptions = useMemo(
-    () => [
-      { value: 'today', label: t('filters.presetToday', 'Today') },
-      { value: '7d', label: t('filters.preset7d', 'Last 7 Days') },
-      { value: '30d', label: t('filters.preset30d', 'Last 30 Days') },
-      { value: 'all', label: t('filters.presetAll', 'All Time') },
-      { value: 'custom', label: t('filters.presetCustom', 'Custom Range') },
-    ],
-    [t]
-  );
 
   // Device Type Options
   const deviceOptions = useMemo(
@@ -147,44 +136,54 @@ export const ActivityAnalyticsView: React.FC = () => {
 
       {/* 3. Reusable Search & Multi-Filters Toolbar */}
       <DataViewToolbar
-        searchLabel={t('filters.searchPlaceholder', 'Search Activity')}
+        searchLabel={t('filters.searchLabel', 'Search Activity')}
         searchQuery={filters.search}
         onSearchChange={(val) => updateFilters({ search: val })}
         searchPlaceholder={t('filters.searchPlaceholder', 'Search by user name, phone, or role...')}
         stackedSwitcher={true}
-        filterGridClassName="grid-cols-1 sm:grid-cols-3"
-        searchSpanClassName="col-span-1"
+        filterGridClassName="grid-cols-12"
+        searchSpanClassName="col-span-12 sm:col-span-6 lg:col-span-4"
         filterElement={
           <>
-            {/* Time Horizon Preset */}
-            <CustomSelect
-              label={t('filters.timeHorizon', 'Time Frame')}
-              value={filters.datePreset}
-              onChange={(val: any) => updateFilters({ datePreset: val as DatePreset })}
-              options={datePresetOptions}
-              placeholder={t('filters.timeHorizon', 'Time Frame')}
-              size="md"
-            />
+            {/* 1. Large Universal Date Range Picker */}
+            <div className="col-span-12 sm:col-span-6 lg:col-span-4">
+              <DateRangePicker
+                startDate={filters.from_date}
+                endDate={filters.to_date}
+                onRangeSelect={(start: string, end: string) => {
+                  updateFilters({ from_date: start, to_date: end, datePreset: 'custom' });
+                }}
+                onReset={resetFilters}
+                label={t('filters.dateRange', 'Date Range')}
+                placeholder={t('filters.selectDateRange', 'Select Date Range...')}
+                isHijriEnabled={false}
+                size="md"
+              />
+            </div>
 
-            {/* Role Filter */}
-            <CustomSelect
-              label={t('filters.role', 'Role')}
-              value={filters.user_type}
-              onChange={(val: any) => updateFilters({ user_type: String(val) })}
-              options={roleOptions}
-              placeholder={t('filters.allRoles', 'All Roles')}
-              size="md"
-            />
+            {/* 2. Target Role Filter */}
+            <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+              <CustomSelect
+                label={t('filters.role', 'Role')}
+                value={filters.user_type}
+                onChange={(val: any) => updateFilters({ user_type: String(val) })}
+                options={roleOptions}
+                placeholder={t('filters.allRoles', 'All Roles')}
+                size="md"
+              />
+            </div>
 
-            {/* Device Type Filter */}
-            <CustomSelect
-              label={t('filters.device', 'Device')}
-              value={filters.device_type}
-              onChange={(val: any) => updateFilters({ device_type: val as DeviceTypeFilter })}
-              options={deviceOptions}
-              placeholder={t('filters.allDevices', 'All Devices')}
-              size="md"
-            />
+            {/* 3. Device Type Filter */}
+            <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+              <CustomSelect
+                label={t('filters.device', 'Device')}
+                value={filters.device_type}
+                onChange={(val: any) => updateFilters({ device_type: val as DeviceTypeFilter })}
+                options={deviceOptions}
+                placeholder={t('filters.allDevices', 'All Devices')}
+                size="md"
+              />
+            </div>
           </>
         }
         viewMode={viewMode}
@@ -208,30 +207,6 @@ export const ActivityAnalyticsView: React.FC = () => {
           </button>
         }
       />
-
-      {/* 4. Custom Date Range Pickers (Rendered when Custom Range is active) */}
-      {filters.datePreset === 'custom' && (
-        <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border flex flex-wrap items-center gap-4 text-xs font-mono">
-          <div className="flex items-center gap-2">
-            <span className="theme-text-secondary">{t('filters.fromDate', 'From')}:</span>
-            <input
-              type="date"
-              value={filters.from_date}
-              onChange={(e) => updateFilters({ from_date: e.target.value })}
-              className="px-3 py-1.5 rounded-xl theme-bg-surface border theme-border theme-text-primary text-xs outline-none"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="theme-text-secondary">{t('filters.toDate', 'To')}:</span>
-            <input
-              type="date"
-              value={filters.to_date}
-              onChange={(e) => updateFilters({ to_date: e.target.value })}
-              className="px-3 py-1.5 rounded-xl theme-bg-surface border theme-border theme-text-primary text-xs outline-none"
-            />
-          </div>
-        </div>
-      )}
 
       {/* 5. Main Content: Table or Card Grid */}
       <div className="space-y-4">

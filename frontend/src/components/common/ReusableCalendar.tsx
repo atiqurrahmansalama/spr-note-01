@@ -437,21 +437,27 @@ export default function ReusableCalendar({
       if (!startDate && !endDate) return placeholder;
 
       const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
+      const formatLocalDate = (d: Date) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      const todayStr = formatLocalDate(today);
 
       const yest = new Date(today);
       yest.setDate(yest.getDate() - 1);
-      const yestStr = yest.toISOString().split('T')[0];
+      const yestStr = formatLocalDate(yest);
 
       const weekAgo = new Date(today);
       weekAgo.setDate(weekAgo.getDate() - 6);
-      const weekStr = weekAgo.toISOString().split('T')[0];
+      const weekStr = formatLocalDate(weekAgo);
 
       const monthAgo = new Date(today);
       monthAgo.setDate(monthAgo.getDate() - 29);
-      const monthStr = monthAgo.toISOString().split('T')[0];
+      const monthStr = formatLocalDate(monthAgo);
 
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+      const startOfMonth = formatLocalDate(new Date(today.getFullYear(), today.getMonth(), 1));
 
       if (startDate === todayStr && endDate === todayStr) return t('today', 'Today');
       if (startDate === yestStr && endDate === yestStr) return t('yesterday', 'Yesterday');

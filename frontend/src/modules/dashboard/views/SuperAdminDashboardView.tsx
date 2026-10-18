@@ -94,8 +94,8 @@ export default function SuperAdminDashboardView() {
     },
     {
       id: 'section_control',
-      title: 'Section Toggle Matrix',
-      description: 'Feature flags & access',
+      title: 'Feature & Module Control',
+      description: 'Feature toggles & access',
       icon: SettingsIcon,
       color: 'amber',
       path: '/section-control',

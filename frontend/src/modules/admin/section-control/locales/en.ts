@@ -1,0 +1,111 @@
+export const en = {
+  title: 'Feature & Module Control',
+  subtitle: 'Enterprise 4-tier precedence evaluation system (User > Group > Role > Global Default)',
+  categoriesBadge: '{{count}} Categories',
+  sectionsBadge: '{{count}} Features & Modules',
+
+  header: {
+    title: 'Feature & Module Control',
+    subtitle: 'Configure feature visibility, module access, and multi-tier override scopes across your institution.',
+    sectionsCount: 'Features & Modules',
+  },
+
+  search: {
+    placeholder: 'Filter features and modules by title or key...',
+  },
+
+  status: {
+    unsavedNotice: 'You have {{count}} unsaved changes in this scope. Click "Save Changes" to apply them.',
+  },
+
+  tabs: {
+    global: 'Global Defaults',
+    role: 'Role Overrides',
+    group: 'Group Overrides',
+    user: 'User Overrides',
+    audit: 'Audit Logs',
+  },
+
+  actions: {
+    saveChanges: 'Save Changes',
+    saving: 'Saving...',
+    forceApply: 'Save & Override All',
+    forceApplyTitle: 'Save global defaults and override all role, group, and user customizations immediately.',
+    applying: 'Saving & Overriding All...',
+    resetOverrides: 'Reset Scope Overrides',
+    resetting: 'Resetting...',
+    refreshLogs: 'Refresh Logs',
+    searchPlaceholder: 'Search feature keys, titles, or descriptions...',
+    collapse: 'Collapse sub-modules',
+    expand: 'Expand sub-modules',
+  },
+
+  targets: {
+    targetRole: 'Target Role:',
+    targetGroup: 'Target Group:',
+    targetUser: 'Target User Search:',
+    userSearchPlaceholder: 'Search user by name, phone, or email...',
+    selectedUserId: 'Selected User ID: #{{id}}',
+    allGroups: 'All Groups',
+    noPhone: 'No Phone',
+    noRolesFound: 'No roles found',
+    noUsersFound: 'No users found',
+    globalScopeBadge: 'Global Baseline Policy',
+    globalScopeDesc: 'Baseline defaults for all users and roles across your institution.',
+  },
+
+  badges: {
+    parentModule: 'Parent Module',
+    unsaved: 'Unsaved',
+    disabledByParent: 'Disabled by Parent',
+    globalDefault: 'Global Default',
+    roleOverride: 'Role Override',
+    groupOverride: 'Group Override',
+    userOverride: 'User Override',
+    categoryKey: 'Category Key: {{key}}',
+    keyLabel: 'Key: {{key}}',
+    subModules: 'Sub-modules',
+  },
+
+  audit: {
+    title: 'Feature & Module Change Audit Trail',
+    loading: 'Loading audit log records...',
+    empty: 'No audit log changes recorded yet.',
+    emptyTitle: 'No Audit Records Found',
+    noSearchResults: 'No audit logs matched your search or filter criteria.',
+    timestamp: 'TIMESTAMP',
+    changedBy: 'CHANGED BY',
+    scope: 'SCOPE',
+    target: 'TARGET',
+    sectionKey: 'SECTION KEY',
+    change: 'CHANGE',
+    allScopes: 'All Scopes',
+    filterByScope: 'Filter by scope',
+    searchPlaceholder: 'Search audit logs by user, section key, or target...',
+    stateEnabled: 'Enabled',
+    stateDisabled: 'Disabled',
+    stateUnset: 'Default / Unset',
+    globalBaseline: 'Global Baseline',
+    systemUser: 'System',
+    paginationItemLabel: 'records',
+  },
+
+  empty: {
+    noSections: 'No categories or feature rules found for the selected scope.',
+    noSearchResults: 'No features matched "{{query}}". Try a different search term.',
+    clearSearch: 'Clear Search',
+  },
+
+  toasts: {
+    noChanges: 'No flag changes to save.',
+    saveSuccess: 'Feature and module rules saved successfully!',
+    saveError: 'Failed to save feature rule updates.',
+    serverError: 'Error updating rules on server.',
+    resetConfirm: 'Reset all {{scope}} overrides for "{{target}}" back to defaults?',
+    resetSuccess: 'Reset {{scope}} overrides back to default',
+    resetError: 'Failed to reset feature overrides',
+    globalResetBlocked: 'Global defaults cannot be reset. Modify individual flags instead.',
+    forceApplyPrompt: 'Toggle features first, then click this to force-apply globally.',
+    loadAuditError: 'Failed to load audit logs',
+  },
+};

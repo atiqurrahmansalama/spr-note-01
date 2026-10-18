@@ -287,7 +287,20 @@ class UserSession(models.Model):
 
     def save(self, *args, **kwargs):
         if self.login_at:
-            end_time = self.logout_at or timezone.now()
+            if self.logout_at:
+                end_time = self.logout_at
+            elif not self.is_active:
+                end_time = self.last_activity or self.login_at
+            else:
+                now = timezone.now()
+                last_act = self.last_activity or self.login_at
+                # If idle for > 30 minutes, mark inactive
+                if (now - last_act).total_seconds() > 1800:
+                    self.is_active = False
+                    self.logout_at = last_act
+                    end_time = last_act
+                else:
+                    end_time = last_act
             duration = end_time - self.login_at
             self.total_duration_minutes = max(0, int(duration.total_seconds() // 60))
         super().save(*args, **kwargs)

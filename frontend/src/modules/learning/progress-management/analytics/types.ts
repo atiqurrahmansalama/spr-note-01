@@ -3,6 +3,7 @@ export interface ProgressKPIItem {
   label: string;
   value: string | number;
   subValue?: string;
+  sparkline?: number[];
   trend?: {
     direction: "up" | "down" | "neutral";
     value: string;
@@ -18,6 +19,8 @@ export interface ProgressTrendPoint {
   date: string;
   label: string;
   totalPages: number;
+  newLessonPages: number;
+  revisionPages: number;
   totalReports: number;
   activeStudents: number;
   totalMistakes: number;
@@ -64,6 +67,28 @@ export interface LearnerProgressPerformanceItem {
   remarks?: string;
 }
 
+export interface TodayRecitationRecord {
+  id: string | number;
+  studentId: string;
+  studentName: string;
+  rollNumber?: string;
+  className?: string;
+  sectionName?: string;
+  groupName?: string;
+  sessionName: string;
+  portionTitle: string;
+  portionType: "new_lesson" | "revision" | "general";
+  totalPages: number;
+  mistakesCount: number;
+  stucksCount: number;
+  status: string;
+  isClean: boolean;
+  score?: string;
+  comment?: string;
+  date: string;
+  timeFormatted?: string;
+}
+
 export interface ProgressAnalyticsData {
   kpis: ProgressKPIItem[];
   totalPages: number;
@@ -82,4 +107,7 @@ export interface ProgressAnalyticsData {
   portionBreakdown: PortionCoverageItem[];
   topPacesetters: LearnerProgressPerformanceItem[];
   remedialLearners: LearnerProgressPerformanceItem[];
+  todayReports: TodayRecitationRecord[];
+  aiInsight: string;
+  exportToCSV: () => void;
 }

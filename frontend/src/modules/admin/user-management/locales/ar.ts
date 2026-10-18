@@ -157,6 +157,7 @@ export const ar = {
     generateInvite: 'إنشاء دعوة',
     generateInviteDesc: 'إنشاء رمز أو رابط QR للتعيين التلقائي للدور',
     totalInvitesBadge: '{{count}} إجمالي الدعوات',
+    searchInvites: 'بحث في الدعوات',
     searchPlaceholder: 'البحث عن الدعوات بالعنوان أو الدور أو الرمز...',
     allStatuses: 'جميع الحالات',
     statusActive: 'نشط وصالح',

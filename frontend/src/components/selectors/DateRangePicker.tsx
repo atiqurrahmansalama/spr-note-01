@@ -1,9 +1,31 @@
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { ChevronIcon, CalendarIcon, CheckIcon } from "../ui/Icons";
 import ReusableCalendar from "../common/ReusableCalendar";
 import { calendarSettings } from "../../utils/localStore";
 import { getCurrentHijriMonthRange } from "../../utils/hijriUtils";
+
+const formatLocalDate = (d: Date | null | undefined): string => {
+  if (!d) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+export interface DateRangePickerProps {
+  startDate?: string;
+  endDate?: string;
+  onRangeSelect?: (start: string, end: string) => void;
+  minDate?: string;
+  maxDate?: string;
+  onReset?: () => void;
+  isHijriEnabled?: boolean;
+  label?: string;
+  placeholder?: string;
+  className?: string;
+  size?: "sm" | "md" | "lg" | string;
+}
 
 /**
  * Universal Reusable Date Range Picker Component
@@ -11,23 +33,23 @@ import { getCurrentHijriMonthRange } from "../../utils/hijriUtils";
  * Uses portal-based rendering to prevent container clipping and mobile right-edge overflow.
  */
 export default function DateRangePicker({
-  startDate,
-  endDate,
+  startDate = "",
+  endDate = "",
   onRangeSelect,
-  minDate,
-  maxDate,
+  minDate = "",
+  maxDate = "",
   onReset,
   isHijriEnabled,
   label = "Select Date Range",
   placeholder = "Select Date Range...",
   className = "",
   size = "md",
-}) {
+}: DateRangePickerProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showCustomCalendar, setShowCustomCalendar] = useState(false);
   const [isCustomPicking, setIsCustomPicking] = useState(false);
-  const containerRef = useRef(null);
-  const dropdownRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   const [coords, setCoords] = useState({
     top: 0,
@@ -127,8 +149,8 @@ export default function DateRangePicker({
 
   useEffect(() => {
     if (isDropdownOpen || showCustomCalendar) {
-      const handleScroll = (e) => {
-        if (dropdownRef.current && dropdownRef.current.contains(e.target)) return;
+      const handleScroll = (e: Event) => {
+        if (dropdownRef.current && dropdownRef.current.contains(e.target as Node)) return;
         setIsDropdownOpen(false);
         setShowCustomCalendar(false);
         setIsCustomPicking(false);
@@ -143,12 +165,12 @@ export default function DateRangePicker({
   }, [isDropdownOpen, showCustomCalendar]);
 
   useEffect(() => {
-    const handleClickOutside = (e) => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (
         containerRef.current &&
-        !containerRef.current.contains(e.target) &&
+        !containerRef.current.contains(e.target as Node) &&
         dropdownRef.current &&
-        !dropdownRef.current.contains(e.target)
+        !dropdownRef.current.contains(e.target as Node)
       ) {
         setIsDropdownOpen(false);
         setShowCustomCalendar(false);
@@ -165,9 +187,9 @@ export default function DateRangePicker({
     };
   }, [isDropdownOpen, showCustomCalendar]);
 
-  const getPresetDates = (presetKey) => {
+  const getPresetDates = (presetKey: string) => {
     const today = new Date();
-    const todayStr = today.toISOString().split("T")[0];
+    const todayStr = formatLocalDate(today);
 
     let start = "";
     let end = "";
@@ -178,22 +200,22 @@ export default function DateRangePicker({
     } else if (presetKey === "yesterday") {
       const yest = new Date(today);
       yest.setDate(yest.getDate() - 1);
-      const yestStr = yest.toISOString().split("T")[0];
+      const yestStr = formatLocalDate(yest);
       start = yestStr;
       end = yestStr;
     } else if (presetKey === "past_week") {
       const weekAgo = new Date(today);
       weekAgo.setDate(weekAgo.getDate() - 6);
-      start = weekAgo.toISOString().split("T")[0];
+      start = formatLocalDate(weekAgo);
       end = todayStr;
     } else if (presetKey === "past_2weeks") {
       const twoWeeksAgo = new Date(today);
       twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 13);
-      start = twoWeeksAgo.toISOString().split("T")[0];
+      start = formatLocalDate(twoWeeksAgo);
       end = todayStr;
     } else if (presetKey === "this_month") {
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      start = startOfMonth.toISOString().split("T")[0];
+      start = formatLocalDate(startOfMonth);
       end = todayStr;
     } else if (presetKey === "full_hijri_month") {
       const hijriRange = getCurrentHijriMonthRange(today);
@@ -202,12 +224,12 @@ export default function DateRangePicker({
     } else if (presetKey === "past_month") {
       const monthAgo = new Date(today);
       monthAgo.setDate(monthAgo.getDate() - 29);
-      start = monthAgo.toISOString().split("T")[0];
+      start = formatLocalDate(monthAgo);
       end = todayStr;
     } else if (presetKey === "past_3months") {
       const ago = new Date(today);
       ago.setDate(ago.getDate() - 89);
-      start = ago.toISOString().split("T")[0];
+      start = formatLocalDate(ago);
       end = todayStr;
     } else if (presetKey === "all_time") {
       return { start: minDate || "", end: maxDate || "" };
@@ -222,7 +244,7 @@ export default function DateRangePicker({
     return { start, end };
   };
 
-  const handleSelectPreset = (presetKey) => {
+  const handleSelectPreset = (presetKey: string) => {
     if (presetKey === "custom") {
       setIsCustomPicking(true);
       setIsDropdownOpen(false);
@@ -241,7 +263,7 @@ export default function DateRangePicker({
     setIsCustomPicking(false);
   };
 
-  const formatDateDisplay = (dStr) => {
+  const formatDateDisplay = (dStr: string) => {
     if (!dStr) return "";
     const [y, m, d] = dStr.split("-");
     return `${d}/${m}/${y.slice(2)}`;
@@ -252,29 +274,29 @@ export default function DateRangePicker({
     if (!startDate && !endDate) return "all_time";
 
     const today = new Date();
-    const todayStr = today.toISOString().split("T")[0];
+    const todayStr = formatLocalDate(today);
 
     const yest = new Date(today);
     yest.setDate(yest.getDate() - 1);
-    const yestStr = yest.toISOString().split("T")[0];
+    const yestStr = formatLocalDate(yest);
 
     const weekAgo = new Date(today);
     weekAgo.setDate(weekAgo.getDate() - 6);
-    const weekStr = weekAgo.toISOString().split("T")[0];
+    const weekStr = formatLocalDate(weekAgo);
 
     const twoWeeksAgo = new Date(today);
     twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 13);
-    const twoWeeksStr = twoWeeksAgo.toISOString().split("T")[0];
+    const twoWeeksStr = formatLocalDate(twoWeeksAgo);
 
     const monthAgo = new Date(today);
     monthAgo.setDate(monthAgo.getDate() - 29);
-    const monthStr = monthAgo.toISOString().split("T")[0];
+    const monthStr = formatLocalDate(monthAgo);
 
     const threeMonthsAgo = new Date(today);
     threeMonthsAgo.setDate(threeMonthsAgo.getDate() - 89);
-    const threeMonthStr = threeMonthsAgo.toISOString().split("T")[0];
+    const threeMonthStr = formatLocalDate(threeMonthsAgo);
 
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
+    const startOfMonth = formatLocalDate(new Date(today.getFullYear(), today.getMonth(), 1));
 
     if (startDate === todayStr && endDate === todayStr) return "today";
     if (startDate === yestStr && endDate === yestStr) return "yesterday";
@@ -400,7 +422,7 @@ export default function DateRangePicker({
               isRange={true}
               startDate={startDate}
               endDate={endDate}
-              onRangeSelect={(start, end) => {
+              onRangeSelect={(start: string, end: string) => {
                 if (onRangeSelect) onRangeSelect(start, end);
                 setIsDropdownOpen(false);
                 setShowCustomCalendar(false);
@@ -447,15 +469,18 @@ export default function DateRangePicker({
         onClick={handleTriggerClick}
         className={`w-full ${heightClass} flex items-center justify-between px-3.5 rounded-xl border transition-all duration-150 cursor-pointer select-none font-semibold ${
           isDropdownOpen || showCustomCalendar
-            ? 'theme-bg-elevated border-[var(--accent-main)] theme-text-primary'
-            : 'theme-bg-sub hover:theme-bg-elevated/70 theme-border hover:border-[var(--border-hover)] theme-text-primary'
+            ? "theme-bg-elevated border-[var(--accent-main)] theme-text-primary"
+            : "theme-bg-sub hover:theme-bg-elevated/70 theme-border hover:border-[var(--border-hover)] theme-text-primary"
         }`}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1 text-left">
           <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />
           <span className="truncate">{getLabel()}</span>
         </div>
-        <ChevronIcon isOpen={isDropdownOpen || showCustomCalendar} className="w-3.5 h-3.5 theme-text-secondary shrink-0 ml-1" />
+        <ChevronIcon
+          isOpen={isDropdownOpen || showCustomCalendar}
+          className="w-3.5 h-3.5 theme-text-secondary shrink-0 ml-1"
+        />
       </button>
 
       {/* Render Dropdown & Calendar Portals */}

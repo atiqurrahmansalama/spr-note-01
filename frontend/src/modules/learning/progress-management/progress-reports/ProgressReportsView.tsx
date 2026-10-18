@@ -6,7 +6,6 @@ import { formatDate } from "@/utils/reportGenerator";
 import {
   CloudIcon,
   UsersIcon,
-  GroupsIcon,
   CheckIcon,
   SearchIcon,
   PrinterIcon,
@@ -18,7 +17,6 @@ import SkeletonLoader from "@/components/common/SkeletonLoader";
 import {
   RecordReportsList,
   StudentGroupedList,
-  ReportsAnalytics,
   ReportContextMenu,
 } from "./components";
 import {
@@ -41,8 +39,8 @@ export default function ProgressReportsView({
   const [offline, setOffline] = useState(!isOnline());
   const [loading, setLoading] = useState(false);
 
-  // View modes: "RECORD_REPORTS" | "STUDENT_VIEW" | "ANALYTICS"
-  const [viewMode, setViewMode] = useState<"RECORD_REPORTS" | "STUDENT_VIEW" | "ANALYTICS">("RECORD_REPORTS");
+  // View modes: "RECORD_REPORTS" | "STUDENT_VIEW"
+  const [viewMode, setViewMode] = useState<"RECORD_REPORTS" | "STUDENT_VIEW">("RECORD_REPORTS");
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
@@ -701,7 +699,7 @@ export default function ProgressReportsView({
                 Student Progress & Daily Reports
               </h2>
               <p className="text-[11px] theme-text-secondary mt-0.5 leading-snug">
-                Explore reports list, student-wise grouped logs, and professional analytics.
+                Explore reports list and student-wise grouped logs.
               </p>
             </div>
           </div>
@@ -727,8 +725,8 @@ export default function ProgressReportsView({
           </div>
         )}
 
-        {/* 3 View Mode Navigation Tabs Bar */}
-        <div className="w-full max-w-xl mx-auto flex flex-col sm:flex-row p-1.5 theme-bg-sub border theme-border rounded-2xl shadow-inner gap-1.5 sm:gap-1">
+        {/* 2 View Mode Navigation Tabs Bar */}
+        <div className="w-full max-w-md mx-auto flex flex-col sm:flex-row p-1.5 theme-bg-sub border theme-border rounded-2xl shadow-inner gap-1.5 sm:gap-1">
           <button
             type="button"
             onClick={() => setViewMode("RECORD_REPORTS")}
@@ -753,19 +751,6 @@ export default function ProgressReportsView({
           >
             <UsersIcon className="w-4 h-4 shrink-0" />
             <span>By Student</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setViewMode("ANALYTICS")}
-            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 ${
-              viewMode === "ANALYTICS"
-                ? "theme-bg-accent theme-accent-text shadow-md scale-[1.01]"
-                : "theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50"
-            }`}
-          >
-            <GroupsIcon className="w-4 h-4 shrink-0" />
-            <span>Analytics</span>
           </button>
         </div>
 
@@ -924,8 +909,6 @@ export default function ProgressReportsView({
               onDelete={handleDeleteReport}
             />
           )}
-
-          {viewMode === "ANALYTICS" && <ReportsAnalytics filteredReports={filteredReports} />}
         </>
       )}
 

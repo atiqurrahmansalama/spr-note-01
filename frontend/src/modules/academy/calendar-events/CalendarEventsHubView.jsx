@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import PageHeader from "../../../components/ui/PageHeader";
 import TabSwitcher from "../../../components/ui/TabSwitcher";
@@ -13,6 +13,7 @@ import { masterCalendarStore } from "../../../utils/localStore";
 import { useTenant } from "../../../context/TenantContext";
 import { useToast } from "../../../context/ToastContext";
 import { useRightSidebar, useDrawerRegistration } from "../../../context/RightSidebarContext";
+import { useFeatureControl } from "../../../context/FeatureControlContext";
 import {
   CalendarIcon,
   TimerIcon,
@@ -22,20 +23,34 @@ import {
   ChecklistIcon,
 } from "../../../components/ui/Icons";
 
-const TABS = [
-  { id: "WORKING_HOURS", label: "Working Hours", icon: TimerIcon },
-  { id: "ACADEMIC_EVENT", label: "Academic Events", icon: CalendarIcon },
-  { id: "AGENDA", label: "Agenda", icon: ChecklistIcon },
-];
-
 export default function CalendarEventsHubView() {
   const { showToast } = useToast();
   const { activeTenantId } = useTenant();
   const { openDrawer, closeDrawer } = useRightSidebar();
+  const { isSectionEnabled } = useFeatureControl();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const isWorkingHoursEnabled = isSectionEnabled('calendar_tab_working_hours');
+  const isEventsEnabled = isSectionEnabled('calendar_tab_events');
+  const isAgendaEnabled = isSectionEnabled('calendar_tab_agenda');
+
+  const visibleTabs = useMemo(() => {
+    const list = [];
+    if (isWorkingHoursEnabled) {
+      list.push({ id: "WORKING_HOURS", label: "Working Hours", icon: TimerIcon });
+    }
+    if (isEventsEnabled) {
+      list.push({ id: "ACADEMIC_EVENT", label: "Academic Events", icon: CalendarIcon });
+    }
+    if (isAgendaEnabled) {
+      list.push({ id: "AGENDA", label: "Agenda", icon: ChecklistIcon });
+    }
+    return list.length > 0 ? list : [{ id: "WORKING_HOURS", label: "Working Hours", icon: TimerIcon }];
+  }, [isWorkingHoursEnabled, isEventsEnabled, isAgendaEnabled]);
+
   const [events, setEvents] = useState([]);
-  const activeTab = searchParams.get("tab") || "WORKING_HOURS";
+  const rawTab = searchParams.get("tab") || "WORKING_HOURS";
+  const activeTab = visibleTabs.some((t) => t.id === rawTab) ? rawTab : (visibleTabs[0]?.id || "WORKING_HOURS");
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTimelineDate, setSelectedTimelineDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [calendarDisplayMode, setCalendarDisplayMode] = useState(() => {
@@ -242,7 +257,7 @@ export default function CalendarEventsHubView() {
       {/* ─── 2. Top Tab Switcher with Add Button on Far Right (Matching Classes & Groups) ─── */}
       <div className="print:hidden">
         <TabSwitcher
-          tabs={TABS}
+          tabs={visibleTabs}
           activeTab={activeTab}
           onChange={setActiveTab}
           rightContent={
