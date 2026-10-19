@@ -146,13 +146,39 @@ class StudentDailyReportViewSet(viewsets.ModelViewSet):
         if status_filter:
             qs = qs.filter(status__iexact=status_filter)
 
-        # Apply strict Row-Level Isolation (except for Super Admin)
+        # Multi-Tenant & Row-Level Isolation Scoping
         user = self.request.user
         if not user or not user.is_authenticated:
             return StudentDailyReport.objects.none()
 
-        if not (getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser):
-            qs = qs.filter(created_by=user)
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(user, 'institution_id', None)
+        if tenant_id and str(tenant_id).upper() != 'ALL':
+            qs = qs.filter(student__institution_id=tenant_id)
+        elif not (getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser):
+            if getattr(user, 'institution_id', None):
+                qs = qs.filter(Q(student__institution_id=user.institution_id) | Q(created_by=user))
+            else:
+                qs = qs.filter(created_by=user)
+
+        # Filter by student_id
+        student_id = params.get('student_id')
+        if student_id:
+            qs = qs.filter(student_id=student_id)
+
+        # Filter by class_id
+        class_id = params.get('class_id') or params.get('class')
+        if class_id:
+            qs = qs.filter(student__student_class=class_id)
+
+        # Filter by section_id
+        section_id = params.get('section_id') or params.get('section')
+        if section_id:
+            qs = qs.filter(student__section=section_id)
+
+        # Filter by department_id
+        department_id = params.get('department_id') or params.get('department')
+        if department_id:
+            qs = qs.filter(student__department=department_id)
 
         return qs
 

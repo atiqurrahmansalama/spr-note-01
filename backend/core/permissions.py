@@ -44,8 +44,8 @@ class HasSectionAccess(BasePermission):
         if section_key in ('app_role_invites', 'app_role_management'):
             return flags.get('app_role_management', flags.get('app_user_management', False))
 
-        if section_key == 'report_builder':
-            return flags.get('progress_tab_daily_progress', flags.get('progress_management', False))
+        if section_key in ('report_builder', 'progress_reports', 'progress_tab_reports'):
+            return flags.get('progress_tab_reports', flags.get('progress_tab_daily_progress', flags.get('progress_management', True)))
 
         if section_key == 'student_departments':
             return flags.get('campus_tab_departments', flags.get('campus_profile', False))

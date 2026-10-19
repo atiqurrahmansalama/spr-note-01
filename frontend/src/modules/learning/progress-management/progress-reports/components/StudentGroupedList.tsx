@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { ChevronIcon } from "@/components/ui/Icons";
+import { ChevronIcon, ChecklistIcon } from "@/components/ui/Icons";
 import ReportCardDetail from "./ReportCardDetail";
 import { StudentGroupedListProps, StudentGroupedItem, ReportItem } from "../types";
 
@@ -14,6 +14,8 @@ export default function StudentGroupedList({
   onStudentContextMenu,
   onEdit,
   onDelete,
+  onResetFilters,
+  onRefresh,
 }: StudentGroupedListProps) {
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
   const [expandedReportId, setExpandedReportId] = useState<number | string | null>(null);
@@ -183,6 +185,42 @@ export default function StudentGroupedList({
           style={selectionStyle}
           className="absolute z-30 bg-sky-500/20 border border-sky-400/80 pointer-events-none rounded-xl backdrop-blur-[1px]"
         />
+      )}
+
+      {activeGroupedData.length === 0 && (
+        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-3.5 shadow-sm">
+          <div className="w-12 h-12 rounded-2xl theme-bg-sub border theme-border flex items-center justify-center theme-text-secondary opacity-80">
+            <ChecklistIcon className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-sm font-bold theme-text-primary">No Student Reports Found</h4>
+            <p className="text-xs theme-text-secondary max-w-sm">
+              No students or recitation reports match the active filters.
+            </p>
+          </div>
+          {(onResetFilters || onRefresh) && (
+            <div className="flex items-center gap-2 pt-1">
+              {onResetFilters && (
+                <button
+                  type="button"
+                  onClick={onResetFilters}
+                  className="px-3.5 py-1.5 rounded-xl theme-bg-sub border theme-border text-xs font-semibold theme-text-primary hover:theme-bg-elevated transition cursor-pointer"
+                >
+                  Reset Filters
+                </button>
+              )}
+              {onRefresh && (
+                <button
+                  type="button"
+                  onClick={onRefresh}
+                  className="px-3.5 py-1.5 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold hover:opacity-90 transition cursor-pointer shadow-sm"
+                >
+                  Refresh Data
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {activeGroupedData.map((stu) => {

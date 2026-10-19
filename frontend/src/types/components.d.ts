@@ -64,68 +64,7 @@ declare module '@/components/ui/CustomInput' {
 }
 
 
-declare module '@/components/ui/DataTable' {
-  export interface Column<T = any> {
-    key?: string;
-    id?: string;
-    header?: React.ReactNode;
-    label?: string;
-    subHeader?: React.ReactNode;
-    align?: 'left' | 'center' | 'right';
-    width?: string | number;
-    minWidth?: string | number;
-    maxWidth?: string | number;
-    sortable?: boolean;
-    sortKey?: string;
-    sortValue?: (item: T) => any;
-    rotatable?: boolean;
-    sticky?: 'left' | 'right' | boolean;
-    headerClassName?: string;
-    cellClassName?: string;
-    className?: string;
-    render?: (item: T, idx?: number) => React.ReactNode;
-    cell?: (val: any, row: T, idx?: number) => React.ReactNode;
-    [key: string]: any;
-  }
-  export interface DataTableProps<T = any> {
-    tableTitle?: React.ReactNode;
-    tableTitleIcon?: React.ComponentType<{ className?: string }>;
-    columns?: Column<T>[];
-    data?: T[];
-    footerRow?: Record<string, any> | null;
-    footerRows?: Record<string, any>[];
-    keyExtractor?: (item: T, idx?: number) => string;
-    showSerial?: boolean;
-    showIndex?: boolean;
-    serialHeader?: string;
-    indexHeader?: string;
-    verticalHeaders?: boolean;
-    rotateHeaders?: boolean;
-    resizable?: boolean;
-    emptyTitle?: string;
-    emptySubMessage?: string;
-    emptyIcon?: React.ComponentType<{ className?: string }>;
-    sortable?: boolean;
-    defaultSortKey?: string;
-    defaultSortDirection?: 'asc' | 'desc';
-    cellPaddingClass?: string;
-    isLoading?: boolean;
-    loading?: boolean;
-    emptyMessage?: string;
-    loadingMessage?: string;
-    onRowClick?: (item: T) => void;
-    rowClassName?: ((item: T, idx: number) => string) | string;
-    onSelectRow?: (item: T) => void;
-    onSelectAll?: (items: T[]) => void;
-    selectedRows?: Set<string | number>;
-    selectable?: boolean;
-    selectedIds?: (string | number)[];
-    headerActions?: React.ReactNode;
-    [key: string]: any;
-  }
-  const DataTable: React.ComponentType<DataTableProps>;
-  export default DataTable;
-}
+
 
 declare module '@/components/ui/TabSwitcher' {
   export interface TabItem {
@@ -163,36 +102,6 @@ declare module '@/components/ui/PageHeader' {
   }
   const PageHeader: React.ComponentType<PageHeaderProps>;
   export default PageHeader;
-}
-
-declare module '@/components/ui/ActionMenu' {
-  export interface ActionMenuItem {
-    label?: string;
-    icon?: React.ComponentType<{ className?: string }>;
-    onClick?: () => void;
-    divider?: boolean;
-    disabled?: boolean;
-    variant?: 'default' | 'danger' | 'warning' | string;
-    [key: string]: any;
-  }
-  export interface ActionMenuProps {
-    items?: ActionMenuItem[];
-    actions?: ActionMenuItem[];
-    align?: 'left' | 'right';
-    buttonClassName?: string;
-    menuClassName?: string;
-    icon?: React.ComponentType<{ className?: string }>;
-    label?: React.ReactNode;
-    disabled?: boolean;
-    size?: 'xs' | 'sm' | 'md' | string;
-    variant?: 'default' | 'sub' | 'surface' | string;
-    showChevron?: boolean;
-    ariaLabel?: string;
-    header?: React.ReactNode;
-    [key: string]: any;
-  }
-  const ActionMenu: React.ComponentType<ActionMenuProps>;
-  export default ActionMenu;
 }
 
 declare module '@/components/ui/DataCardGrid' {

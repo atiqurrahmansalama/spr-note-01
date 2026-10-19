@@ -45,17 +45,36 @@ export const getInAppNotifications = async (): Promise<InAppNotification[]> => {
   return Array.isArray(data) ? data : data.results || [];
 };
 
-export const getUnreadNotificationCount = async (): Promise<number> => {
+export interface UnreadNotificationSummary {
+  unread_count: number;
+  latest_id?: string | number | null;
+  latest_title?: string | null;
+  latest_message?: string | null;
+  latest_action_url?: string | null;
+}
+
+export const getUnreadNotificationSummary = async (): Promise<UnreadNotificationSummary> => {
   try {
     const response = await fetchWithAuth('/api/v1/notifications/in-app/unread-count/');
     if (response.ok) {
       const data = await response.json();
-      return data.unread_count || 0;
+      return {
+        unread_count: data.unread_count || 0,
+        latest_id: data.latest_id || null,
+        latest_title: data.latest_title || null,
+        latest_message: data.latest_message || null,
+        latest_action_url: data.latest_action_url || null,
+      };
     }
   } catch (err) {
-    console.warn('[notifications.ts] Unread count fetch error:', err);
+    console.warn('[notifications.ts] Unread summary fetch error:', err);
   }
-  return 0;
+  return { unread_count: 0 };
+};
+
+export const getUnreadNotificationCount = async (): Promise<number> => {
+  const summary = await getUnreadNotificationSummary();
+  return summary.unread_count;
 };
 
 export const markNotificationAsRead = async (id: string | number): Promise<any> => {

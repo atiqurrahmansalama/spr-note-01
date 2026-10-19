@@ -7,7 +7,8 @@ export { default as CustomCheckbox } from './CustomCheckbox';
 export { default as CustomTimePicker } from './CustomTimePicker';
 export { default as Modal, ConfirmModal } from './Modal';
 export type { ModalProps, ConfirmModalProps } from './Modal';
-export { default as DataTable } from './DataTable';
+export { default as DataTable, ExpandedCell } from './DataTable';
+export type { Column, ExpandedColumn, ExpandedCellProps, DataTableProps, SortConfig, SortDirection } from './DataTable';
 export { default as DataCardGrid } from './DataCardGrid';
 export { default as StatusBadge } from './StatusBadge';
 export { default as AutoSaveBadge } from './AutoSaveBadge';
@@ -51,5 +52,7 @@ export type {
 } from './EmptyState';
 export { default as Pagination } from './Pagination';
 export type { PaginationProps } from './Pagination';
+export { default as ActionMenu } from './ActionMenu';
+export type { ActionMenuProps, ActionMenuItem } from './ActionMenu';
 export * from './Icons';
 

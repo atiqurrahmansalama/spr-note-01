@@ -1,5 +1,5 @@
 import { fetchWithAuth } from "./authService";
-import { students as studentStore, sessions as sessionStore, savedComments as commentStore } from "./localStore";
+import { auth as authStore, students as studentStore, sessions as sessionStore, savedComments as commentStore } from "./localStore";
 import { createReport } from "../api/reports";
 
 /**
@@ -115,6 +115,9 @@ export const commitReportToCloud = async (reportId) => {
   if (!navigator.onLine) {
     return { success: false, isOffline: true };
   }
+  if (!authStore.getAccessToken() && !authStore.getRefreshToken()) {
+    return { success: false, isOffline: false, error: "Unauthenticated" };
+  }
 
   const reports = getLocalReports();
   const reportIndex = reports.findIndex((r) => r.id === reportId || r.report_unique_id === reportId);
@@ -160,6 +163,9 @@ export const commitReportToCloud = async (reportId) => {
 export const triggerCloudSync = async () => {
   if (!navigator.onLine) {
     console.warn("[SyncEngine] Network offline. Sync postponed.");
+    return;
+  }
+  if (!authStore.getAccessToken() && !authStore.getRefreshToken()) {
     return;
   }
 
@@ -215,6 +221,9 @@ export const triggerCloudSync = async () => {
           };
         }
         updatedIds = updatedIds.filter((id) => id !== item.id && id !== serverReport.id);
+      } else if (apiResult.status === 401 || apiResult.status === 403) {
+        console.warn("[SyncEngine] Authentication credentials invalid or expired. Aborting pending queue sync.");
+        break;
       }
     } catch (error) {
       console.error("[SyncEngine] Failed to sync item:", item.id, error);
@@ -229,13 +238,18 @@ export const triggerCloudSync = async () => {
 // 5. Periodic check for grace period expiry and background sync
 export const checkGracePeriodReports = async () => {
   if (!navigator.onLine) return;
+  if (!authStore.getAccessToken() && !authStore.getRefreshToken()) return;
   const reports = getLocalReports();
   const now = Date.now();
 
   for (const rep of reports) {
     if (rep.sync_status === "GRACE_PERIOD" && rep.grace_expires_at) {
       if (now >= rep.grace_expires_at) {
-        await commitReportToCloud(rep.id);
+        const res = await commitReportToCloud(rep.id);
+        if (res && (res.status === 401 || res.status === 403)) {
+          console.warn("[SyncEngine] Session expired during grace period sync. Aborting.");
+          break;
+        }
       } else {
         const remainingMs = rep.grace_expires_at - now;
         if (!activeGraceTimers.has(rep.id)) {

@@ -92,6 +92,12 @@ export interface DailyClassroomFilterControlsProps {
   onPeriodChange?: (periodId: string) => void;
   getSlotCount?: (periodId: string) => number;
   getPeriodSubtitle?: (periodId: string) => string;
+
+  // Custom filter extensions
+  searchControl?: React.ReactNode;
+  customDateComponent?: React.ReactNode;
+  extraFields?: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 /**
@@ -104,6 +110,12 @@ export default function DailyClassroomFilterControls({
   wrapGrid = false,
   gridClassName = '',
   className = '',
+
+  // Custom extensions
+  searchControl,
+  customDateComponent,
+  extraFields,
+  children,
 
   // Date configuration
   showDate = filterProps?.showDate ?? true,
@@ -194,8 +206,19 @@ export default function DailyClassroomFilterControls({
 
   const filterFields = (
     <>
-      {/* 1. Date Picker */}
-      {showDate && (
+      {/* 0. Optional Search Bar */}
+      {searchControl && (
+        <div className="col-span-1">
+          {searchControl}
+        </div>
+      )}
+
+      {/* 1. Date Picker or Custom Date Component */}
+      {customDateComponent ? (
+        <div className="col-span-1">
+          {customDateComponent}
+        </div>
+      ) : showDate ? (
         <div className={dateSpanClass}>
           <ReusableCalendar
             label={dateLabel}
@@ -209,7 +232,7 @@ export default function DailyClassroomFilterControls({
             size="md"
           />
         </div>
-      )}
+      ) : null}
 
       {/* 2. Academic Department Selector */}
       {hasDepartments && (
@@ -250,8 +273,22 @@ export default function DailyClassroomFilterControls({
           />
         </div>
       )}
+
+      {/* 5. Extra Fields */}
+      {extraFields}
     </>
   );
+
+  const hasExtra = Boolean(searchControl || customDateComponent || extraFields);
+  const responsiveGridCols = hasExtra
+    ? 'grid-cols-1 @[540px]:grid-cols-2 @[820px]:grid-cols-3 @[1100px]:grid-cols-4 @[1350px]:grid-cols-5'
+    : `grid-cols-2 ${
+        hasDepartments && hasSectionsForClass
+          ? '@[800px]:grid-cols-4'
+          : hasDepartments || hasSectionsForClass
+          ? '@[720px]:grid-cols-3'
+          : '@[480px]:grid-cols-2'
+      }`;
 
   // 1. If showCardWrapper is true, render inside standard enterprise toolbar/filter background box
   if (showCardWrapper) {
@@ -260,16 +297,11 @@ export default function DailyClassroomFilterControls({
         className={`@container p-3 sm:p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3 w-full min-w-0 ${className}`}
       >
         <div
-          className={`grid grid-cols-2 ${
-            hasDepartments && hasSectionsForClass
-              ? '@[800px]:grid-cols-4'
-              : hasDepartments || hasSectionsForClass
-              ? '@[720px]:grid-cols-3'
-              : '@[480px]:grid-cols-2'
-          } gap-2.5 sm:gap-3 w-full items-end ${gridClassName}`}
+          className={`grid ${responsiveGridCols} gap-2.5 sm:gap-3 w-full items-end ${gridClassName}`}
         >
           {filterFields}
         </div>
+        {children}
 
         {/* Routine Period Fast Selector Bar */}
         {showPeriodSwitcher && (
@@ -290,15 +322,10 @@ export default function DailyClassroomFilterControls({
   if (wrapGrid) {
     return (
       <div
-        className={`@container grid grid-cols-2 ${
-          hasDepartments && hasSectionsForClass
-            ? '@[800px]:grid-cols-4'
-            : hasDepartments || hasSectionsForClass
-            ? '@[720px]:grid-cols-3'
-            : '@[480px]:grid-cols-2'
-        } gap-3 ${gridClassName}`}
+        className={`@container grid ${responsiveGridCols} gap-3 ${gridClassName}`}
       >
         {filterFields}
+        {children}
         {showPeriodSwitcher && (
           <ClassPeriodSwitcherBar
             title={periodSwitcherTitle}

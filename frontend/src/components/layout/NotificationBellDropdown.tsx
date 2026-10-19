@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BellIcon } from '../ui/Icons';
 import { useRightSidebar } from '@/context/RightSidebarContext';
 import {
-  getInAppNotifications,
-  getUnreadNotificationCount,
+  getUnreadNotificationSummary,
 } from '@/api/notifications';
 import {
   triggerNotificationAlert,
@@ -14,58 +13,70 @@ import {
  * 
  * Header Notification Trigger Button.
  * Directly triggers the modern Right Sidebar Notification Center drawer on click,
- * maintaining real-time background polling, sound chimes, and live unread badge updates.
+ * maintaining lightweight background summary polling, sound chimes, and live unread badge updates.
+ * Optimized for minimal database network transfer and pauses when browser tab is inactive.
  */
 export default function NotificationBellDropdown() {
   const { openDrawer } = useRightSidebar();
   const [unreadCount, setUnreadCount] = useState<number>(0);
 
-  const seenIdsRef = useRef<Set<string | number>>(new Set());
+  const lastAlertedIdRef = useRef<string | number | null>(null);
   const isInitialLoadRef = useRef<boolean>(true);
 
-  const loadNotifications = useCallback(async (triggerAlerts: boolean = true) => {
-    try {
-      const [list, count] = await Promise.all([
-        getInAppNotifications(),
-        getUnreadNotificationCount(),
-      ]);
+  const checkUnreadNotifications = useCallback(async (triggerAlerts: boolean = true) => {
+    // Skip network polling completely if browser tab is hidden or minimized
+    if (typeof document !== 'undefined' && document.hidden) {
+      return;
+    }
 
-      if (!isInitialLoadRef.current && triggerAlerts) {
-        // Detect newly arrived unread notifications
-        const incomingUnread = list.filter((n) => !n.is_read && !seenIdsRef.current.has(n.id));
-        if (incomingUnread.length > 0) {
-          const latest = incomingUnread[0];
+    try {
+      const summary = await getUnreadNotificationSummary();
+      setUnreadCount(summary.unread_count);
+
+      if (!isInitialLoadRef.current && triggerAlerts && summary.latest_id) {
+        if (lastAlertedIdRef.current !== summary.latest_id) {
+          lastAlertedIdRef.current = summary.latest_id;
           triggerNotificationAlert(
-            latest.title,
-            latest.message,
-            latest.action_url,
-            String(latest.id)
+            summary.latest_title || 'New Notification',
+            summary.latest_message || '',
+            summary.latest_action_url || '',
+            String(summary.latest_id)
           );
         }
+      } else if (summary.latest_id) {
+        lastAlertedIdRef.current = summary.latest_id;
       }
 
-      // Update seen set
-      list.forEach((n) => seenIdsRef.current.add(n.id));
       isInitialLoadRef.current = false;
-
-      setUnreadCount(count);
     } catch (err) {
-      console.warn('[NotificationBellDropdown] Fetch error:', err);
+      console.warn('[NotificationBellDropdown] Summary check error:', err);
     }
   }, []);
 
   useEffect(() => {
-    loadNotifications(false);
-    const interval = setInterval(() => loadNotifications(true), 25000); // 25s auto polling
+    checkUnreadNotifications(false);
 
-    const handleCustomRefresh = () => loadNotifications(true);
+    // 60-second gentle polling interval (converses database egress)
+    const interval = setInterval(() => checkUnreadNotifications(true), 60000);
+
+    // Immediate check upon returning to tab
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        checkUnreadNotifications(true);
+      }
+    };
+
+    const handleCustomRefresh = () => checkUnreadNotifications(true);
+
     window.addEventListener('spr_notification_refresh', handleCustomRefresh);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('spr_notification_refresh', handleCustomRefresh);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [loadNotifications]);
+  }, [checkUnreadNotifications]);
 
   const handleOpenNotifications = () => {
     openDrawer('notifications');

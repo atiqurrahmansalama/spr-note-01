@@ -855,7 +855,7 @@ export default function DailyClassroomHubView({
           aria-hidden={activeTab !== 'PROGRESS_ASSESSMENT' && activeTab !== 'PROGRESS_ASSESSMENTS'}
         >
           <Suspense fallback={<HubTabSkeletonLoader isProgress={true} />}>
-            <StudentReportsView isEmbedded={true} />
+            <StudentReportsView isEmbedded={true} filterProps={sharedFilterProps} />
           </Suspense>
         </div>
       )}

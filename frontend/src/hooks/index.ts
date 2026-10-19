@@ -21,4 +21,6 @@ export { usePortalPosition, default as usePortalPositionDefault } from './usePor
 export type { PortalCoords, UsePortalPositionOptions, UsePortalPositionReturn } from './usePortalPosition';
 export { useDropdownKeyboard, default as useDropdownKeyboardDefault } from './useDropdownKeyboard';
 export type { UseDropdownKeyboardOptions, UseDropdownKeyboardReturn } from './useDropdownKeyboard';
+export { useContextMenu, default as useContextMenuDefault } from './useContextMenu';
+export type { ContextMenuState, UseContextMenuReturn } from './useContextMenu';
 

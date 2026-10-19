@@ -162,11 +162,10 @@ export const refreshToken = async () => {
         }
         return data.access;
       }
-    } else if (response.status === 400 || response.status === 401 || response.status === 403) {
-      const latestToken = authStore.getAccessToken();
-      if (!latestToken) {
-        authStore.clear();
-      }
+    } else {
+      // Clear invalid session on any rejection (400, 401, 403, 500) to break infinite retry loops
+      authStore.clear();
+      window.dispatchEvent(new CustomEvent("spr_auth_updated"));
     }
   } catch (err) {
     console.warn('[authService] Token refresh failed (network/server error):', err.message);

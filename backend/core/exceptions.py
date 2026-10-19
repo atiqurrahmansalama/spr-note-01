@@ -25,6 +25,8 @@ def custom_exception_handler(exc: Exception, context: Dict[str, Any]) -> Respons
 
     is_debug = os.getenv("DEBUG", "False").lower() in ("true", "1")
 
+    from django.core.exceptions import ObjectDoesNotExist
+
     if response is not None:
         logger.warning(
             f"API Exception in [{view_name}] [{request_id}]: {exc} | Status Code: {response.status_code}"
@@ -37,6 +39,24 @@ def custom_exception_handler(exc: Exception, context: Dict[str, Any]) -> Respons
             "details": response.data,
         }
         response["X-Request-ID"] = request_id
+    elif isinstance(exc, ObjectDoesNotExist) and (
+        view_name in ("TokenRefreshView", "TokenVerifyView", "TokenObtainPairView")
+        or (request and getattr(request, "path", "").startswith(("/api/token/", "/token/")))
+    ):
+        logger.warning(
+            f"Authentication token user not found in [{view_name}] [{request_id}]: {exc} | Status Code: 401"
+        )
+        response = Response(
+            {
+                "success": False,
+                "status_code": status.HTTP_401_UNAUTHORIZED,
+                "error_type": "InvalidToken",
+                "request_id": request_id,
+                "detail": "User associated with this authentication session does not exist. Please log in again.",
+            },
+            status=status.HTTP_401_UNAUTHORIZED,
+            headers={"X-Request-ID": request_id}
+        )
     else:
         logger.error(
             f"Unhandled Critical Exception in [{view_name}] [{request_id}]: {exc}",

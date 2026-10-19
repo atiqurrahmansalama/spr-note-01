@@ -76,17 +76,32 @@ User = get_user_model()
 from .templates import SavedMessageViewSet
 
 
+class NotificationPagination(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
 class InAppNotificationViewSet(viewsets.ModelViewSet):
     serializer_class = InAppNotificationSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = NotificationPagination
 
     def get_queryset(self):
         return InAppNotification.objects.filter(recipient=self.request.user).order_by('-created_at')
 
     @action(detail=False, methods=['get'], url_path='unread-count')
     def unread_count(self, request):
-        count = self.get_queryset().filter(is_read=False).count()
-        return Response({"unread_count": count}, status=status.HTTP_200_OK)
+        qs = self.get_queryset().filter(is_read=False)
+        count = qs.count()
+        latest = qs.first()
+        return Response({
+            "unread_count": count,
+            "latest_id": latest.id if latest else None,
+            "latest_title": latest.title if latest else None,
+            "latest_message": latest.message if latest else None,
+            "latest_action_url": latest.action_url if latest else None,
+        }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='mark-read')
     def mark_read(self, request, pk=None):
@@ -263,6 +278,7 @@ class NotificationTriggerRuleViewSet(viewsets.ModelViewSet):
 class NotificationDispatchLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = NotificationDispatchLogSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = NotificationPagination
 
     def get_queryset(self):
         tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)

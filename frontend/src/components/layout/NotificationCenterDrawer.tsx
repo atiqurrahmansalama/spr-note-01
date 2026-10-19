@@ -142,25 +142,17 @@ export default function NotificationCenterDrawer({
   const isInitialLoadRef = useRef<boolean>(true);
 
   // Load all notifications list
-  const loadNotifications = useCallback(async (triggerAlerts: boolean = true) => {
+  const loadNotifications = useCallback(async () => {
+    // Skip if tab is hidden to save database transfer
+    if (typeof document !== 'undefined' && document.hidden) {
+      return;
+    }
+
     try {
       const [list, count] = await Promise.all([
         getInAppNotifications(),
         getUnreadNotificationCount(),
       ]);
-
-      if (!isInitialLoadRef.current && triggerAlerts) {
-        const incomingUnread = list.filter((n) => !n.is_read && !seenIdsRef.current.has(n.id));
-        if (incomingUnread.length > 0) {
-          const latest = incomingUnread[0];
-          triggerNotificationAlert(
-            latest.title,
-            latest.message,
-            latest.action_url,
-            String(latest.id)
-          );
-        }
-      }
 
       list.forEach((n) => seenIdsRef.current.add(n.id));
       isInitialLoadRef.current = false;
@@ -174,17 +166,27 @@ export default function NotificationCenterDrawer({
     }
   }, []);
 
-  // Sync notifications on mount and setup polling
+  // Sync notifications on mount and setup visibility-aware polling
   useEffect(() => {
-    loadNotifications(false);
-    const interval = setInterval(() => loadNotifications(true), 25000);
+    loadNotifications();
 
-    const handleCustomRefresh = () => loadNotifications(true);
+    // 60-second gentle interval while drawer is mounted
+    const interval = setInterval(() => loadNotifications(), 60000);
+
+    const handleCustomRefresh = () => loadNotifications();
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        loadNotifications();
+      }
+    };
+
     window.addEventListener('spr_notification_refresh', handleCustomRefresh);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('spr_notification_refresh', handleCustomRefresh);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [loadNotifications]);
 

@@ -98,6 +98,7 @@ export interface ProgressReportsViewProps {
   hideHeader?: boolean;
   isEmbedded?: boolean;
   className?: string;
+  filterProps?: any;
 }
 
 export interface RecordReportsListProps {
@@ -110,6 +111,26 @@ export interface RecordReportsListProps {
   onContextMenu?: (e: React.MouseEvent, report: ReportItem) => void;
   onEdit?: (report: ReportItem) => void;
   onDelete?: (report: ReportItem) => void;
+  onResetFilters?: () => void;
+  onRefresh?: () => void;
+}
+
+export interface RecordReportsTableProps {
+  reports?: ReportItem[];
+  reportsList?: ReportItem[];
+  selectedIds?: Set<number | string>;
+  onToggleSelect?: (id: number | string) => void;
+  onBatchSelect?: (ids: Set<number | string>) => void;
+  onDeselectAll?: () => void;
+  onContextMenu?: (e: React.MouseEvent, report: ReportItem) => void;
+  onEdit?: (report: ReportItem) => void;
+  onDelete?: (report: ReportItem) => void;
+  onCopyText?: (payload: any) => void;
+  onExportCSV?: (payload: any) => void;
+  onExportJSON?: (payload: any) => void;
+  onPrintPDF?: (payload: any) => void;
+  onResetFilters?: () => void;
+  onRefresh?: () => void;
 }
 
 export interface StudentGroupedListProps {
@@ -123,12 +144,15 @@ export interface StudentGroupedListProps {
   onStudentContextMenu?: (e: React.MouseEvent, studentObj: StudentGroupedItem) => void;
   onEdit?: (report: ReportItem) => void;
   onDelete?: (report: ReportItem) => void;
+  onResetFilters?: () => void;
+  onRefresh?: () => void;
 }
 
 export interface ReportCardDetailProps {
   report: ReportItem | null;
   onEdit?: (report: ReportItem) => void;
   onDelete?: (report: ReportItem) => void;
+  variant?: "table-cells" | "footer" | "card";
 }
 
 export interface ReportContextMenuProps {
@@ -143,10 +167,4 @@ export interface ReportContextMenuProps {
   onPrintPDF?: (report: ReportItem | ReportItem[]) => void;
   onEdit?: (report: ReportItem) => void;
   onDelete?: (report: ReportItem) => void;
-}
-
-export interface ReportsAnalyticsProps {
-  filteredReports?: ReportItem[];
-  reportsList?: ReportItem[];
-  reports?: ReportItem[];
 }

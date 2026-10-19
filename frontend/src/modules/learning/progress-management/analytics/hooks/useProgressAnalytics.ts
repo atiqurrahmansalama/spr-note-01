@@ -60,10 +60,27 @@ export function useProgressAnalytics({
     if (!isOnline()) return;
 
     try {
-      const res = await fetchWithAuth("/reports/");
-      if (res.ok) {
+      const endpoints = [
+        "/api/v1/reports/?page_size=500",
+        "/api/reports/?page_size=500",
+        "/reports/?page_size=500",
+      ];
+      let res: Response | null = null;
+      for (const ep of endpoints) {
+        try {
+          const attempt = await fetchWithAuth(ep);
+          if (attempt && attempt.ok) {
+            res = attempt;
+            break;
+          }
+        } catch {
+          // Continue to next endpoint
+        }
+      }
+
+      if (res && res.ok) {
         const raw = await res.json();
-        const apiReports = Array.isArray(raw) ? raw : raw?.results || [];
+        const apiReports = Array.isArray(raw) ? raw : (raw?.results || raw?.data || []);
         if (apiReports.length > 0) {
           const map = new Map<string, any>();
           apiReports.forEach((r: any) => {
@@ -87,9 +104,11 @@ export function useProgressAnalytics({
     const handleUpdate = () => loadReports();
     window.addEventListener("spr_report_saved", handleUpdate);
     window.addEventListener("spr_report_deleted", handleUpdate);
+    window.addEventListener("spr_tenant_changed", handleUpdate);
     return () => {
       window.removeEventListener("spr_report_saved", handleUpdate);
       window.removeEventListener("spr_report_deleted", handleUpdate);
+      window.removeEventListener("spr_tenant_changed", handleUpdate);
     };
   }, [loadReports]);
 

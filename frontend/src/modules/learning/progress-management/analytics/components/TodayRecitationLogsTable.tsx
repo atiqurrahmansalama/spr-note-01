@@ -244,7 +244,7 @@ export const TodayRecitationLogsTable: React.FC<TodayRecitationLogsTableProps> =
                           {r.portionTitle}
                         </span>
                         <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded theme-bg-sub theme-text-secondary border theme-border inline-block">
-                          {r.portionType === "new_lesson" ? "সবক (New)" : "সবকী (Revision)"}
+                          {r.portionType === "new_lesson" ? "Sabak (New)" : "Sabqi (Revision)"}
                         </span>
                       </div>
                     </td>

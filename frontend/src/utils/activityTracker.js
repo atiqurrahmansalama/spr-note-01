@@ -27,14 +27,18 @@ export async function sendLoginLog(status = "LOGIN", locationInfo = {}) {
   }
 }
 
+let statusDebounceTimer = null;
+
 /**
  * Send Active or Inactive status ping to backend
  */
 export async function sendActivityLog(status = "ACTIVE") {
   const user = authStore.getUser();
   if (!user) return;
+  if (currentStatus === status) return;
 
   try {
+    currentStatus = status;
     await fetchWithAuth("/activity/log-status/", {
       method: "POST",
       body: JSON.stringify({
@@ -42,10 +46,21 @@ export async function sendActivityLog(status = "ACTIVE") {
         username: user.username,
       }),
     });
-    currentStatus = status;
   } catch (err) {
     console.warn("[activityTracker] Log activity status failed:", err.message);
   }
+}
+
+/**
+ * Safely schedule activity state update with debounce to avoid duplicate events on tab switch
+ */
+function scheduleStatusUpdate(targetStatus) {
+  if (statusDebounceTimer) clearTimeout(statusDebounceTimer);
+  statusDebounceTimer = setTimeout(() => {
+    if (authStore.getUser()) {
+      sendActivityLog(targetStatus);
+    }
+  }, 500);
 }
 
 /**
@@ -56,41 +71,28 @@ export function initActivityTracker() {
   isInitialized = true;
 
   const user = authStore.getUser();
-  if (user && currentStatus === "INACTIVE") {
+  if (user && currentStatus === "INACTIVE" && !document.hidden) {
     sendActivityLog("ACTIVE");
   }
 
-  const handleFocus = () => {
-    if (authStore.getUser()) {
-      sendActivityLog("ACTIVE");
-    }
-  };
-
-  const handleBlur = () => {
-    if (authStore.getUser()) {
-      sendActivityLog("INACTIVE");
-    }
-  };
-
   const handleVisibilityChange = () => {
     if (document.hidden) {
-      handleBlur();
+      scheduleStatusUpdate("INACTIVE");
     } else {
-      handleFocus();
+      scheduleStatusUpdate("ACTIVE");
     }
   };
 
-  window.addEventListener("focus", handleFocus);
-  window.addEventListener("blur", handleBlur);
   document.addEventListener("visibilitychange", handleVisibilityChange);
+  window.addEventListener("pagehide", () => scheduleStatusUpdate("INACTIVE"));
 
-  // Heartbeat ping every 2 minutes when tab is open
+  // Heartbeat ping every 5 minutes when tab is actively open
   if (heartbeatInterval) clearInterval(heartbeatInterval);
   heartbeatInterval = setInterval(() => {
     if (authStore.getUser() && !document.hidden) {
       sendActivityLog("ACTIVE");
     }
-  }, 2 * 60 * 1000);
+  }, 5 * 60 * 1000);
 }
 
 /**
