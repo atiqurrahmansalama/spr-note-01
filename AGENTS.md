@@ -24,7 +24,10 @@
      3. `ar` (Arabic) — العربية (Right-to-Left bidirectional layout).
      4. `ur` (Urdu) — اردو (Right-to-Left bidirectional layout with Nastaliq line-height handling).
    - **100% Pure English Codebase & Default Fallback:** The core codebase, JSX/TSX markup, state identifiers, backend models, logs, and default fallback parameters must strictly remain 100% pure English. Never hardcode Bengali, Arabic, or Urdu strings directly inside component logic or templates.
-   - **Dedicated Locale Dictionaries:** All translations must be isolated exclusively in modular locale dictionaries under `frontend/src/i18n/locales/{en, bn, ar, ur}/`. When creating or updating a feature, translation keys must be maintained across all 4 locales simultaneously.
+   - **Colocated Module-Level Translation Dictionaries (Self-Contained Localization):**
+     - All module-specific translation dictionaries must reside directly inside the respective module's own folder under `<module-path>/locales/{en, bn, ar, ur}.ts` and an `index.ts` barrel registering them via `registerModuleLocales(namespace, { en, bn, ar, ur })`.
+     - The global `frontend/src/i18n/locales/{en, bn, ar, ur}/` is strictly reserved for application-wide, cross-cutting namespaces (such as `common`, `navigation`, `settings`, `errors`).
+     - Feature-specific keys must never bloat the global dictionary files. When creating or updating any module, translation keys must be maintained across all 4 locales (`en`, `bn`, `ar`, `ur`) inside that module's own `locales/` directory.
    - **Universal `useTranslation` Hook Usage:** Always consume translations using `const { t, formatNumber, formatDate, isRTL } = useTranslation(namespace);` with standard fallback chaining: `t('key', 'Default English Text', params)`.
    - **Bidirectional RTL Compliance:** Every UI layout, flex arrangement, text alignment, and icon orientation must seamlessly adapt to RTL mode when Arabic or Urdu is active (using `rtl:...`, CSS logical properties, or text alignment tokens).
    - **Intl Number & Date Formatting:** All displayed numbers, dates, and times must pass through centralized formatters (`formatNumber`, `formatDate`, `formatTime`) to ensure culturally accurate numeral rendering across Bengali (`১, ২, ৩`) and standard/Arabic formats.

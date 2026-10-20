@@ -2,6 +2,21 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from core.views.backup_views import (
+    BackupStatusView,
+    DownloadFullBackupView,
+    CreateBackupArchiveView,
+    RestoreFullBackupView,
+    BackupHistoryListView,
+    DownloadNamedBackupView,
+    DeleteBackupArchiveView,
+    RestoreNamedBackupView,
+    FeatureAnalyticsView,
+    ArchiveActivityLogsView,
+    BackupScheduleSettingsView,
+    TestCloudStorageView,
+)
+
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
@@ -376,6 +391,20 @@ urlpatterns = [
     # Universal Document Export Suite
     path('api/v1/export/vector-pdf/', VectorPDFExportAPIView.as_view(), name='export_vector_pdf_v1'),
     path('api/export/vector-pdf/', VectorPDFExportAPIView.as_view(), name='export_vector_pdf_legacy'),
+
+    # Enterprise 3-Tier Full-System Backup & Disaster Recovery Endpoints
+    path('api/v1/system/backup/status/', BackupStatusView.as_view(), name='backup_status'),
+    path('api/v1/system/backup/history/', BackupHistoryListView.as_view(), name='backup_history'),
+    path('api/v1/system/backup/download-full/', DownloadFullBackupView.as_view(), name='backup_download_full'),
+    path('api/v1/system/backup/create/', CreateBackupArchiveView.as_view(), name='backup_create_archive'),
+    path('api/v1/system/backup/download/<str:archive_name>/', DownloadNamedBackupView.as_view(), name='backup_download_named'),
+    path('api/v1/system/backup/delete/', DeleteBackupArchiveView.as_view(), name='backup_delete_archive'),
+    path('api/v1/system/backup/restore-named/', RestoreNamedBackupView.as_view(), name='backup_restore_named'),
+    path('api/v1/system/backup/restore-full/', RestoreFullBackupView.as_view(), name='backup_restore_full'),
+    path('api/v1/system/backup/feature-analytics/', FeatureAnalyticsView.as_view(), name='backup_feature_analytics'),
+    path('api/v1/system/backup/archive-logs/', ArchiveActivityLogsView.as_view(), name='backup_archive_logs'),
+    path('api/v1/system/backup/schedule-settings/', BackupScheduleSettingsView.as_view(), name='backup_schedule_settings'),
+    path('api/v1/system/backup/test-cloud/', TestCloudStorageView.as_view(), name='backup_test_cloud'),
 
     path('api/v1/', include(router.urls)),
     path('api/', include(router.urls)),

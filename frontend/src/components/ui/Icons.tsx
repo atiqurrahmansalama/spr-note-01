@@ -1413,6 +1413,28 @@ return (
   );
 }
 
+
+export function DatabaseIcon({ className = "w-4 h-4", ...props }: IconProps) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <ellipse cx="12" cy="5" rx="9" ry="3" />
+      <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+      <path d="M3 12A9 3 0 0 0 21 12" />
+    </svg>
+  );
+}
+
+export function HardDriveIcon({ className = "w-4 h-4", ...props }: IconProps) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <line x1="22" y1="12" x2="2" y2="12" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+      <line x1="6" y1="16" x2="6.01" y2="16" />
+      <line x1="10" y1="16" x2="10.01" y2="16" />
+    </svg>
+  );
+}
+
 // ==========================================
 // Standardized Aliases (DRY / Deduplicated)
 // ==========================================

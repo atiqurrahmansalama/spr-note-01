@@ -30,6 +30,7 @@ backend/db.sqlite3-journal
 backend/staticfiles/
 backend/media/
 backend/logs/
+backend/backups/
 
 # ==========================================
 # 4. Frontend Exclusions (Node & React/Vite)

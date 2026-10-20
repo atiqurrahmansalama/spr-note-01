@@ -294,6 +294,7 @@ export default function CampusProfileHubView() {
           size: 'md',
           content: (
             <AcademicYearDrawerForm
+              key={`acad-year-drawer-${yearId || mode}`}
               year={foundYear}
               onSave={(savedData) => {
                 if (savedData.id && foundYear) {

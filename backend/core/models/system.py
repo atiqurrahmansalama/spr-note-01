@@ -199,3 +199,33 @@ class AuditLog(models.Model):
         return f"[{self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else 'NEW'}] {actor_disp} {self.action} {self.resource_type}#{self.resource_id}"
 
 
+class FeatureUsageSummary(models.Model):
+    """
+    Enterprise Aggregated Feature Usage Analytics.
+    Stores rollups of endpoint & feature usage per day to guide product roadmap decisions
+    without retaining millions of raw high-frequency HTTP request logs in the hot database.
+    """
+    date = models.DateField(db_index=True)
+    action_name = models.CharField(max_length=150, db_index=True)
+    endpoint = models.CharField(max_length=255, db_index=True)
+    http_method = models.CharField(max_length=10, default='GET')
+    hit_count = models.PositiveIntegerField(default=0)
+    unique_users_count = models.PositiveIntegerField(default=0)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('date', 'action_name', 'endpoint', 'http_method')
+        ordering = ['-date', '-hit_count']
+        verbose_name = "Feature Usage Summary"
+        verbose_name_plural = "Feature Usage Summaries"
+        indexes = [
+            models.Index(fields=['date', 'action_name'], name='idx_feat_usage_date_act'),
+            models.Index(fields=['-hit_count'], name='idx_feat_usage_hit_count'),
+        ]
+
+    def __str__(self):
+        return f"{self.date} | {self.action_name} ({self.hit_count} hits, {self.unique_users_count} users)"
+
+

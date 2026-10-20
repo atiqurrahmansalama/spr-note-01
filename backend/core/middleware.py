@@ -146,7 +146,9 @@ class UserActivityMiddleware:
 
         # 3. Asynchronously log state-changing HTTP methods (POST, PUT, DELETE, PATCH)
         if request.method in ['POST', 'PUT', 'DELETE', 'PATCH']:
-            if not request.path.endswith('/auth/heartbeat/') and not request.path.endswith('/auth/heartbeat'):
+            # Ignore heartbeat pings, redundant status pings, and backup polling
+            bypass_paths = ('/auth/heartbeat', '/activity/log-status', '/system/backup/status')
+            if not any(bp in request.path for bp in bypass_paths):
                 user_id = request.user.id if (request.user and request.user.is_authenticated) else None
                 action_name = derive_action_name(request)
                 endpoint = request.path

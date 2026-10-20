@@ -249,6 +249,7 @@ export function DrawerFooter({
   onSave,
   cancelLabel = "Cancel",
   saveLabel = "Save Changes",
+  saveIcon,
   isSubmitting = false,
   isSaveDisabled = false,
   autoSaveStatus = null,
@@ -303,7 +304,8 @@ export function DrawerFooter({
             type={onSubmit ? "submit" : "button"}
             variant="primary"
             size="md"
-            onClick={onSave}
+            icon={saveIcon}
+            onClick={onSave || (typeof onSubmit === "function" ? onSubmit : undefined)}
             loading={isSubmitting}
             disabled={isSaveDisabled}
           >
