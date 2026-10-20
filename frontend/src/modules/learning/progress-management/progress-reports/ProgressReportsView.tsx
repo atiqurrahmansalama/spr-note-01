@@ -21,8 +21,7 @@ import DailyClassroomFilterControls from "../../components/DailyClassroomFilterC
 import { useAcademicData } from "@/hooks/useAcademicData";
 import {
   RecordReportsTable,
-  RecordReportsList,
-  StudentGroupedList,
+  StudentGroupedTable,
   ReportContextMenu,
 } from "./components";
 import {
@@ -1253,7 +1252,7 @@ export default function ProgressReportsView({
           )}
 
           {viewMode === "STUDENT_VIEW" && (
-            <StudentGroupedList
+            <StudentGroupedTable
               studentGroupedData={studentGroupedData}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelectReport}
@@ -1263,6 +1262,10 @@ export default function ProgressReportsView({
               onStudentContextMenu={handleStudentContextMenu}
               onEdit={handleEditReport}
               onDelete={handleDeleteReport}
+              onCopyText={(rep) => handleCopyTextReport(rep)}
+              onExportCSV={(rep) => handleExportCSV(rep)}
+              onExportJSON={(rep) => handleExportJSON(rep)}
+              onPrintPDF={(rep) => handlePrintPDF(rep)}
               onResetFilters={handleResetAllFilters}
               onRefresh={handleRefresh}
             />

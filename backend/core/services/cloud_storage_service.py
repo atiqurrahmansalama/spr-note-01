@@ -15,6 +15,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone as dt_timezone
 
 from django.conf import settings
+from django.utils import timezone
 
 logger = logging.getLogger("django")
 

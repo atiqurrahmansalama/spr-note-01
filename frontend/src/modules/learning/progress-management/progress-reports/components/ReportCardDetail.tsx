@@ -1,7 +1,8 @@
 import React from "react";
 import { EditIcon, TrashIcon } from "@/components/ui/Icons";
 import { ExpandedCell } from "@/components/ui/DataTable";
-import { ReportCardDetailProps, ReportPortion, ReportMistakeDetail, ReportStuckDetail } from "../types";
+import { ReportCardDetailProps } from "../types";
+import { getPortions, getMistakes, getStucks } from "../utils/studentMetaResolver";
 
 export default function ReportCardDetail({
   report,
@@ -11,92 +12,17 @@ export default function ReportCardDetail({
 }: ReportCardDetailProps) {
   if (!report) return null;
 
-  // Extract recitation ranges in a standard format: [{ juz, ranges: [{ start, end }] }]
-  const getPortions = (): ReportPortion[] => {
-    if (Array.isArray(report.juz_and_pages) && report.juz_and_pages.length > 0) {
-      return report.juz_and_pages;
-    }
-    if (Array.isArray(report.portions) && report.portions.length > 0) {
-      const juzMap = new Map<number | string, Array<{ start: number | string; end: number | string }>>();
-      report.portions.forEach((p) => {
-        const j = p.start_juz || p.juz || 1;
-        if (!juzMap.has(j)) {
-          juzMap.set(j, []);
-        }
-        juzMap.get(j)!.push({
-          start: p.start_page || 1,
-          end: p.end_page || p.start_page || 1,
-        });
-      });
-      return Array.from(juzMap.entries()).map(([juz, ranges]) => ({
-        juz,
-        ranges,
-      }));
-    }
-    return [];
-  };
+  const displayPortions = getPortions(report);
+  const rawMistakes = getMistakes(report);
+  const rawStucks = getStucks(report);
 
-  // Extract mistakes in a standard format: [{ juz, page, ayah }]
-  const getMistakes = (): ReportMistakeDetail[] => {
-    if (Array.isArray(report.mistake_details) && report.mistake_details.length > 0) {
-      return report.mistake_details;
-    }
-    if (Array.isArray(report.error_details)) {
-      const serverMistakes = report.error_details.filter((e) => e.type === "Mistake");
-      if (serverMistakes.length > 0) return serverMistakes;
-    }
-    if (Array.isArray(report.mistakes)) {
-      const list: ReportMistakeDetail[] = [];
-      report.mistakes.forEach((row) => {
-        const juz = row.juz || "";
-        const page = row.page || "";
-        (row.ayahs || []).forEach((a: any) => {
-          const val = typeof a === "object" ? (a.value || a.ayah || "") : (a || "");
-          if (val && String(val).trim()) {
-            list.push({ juz, page, ayah: val });
-          }
-        });
-      });
-      return list;
-    }
-    return [];
-  };
-
-  // Extract stucks in a standard format: [{ juz, page, ayah }]
-  const getStucks = (): ReportStuckDetail[] => {
-    if (Array.isArray(report.stuck_details) && report.stuck_details.length > 0) {
-      return report.stuck_details;
-    }
-    if (Array.isArray(report.error_details)) {
-      const serverStucks = report.error_details.filter((e) => e.type === "Stuck");
-      if (serverStucks.length > 0) return serverStucks;
-    }
-    if (Array.isArray(report.stucks)) {
-      const list: ReportStuckDetail[] = [];
-      report.stucks.forEach((row) => {
-        const juz = row.juz || "";
-        const page = row.page || "";
-        (row.ayahs || []).forEach((a: any) => {
-          const val = typeof a === "object" ? (a.value || a.ayah || "") : (a || "");
-          if (val && String(val).trim()) {
-            list.push({ juz, page, ayah: val });
-          }
-        });
-      });
-      return list;
-    }
-    return [];
-  };
-
-  const displayPortions = getPortions();
-
-  const validMistakes = getMistakes().filter((m) => {
+  const validMistakes = rawMistakes.filter((m) => {
     const hasPage = m.page !== undefined && m.page !== null && String(m.page).trim() !== "";
     const hasAyah = m.ayah !== undefined && m.ayah !== null && String(m.ayah).trim() !== "";
     return hasPage || hasAyah;
   });
 
-  const validStucks = getStucks().filter((s) => {
+  const validStucks = rawStucks.filter((s) => {
     const hasPage = s.page !== undefined && s.page !== null && String(s.page).trim() !== "";
     const hasAyah = s.ayah !== undefined && s.ayah !== null && String(s.ayah).trim() !== "";
     return hasPage || hasAyah;

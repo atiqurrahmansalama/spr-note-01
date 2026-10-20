@@ -15,6 +15,11 @@ from core.views.backup_views import (
     ArchiveActivityLogsView,
     BackupScheduleSettingsView,
     TestCloudStorageView,
+    ReplicationStatusView,
+    ReplicationSyncNowView,
+    TenantInstitutionListView,
+    TenantBackupExportView,
+    TenantBackupRestoreView,
 )
 
 from drf_spectacular.views import (
@@ -405,6 +410,11 @@ urlpatterns = [
     path('api/v1/system/backup/archive-logs/', ArchiveActivityLogsView.as_view(), name='backup_archive_logs'),
     path('api/v1/system/backup/schedule-settings/', BackupScheduleSettingsView.as_view(), name='backup_schedule_settings'),
     path('api/v1/system/backup/test-cloud/', TestCloudStorageView.as_view(), name='backup_test_cloud'),
+    path('api/v1/system/backup/institutions/', TenantInstitutionListView.as_view(), name='backup_institutions'),
+    path('api/v1/system/backup/tenant-export/', TenantBackupExportView.as_view(), name='backup_tenant_export'),
+    path('api/v1/system/backup/tenant-restore/', TenantBackupRestoreView.as_view(), name='backup_tenant_restore'),
+    path('api/v1/system/replication/status/', ReplicationStatusView.as_view(), name='replication_status'),
+    path('api/v1/system/replication/sync-now/', ReplicationSyncNowView.as_view(), name='replication_sync_now'),
 
     path('api/v1/', include(router.urls)),
     path('api/', include(router.urls)),

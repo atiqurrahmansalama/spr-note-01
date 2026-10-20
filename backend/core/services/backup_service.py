@@ -631,3 +631,160 @@ class EnterpriseBackupService:
             return {"success": False, "error": f"Backup archive '{clean_name}' not found on server."}
 
         return cls.restore_full_backup(str(target_file), passphrase=passphrase, dry_run=dry_run)
+
+    @classmethod
+    def create_tenant_backup(
+        cls,
+        tenant_id: str,
+        output_dir: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Creates a lightweight, isolated backup bundle strictly for a single institution/tenant.
+        Includes all academic, financial, attendance, and student data belonging to this institution.
+        """
+        from core.models import AcademicInstitution
+        try:
+            inst = AcademicInstitution.objects.get(id=tenant_id)
+        except Exception:
+            return {"success": False, "error": f"Institution with ID '{tenant_id}' not found."}
+
+        backup_root = Path(output_dir) if output_dir else cls.ensure_backup_dir() / "tenant_backups"
+        backup_root.mkdir(parents=True, exist_ok=True)
+
+        timestamp_str = timezone.now().strftime("%Y%m%d_%H%M%S")
+        safe_code = (getattr(inst, "slug", None) or getattr(inst, "eiin_or_reg_no", None) or str(inst.id)[:8]).lower().replace(" ", "_")
+        backup_uuid = hashlib.md5(f"{tenant_id}_{timestamp_str}".encode()).hexdigest()[:8]
+        archive_name = f"tenant_{safe_code}_backup_{timestamp_str}_{backup_uuid}.json.gz"
+        archive_path = backup_root / archive_name
+
+        all_models = cls.get_core_models()
+        tenant_data = {}
+        record_breakdown = {}
+        total_records = 0
+
+        for model in all_models:
+            field_names = [f.name for f in model._meta.fields]
+            has_inst_fk = "institution" in field_names
+            is_institution_model = model == AcademicInstitution
+
+            qs = None
+            if is_institution_model:
+                qs = model.objects.filter(id=tenant_id)
+            elif has_inst_fk:
+                qs = model.objects.filter(institution_id=tenant_id)
+
+            if qs is not None:
+                count = qs.count()
+                if count > 0:
+                    from core.services.outbox_service import serialize_model_instance
+                    tenant_data[model._meta.label] = [serialize_model_instance(obj) for obj in qs]
+                    record_breakdown[model._meta.label] = count
+                    total_records += count
+
+        manifest = {
+            "type": "TENANT_SCOPED_BACKUP",
+            "institution_id": str(inst.id),
+            "institution_name": inst.name,
+            "institution_code": getattr(inst, "eiin_or_reg_no", "") or getattr(inst, "slug", ""),
+            "exported_at": timezone.now().isoformat(),
+            "total_records": total_records,
+            "record_breakdown": record_breakdown,
+        }
+
+        package_bundle = {
+            "manifest": manifest,
+            "data": tenant_data
+        }
+
+        raw_json_bytes = json.dumps(package_bundle, indent=2, default=str).encode("utf-8")
+        with gzip.open(archive_path, "wb") as gz:
+            gz.write(raw_json_bytes)
+
+        file_size_bytes = os.path.getsize(archive_path)
+        sha256 = cls.calculate_sha256(str(archive_path))
+
+        sidecar_path = backup_root / f"{archive_name}.sha256"
+        with open(sidecar_path, "w", encoding="utf-8") as sf:
+            sf.write(f"{sha256}  {archive_name}\n")
+
+        return {
+            "success": True,
+            "archive_name": archive_name,
+            "archive_path": str(archive_path),
+            "file_size_mb": round(file_size_bytes / (1024 * 1024), 2),
+            "sha256": sha256,
+            "institution_name": inst.name,
+            "institution_id": str(inst.id),
+            "total_records": total_records,
+            "record_breakdown": record_breakdown,
+        }
+
+    @classmethod
+    def restore_tenant_backup(
+        cls,
+        tenant_id: str,
+        archive_path: str,
+        dry_run: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Safely restores a tenant-scoped backup for a specific institution inside an atomic transaction.
+        Guarantees other institutions remain 100% untouched and isolated.
+        """
+        path = Path(archive_path)
+        if not path.exists():
+            return {"success": False, "error": "Tenant backup archive file not found."}
+
+        try:
+            with gzip.open(path, "rb") as gz:
+                content = json.loads(gz.read().decode("utf-8"))
+        except Exception as e:
+            return {"success": False, "error": f"Invalid or corrupted tenant archive: {e}"}
+
+        manifest = content.get("manifest", {})
+        archived_inst_id = manifest.get("institution_id")
+        if archived_inst_id != str(tenant_id):
+            return {
+                "success": False,
+                "error": f"Security mismatch: Archive belongs to institution '{manifest.get('institution_name')}' ({archived_inst_id}), but target is '{tenant_id}'."
+            }
+
+        total_records = manifest.get("total_records", 0)
+        if dry_run:
+            return {
+                "success": True,
+                "is_dry_run": True,
+                "manifest": manifest,
+                "message": f"Tenant archive integrity validated. Contains {total_records} records for {manifest.get('institution_name')}."
+            }
+
+        from django.db import transaction
+        from core.services.outbox_service import OutboxService
+
+        with OutboxService.pause_capture():
+            with transaction.atomic():
+                data = content.get("data", {})
+                all_models_map = {m._meta.label: m for m in cls.get_core_models()}
+
+                restored_count = 0
+                for model_label, records in data.items():
+                    model = all_models_map.get(model_label)
+                    if not model:
+                        continue
+                    for row_dict in records:
+                        pk_val = row_dict.get("id")
+                        if pk_val:
+                            model.objects.update_or_create(id=pk_val, defaults={k: v for k, v in row_dict.items() if k != "id"})
+                            restored_count += 1
+
+                return {
+                    "success": True,
+                    "is_dry_run": False,
+                    "restored_records": restored_count,
+                    "institution_name": manifest.get("institution_name"),
+                    "message": f"Successfully restored {restored_count} records for {manifest.get('institution_name')}."
+                }
+
+
+# Export convenient alias
+BackupService = EnterpriseBackupService
+

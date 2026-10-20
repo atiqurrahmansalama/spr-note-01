@@ -403,3 +403,186 @@ class TestCloudStorageView(APIView):
 
         result = CloudStorageService.test_connection()
         return Response({"success": True, "data": result})
+
+
+# ==============================================================================
+# Dual-Engine Cloud Replication & Scoped Tenant Backup API Views
+# ==============================================================================
+
+class ReplicationStatusView(APIView):
+    """
+    GET /api/v1/system/replication/status/
+    Returns real-time dual-engine replication telemetry, outbox queue metrics, and lag.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not (request.user.is_superuser or getattr(request.user, "user_type", "").upper() == "SUPER_ADMIN"):
+            raise PermissionDenied("Only Super Administrators can inspect dual-engine cloud replication telemetry.")
+        from core.services.replication_service import CloudReplicationService
+        status_data = CloudReplicationService.get_replication_status()
+        return Response({"success": True, "data": status_data})
+
+
+class ReplicationSyncNowView(APIView):
+    """
+    POST /api/v1/system/replication/sync-now/
+    Triggers an immediate batch push of pending outbox records to remote Supabase storage/database.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not (request.user.is_superuser or getattr(request.user, "user_type", "").upper() == "SUPER_ADMIN"):
+            raise PermissionDenied("Only Super Administrators can trigger cloud replication sync.")
+        from core.services.replication_service import CloudReplicationService
+        batch_size = int(request.data.get("batch_size", 100))
+        result = CloudReplicationService.replicate_batch(batch_size=batch_size)
+        status_data = CloudReplicationService.get_replication_status()
+        return Response({
+            "success": True,
+            "result": result,
+            "status": status_data
+        })
+
+
+class TenantInstitutionListView(APIView):
+    """
+    GET /api/v1/system/backup/institutions/
+    Returns list of campuses/institutions for tenant backup selection.
+    Super Admins see all institutions; regular users only see their own assigned institution.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from core.models import AcademicInstitution
+        is_super = request.user.is_superuser or getattr(request.user, "user_type", "").upper() == "SUPER_ADMIN"
+        if is_super:
+            institutions = AcademicInstitution.objects.filter(is_deleted=False).order_by("name")
+        else:
+            if not request.user.institution_id:
+                return Response({"success": True, "institutions": [], "is_super_admin": False})
+            institutions = AcademicInstitution.objects.filter(id=request.user.institution_id, is_deleted=False)
+
+        data = [
+            {
+                "id": str(inst.id),
+                "name": inst.name,
+                "bangla_name": inst.bangla_name or "",
+                "slug": inst.slug or "",
+                "eiin_or_reg_no": inst.eiin_or_reg_no or "",
+                "is_current_user_tenant": bool(request.user.institution_id and str(request.user.institution_id) == str(inst.id))
+            }
+            for inst in institutions
+        ]
+        return Response({"success": True, "institutions": data, "is_super_admin": is_super})
+
+
+class TenantBackupExportView(APIView):
+    """
+    GET /api/v1/system/backup/tenant-export/
+    Creates and streams a secure, tenant-scoped compressed bundle (.json.gz).
+    Regular campus admins can only export their own institution's partition.
+    Super Admins can export any institution's partition or specify via ?tenant_id=.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from core.models import AcademicInstitution
+        is_super = request.user.is_superuser or getattr(request.user, "user_type", "").upper() == "SUPER_ADMIN"
+        requested_tenant_id = request.query_params.get("tenant_id")
+
+        if is_super:
+            tenant_id = requested_tenant_id or (str(request.user.institution_id) if request.user.institution_id else None)
+            if not tenant_id:
+                first_inst = AcademicInstitution.objects.first()
+                if not first_inst:
+                    return Response({"success": False, "error": "No academic institutions found in system."}, status=status.HTTP_404_NOT_FOUND)
+                tenant_id = str(first_inst.id)
+        else:
+            if not request.user.institution_id:
+                raise PermissionDenied("You are not associated with any academic institution.")
+            if requested_tenant_id and str(requested_tenant_id) != str(request.user.institution_id):
+                raise PermissionDenied("Security policy violation: You can only export your own campus partition.")
+            tenant_id = str(request.user.institution_id)
+
+        result = EnterpriseBackupService.create_tenant_backup(tenant_id=tenant_id)
+        if not result.get("success"):
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+        archive_path = Path(result["archive_path"])
+        if not archive_path.exists():
+            return Response({"success": False, "error": "Backup file could not be created."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        response = FileResponse(
+            open(archive_path, "rb"),
+            content_type="application/gzip"
+        )
+        response["Content-Disposition"] = f'attachment; filename="{result["archive_name"]}"'
+        response["X-Backup-Checksum-SHA256"] = result["sha256"]
+        response["X-Tenant-Records"] = str(result["total_records"])
+        return response
+
+
+class TenantBackupRestoreView(APIView):
+    """
+    POST /api/v1/system/backup/tenant-restore/
+    Safely restores a tenant-scoped backup inside an isolated atomic transaction.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        is_super = request.user.is_superuser or getattr(request.user, "user_type", "").upper() == "SUPER_ADMIN"
+        requested_tenant_id = request.data.get("tenant_id")
+        dry_run = str(request.data.get("dry_run", "false")).lower() in ("true", "1")
+
+        if is_super:
+            tenant_id = requested_tenant_id or (str(request.user.institution_id) if request.user.institution_id else None)
+        else:
+            if not request.user.institution_id:
+                raise PermissionDenied("You are not associated with any academic institution.")
+            if requested_tenant_id and str(requested_tenant_id) != str(request.user.institution_id):
+                raise PermissionDenied("Security policy violation: You can only restore your own campus partition.")
+            tenant_id = str(request.user.institution_id)
+
+        if not tenant_id:
+            return Response({"success": False, "error": "Institution ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        uploaded_file = request.FILES.get("backup_file")
+        archive_name = request.data.get("archive_name")
+
+        backup_root = EnterpriseBackupService.ensure_backup_dir() / "tenant_backups"
+        backup_root.mkdir(parents=True, exist_ok=True)
+
+        if uploaded_file:
+            if not (uploaded_file.name.endswith(".json.gz") or uploaded_file.name.endswith(".json")):
+                return Response(
+                    {"success": False, "error": "Invalid file format. Tenant backup must be a .json.gz or .json archive."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            target_path = backup_root / f"uploaded_{uploaded_file.name}"
+            with open(target_path, "wb") as f:
+                for chunk in uploaded_file.chunks():
+                    f.write(chunk)
+            archive_path = str(target_path)
+        elif archive_name:
+            clean_name = os.path.basename(archive_name).strip()
+            target_path = backup_root / clean_name
+            if not target_path.exists():
+                return Response({"success": False, "error": f"Tenant archive '{clean_name}' not found on server."}, status=status.HTTP_404_NOT_FOUND)
+            archive_path = str(target_path)
+        else:
+            return Response(
+                {"success": False, "error": "Please provide an uploaded backup_file or an existing archive_name."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        result = EnterpriseBackupService.restore_tenant_backup(
+            tenant_id=tenant_id,
+            archive_path=archive_path,
+            dry_run=dry_run
+        )
+
+        if result.get("success"):
+            return Response(result, status=status.HTTP_200_OK)
+        return Response(result, status=status.HTTP_400_BAD_REQUEST)
+

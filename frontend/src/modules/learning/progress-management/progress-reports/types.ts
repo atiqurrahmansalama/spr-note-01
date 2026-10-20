@@ -101,39 +101,7 @@ export interface ProgressReportsViewProps {
   filterProps?: any;
 }
 
-export interface RecordReportsListProps {
-  reports?: ReportItem[];
-  reportsList?: ReportItem[];
-  selectedIds?: Set<number | string>;
-  onToggleSelect?: (id: number | string) => void;
-  onBatchSelect?: (ids: Set<number | string>) => void;
-  onDeselectAll?: () => void;
-  onContextMenu?: (e: React.MouseEvent, report: ReportItem) => void;
-  onEdit?: (report: ReportItem) => void;
-  onDelete?: (report: ReportItem) => void;
-  onResetFilters?: () => void;
-  onRefresh?: () => void;
-}
-
-export interface RecordReportsTableProps {
-  reports?: ReportItem[];
-  reportsList?: ReportItem[];
-  selectedIds?: Set<number | string>;
-  onToggleSelect?: (id: number | string) => void;
-  onBatchSelect?: (ids: Set<number | string>) => void;
-  onDeselectAll?: () => void;
-  onContextMenu?: (e: React.MouseEvent, report: ReportItem) => void;
-  onEdit?: (report: ReportItem) => void;
-  onDelete?: (report: ReportItem) => void;
-  onCopyText?: (payload: any) => void;
-  onExportCSV?: (payload: any) => void;
-  onExportJSON?: (payload: any) => void;
-  onPrintPDF?: (payload: any) => void;
-  onResetFilters?: () => void;
-  onRefresh?: () => void;
-}
-
-export interface StudentGroupedListProps {
+export interface StudentGroupedTableProps {
   studentGroupedData?: StudentGroupedItem[];
   reportsList?: ReportItem[];
   selectedIds?: Set<number | string>;
@@ -144,9 +112,17 @@ export interface StudentGroupedListProps {
   onStudentContextMenu?: (e: React.MouseEvent, studentObj: StudentGroupedItem) => void;
   onEdit?: (report: ReportItem) => void;
   onDelete?: (report: ReportItem) => void;
+  onCopyText?: (payload: any) => void;
+  onExportCSV?: (payload: any) => void;
+  onExportJSON?: (payload: any) => void;
+  onPrintPDF?: (payload: any) => void;
   onResetFilters?: () => void;
   onRefresh?: () => void;
 }
+
+// Backward-compatible aliases
+export type StudentGroupedListProps = StudentGroupedTableProps;
+export type RecordReportsListProps = RecordReportsTableProps;
 
 export interface ReportCardDetailProps {
   report: ReportItem | null;

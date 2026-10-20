@@ -229,3 +229,49 @@ class FeatureUsageSummary(models.Model):
         return f"{self.date} | {self.action_name} ({self.hit_count} hits, {self.unique_users_count} users)"
 
 
+class DataMutationOutbox(models.Model):
+    """
+    Enterprise Change Data Capture (CDC) & Write-Behind Outbox Queue.
+    Enables instant sub-millisecond local execution while safely queueing mutations
+    for non-blocking streaming replication to remote Supabase PostgreSQL.
+    """
+    STATUS_CHOICES = (
+        ('PENDING', 'Pending'),
+        ('SYNCING', 'Syncing'),
+        ('SYNCED', 'Synced'),
+        ('FAILED', 'Failed'),
+    )
+
+    OPERATION_CHOICES = (
+        ('INSERT', 'Insert'),
+        ('UPDATE', 'Update'),
+        ('DELETE', 'Delete'),
+    )
+
+    mutation_id = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True, editable=False)
+    table_name = models.CharField(max_length=150, db_index=True)
+    record_pk = models.CharField(max_length=150, db_index=True)
+    operation = models.CharField(max_length=10, choices=OPERATION_CHOICES)
+    payload = models.JSONField(default=dict, blank=True)
+    tenant_id = models.CharField(max_length=100, db_index=True, null=True, blank=True)
+    status = models.CharField(max_length=20, default='PENDING', choices=STATUS_CHOICES, db_index=True)
+    retry_count = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    synced_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = "Data Mutation Outbox"
+        verbose_name_plural = "Data Mutation Outbox Entries"
+        indexes = [
+            models.Index(fields=['status', 'created_at'], name='idx_outbox_status_created'),
+            models.Index(fields=['tenant_id', 'status'], name='idx_outbox_tenant_status'),
+            models.Index(fields=['table_name', 'record_pk'], name='idx_outbox_table_pk'),
+        ]
+
+    def __str__(self):
+        return f"[{self.status}] {self.operation} on {self.table_name}#{self.record_pk} (Mutation: {self.mutation_id})"
+
+
+

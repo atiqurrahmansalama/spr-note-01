@@ -76,7 +76,7 @@ const PersonalizeSettingsHubView = lazy(() => import("./modules/settings/Persona
 const SecuritySessionsView = lazy(() => import("./modules/settings/components/SecuritySessionsView"));
 const ClassroomConfigurationView = lazy(() => import("./modules/learning/components/ClassroomConfigurationView"));
 const ReportSettingsView = ClassroomConfigurationView;
-const DataBackupView = lazy(() => import("./modules/settings/components/DataBackupView"));
+const DataBackupView = lazy(() => import("./modules/settings/backup"));
 const ShortcutsGuide = lazy(() => import("./modules/settings/components/ShortcutsGuide"));
 const AppGuideView = lazy(() => import("./modules/settings/components/AppGuideView"));
 const AboutAppView = lazy(() => import("./modules/settings/components/AboutAppView"));
