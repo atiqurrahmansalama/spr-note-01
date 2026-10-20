@@ -104,30 +104,6 @@ export default function ProgressReportsView({
   // Context Menu state
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
-  // Deselect items when clicking outside report cards or interactive controls
-  useEffect(() => {
-    const handleGlobalMouseDown = (e: MouseEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!containerRef.current || !containerRef.current.contains(target)) {
-        return;
-      }
-      if (
-        target?.closest(".report-card-row") ||
-        target?.closest(".student-grouped-row") ||
-        target?.closest(".report-context-menu") ||
-        target?.closest("button") ||
-        target?.closest("input") ||
-        target?.closest(".autocomplete-dropdown")
-      ) {
-        return;
-      }
-      setSelectedIds(new Set());
-    };
-
-    document.addEventListener("mousedown", handleGlobalMouseDown);
-    return () => document.removeEventListener("mousedown", handleGlobalMouseDown);
-  }, []);
-
   // Helper: Normalize a single report object into strict typed contract
   const normalizeReport = useCallback((rep: any): ReportItem => {
     // 1. Report Date (Recitation Date)
@@ -783,21 +759,33 @@ export default function ProgressReportsView({
 
   // Selection handlers
   const toggleSelectAll = () => {
-    if (selectedIds.size === filteredReports.length) {
+    if (selectedIds.size >= filteredReports.length && filteredReports.length > 0) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredReports.map((r) => r.id || r.report_unique_id || "")));
+      setSelectedIds(
+        new Set(filteredReports.map((r) => r.id ?? r.report_unique_id ?? "").filter(Boolean))
+      );
     }
   };
 
-  const toggleSelectReport = (id: number | string) => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
-    setSelectedIds(next);
+  const toggleSelectReport = (id: number | string, explicitChecked?: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const strId = String(id);
+      const numId = !isNaN(Number(id)) ? Number(id) : null;
+      const isPresent = next.has(id) || next.has(strId) || (numId !== null && next.has(numId));
+
+      const shouldUnselect = explicitChecked !== undefined ? !explicitChecked : isPresent;
+
+      if (shouldUnselect) {
+        next.delete(id);
+        next.delete(strId);
+        if (numId !== null) next.delete(numId);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   };
 
   const handleBatchSelect = (idsSet: Set<number | string>) => {
@@ -845,7 +833,15 @@ export default function ProgressReportsView({
       return [targetReports];
     }
     if (selectedIds.size > 0) {
-      return filteredReports.filter((r) => selectedIds.has(r.id || r.report_unique_id || ""));
+      return filteredReports.filter((r) => {
+        const id = r.id ?? r.report_unique_id;
+        if (!id) return false;
+        return (
+          selectedIds.has(id) ||
+          selectedIds.has(String(id)) ||
+          (!isNaN(Number(id)) && selectedIds.has(Number(id)))
+        );
+      });
     }
     return filteredReports;
   };

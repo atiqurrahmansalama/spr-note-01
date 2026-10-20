@@ -211,11 +211,12 @@ function ExpandedDividerRow({
   level?: number;
   indentPerLevel?: number;
 }) {
+  if (className === 'hidden' || className.includes('hidden')) return null;
   return (
     <tr key={`expanded-divider-${rowKey}`} className="theme-bg-sub/30 border-0">
       <td colSpan={totalColCount} className="p-0 border-0 h-px">
         <div
-          className={`mx-6 sm:mx-8 border-t theme-border ${className}`}
+          className={`w-full border-t theme-border ${className}`}
           style={
             level > 0
               ? { marginLeft: `calc(1.5rem + ${level * indentPerLevel}px)` }
@@ -604,7 +605,13 @@ function DataTable<T = any>({
     (item: any, idx: number) => {
       if (!selectable) return false;
       const itemId = getItemId(item, idx);
-      return selectedSet.has(itemId);
+      if (selectedSet.has(itemId)) return true;
+      if (itemId !== null && itemId !== undefined && itemId !== '') {
+        if (selectedSet.has(String(itemId))) return true;
+        const num = Number(itemId);
+        if (!isNaN(num) && selectedSet.has(num)) return true;
+      }
+      return false;
     },
     [selectable, getItemId, selectedSet]
   );
@@ -781,7 +788,7 @@ function DataTable<T = any>({
           }}
           className={`group/row ${
             isExpanded ? 'border-b-0' : 'border-b theme-border'
-          } hover:bg-black/[0.015] dark:hover:bg-white/[0.02] transition-colors ${
+          } hover:theme-bg-elevated/40 transition-colors ${
             isRowHighlight
               ? 'theme-row-highlight font-semibold'
               : itemSelected
@@ -798,7 +805,7 @@ function DataTable<T = any>({
           {selectable && (
             <td
               className={`${defaultCellPad} ${selectionCellClassName} ${
-                isExpanded ? 'border-b-0' : 'border-b theme-border'
+                isExpanded && !renderExpandedRow ? 'border-b-0' : 'border-b theme-border'
               }`}
               onClick={(e) => e.stopPropagation()}
             >
@@ -817,7 +824,7 @@ function DataTable<T = any>({
           {shouldShowSerial && (
             <td
               className={`${defaultCellPad} ${indexCellClassName} ${
-                isExpanded ? 'border-b-0' : 'border-b theme-border'
+                isExpanded && !renderExpandedRow ? 'border-b-0' : 'border-b theme-border'
               }`}
             >
               <span className="text-xs font-bold theme-text-secondary">
@@ -860,7 +867,7 @@ function DataTable<T = any>({
                 key={col.key || colIdx}
                 style={colStyle}
                 className={`${defaultCellPad} ${alignClass} ${stickyCellClass} ${
-                  isExpanded ? 'border-b-0' : 'border-b theme-border'
+                  isExpanded && !renderExpandedRow ? 'border-b-0' : 'border-b theme-border'
                 } ${customCellClass}`}
               >
                 {showTreeGuides ? (
@@ -1010,18 +1017,20 @@ function DataTable<T = any>({
           renderExpandedRow &&
           isExpanded && (
             <>
-              <ExpandedDividerRow
-                rowKey={rowKey}
-                totalColCount={totalColCount}
-                className={expandedDividerClassName}
-                level={level}
-                indentPerLevel={indentPerLevel}
-              />
               <tr key={`expanded-${rowKey}`} className="theme-bg-sub/30">
-                <td colSpan={totalColCount} className="p-0 border-b theme-border">
+                <td colSpan={totalColCount} className="p-0 border-0">
                   {renderExpandedRow(item, rowIdx, () => toggleExpand(rowKey), level)}
                 </td>
               </tr>
+              {expandedDividerClassName !== 'hidden' && !expandedDividerClassName?.includes('hidden') && (
+                <ExpandedDividerRow
+                  rowKey={`bottom-${rowKey}`}
+                  totalColCount={totalColCount}
+                  className={expandedDividerClassName}
+                  level={level}
+                  indentPerLevel={indentPerLevel}
+                />
+              )}
             </>
           )}
 
@@ -1087,7 +1096,7 @@ function DataTable<T = any>({
   }
 
   return (
-    <div className="w-full space-y-2">
+    <div className={`w-full ${isNestedTable ? '' : 'space-y-2'}`}>
       {/* ── Top Header Toolbar with Title and Custom Actions (if provided) ── */}
       {(tableTitle || headerActions) && (
         <div className="flex items-center justify-between gap-3 px-1 py-0.5 flex-wrap print:hidden">
@@ -1133,7 +1142,7 @@ function DataTable<T = any>({
                     <th
                       className={`${defaultHeaderPad} ${selectionHeaderClassName} ${
                         isVertical ? 'align-middle' : ''
-                      } theme-bg-sub max-h-[96px]`}
+                      } ${isNestedTable ? 'bg-transparent' : 'theme-bg-sub'} max-h-[96px]`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div
@@ -1148,7 +1157,7 @@ function DataTable<T = any>({
                             const allIds = processedData.map((item, idx) =>
                               getItemId(item, idx)
                             );
-                            onSelectAll?.(checked ? allIds : [], checked);
+                            onSelectAll?.(checked ? allIds : [], checked, allIds);
                           }}
                           disabled={processedData.length === 0}
                         />
@@ -1159,7 +1168,7 @@ function DataTable<T = any>({
                     <th
                       className={`${defaultHeaderPad} ${indexHeaderClassName} ${
                         isVertical ? 'align-middle' : ''
-                      } theme-bg-sub max-h-[96px]`}
+                      } ${isNestedTable ? 'bg-transparent' : 'theme-bg-sub'} max-h-[96px]`}
                     >
                       <div
                         className={`flex items-center justify-center ${
@@ -1172,7 +1181,10 @@ function DataTable<T = any>({
                   )}
                   {columns.map((col, idx) => {
                     const alignClass = getAlignClass(col.align);
-                    const stickyHeaderClass = getStickyHeaderClass(col, 'theme-bg-sub');
+                    const stickyHeaderClass = getStickyHeaderClass(
+                      col,
+                      isNestedTable ? 'bg-transparent' : 'theme-bg-sub'
+                    );
                     const colSortKey =
                       col.sortKey || col.accessor || col.key || col.id || col.dataIndex;
                     const colStyle = getColumnStyle(colSortKey, activeColumnWidths, col);
@@ -1350,7 +1362,7 @@ function DataTable<T = any>({
                           isColSortable
                             ? `cursor-pointer select-none group/col-header ${
                                 !isStickyCol(col, 'right') && !isStickyCol(col, 'left')
-                                  ? 'hover:bg-black/[0.025] dark:hover:bg-white/[0.03]'
+                                  ? 'hover:theme-bg-elevated/70'
                                   : ''
                               } transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-main)]/40`
                             : ''

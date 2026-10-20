@@ -3,3 +3,4 @@ export { default as StudentReportsView } from "./ProgressReportsView";
 export { default } from "./ProgressReportsView";
 export * from "./types";
 export * from "./components";
+export * from "./hooks";
