@@ -42,6 +42,8 @@ export function generateReportText({
   groupName = "",
   selectedSession = "",
   selectedDate = "",
+  lessonTitle = "",
+  isBookMode = false,
   juzPageData = [],
   mistakeData = [],
   stuckData = [],
@@ -55,7 +57,23 @@ export function generateReportText({
 
   // 2. Extract Juz & Page Ranges
   const juzMap = new Map();
+  const directRanges = [];
+
   juzPageData.forEach((row) => {
+    if (row.ranges && Array.isArray(row.ranges)) {
+      row.ranges.forEach((r) => {
+        const s = (r.start || "").toString().trim();
+        const e = (r.end || "").toString().trim();
+        if (s) {
+          if (e && e !== s) {
+            directRanges.push(`${s}–${e}`);
+          } else {
+            directRanges.push(s);
+          }
+        }
+      });
+    }
+
     if (!row.juz || row.juz.toString().trim() === "") return;
     const juzNum = row.juz.toString().trim();
     if (!juzMap.has(juzNum)) {
@@ -88,11 +106,14 @@ export function generateReportText({
   if (featureConfig.studentSelect !== false) {
     lines.push(`Student Name: ${studentName || "N/A"}`);
   }
+  if (isBookMode && lessonTitle) {
+    lines.push(`Lesson: ${lessonTitle}`);
+  }
   lines.push("");
 
   // 4. Juz & Page Block
   if (featureConfig.juzPageInput !== false) {
-    if (validJuzs.length > 0) {
+    if (!isBookMode && validJuzs.length > 0) {
       lines.push(`Juz Number: ${validJuzs.join(", ")}`);
       if (isSingleJuz) {
         const juzNum = validJuzs[0];
@@ -110,8 +131,10 @@ export function generateReportText({
           }
         });
       }
+    } else if (isBookMode && directRanges.length > 0) {
+      lines.push(`Page: ${directRanges.join(", ")}`);
     } else {
-      lines.push("Juz Number: N/A");
+      if (!isBookMode) lines.push("Juz Number: N/A");
       lines.push("Page: N/A");
     }
     lines.push("");
@@ -167,8 +190,9 @@ export function generateReportText({
         detailByJuz.set(juzNum, []);
       }
 
+      const unitLabel = isBookMode ? "Line" : "Ayah";
       validAyahs.forEach((ayahVal) => {
-        detailByJuz.get(juzNum).push(`Page ${pageStr} Ayah ${ayahVal}`);
+        detailByJuz.get(juzNum).push(`Page ${pageStr} ${unitLabel} ${ayahVal}`);
       });
     });
 
@@ -176,11 +200,12 @@ export function generateReportText({
 
     let resLines = [title];
 
-    if (isSingleJuz) {
-      // Single Juz format
-      const entries = Array.from(detailByJuz.values())[0];
-      entries.forEach((item) => {
-        resLines.push(item);
+    if (isBookMode || isSingleJuz) {
+      // Single Juz or Book format (flush items)
+      detailByJuz.forEach((entries) => {
+        entries.forEach((item) => {
+          resLines.push(item);
+        });
       });
     } else {
       // Multiple Juz format

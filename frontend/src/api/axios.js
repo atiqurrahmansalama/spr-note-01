@@ -121,6 +121,7 @@ apiClient.interceptors.response.use(
           const freshToken = authStore.getAccessToken();
           if (!freshToken) {
             authStore.clearTokens();
+            import('../offline').then(({ purgeAllUserData }) => purgeAllUserData()).catch(() => {});
             if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
               window.location.href = '/login';
             }

@@ -133,32 +133,42 @@ export default function AutocompleteDropdown({
     return (options || []).filter((item) => {
       if (readOnly) return true;
 
-      // 1. If user is actively typing, ALWAYS filter strictly by what they typed!
-      if (isUserTypingRef.current) {
-        if (!safeSearchTerm || !safeSearchTerm.trim()) return true;
-        const term = safeSearchTerm.trim().toLowerCase();
+      const matchesTerm = (searchTerm: string) => {
+        if (!searchTerm || !searchTerm.trim()) return true;
+        const term = searchTerm.trim().toLowerCase();
         const labelText = (typeof item === 'string' ? item : item?.label || item?.name || '').toLowerCase();
         const sub = (
           typeof item === 'object' && item !== null
             ? (typeof item.sub === 'string' ? item.sub : typeof item.subLabel === 'string' ? item.subLabel : typeof item.group_name === 'string' ? item.group_name : '')
             : ''
         ).toLowerCase();
-        return labelText.includes(term) || sub.includes(term);
+        const badge = typeof item === 'object' && item?.badge ? String(item.badge).toLowerCase() : '';
+        const idVal = typeof item === 'object' && item?.id ? String(item.id).toLowerCase() : '';
+        const uniqVal = typeof item === 'object' && item?.uniq_id ? String(item.uniq_id).toLowerCase() : '';
+        const rollVal = typeof item === 'object' && item?.roll_number != null ? String(item.roll_number).toLowerCase() : '';
+        const cardVal = typeof item === 'object' && item?.student_id_card_number ? String(item.student_id_card_number).toLowerCase() : '';
+
+        return (
+          labelText.includes(term) ||
+          sub.includes(term) ||
+          badge.includes(term) ||
+          idVal === term ||
+          uniqVal.includes(term) ||
+          rollVal === term ||
+          cardVal.includes(term)
+        );
+      };
+
+      // 1. If user is actively typing, ALWAYS filter strictly by what they typed!
+      if (isUserTypingRef.current) {
+        return matchesTerm(safeSearchTerm);
       }
 
       // 2. When not typing and dropdown is opened, show all if showAllOptionsOnFocus is true
       if (showAllOptionsOnFocus) return true;
 
       // 3. Fallback when not typing and showAllOptionsOnFocus is false
-      if (!safeSearchTerm || !safeSearchTerm.trim()) return true;
-      const term = safeSearchTerm.trim().toLowerCase();
-      const labelText = (typeof item === 'string' ? item : item?.label || item?.name || '').toLowerCase();
-      const sub = (
-        typeof item === 'object' && item !== null
-          ? (typeof item.sub === 'string' ? item.sub : typeof item.subLabel === 'string' ? item.subLabel : typeof item.group_name === 'string' ? item.group_name : '')
-          : ''
-      ).toLowerCase();
-      return labelText.includes(term) || sub.includes(term);
+      return matchesTerm(safeSearchTerm);
     });
   }, [options, showAllOptionsOnFocus, safeSearchTerm, readOnly, isOpen]);
 

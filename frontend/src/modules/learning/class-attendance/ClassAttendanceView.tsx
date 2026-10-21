@@ -5,6 +5,7 @@ import {
   PrintIcon,
   FullScreenIcon,
   MinimizeIcon,
+  CloudIcon,
 } from '@/components/ui/Icons';
 import PageHeader from '@/components/ui/PageHeader';
 import { PageContainer } from '@/components/layout';
@@ -12,6 +13,12 @@ import { ClassSelect, GroupSelect, TeacherSelect, DateRangePicker } from '@/comp
 import ActionMenu from '@/components/ui/ActionMenu';
 import AttendanceTable, { TakeAttendanceButton, AttendanceDateStepper } from '@/components/common/AttendanceTable';
 import { getMonthlyAttendanceMatrix, bulkMarkStudentAttendance } from '@/api/attendance';
+import {
+  attendanceRepository,
+  enqueueMutation,
+  getOutboxPendingCount,
+  processUniversalOutbox,
+} from '@/offline';
 import { fetchWithAuth } from '@/utils/authService';
 import { useToast } from '@/context/ToastContext';
 import { useTenant } from '@/context/TenantContext';
@@ -132,6 +139,31 @@ export default function ClassAttendanceView({
   const [isLoading, setIsLoading] = useState(true);
   const [metadataLoaded, setMetadataLoaded] = useState(false);
 
+  // Universal Outbox Pending Sync State
+  const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
+
+  const refreshPendingOutbox = useCallback(() => {
+    getOutboxPendingCount(activeTenantId).then(setPendingSyncCount).catch(() => {});
+  }, [activeTenantId]);
+
+  useEffect(() => {
+    refreshPendingOutbox();
+    const handleSyncChange = () => refreshPendingOutbox();
+    window.addEventListener('spr_outbox_mutation_enqueued', handleSyncChange);
+    window.addEventListener('spr_outbox_mutation_synced', handleSyncChange);
+    window.addEventListener('spr_universal_sync_completed', handleSyncChange);
+    return () => {
+      window.removeEventListener('spr_outbox_mutation_enqueued', handleSyncChange);
+      window.removeEventListener('spr_outbox_mutation_synced', handleSyncChange);
+      window.removeEventListener('spr_universal_sync_completed', handleSyncChange);
+    };
+  }, [refreshPendingOutbox]);
+
+  // Unique Matrix Cache Key for active tenant and filter scope
+  const matrixCacheKey = useMemo(() => {
+    return `matrix_${activeTenantId || 'default'}_${selectedClassId}_${selectedGroupId}_${selectedTeacherId}_${selectedYear}_${selectedMonth}_${startDate}_${endDate}`;
+  }, [activeTenantId, selectedClassId, selectedGroupId, selectedTeacherId, selectedYear, selectedMonth, startDate, endDate]);
+
   // Persist filters to localStorage (throttled)
   useEffect(() => {
     attendanceFilters.saveMonthlyFilters(activeTenantId, {
@@ -195,18 +227,27 @@ export default function ClassAttendanceView({
     fetchAllMetadata();
 
     const handleTenantChanged = () => {
+      setMatrixData(null);
       fetchAllMetadata();
     };
+    const handleOfflinePurged = () => {
+      setMatrixData(null);
+      setPendingSyncCount(0);
+    };
     window.addEventListener('spr_tenant_changed', handleTenantChanged);
+    window.addEventListener('spr_offline_purged', handleOfflinePurged);
 
     return () => {
       isMounted = false;
       window.removeEventListener('spr_tenant_changed', handleTenantChanged);
+      window.removeEventListener('spr_offline_purged', handleOfflinePurged);
     };
   }, [activeTenantId]);
 
-  // 2. Fetch Monthly / Range Attendance Matrix with request cancellation ref
+  // 2. Fetch Monthly / Range Attendance Matrix with request cancellation ref & 0ms IndexedDB Read
   const activeRequestIdRef = useRef(0);
+  const matrixDataRef = useRef<any>(null);
+  matrixDataRef.current = matrixData;
 
   const loadMatrix = useCallback(async () => {
     if (!metadataLoaded && !propClassId) {
@@ -214,7 +255,21 @@ export default function ClassAttendanceView({
     }
 
     const requestId = ++activeRequestIdRef.current;
-    setIsLoading(true);
+
+    // 1. Instant 0ms Read from Central IndexedDB Cache if no data currently loaded
+    if (!matrixDataRef.current) {
+      try {
+        const cached = await attendanceRepository.get(matrixCacheKey);
+        if (cached && requestId === activeRequestIdRef.current) {
+          setMatrixData(cached);
+          setIsLoading(false);
+        } else if (!cached && requestId === activeRequestIdRef.current) {
+          setIsLoading(true);
+        }
+      } catch (e) {
+        console.warn('[ClassAttendanceView] Cache read error:', e);
+      }
+    }
 
     try {
       const trackedCategories = periodCategoriesStore.getAttendanceTrackedCategoryCodes(activeTenantId);
@@ -237,11 +292,31 @@ export default function ClassAttendanceView({
       const res = await getMonthlyAttendanceMatrix(params);
       if (requestId === activeRequestIdRef.current) {
         setMatrixData(res);
+        setIsLoading(false);
+        // Persist fresh server payload into IndexedDB cache for future 0ms instant loading
+        attendanceRepository.saveOptimistic(
+          { id: matrixCacheKey, ...res },
+          'UPDATE',
+          '',
+          { skipOutbox: true }
+        ).catch(() => {});
       }
     } catch (err) {
       if (requestId === activeRequestIdRef.current) {
-        console.error('Error loading attendance matrix:', err);
-        showToast('Failed to load class attendance matrix', 'error');
+        // Fallback to cached copy if available, without spamming toasts in a loop
+        if (!matrixDataRef.current) {
+          try {
+            const cached = await attendanceRepository.get(matrixCacheKey);
+            if (cached && requestId === activeRequestIdRef.current) {
+              setMatrixData(cached);
+            } else {
+              console.error('Error loading attendance matrix:', err);
+              showToast('Failed to load class attendance matrix', 'error');
+            }
+          } catch {
+            showToast('Failed to load class attendance matrix', 'error');
+          }
+        }
       }
     } finally {
       if (requestId === activeRequestIdRef.current) {
@@ -259,6 +334,7 @@ export default function ClassAttendanceView({
     endDate,
     propClassId,
     activeTenantId,
+    matrixCacheKey,
     showToast,
   ]);
 
@@ -295,7 +371,7 @@ export default function ClassAttendanceView({
 
     const nextStatus = cycleStatusWithinAllowed(currentStatus, timingPolicy);
 
-    // Optimistic UI Update
+    // 1. Optimistic UI Update in Memory & Central IndexedDB
     setMatrixData((prev: any) => {
       if (!prev || !prev.students_matrix) return prev;
       const updatedRows = prev.students_matrix.map((row: any) => {
@@ -311,26 +387,63 @@ export default function ClassAttendanceView({
         }
         return row;
       });
-      return { ...prev, students_matrix: updatedRows };
+      const nextMatrix = { ...prev, students_matrix: updatedRows };
+      if (matrixCacheKey) {
+        attendanceRepository.saveOptimistic(
+          { id: matrixCacheKey, ...nextMatrix },
+          'UPDATE',
+          '',
+          { skipOutbox: true }
+        ).catch(() => {});
+      }
+      return nextMatrix;
     });
 
+    const payload = {
+      date,
+      records: [{ student_id: studentId, status: nextStatus }],
+    };
+
+    // 3. Attempt direct cloud dispatch if online, or enqueue to Universal Outbox
     try {
-      await bulkMarkStudentAttendance({
-        date,
-        records: [{ student_id: studentId, status: nextStatus }],
+      if (navigator.onLine) {
+        await bulkMarkStudentAttendance(payload);
+      } else {
+        throw new Error('Offline');
+      }
+    } catch (err: any) {
+      // If offline or network dropped: Enqueue mutation into Universal Outbox with UUID idempotency key
+      await enqueueMutation({
+        module: 'attendance',
+        action: 'CREATE',
+        endpoint: '/api/v1/attendance/students/bulk-mark/',
+        payload,
+        metadata: { studentId, date, status: nextStatus },
       });
-    } catch (err) {
-      console.error('Failed to mark student attendance:', err);
-      showToast('Failed to save attendance change', 'error');
-      loadMatrix();
+      showToast('Attendance recorded offline. Will sync automatically when connected.', 'info');
+      refreshPendingOutbox();
     }
-  }, [isEditing, enrichedDaysHeader, timingPolicy, showToast, loadMatrix]);
+  }, [isEditing, enrichedDaysHeader, timingPolicy, matrixCacheKey, refreshPendingOutbox, showToast]);
 
   const handleToggleFullscreen = useCallback(() => {
     setIsFullscreen((prev: boolean) => !prev);
   }, [setIsFullscreen]);
 
   const actionMenuActions = useMemo(() => [
+    ...(pendingSyncCount > 0
+      ? [
+          {
+            label: `Sync Pending (${pendingSyncCount})`,
+            icon: CloudIcon,
+            onClick: async () => {
+              showToast('Syncing offline attendance records...', 'info');
+              await processUniversalOutbox({ force: true });
+              refreshPendingOutbox();
+              loadMatrix();
+            },
+          },
+        ]
+      : []),
     {
       label: isFullscreen ? 'Exit Full Screen' : 'Full Screen',
       icon: isFullscreen ? MinimizeIcon : FullScreenIcon,
@@ -346,7 +459,7 @@ export default function ClassAttendanceView({
       icon: RefreshIcon,
       onClick: loadMatrix,
     },
-  ], [isFullscreen, handleToggleFullscreen, loadMatrix]);
+  ], [isFullscreen, pendingSyncCount, handleToggleFullscreen, loadMatrix, refreshPendingOutbox, showToast]);
 
   const toggleEditing = useCallback(() => {
     setIsEditing((prev) => !prev);
@@ -366,6 +479,22 @@ export default function ClassAttendanceView({
           icon={MatrixIcon}
         >
           <div className="flex items-center gap-2">
+            {pendingSyncCount > 0 && (
+              <button
+                type="button"
+                onClick={async () => {
+                  showToast('Syncing offline attendance records...', 'info');
+                  await processUniversalOutbox({ force: true });
+                  refreshPendingOutbox();
+                  loadMatrix();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg theme-bg-elevated border theme-border text-xs font-semibold theme-accent hover:opacity-80 transition cursor-pointer"
+                title="Offline changes pending sync"
+              >
+                <CloudIcon className="w-3.5 h-3.5" />
+                <span>Sync to DB ({pendingSyncCount})</span>
+              </button>
+            )}
             <TakeAttendanceButton
               title="Take / Edit Attendance"
               isEditing={isEditing}

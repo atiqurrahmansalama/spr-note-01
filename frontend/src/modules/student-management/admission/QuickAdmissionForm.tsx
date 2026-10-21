@@ -11,7 +11,7 @@ import { useAcademicData } from "../../../hooks/useAcademicData";
 import {
   doesStudentMatchDepartment,
   doesStudentMatchClass,
-} from "../../learning/utils/dailyClassroomUtils";
+} from "../../learning/daily-classroom/utils/dailyClassroomUtils";
 import { fetchWithAuth } from "../../../utils/authService";
 import { useToast } from "../../../context/ToastContext";
 import { students as studentStore } from "../../../utils/localStore";

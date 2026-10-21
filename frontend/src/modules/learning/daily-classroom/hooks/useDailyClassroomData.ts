@@ -36,7 +36,7 @@ export default function useDailyClassroomData(
     if (!enabled) return;
 
     try {
-      // 1. Synchronous render from local store
+      // 1. Synchronous render from local store + IndexedDB fallback
       const localLessons = learningStore.getDailyLessons(tenantId) || [];
       const localEvals = learningStore.getEvaluations(tenantId) || [];
       const localBooks = curriculumStore.getItems(tenantId) || [];
@@ -44,6 +44,17 @@ export default function useDailyClassroomData(
       setLessons(localLessons);
       setEvaluations(localEvals);
       setCurriculumBooks(localBooks);
+
+      // IndexedDB fallback if local storage had no records
+      if (localLessons.length === 0) {
+        import('@/offline').then(({ lessonsRepository }) => {
+          lessonsRepository.list().then((idbLessons) => {
+            if (idbLessons.length > 0) {
+              setLessons((prev) => (prev.length === 0 ? idbLessons : prev));
+            }
+          }).catch(() => {});
+        }).catch(() => {});
+      }
 
       // 2. Async fetch from backend and merge (live sync)
       try {
@@ -59,9 +70,14 @@ export default function useDailyClassroomData(
             if (!map.has(String(l.id))) map.set(String(l.id), l);
           });
           setLessons(Array.from(map.values()));
+
+          // Persist fresh server records into IndexedDB cache for offline access
+          import('@/offline').then(({ lessonsRepository }) => {
+            lessonsRepository.bulkHydrate(liveLessons).catch(() => {});
+          }).catch(() => {});
         }
       } catch {
-        // Backend offline — local store already populated above
+        // Backend offline — local store / IndexedDB already populated above
       }
 
       try {
@@ -77,6 +93,11 @@ export default function useDailyClassroomData(
             if (!map.has(String(e.id))) map.set(String(e.id), e);
           });
           setEvaluations(Array.from(map.values()));
+
+          // Persist evaluations to IndexedDB
+          import('@/offline').then(({ evaluationsRepository }) => {
+            evaluationsRepository.bulkHydrate(liveEvals).catch(() => {});
+          }).catch(() => {});
         }
       } catch {
         // Backend offline — local store already populated above
@@ -93,11 +114,21 @@ export default function useDailyClassroomData(
     loadData();
 
     const handleUpdate = () => loadData();
+    const handlePurged = () => {
+      setLessons([]);
+      setEvaluations([]);
+      setCurriculumBooks([]);
+    };
+
     window.addEventListener('spr_learning_updated', handleUpdate);
     window.addEventListener('spr_curriculum_updated', handleUpdate);
+    window.addEventListener('spr_tenant_changed', handleUpdate);
+    window.addEventListener('spr_offline_purged', handlePurged);
     return () => {
       window.removeEventListener('spr_learning_updated', handleUpdate);
       window.removeEventListener('spr_curriculum_updated', handleUpdate);
+      window.removeEventListener('spr_tenant_changed', handleUpdate);
+      window.removeEventListener('spr_offline_purged', handlePurged);
     };
   }, [loadData, enabled]);
 

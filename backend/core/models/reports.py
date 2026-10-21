@@ -60,11 +60,13 @@ class StudentDailyReport(models.Model):
     def save(self, *args, **kwargs):
         if not self.report_unique_id:
             self.report_unique_id = f"REP-{uuid.uuid4().hex[:8].upper()}"
-        if getattr(self, 'student_id', None) and not self.student_name:
-            try:
-                self.student_name = self.student.name_en or getattr(self.student, 'name', '') or 'Student'
-            except Exception:
-                pass
+        if getattr(self, 'student_id', None):
+            raw_name = str(self.student_name or "").strip()
+            if not raw_name or raw_name.isdigit() or raw_name == str(self.student_id):
+                try:
+                    self.student_name = self.student.name_en or getattr(self.student, 'name', '') or 'Student'
+                except Exception:
+                    pass
         super().save(*args, **kwargs)
 
     @property

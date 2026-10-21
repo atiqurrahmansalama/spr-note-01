@@ -1,6 +1,6 @@
 import { fetchWithAuth } from "./authService";
 import { auth as authStore, students as studentStore, sessions as sessionStore, savedComments as commentStore } from "./localStore";
-import { createReport } from "../api/reports";
+import { createReport, updateReport } from "../api/reports";
 
 /**
  * Hybrid Sync Engine (LocalStorage <-> Django PostgreSQL)
@@ -96,6 +96,11 @@ export const saveReportLocally = (reportData, options = {}) => {
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reports));
   localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(pendingQueue));
 
+  // Mirror into Central Offline IndexedDB entities for high-capacity local persistence
+  import("../offline").then(({ dailyProgressRepository }) => {
+    dailyProgressRepository.bulkHydrate([updatedReport]).catch(() => {});
+  }).catch(() => {});
+
   return existingIndex > -1 ? reports[existingIndex] : updatedReport;
 };
 
@@ -110,10 +115,68 @@ export const getLocalReports = () => {
   }
 };
 
+/**
+ * Authoritative check if a report has pending sync changes to the cloud database
+ */
+export const isReportUnsynced = (r) => {
+  if (!r) return false;
+  if (r.sync_status === "SYNCED") return false;
+
+  const hasNumericId =
+    (typeof r.id === "number" && !isNaN(r.id)) ||
+    (typeof r.id === "string" && /^\d+$/.test(r.id.trim()) && !r.id.includes("-"));
+  const hasNumericServerId =
+    (typeof r.server_id === "number" && !isNaN(r.server_id)) ||
+    (typeof r.server_id === "string" && /^\d+$/.test(r.server_id.trim()));
+
+  if (hasNumericServerId || (hasNumericId && r.sync_status !== "PENDING" && r.sync_status !== "GRACE_PERIOD")) {
+    return false;
+  }
+
+  return r.sync_status === "PENDING" || r.sync_status === "GRACE_PERIOD" || (!hasNumericId && !hasNumericServerId);
+};
+
+/**
+ * Human-readable parser for Django REST Framework error payloads
+ */
+export const parseErrorReason = (errorData) => {
+  if (!errorData) return "Unknown server error";
+  if (typeof errorData === "string") return errorData;
+
+  // Unwrap backend custom exception payloads (e.g. { error_type, details: { ... } })
+  const target = errorData.details || errorData.errors || errorData;
+
+  if (typeof target === "string") return target;
+  if (target.detail && typeof target.detail === "string") return target.detail;
+  if (target.message && typeof target.message === "string") return target.message;
+  if (target.error && typeof target.error === "string") return target.error;
+
+  if (typeof target === "object" && target !== null) {
+    const entries = Object.entries(target)
+      .filter(([key]) => !["success", "status_code", "error_type", "request_id", "timestamp"].includes(key))
+      .map(([key, val]) => {
+        let msg = "";
+        if (Array.isArray(val)) {
+          msg = val.map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v))).join(", ");
+        } else if (typeof val === "object" && val !== null) {
+          msg = JSON.stringify(val);
+        } else {
+          msg = String(val);
+        }
+        const formattedKey = key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, " ");
+        return `${formattedKey}: ${msg}`;
+      });
+
+    if (entries.length > 0) return entries.join(" • ");
+  }
+
+  return errorData.error_type || errorData.message || JSON.stringify(errorData);
+};
+
 // 3. Commit a Specific Report to Cloud Immediately
 export const commitReportToCloud = async (reportId) => {
   if (!navigator.onLine) {
-    return { success: false, isOffline: true };
+    return { success: false, isOffline: true, error: "Network offline" };
   }
   if (!authStore.getAccessToken() && !authStore.getRefreshToken()) {
     return { success: false, isOffline: false, error: "Unauthenticated" };
@@ -131,7 +194,14 @@ export const commitReportToCloud = async (reportId) => {
   }
 
   try {
-    const apiResult = await createReport(item);
+    const targetServerId = item.server_id || (typeof item.id === "number" ? item.id : null);
+    let apiResult;
+    if (targetServerId) {
+      apiResult = await updateReport(targetServerId, item);
+    } else {
+      apiResult = await createReport(item);
+    }
+
     if (apiResult.success && apiResult.data) {
       const serverReport = apiResult.data;
       reports[reportIndex] = {
@@ -152,87 +222,206 @@ export const commitReportToCloud = async (reportId) => {
       window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "database", data: serverReport } }));
       return { success: true, data: serverReport };
     }
-    return apiResult;
+
+    const reason = parseErrorReason(apiResult.errors || apiResult.error || apiResult.data);
+    reports[reportIndex] = {
+      ...reports[reportIndex],
+      sync_status: "FAILED",
+      sync_error: reason,
+      last_sync_error_at: Date.now(),
+    };
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reports));
+    return { success: false, status: apiResult.status, error: reason, errors: apiResult.errors };
   } catch (err) {
     console.warn("[SyncEngine] commitReportToCloud failed:", err);
+    if (reports[reportIndex]) {
+      reports[reportIndex] = {
+        ...reports[reportIndex],
+        sync_status: "FAILED",
+        sync_error: err.message,
+        last_sync_error_at: Date.now(),
+      };
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reports));
+    }
     return { success: false, error: err.message };
   }
 };
 
+let isSyncInProgress = false;
+
 // 4. Trigger Delta Cloud Sync with DRF Backend API
-export const triggerCloudSync = async () => {
-  if (!navigator.onLine) {
-    console.warn("[SyncEngine] Network offline. Sync postponed.");
-    return;
+export const triggerCloudSync = async (options = {}) => {
+  const force = Boolean(options?.force);
+
+  if (isSyncInProgress) {
+    console.log("[SyncEngine] Sync already in progress. Skipping redundant concurrent run.");
+    return { success: false, inProgress: true, errors: [] };
   }
-  if (!authStore.getAccessToken() && !authStore.getRefreshToken()) {
-    return;
-  }
+  isSyncInProgress = true;
 
-  const reports = getLocalReports();
-  const pendingIds = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || "[]");
-
-  if (pendingIds.length === 0) {
-    console.log("[SyncEngine] Local storage is in sync.");
-    return;
-  }
-
-  const pendingItems = reports.filter((r) => pendingIds.includes(r.id));
-  let updatedIds = [...pendingIds];
-
-  for (const item of pendingItems) {
-    // Grace Period check: if report is currently within its 10-minute buffer, postpone cloud sync
-    if (item.grace_expires_at && Date.now() < item.grace_expires_at) {
-      continue;
+  try {
+    if (!navigator.onLine) {
+      console.warn("[SyncEngine] Network offline. Sync postponed.");
+      return {
+        success: false,
+        isOffline: true,
+        errors: [{ id: "err-offline", student_name: "Network Connection", reason: "You are currently offline. Check your internet connection." }],
+      };
+    }
+    if (!authStore.getAccessToken() && !authStore.getRefreshToken()) {
+      return {
+        success: false,
+        isOffline: false,
+        errors: [{ id: "err-auth", student_name: "Authentication", reason: "Unauthenticated. Please log in again to sync records." }],
+      };
     }
 
-    // Safety check: skip completely blank or default empty reports (student is N/A/empty and no pages/errors)
-    const isBlank = (
-      (!item.student || item.student === "N/A") &&
-      (!item.student_name || item.student_name === "N/A") &&
-      (!item.juz_and_pages || item.juz_and_pages.length === 0) &&
-      (!item.portions || item.portions.length === 0) &&
-      (!item.mistakes || item.mistakes.length === 0) &&
-      (!item.stucks || item.stucks.length === 0)
-    );
+    const reports = getLocalReports();
+    let pendingIds = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || "[]");
 
-    if (isBlank) {
-      console.warn("[SyncEngine] Skipping blank pending report:", item.id);
-      updatedIds = updatedIds.filter((id) => id !== item.id);
-      continue;
-    }
-
-    try {
-      const apiResult = await createReport(item);
-
-      if (apiResult.success && apiResult.data) {
-        const serverReport = apiResult.data;
-        const itemIdx = reports.findIndex(
-          (r) => r.id === item.id || (item.report_unique_id && r.report_unique_id === item.report_unique_id)
-        );
-        if (itemIdx > -1) {
-          reports[itemIdx] = {
-            ...reports[itemIdx],
-            ...serverReport,
-            id: serverReport.id,
-            report_unique_id: serverReport.report_unique_id || reports[itemIdx].report_unique_id,
-            sync_status: "SYNCED",
-            grace_expires_at: null,
-          };
-        }
-        updatedIds = updatedIds.filter((id) => id !== item.id && id !== serverReport.id);
-      } else if (apiResult.status === 401 || apiResult.status === 403) {
-        console.warn("[SyncEngine] Authentication credentials invalid or expired. Aborting pending queue sync.");
-        break;
+    // Enterprise Resilience: Automatically detect and include any local reports that are unsynced
+    const unsyncedReports = reports.filter(isReportUnsynced);
+    unsyncedReports.forEach((r) => {
+      const rId = r.id || r.report_unique_id;
+      if (rId && !pendingIds.includes(rId)) {
+        pendingIds.push(rId);
       }
-    } catch (error) {
-      console.error("[SyncEngine] Failed to sync item:", item.id, error);
-    }
-  }
+    });
 
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reports));
-  localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(updatedIds));
-  window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "sync" } }));
+    // Filter out any IDs in pendingQueue that are already SYNCED in local storage
+    pendingIds = pendingIds.filter((pId) => {
+      const found = reports.find((r) => r.id === pId || r.report_unique_id === pId);
+      return !found || isReportUnsynced(found);
+    });
+
+    if (pendingIds.length === 0) {
+      console.log("[SyncEngine] Local storage is in sync.");
+      localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify([]));
+      return { success: true, syncedCount: 0, failedCount: 0, remainingCount: 0, errors: [] };
+    }
+
+    const pendingItems = reports.filter((r) => pendingIds.includes(r.id) || pendingIds.includes(r.report_unique_id));
+    let updatedIds = [...pendingIds];
+    let syncedCount = 0;
+    const syncErrors = [];
+
+    for (const item of pendingItems) {
+      // Unless forced (manual click on "Retry Sync" or "Sync to DB"), do NOT repeatedly retry items that already failed
+      if (!force && (item.sync_status === "FAILED" || item.sync_error)) {
+        continue;
+      }
+
+      // Grace Period check: unless forced, postpone cloud sync if within grace buffer
+      if (!force && item.grace_expires_at && Date.now() < item.grace_expires_at) {
+        continue;
+      }
+
+      // Safety check: skip and prune completely blank or default empty reports (student is N/A/empty and no pages/errors)
+      const isBlank = (
+        (!item.student || item.student === "N/A") &&
+        (!item.student_name || item.student_name === "N/A") &&
+        (!item.juz_and_pages || item.juz_and_pages.length === 0) &&
+        (!item.portions || item.portions.length === 0) &&
+        (!item.mistakes || item.mistakes.length === 0) &&
+        (!item.stucks || item.stucks.length === 0)
+      );
+
+      if (isBlank) {
+        console.warn("[SyncEngine] Skipping and pruning blank pending report:", item.id);
+        const pruneIdx = reports.findIndex((r) => r.id === item.id || r.report_unique_id === item.report_unique_id);
+        if (pruneIdx > -1) {
+          reports.splice(pruneIdx, 1);
+        }
+        updatedIds = updatedIds.filter((id) => id !== item.id && id !== item.report_unique_id);
+        continue;
+      }
+
+      try {
+        const targetServerId = item.server_id || (typeof item.id === "number" ? item.id : null);
+        let apiResult;
+        if (targetServerId) {
+          apiResult = await updateReport(targetServerId, item);
+        } else {
+          apiResult = await createReport(item);
+        }
+
+        if (apiResult.success && apiResult.data) {
+          const serverReport = apiResult.data;
+          const itemIdx = reports.findIndex(
+            (r) => r.id === item.id || (item.report_unique_id && r.report_unique_id === item.report_unique_id)
+          );
+          if (itemIdx > -1) {
+            reports[itemIdx] = {
+              ...reports[itemIdx],
+              ...serverReport,
+              id: serverReport.id,
+              server_id: serverReport.id,
+              report_unique_id: serverReport.report_unique_id || reports[itemIdx].report_unique_id,
+              sync_status: "SYNCED",
+              sync_error: null,
+              grace_expires_at: null,
+            };
+          }
+          updatedIds = updatedIds.filter((id) => id !== item.id && id !== item.report_unique_id && id !== serverReport.id);
+          syncedCount += 1;
+        } else {
+          const reason = parseErrorReason(apiResult.errors || apiResult.error || apiResult.data);
+          const itemIdx = reports.findIndex(
+            (r) => r.id === item.id || (item.report_unique_id && r.report_unique_id === item.report_unique_id)
+          );
+          if (itemIdx > -1) {
+            reports[itemIdx] = {
+              ...reports[itemIdx],
+              sync_status: "FAILED",
+              sync_error: reason,
+              last_sync_error_at: Date.now(),
+            };
+          }
+          syncErrors.push({
+            id: item.id || item.report_unique_id,
+            report_unique_id: item.report_unique_id,
+            student_name: item.student_name || (item.student ? `Student #${item.student}` : "Unknown Student"),
+            status: apiResult.status || 400,
+            reason,
+          });
+
+          if (apiResult.status === 401 || apiResult.status === 403) {
+            console.warn("[SyncEngine] Authentication credentials invalid or expired. Aborting pending queue sync.");
+            break;
+          }
+        }
+      } catch (error) {
+        console.error("[SyncEngine] Failed to sync item:", item.id, error);
+        syncErrors.push({
+          id: item.id || item.report_unique_id,
+          report_unique_id: item.report_unique_id,
+          student_name: item.student_name || (item.student ? `Student #${item.student}` : "Unknown Student"),
+          reason: error.message || "Network error",
+        });
+      }
+    }
+
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reports));
+    localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(updatedIds));
+    if (syncedCount > 0) {
+      window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "sync", count: syncedCount } }));
+    }
+
+    // Trigger Central Universal Outbox sync across all modules simultaneously
+    import("../offline").then(({ processUniversalOutbox }) => {
+      processUniversalOutbox({ force }).catch(() => {});
+    }).catch(() => {});
+
+    return {
+      success: syncErrors.length === 0,
+      syncedCount,
+      failedCount: syncErrors.length,
+      remainingCount: updatedIds.length,
+      errors: syncErrors,
+    };
+  } finally {
+    isSyncInProgress = false;
+  }
 };
 
 // 5. Periodic check for grace period expiry and background sync
@@ -243,7 +432,16 @@ export const checkGracePeriodReports = async () => {
   const now = Date.now();
 
   for (const rep of reports) {
-    if (rep.sync_status === "GRACE_PERIOD" && rep.grace_expires_at) {
+    if (rep.sync_status === "FAILED" || rep.sync_error) {
+      continue; // Do not repeatedly hit database if report has already encountered a validation/server error
+    }
+    if (rep.sync_status === "PENDING" && !rep.server_id) {
+      // Immediately attempt cloud commit for pending items
+      const res = await commitReportToCloud(rep.id);
+      if (res && (res.status === 401 || res.status === 403)) {
+        break;
+      }
+    } else if (rep.sync_status === "GRACE_PERIOD" && rep.grace_expires_at) {
       if (now >= rep.grace_expires_at) {
         const res = await commitReportToCloud(rep.id);
         if (res && (res.status === 401 || res.status === 403)) {

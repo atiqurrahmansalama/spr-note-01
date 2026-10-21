@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpenIcon } from '../../components/ui/Icons';
+import { BookOpenIcon } from '@/components/ui/Icons';
 
 export default function StudentDiaryFeedCard({ date, lessons = [], evaluations = [] }) {
   const displayDate = date || new Date().toISOString().split('T')[0];

@@ -139,6 +139,14 @@ export const logoutUser = async () => {
     // fallback
   }
   authStore.clear();
+
+  // Complete Offline Security Purge
+  try {
+    const { purgeAllUserData } = await import('../offline');
+    await purgeAllUserData();
+  } catch (err) {
+    console.warn('[authService] Offline purge warning:', err);
+  }
 };
 
 // Token Refresh Helper
@@ -165,6 +173,7 @@ export const refreshToken = async () => {
     } else {
       // Clear invalid session on any rejection (400, 401, 403, 500) to break infinite retry loops
       authStore.clear();
+      import('../offline').then(({ purgeAllUserData }) => purgeAllUserData()).catch(() => {});
       window.dispatchEvent(new CustomEvent("spr_auth_updated"));
     }
   } catch (err) {

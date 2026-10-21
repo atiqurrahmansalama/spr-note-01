@@ -1,0 +1,1405 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useToast } from "@/context/ToastContext";
+import {
+  auth as authStore,
+  students as studentStore,
+  sessions as sessionStore,
+  savedComments as commentStore,
+  isOnline,
+  mergeStudents,
+  mergeSessions,
+  mergeComments,
+  draftReport,
+  saveStatusStore,
+} from "@/utils/localStore";
+import {
+  saveReportLocally,
+  syncSessionsAndComments,
+  scheduleGracePeriodSync,
+  clearGracePeriodTimer,
+  commitReportToCloud,
+} from "@/utils/syncEngine";
+import { dailyProgressRepository } from "@/offline";
+import { updateReport } from "@/api/reports";
+import { fetchWithAuth } from "@/utils/authService";
+import { recordStudentUsage } from "@/utils/studentUsageTracker";
+import { getClassroomTodayDate } from "@/constants/calendarConstants";
+import { useAcademicData } from "@/hooks/useAcademicData";
+import {
+  doesStudentMatchDepartment,
+  doesStudentMatchClass,
+  doesStudentMatchSection,
+} from "@/modules/learning/daily-classroom/utils/dailyClassroomUtils";
+import type { JuzRowData, DetailRowData, DailyProgressDraft } from "../types";
+
+export interface AcademicValidationContext {
+  departmentId?: string | number | null;
+  classId?: string | number | null;
+  sectionId?: string | number | null;
+  allStudents?: any[];
+  departments?: any[];
+  classes?: any[];
+  sections?: any[];
+}
+
+export function useReportForm() {
+  const { showToast } = useToast();
+  const academicData = (useAcademicData() as any) || {};
+  const {
+    departments: defaultDepartments = [],
+    classes: defaultClasses = [],
+    sections: defaultSections = [],
+    students: defaultAcademicStudents = [],
+  } = academicData;
+
+  const [selectedDate, setSelectedDate] = useState<string>(() => getClassroomTodayDate());
+  const [studentName, setStudentName] = useState<string>("");
+  const [selectedStudentId, setSelectedStudentId] = useState<string | number | null>(null);
+  const [groupName, setGroupName] = useState<string>("");
+  const [selectedSession, setSelectedSession] = useState<string>("");
+  const [progressMode, setProgressModeState] = useState<"QURAN" | "BOOK">(() => {
+    try {
+      return (localStorage.getItem("spr_daily_progress_mode") as "QURAN" | "BOOK") || "QURAN";
+    } catch {
+      return "QURAN";
+    }
+  });
+
+  const setProgressMode = useCallback((mode: "QURAN" | "BOOK") => {
+    setProgressModeState(mode);
+    try {
+      localStorage.setItem("spr_daily_progress_mode", mode);
+      window.dispatchEvent(new CustomEvent("spr_daily_progress_mode_change", { detail: mode }));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const handleSync = (e: any) => {
+      if (e?.detail && (e.detail === "QURAN" || e.detail === "BOOK")) {
+        setProgressModeState(e.detail);
+      }
+    };
+    window.addEventListener("spr_daily_progress_mode_change", handleSync);
+    return () => window.removeEventListener("spr_daily_progress_mode_change", handleSync);
+  }, []);
+
+  const [bookTitle, setBookTitle] = useState<string>("");
+  const [lessonTitle, setLessonTitle] = useState<string>("");
+
+  const [juzPageData, setJuzPageData] = useState<JuzRowData[]>([
+    {
+      id: crypto.randomUUID(),
+      juz: "",
+      ranges: [{ id: crypto.randomUUID(), start: "", end: "" }],
+    },
+  ]);
+
+  const [mistakeData, setMistakeData] = useState<DetailRowData[]>([
+    { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] },
+  ]);
+
+  const [stuckData, setStuckData] = useState<DetailRowData[]>([
+    { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] },
+  ]);
+
+  // Book Progress States (General Book / Kitab / Subject)
+  const [bookPageData, setBookPageData] = useState<JuzRowData[]>([
+    {
+      id: crypto.randomUUID(),
+      juz: "",
+      ranges: [{ id: crypto.randomUUID(), start: "", end: "" }],
+    },
+  ]);
+
+  const [bookMistakeData, setBookMistakeData] = useState<DetailRowData[]>([
+    { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] },
+  ]);
+
+  const [bookStuckData, setBookStuckData] = useState<DetailRowData[]>([
+    { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] },
+  ]);
+
+  const [comment, setComment] = useState<string>("");
+  const [savedComments, setSavedComments] = useState<string[]>(() => commentStore.getAll());
+
+  const [studentDatabase, setStudentDatabase] = useState<any[]>(() => {
+    try {
+      const fromStore = studentStore.getAll() || [];
+      if (fromStore.length > 0) return fromStore;
+      const tenantId = localStorage.getItem("spr_active_tenant_id") || "default";
+      const fromCache = JSON.parse(localStorage.getItem(`spr_students_cache_${tenantId}`) || "[]");
+      if (Array.isArray(fromCache) && fromCache.length > 0) {
+        return fromCache.map((s: any) => ({
+          ...(typeof s === "object" ? s : {}),
+          id: typeof s === "object" ? s.id : null,
+          label: typeof s === "object" ? (s.name_en || s.name || s.student_name || s.label || String(s)) : String(s),
+          sub: s?.section_name || s?.student_section_name || s?.sub || s?.group_name || "",
+          section_name: s?.section_name || s?.student_section_name || s?.sub || "",
+          student_section: s?.student_section || s?.section_id || s?.section,
+          student_class: s?.student_class || s?.class_id,
+        }));
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+  const [sessionList, setSessionList] = useState<any[]>(() => {
+    try {
+      return sessionStore.getAll() || [];
+    } catch {
+      return [];
+    }
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editingReport, setEditingReport] = useState<any | null>(null);
+
+  const historyStackRef = useRef<string[]>([]);
+  const redoStackRef = useRef<string[]>([]);
+  const isRestoringRef = useRef(false);
+  const [canUndoDraft, setCanUndoDraft] = useState(false);
+  const [canRedoDraft, setCanRedoDraft] = useState(false);
+
+  const captureSnapshot = useCallback(() => {
+    return JSON.stringify({
+      studentName,
+      selectedStudentId,
+      groupName,
+      selectedSession,
+      progressMode,
+      bookTitle,
+      lessonTitle,
+      selectedDate,
+      juzPageData,
+      mistakeData,
+      stuckData,
+      bookPageData,
+      bookMistakeData,
+      bookStuckData,
+      comment,
+      savedReportId: editingReport?.id,
+      savedReportKey: editingReport?.report_unique_id,
+      serverId: editingReport?.server_id,
+      isGracePeriod: editingReport?.isGracePeriod,
+    });
+  }, [
+    studentName,
+    selectedStudentId,
+    groupName,
+    selectedSession,
+    progressMode,
+    bookTitle,
+    lessonTitle,
+    selectedDate,
+    juzPageData,
+    mistakeData,
+    stuckData,
+    bookPageData,
+    bookMistakeData,
+    bookStuckData,
+    comment,
+    editingReport,
+  ]);
+
+  useEffect(() => {
+    if (isRestoringRef.current) {
+      isRestoringRef.current = false;
+      return;
+    }
+    const snap = captureSnapshot();
+    const stack = historyStackRef.current;
+    if (stack.length === 0 || stack[stack.length - 1] !== snap) {
+      stack.push(snap);
+      if (stack.length > 35) stack.shift();
+      redoStackRef.current = [];
+      setCanUndoDraft(stack.length > 1);
+      setCanRedoDraft(false);
+    }
+  }, [captureSnapshot]);
+
+  const handleUndo = useCallback(() => {
+    const stack = historyStackRef.current;
+    if (stack.length <= 1) {
+      showToast("Nothing to undo", "info");
+      return;
+    }
+    const currentSnap = stack.pop();
+    if (currentSnap) redoStackRef.current.push(currentSnap);
+    setCanUndoDraft(stack.length > 1);
+    setCanRedoDraft(redoStackRef.current.length > 0);
+
+    const prevSnapStr = stack[stack.length - 1];
+    if (prevSnapStr) {
+      try {
+        const data = JSON.parse(prevSnapStr);
+        isRestoringRef.current = true;
+        setStudentName(data.studentName || "");
+        setSelectedStudentId(data.selectedStudentId || null);
+        setGroupName(data.groupName || "");
+        setSelectedSession(data.selectedSession || "");
+        if (data.progressMode) {
+          setProgressMode(data.progressMode);
+        }
+        setBookTitle(data.bookTitle || "");
+        setLessonTitle(data.lessonTitle || "");
+        if (data.selectedDate) setSelectedDate(data.selectedDate);
+
+        // Restore Quran page & mistake/stuck data
+        if (Array.isArray(data.juzPageData) && data.juzPageData.length > 0) {
+          setJuzPageData(data.juzPageData);
+        } else {
+          setJuzPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
+        }
+        if (Array.isArray(data.mistakeData) && data.mistakeData.length > 0) {
+          setMistakeData(data.mistakeData);
+        } else {
+          setMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+        }
+        if (Array.isArray(data.stuckData) && data.stuckData.length > 0) {
+          setStuckData(data.stuckData);
+        } else {
+          setStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+        }
+
+        // Restore Book page & mistake/stuck data (with fallback to generic arrays if book arrays were omitted)
+        const resolvedBookPages = (Array.isArray(data.bookPageData) && data.bookPageData.length > 0)
+          ? data.bookPageData
+          : (data.progressMode === "BOOK" && Array.isArray(data.juzPageData) && data.juzPageData.length > 0 ? data.juzPageData : []);
+        if (resolvedBookPages.length > 0) {
+          setBookPageData(resolvedBookPages);
+        } else {
+          setBookPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
+        }
+
+        const resolvedBookMistakes = (Array.isArray(data.bookMistakeData) && data.bookMistakeData.length > 0)
+          ? data.bookMistakeData
+          : (data.progressMode === "BOOK" && Array.isArray(data.mistakeData) && data.mistakeData.length > 0 ? data.mistakeData : []);
+        if (resolvedBookMistakes.length > 0) {
+          setBookMistakeData(resolvedBookMistakes);
+        } else {
+          setBookMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+        }
+
+        const resolvedBookStucks = (Array.isArray(data.bookStuckData) && data.bookStuckData.length > 0)
+          ? data.bookStuckData
+          : (data.progressMode === "BOOK" && Array.isArray(data.stuckData) && data.stuckData.length > 0 ? data.stuckData : []);
+        if (resolvedBookStucks.length > 0) {
+          setBookStuckData(resolvedBookStucks);
+        } else {
+          setBookStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+        }
+
+        setComment(data.comment || "");
+
+        if (data.savedReportId || data.savedReportKey || data.serverId) {
+          if (data.savedReportId) clearGracePeriodTimer(data.savedReportId);
+          setEditingReport({
+            id: data.savedReportId,
+            server_id: data.serverId,
+            report_unique_id: data.savedReportKey,
+            student_name: data.studentName,
+            isGracePeriod: data.isGracePeriod ?? true,
+          });
+          showToast(`Restored report #${data.savedReportKey || ""}. You can edit and confirm changes.`, "info");
+        } else {
+          setEditingReport(null);
+          showToast("Undo: Restored previous draft state", "info");
+        }
+      } catch (err) {
+        console.error("Undo restore failed", err);
+      }
+    }
+  }, [showToast]);
+
+  const handleRedo = useCallback(() => {
+    const rStack = redoStackRef.current;
+    if (rStack.length === 0) {
+      showToast("Nothing to redo", "info");
+      return;
+    }
+    const nextSnapStr = rStack.pop();
+    if (!nextSnapStr) return;
+    historyStackRef.current.push(nextSnapStr);
+    setCanUndoDraft(historyStackRef.current.length > 1);
+    setCanRedoDraft(rStack.length > 0);
+
+    try {
+      const data = JSON.parse(nextSnapStr);
+      isRestoringRef.current = true;
+      setStudentName(data.studentName || "");
+      setSelectedStudentId(data.selectedStudentId || null);
+      setGroupName(data.groupName || "");
+      setSelectedSession(data.selectedSession || "");
+      if (data.progressMode) {
+        setProgressMode(data.progressMode);
+      }
+      setBookTitle(data.bookTitle || "");
+      setLessonTitle(data.lessonTitle || "");
+      if (data.selectedDate) setSelectedDate(data.selectedDate);
+
+      // Restore Quran page & mistake/stuck data
+      if (Array.isArray(data.juzPageData) && data.juzPageData.length > 0) {
+        setJuzPageData(data.juzPageData);
+      } else {
+        setJuzPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
+      }
+      if (Array.isArray(data.mistakeData) && data.mistakeData.length > 0) {
+        setMistakeData(data.mistakeData);
+      } else {
+        setMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+      }
+      if (Array.isArray(data.stuckData) && data.stuckData.length > 0) {
+        setStuckData(data.stuckData);
+      } else {
+        setStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+      }
+
+      // Restore Book page & mistake/stuck data
+      const resolvedBookPages = (Array.isArray(data.bookPageData) && data.bookPageData.length > 0)
+        ? data.bookPageData
+        : (data.progressMode === "BOOK" && Array.isArray(data.juzPageData) && data.juzPageData.length > 0 ? data.juzPageData : []);
+      if (resolvedBookPages.length > 0) {
+        setBookPageData(resolvedBookPages);
+      } else {
+        setBookPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
+      }
+
+      const resolvedBookMistakes = (Array.isArray(data.bookMistakeData) && data.bookMistakeData.length > 0)
+        ? data.bookMistakeData
+        : (data.progressMode === "BOOK" && Array.isArray(data.mistakeData) && data.mistakeData.length > 0 ? data.mistakeData : []);
+      if (resolvedBookMistakes.length > 0) {
+        setBookMistakeData(resolvedBookMistakes);
+      } else {
+        setBookMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+      }
+
+      const resolvedBookStucks = (Array.isArray(data.bookStuckData) && data.bookStuckData.length > 0)
+        ? data.bookStuckData
+        : (data.progressMode === "BOOK" && Array.isArray(data.stuckData) && data.stuckData.length > 0 ? data.stuckData : []);
+      if (resolvedBookStucks.length > 0) {
+        setBookStuckData(resolvedBookStucks);
+      } else {
+        setBookStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+      }
+
+      setComment(data.comment || "");
+
+      if (data.savedReportId || data.savedReportKey || data.serverId) {
+        if (data.savedReportId) clearGracePeriodTimer(data.savedReportId);
+        setEditingReport({
+          id: data.savedReportId,
+          server_id: data.serverId,
+          report_unique_id: data.savedReportKey,
+          student_name: data.studentName,
+          isGracePeriod: data.isGracePeriod ?? true,
+        });
+      } else {
+        setEditingReport(null);
+      }
+      showToast("Redo: Restored next draft state", "info");
+    } catch (err) {
+      console.error("Redo restore failed", err);
+    }
+  }, [showToast]);
+  const [draftInfo, setDraftInfo] = useState<DailyProgressDraft[] | null>(null);
+
+  const [currentDraftId] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("recover_draft_id") || "active_report_draft";
+  });
+
+  const applyReportToForm = useCallback((rep: any) => {
+    if (!rep) return;
+
+    let sName = rep.student_name || rep.studentName || (typeof rep.student === "object" ? rep.student?.name || rep.student?.name_en : null) || (typeof rep.student === "string" && isNaN(Number(rep.student)) ? rep.student : "") || "";
+    const gName = rep.student_group || rep.subject_course || "";
+    const sSession = rep.session_name || rep.session || "";
+    const sId =
+      rep.student_id ||
+      rep.studentId ||
+      (typeof rep.student === "object" ? rep.student?.id : null) ||
+      (typeof rep.student === "number" || (typeof rep.student === "string" && !isNaN(Number(rep.student)))
+        ? rep.student
+        : null);
+
+    const isNumericName = Boolean(sName && /^\d+$/.test(String(sName).trim()));
+    if (isNumericName) {
+      const realCandidate =
+        rep.student_details?.name_en ||
+        rep.student_details?.name ||
+        rep.student_details?.label ||
+        (sId ? defaultAcademicStudents.find((s: any) => String(s.id) === String(sId))?.name_en : null) ||
+        (sId ? defaultAcademicStudents.find((s: any) => String(s.id) === String(sId))?.name : null);
+      if (realCandidate) {
+        sName = realCandidate;
+      }
+    }
+
+    let rawDate = rep.report_date || rep.record_date || rep.date || rep.isoDateOnly || rep.date_time || rep.created_at;
+    let rDate = "";
+    if (rawDate) {
+      if (typeof rawDate === "string") {
+        rDate = rawDate.split("T")[0].split(" ")[0];
+      } else {
+        try {
+          rDate = new Date(rawDate).toISOString().split("T")[0];
+        } catch {
+          rDate = "";
+        }
+      }
+    }
+
+    setStudentName(sName);
+    setSelectedStudentId(sId != null ? String(sId) : null);
+    setGroupName(gName);
+    setSelectedSession(sSession);
+    if (rDate) setSelectedDate(rDate);
+
+    if (Array.isArray(rep.juz_and_pages) && rep.juz_and_pages.length > 0) {
+      setJuzPageData(
+        rep.juz_and_pages.map((jp: any) => ({
+          id: crypto.randomUUID(),
+          juz: String(jp.juz || ""),
+          ranges: Array.isArray(jp.ranges)
+            ? jp.ranges.map((r: any) => ({
+                id: crypto.randomUUID(),
+                start: String(r.start || r.page_start || ""),
+                end: String(r.end || r.page_end || ""),
+              }))
+            : [{ id: crypto.randomUUID(), start: "", end: "" }],
+        }))
+      );
+    } else {
+      setJuzPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
+    }
+
+    const mistakesList = rep.mistake_details || rep.mistakes || [];
+    if (Array.isArray(mistakesList) && mistakesList.length > 0) {
+      setMistakeData(
+        mistakesList.map((m: any) => ({
+          id: crypto.randomUUID(),
+          juz: String(m.juz || ""),
+          page: String(m.page || ""),
+          ayahs: Array.isArray(m.ayahs)
+            ? m.ayahs.map((a: any) => ({ id: crypto.randomUUID(), value: String(a.value || a || "") }))
+            : m.ayah
+            ? [{ id: crypto.randomUUID(), value: String(m.ayah) }]
+            : [{ id: crypto.randomUUID(), value: "" }],
+        }))
+      );
+    } else {
+      setMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+    }
+
+    const stucksList = rep.stuck_details || rep.stucks || [];
+    if (Array.isArray(stucksList) && stucksList.length > 0) {
+      setStuckData(
+        stucksList.map((s: any) => ({
+          id: crypto.randomUUID(),
+          juz: String(s.juz || ""),
+          page: String(s.page || ""),
+          ayahs: Array.isArray(s.ayahs)
+            ? s.ayahs.map((a: any) => ({ id: crypto.randomUUID(), value: String(a.value || a || "") }))
+            : s.ayah
+            ? [{ id: crypto.randomUUID(), value: String(s.ayah) }]
+            : [{ id: crypto.randomUUID(), value: "" }],
+        }))
+      );
+    } else {
+      setStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+    }
+
+    const isBookMode = Boolean(
+      rep.mode === "BOOK" ||
+      rep.progress_mode === "BOOK" ||
+      rep.book_title ||
+      rep.curriculum_book_name ||
+      rep.lesson_title ||
+      rep.lesson_covered ||
+      (Array.isArray(rep.bookPageData) && rep.bookPageData.length > 0)
+    );
+    if (isBookMode) {
+      setProgressMode("BOOK");
+      const bookPagesSource = rep.bookPageData || rep.juz_and_pages || rep.portions || [];
+      if (Array.isArray(bookPagesSource) && bookPagesSource.length > 0) {
+        setBookPageData(
+          bookPagesSource.map((jp: any) => ({
+            id: crypto.randomUUID(),
+            juz: "",
+            ranges: Array.isArray(jp.ranges)
+              ? jp.ranges.map((r: any) => ({
+                  id: crypto.randomUUID(),
+                  start: String(r.start || r.page_start || ""),
+                  end: String(r.end || r.page_end || ""),
+                }))
+              : [{ id: crypto.randomUUID(), start: "", end: "" }],
+          }))
+        );
+      }
+      const bookMistakesSource = rep.bookMistakeData || rep.mistakes || (Array.isArray(rep.error_details) ? rep.error_details.filter((e: any) => e.type === "Mistake") : []);
+      if (Array.isArray(bookMistakesSource) && bookMistakesSource.length > 0) {
+        setBookMistakeData(
+          bookMistakesSource.map((m: any) => ({
+            id: crypto.randomUUID(),
+            juz: "",
+            page: String(m.page || ""),
+            ayahs: Array.isArray(m.ayahs)
+              ? m.ayahs.map((a: any) => ({ id: crypto.randomUUID(), value: String(a.value || a || "") }))
+              : [{ id: crypto.randomUUID(), value: String(m.ayah || "") }],
+          }))
+        );
+      }
+      const bookStucksSource = rep.bookStuckData || rep.stucks || (Array.isArray(rep.error_details) ? rep.error_details.filter((e: any) => e.type === "Stuck") : []);
+      if (Array.isArray(bookStucksSource) && bookStucksSource.length > 0) {
+        setBookStuckData(
+          bookStucksSource.map((s: any) => ({
+            id: crypto.randomUUID(),
+            juz: "",
+            page: String(s.page || ""),
+            ayahs: Array.isArray(s.ayahs)
+              ? s.ayahs.map((a: any) => ({ id: crypto.randomUUID(), value: String(a.value || a || "") }))
+              : [{ id: crypto.randomUUID(), value: String(s.ayah || "") }],
+          }))
+        );
+      }
+    } else {
+      setProgressMode("QURAN");
+    }
+
+    setComment(rep.comment || "");
+    setBookTitle(rep.curriculum_book_name || rep.book_name || rep.bookName || rep.bookTitle || rep.book || "");
+    setLessonTitle(rep.lesson_title || rep.lesson_covered || rep.lessonTitle || rep.lesson || "");
+    setDraftInfo(null);
+    draftReport.remove(currentDraftId);
+    setEditingReport(rep);
+  }, [currentDraftId]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const recoverId = params.get("recover_draft_id");
+    if (recoverId) {
+      const recovered = draftReport.getById(recoverId);
+      if (recovered) {
+        if (recovered.studentName !== undefined) setStudentName(recovered.studentName);
+        if (recovered.selectedStudentId !== undefined) setSelectedStudentId(recovered.selectedStudentId);
+        if (recovered.groupName !== undefined) setGroupName(recovered.groupName);
+        if (recovered.selectedSession !== undefined) setSelectedSession(recovered.selectedSession);
+        if (recovered.selectedDate !== undefined) setSelectedDate(recovered.selectedDate);
+        if (recovered.juzPageData?.length) setJuzPageData(recovered.juzPageData);
+        if (recovered.mistakeData?.length) setMistakeData(recovered.mistakeData);
+        if (recovered.stuckData?.length) setStuckData(recovered.stuckData);
+        if (recovered.comment !== undefined) setComment(recovered.comment);
+
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+        showToast("Report draft recovered successfully!", "success");
+      }
+    } else {
+      const recovered = draftReport.getById("active_report_draft");
+      if (recovered) {
+        if (recovered.studentName !== undefined) setStudentName(recovered.studentName);
+        if (recovered.selectedStudentId !== undefined) setSelectedStudentId(recovered.selectedStudentId);
+        if (recovered.groupName !== undefined) setGroupName(recovered.groupName);
+        if (recovered.selectedSession !== undefined) setSelectedSession(recovered.selectedSession);
+        if (recovered.selectedDate !== undefined) setSelectedDate(recovered.selectedDate);
+        if (recovered.juzPageData?.length) setJuzPageData(recovered.juzPageData);
+        if (recovered.mistakeData?.length) setMistakeData(recovered.mistakeData);
+        if (recovered.stuckData?.length) setStuckData(recovered.stuckData);
+        if (recovered.comment !== undefined) setComment(recovered.comment);
+      } else {
+        // Asynchronously check Central IndexedDB drafts
+        dailyProgressRepository.getDraft(currentDraftId).then((idbDraft) => {
+          if (idbDraft && typeof idbDraft === "object") {
+            if (idbDraft.studentName !== undefined) setStudentName(idbDraft.studentName);
+            if (idbDraft.selectedStudentId !== undefined) setSelectedStudentId(idbDraft.selectedStudentId);
+            if (idbDraft.groupName !== undefined) setGroupName(idbDraft.groupName);
+            if (idbDraft.selectedSession !== undefined) setSelectedSession(idbDraft.selectedSession);
+            if (idbDraft.selectedDate !== undefined) setSelectedDate(idbDraft.selectedDate);
+            if (idbDraft.juzPageData?.length) setJuzPageData(idbDraft.juzPageData);
+            if (idbDraft.mistakeData?.length) setMistakeData(idbDraft.mistakeData);
+            if (idbDraft.stuckData?.length) setStuckData(idbDraft.stuckData);
+            if (idbDraft.comment !== undefined) setComment(idbDraft.comment);
+          }
+        }).catch(() => {});
+      }
+    }
+
+    const allDrafts = draftReport.getAll();
+    const unsavedDrafts = allDrafts.filter((d: any) => {
+      const hasContent = d.studentName || d.comment || d.selectedSession || d.hasData;
+      return hasContent && d.id !== currentDraftId && d.id !== "active_report_draft";
+    });
+
+    if (unsavedDrafts.length > 0) {
+      setDraftInfo(unsavedDrafts);
+    }
+
+    const pendingEditRaw = localStorage.getItem("spr_editing_report");
+    if (pendingEditRaw) {
+      try {
+        const pendingEdit = JSON.parse(pendingEditRaw);
+        if (pendingEdit && typeof pendingEdit === "object") {
+          localStorage.removeItem("spr_editing_report");
+          applyReportToForm(pendingEdit);
+        }
+      } catch (err) {
+        console.error("Failed to parse pending edit report:", err);
+      }
+    }
+  }, [currentDraftId, applyReportToForm, showToast]);
+
+  useEffect(() => {
+    const handleEditEvent = (e: any) => {
+      const rep = e?.detail;
+      if (rep && typeof rep === "object") {
+        applyReportToForm(rep);
+      }
+    };
+    window.addEventListener("spr_edit_report", handleEditEvent);
+    return () => window.removeEventListener("spr_edit_report", handleEditEvent);
+  }, [applyReportToForm]);
+
+  useEffect(() => {
+    commentStore.saveAll(savedComments);
+  }, [savedComments]);
+
+  useEffect(() => {
+    const hasAnyContent = Boolean(
+      studentName.trim() ||
+      groupName.trim() ||
+      selectedSession ||
+      bookTitle.trim() ||
+      lessonTitle.trim() ||
+      comment.trim() ||
+      juzPageData.some((d) => d.juz || (d.ranges || []).some((r) => r.start || r.end)) ||
+      mistakeData.some((m) => m.page || m.juz || (m.ayahs || []).some((a) => a.value)) ||
+      stuckData.some((s) => s.page || s.juz || (s.ayahs || []).some((a) => a.value)) ||
+      bookPageData.some((d) => (d.ranges || []).some((r) => r.start || r.end)) ||
+      bookMistakeData.some((m) => m.page || (m.ayahs || []).some((a) => a.value)) ||
+      bookStuckData.some((s) => s.page || (s.ayahs || []).some((a) => a.value))
+    );
+
+    const draftPayload = {
+      studentName,
+      selectedStudentId,
+      groupName,
+      selectedSession,
+      progressMode,
+      bookTitle,
+      lessonTitle,
+      selectedDate,
+      juzPageData,
+      mistakeData,
+      stuckData,
+      bookPageData,
+      bookMistakeData,
+      bookStuckData,
+      comment,
+      hasData: hasAnyContent,
+    };
+
+    if (hasAnyContent) {
+      draftReport.save(currentDraftId, draftPayload);
+      dailyProgressRepository.saveDraft(currentDraftId, draftPayload).catch(() => {});
+      saveStatusStore.set("local", "Saved");
+    } else {
+      draftReport.remove(currentDraftId);
+      dailyProgressRepository.clearDraft(currentDraftId).catch(() => {});
+    }
+  }, [
+    studentName,
+    selectedStudentId,
+    groupName,
+    selectedSession,
+    progressMode,
+    bookTitle,
+    lessonTitle,
+    selectedDate,
+    juzPageData,
+    mistakeData,
+    stuckData,
+    bookPageData,
+    bookMistakeData,
+    bookStuckData,
+    comment,
+    currentDraftId,
+  ]);
+
+  const recoverDraft = (draft: any) => {
+    if (!draft) return;
+    if (draft.studentName !== undefined) setStudentName(draft.studentName);
+    if (draft.selectedStudentId !== undefined) setSelectedStudentId(draft.selectedStudentId);
+    if (draft.groupName !== undefined) setGroupName(draft.groupName);
+    if (draft.selectedSession !== undefined) setSelectedSession(draft.selectedSession);
+    if (draft.progressMode !== undefined) setProgressMode(draft.progressMode);
+    if (draft.bookTitle !== undefined) setBookTitle(draft.bookTitle);
+    if (draft.lessonTitle !== undefined) setLessonTitle(draft.lessonTitle);
+    if (draft.selectedDate !== undefined) setSelectedDate(draft.selectedDate);
+    if (draft.juzPageData?.length) setJuzPageData(draft.juzPageData);
+    if (draft.mistakeData?.length) setMistakeData(draft.mistakeData);
+    if (draft.stuckData?.length) setStuckData(draft.stuckData);
+    if (draft.bookPageData?.length) setBookPageData(draft.bookPageData);
+    if (draft.bookMistakeData?.length) setBookMistakeData(draft.bookMistakeData);
+    if (draft.bookStuckData?.length) setBookStuckData(draft.bookStuckData);
+    if (draft.comment !== undefined) setComment(draft.comment);
+
+    setDraftInfo((prev) => (prev ? prev.filter((d) => d.id !== draft.id) : null));
+    draftReport.remove(draft.id);
+    showToast("Report draft recovered successfully!", "success");
+    saveStatusStore.set("local", "Saved (Local)");
+  };
+
+  const discardDraft = (draft: any) => {
+    if (!draft) return;
+    setDraftInfo((prev) => {
+      const updated = prev ? prev.filter((d) => d.id !== draft.id) : null;
+      return updated && updated.length > 0 ? updated : null;
+    });
+    draftReport.remove(draft.id);
+    showToast("Report draft discarded", "info");
+  };
+
+  const fetchData = async () => {
+    const cachedStudents = studentStore.getAll();
+    const cachedSessions = sessionStore.getAll();
+
+    if (cachedStudents.length > 0) setStudentDatabase(cachedStudents);
+    if (cachedSessions.length > 0) setSessionList(cachedSessions);
+    if (cachedStudents.length > 0 || cachedSessions.length > 0) setIsLoading(false);
+    if (!isOnline()) return;
+
+    // Run sync in the background without blocking UI initialization
+    syncSessionsAndComments().catch((err) => {
+      console.warn("[useReportForm] Background sync error:", err);
+    });
+
+    try {
+      const [studentsSettled, sessionsSettled, messagesSettled] = await Promise.allSettled([
+        fetchWithAuth("/students/"),
+        fetchWithAuth("/sessions/"),
+        fetchWithAuth("/messages/?category=report_builder_comments"),
+      ]);
+
+      if (studentsSettled.status === "fulfilled" && studentsSettled.value.ok) {
+        const rawStudents = await studentsSettled.value.json();
+        const apiStudents = (Array.isArray(rawStudents) ? rawStudents : []).map((s: any) => ({
+          ...(typeof s === "object" ? s : {}),
+          id: typeof s === "object" ? s.id : null,
+          label: typeof s === "object" ? (s.name_en || s.name || s.student_name || s.label || String(s)) : String(s),
+          sub: s?.section_name || s?.student_section_name || s?.sub || s?.group_name || "",
+          section_name: s?.section_name || s?.student_section_name || s?.sub || "",
+          student_section: s?.student_section || s?.section_id || s?.section,
+          student_class: s?.student_class || s?.class_id,
+        }));
+        const merged = mergeStudents(apiStudents, studentStore.getAll());
+        setStudentDatabase(merged);
+      }
+
+      if (sessionsSettled.status === "fulfilled" && sessionsSettled.value.ok) {
+        const rawSessions = await sessionsSettled.value.json();
+        const apiSessions = (Array.isArray(rawSessions) ? rawSessions : []).map((s: any) => ({
+          id: typeof s === "object" ? (s.id || s.name) : String(s),
+          name: typeof s === "object" ? (s.name || s.session_name || s.label || String(s)) : String(s),
+        }));
+        const merged = mergeSessions(apiSessions, sessionStore.getAll());
+        setSessionList(merged);
+      }
+
+      if (messagesSettled.status === "fulfilled" && messagesSettled.value.ok) {
+        const rawMessages = await messagesSettled.value.json();
+        const apiComments = (Array.isArray(rawMessages) ? rawMessages : [])
+          .map((m: any) => (typeof m === "object" ? { id: m.id, text: m.text || m.comment || "" } : { text: String(m) }))
+          .filter((c: any) => Boolean(c.text && c.text.trim()));
+        const mergedComments = mergeComments(apiComments, commentStore.getAll());
+        setSavedComments(mergedComments);
+      }
+    } catch (error: any) {
+      console.warn("[useReportForm] API unreachable, using cached data:", error.message);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    async function initLoad() {
+      try {
+        await fetchData();
+      } catch (err) {
+        console.error("Init load error:", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    initLoad();
+
+    const handleTenantChanged = () => isMounted && fetchData();
+    const handleStudentsUpdated = () => {
+      if (isMounted) {
+        const cached = studentStore.getAll();
+        if (cached && cached.length > 0) setStudentDatabase(cached);
+      }
+    };
+
+    window.addEventListener("spr_tenant_changed", handleTenantChanged);
+    window.addEventListener("spr_students_updated", handleStudentsUpdated);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("spr_tenant_changed", handleTenantChanged);
+      window.removeEventListener("spr_students_updated", handleStudentsUpdated);
+    };
+  }, []);
+
+  const resolveStudentFromInputs = (context?: AcademicValidationContext) => {
+    const currentDepts = context?.departments || defaultDepartments;
+    const currentClasses = context?.classes || defaultClasses;
+    const currentSections = context?.sections || defaultSections;
+
+    const allCandidates: any[] = [
+      ...(context?.allStudents || []),
+      ...(defaultAcademicStudents || []),
+      ...(studentDatabase || []),
+      ...(studentStore.getAll() || []),
+    ];
+
+    const query = (studentName || "").trim().toLowerCase();
+    const idQuery = selectedStudentId != null ? String(selectedStudentId).trim() : "";
+
+    let matched: any = null;
+
+    if (idQuery) {
+      matched = allCandidates.find(
+        (s: any) => String(s.id) === idQuery || (s.uniq_id && String(s.uniq_id) === idQuery)
+      );
+    }
+
+    if (!matched && query) {
+      matched = allCandidates.find(
+        (s: any) =>
+          String(s.id) === query ||
+          (s.uniq_id && String(s.uniq_id).toLowerCase() === query) ||
+          (s.student_id_card_number && String(s.student_id_card_number).toLowerCase() === query)
+      );
+    }
+
+    if (!matched && query) {
+      const nameMatches = allCandidates.filter(
+        (s: any) =>
+          (s.name_en || s.name || s.label || s.bangla_name || "").trim().toLowerCase() === query
+      );
+      if (nameMatches.length === 1) {
+        matched = nameMatches[0];
+      } else if (nameMatches.length > 1) {
+        const activeSec = context?.sectionId;
+        const activeCls = context?.classId;
+        const activeDept = context?.departmentId;
+        matched =
+          (activeSec && nameMatches.find((s: any) => doesStudentMatchSection(s, activeSec, currentSections))) ||
+          (activeCls && nameMatches.find((s: any) => doesStudentMatchClass(s, activeCls, currentClasses))) ||
+          (activeDept && nameMatches.find((s: any) => doesStudentMatchDepartment(s, activeDept, currentDepts, currentClasses))) ||
+          nameMatches[0];
+      }
+    }
+
+    if (!matched && query && /^\d+$/.test(query)) {
+      const rollMatches = allCandidates.filter(
+        (s: any) => String(s.roll_number ?? s.roll ?? "").trim() === query
+      );
+      if (rollMatches.length === 1) {
+        matched = rollMatches[0];
+      } else if (rollMatches.length > 1) {
+        const activeSec = context?.sectionId;
+        const activeCls = context?.classId;
+        matched =
+          (activeSec && rollMatches.find((s: any) => doesStudentMatchSection(s, activeSec, currentSections))) ||
+          (activeCls && rollMatches.find((s: any) => doesStudentMatchClass(s, activeCls, currentClasses))) ||
+          rollMatches[0];
+      }
+    }
+
+    return matched;
+  };
+
+  const validateReportForm = (context?: AcademicValidationContext) => {
+    if (!studentName.trim()) {
+      showToast("Please specify a student name first", "warning");
+      return false;
+    }
+
+    const currentDepts = context?.departments || defaultDepartments;
+    const currentClasses = context?.classes || defaultClasses;
+    const currentSections = context?.sections || defaultSections;
+
+    const matchedStudent = resolveStudentFromInputs(context);
+
+    // Strict Check 1: Student Existence in Admissions DB
+    if (!matchedStudent) {
+      showToast("No student found with this name in the selected Dept · Class · Sec.", "error");
+      return false;
+    }
+
+    // Strict Check 2: Academic Hierarchy Matching
+    const activeDeptId = context?.departmentId && String(context.departmentId) !== "ALL" ? String(context.departmentId) : null;
+    const activeClassId = context?.classId && String(context.classId) !== "ALL" ? String(context.classId) : null;
+    const activeSecId = context?.sectionId && String(context.sectionId) !== "ALL" ? String(context.sectionId) : null;
+
+    if (activeDeptId && !doesStudentMatchDepartment(matchedStudent, activeDeptId, currentDepts, currentClasses)) {
+      showToast("No student found with this name in the selected Dept · Class · Sec.", "error");
+      return false;
+    }
+
+    if (activeClassId && !doesStudentMatchClass(matchedStudent, activeClassId, currentClasses)) {
+      showToast("No student found with this name in the selected Dept · Class · Sec.", "error");
+      return false;
+    }
+
+    if (activeSecId && !doesStudentMatchSection(matchedStudent, activeSecId, currentSections)) {
+      showToast("No student found with this name in the selected Dept · Class · Sec.", "error");
+      return false;
+    }
+
+    if (!selectedSession.trim()) {
+      showToast("Please select a session first", "warning");
+      return false;
+    }
+
+    const hasProgressData = progressMode === "BOOK"
+      ? bookPageData.some((d) => (d.ranges || []).some((r) => r.start || r.end))
+      : juzPageData.some((d) => d.juz || (d.ranges || []).some((r) => r.start || r.end));
+
+    if (!hasProgressData) {
+      showToast(progressMode === "BOOK" ? "Please enter Page details first" : "Please enter Juz & Page information first", "warning");
+      return false;
+    }
+
+    return true;
+  };
+
+  const resetForm = () => {
+    localStorage.removeItem("spr_editing_report");
+    setStudentName("");
+    setSelectedStudentId(null);
+    setGroupName("");
+    setSelectedSession("");
+    setSelectedDate(getClassroomTodayDate());
+    setJuzPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
+    setMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+    setStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+    setBookPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
+    setBookMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+    setBookStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
+    setComment("");
+    setBookTitle("");
+    setLessonTitle("");
+    draftReport.remove(currentDraftId);
+    dailyProgressRepository.clearDraft(currentDraftId).catch(() => {});
+    setDraftInfo(null);
+    setEditingReport(null);
+  };
+
+  const cancelEditMode = () => {
+    if (editingReport?.id && editingReport.isGracePeriod) {
+      scheduleGracePeriodSync(editingReport.id, 10 * 60 * 1000);
+    }
+    resetForm();
+    showToast("Edit cancelled. Form cleared.", "info");
+  };
+
+  const handleSaveRecord = async (context?: AcademicValidationContext) => {
+    if (isSaving) return;
+    if (!validateReportForm(context)) return;
+    setIsSaving(true);
+
+    try {
+      const selectedStudent = resolveStudentFromInputs(context);
+      if (!selectedStudent) {
+        setIsSaving(false);
+        showToast("No student found with this name in the selected Dept · Class · Sec.", "error");
+        return;
+      }
+
+      const cleanMistakes = mistakeData.filter(
+        (m) => (m.page && String(m.page).trim()) || ((m.ayahs || []).some((a) => a.value && String(a.value).trim()))
+      );
+      const cleanStucks = stuckData.filter(
+        (s) => (s.page && String(s.page).trim()) || ((s.ayahs || []).some((a) => a.value && String(a.value).trim()))
+      );
+
+      const activePages = progressMode === "BOOK" ? bookPageData : juzPageData;
+      const activeRawMistakes = progressMode === "BOOK" ? bookMistakeData : mistakeData;
+      const activeRawStucks = progressMode === "BOOK" ? bookStuckData : stuckData;
+
+      const cleanActiveMistakes = activeRawMistakes.filter(
+        (m) => (m.page && String(m.page).trim()) || ((m.ayahs || []).some((a) => a.value && String(a.value).trim()))
+      );
+
+      const cleanActiveStucks = activeRawStucks.filter(
+        (s) => (s.page && String(s.page).trim()) || ((s.ayahs || []).some((a) => a.value && String(a.value).trim()))
+      );
+
+      const editedAt = new Date().toISOString();
+      const isEditing = Boolean(editingReport);
+
+      const realStudentName = (
+        selectedStudent.name_en ||
+        selectedStudent.name ||
+        selectedStudent.label ||
+        selectedStudent.bangla_name ||
+        studentName.trim()
+      );
+      const studentNumericId =
+        selectedStudent.id && !isNaN(Number(selectedStudent.id))
+          ? Number(selectedStudent.id)
+          : (selectedStudentId && !isNaN(Number(selectedStudentId)) ? Number(selectedStudentId) : null);
+      const studentRollNumber = selectedStudent.roll_number ?? selectedStudent.roll ?? "";
+      const studentUniqId = selectedStudent.uniq_id || selectedStudent.student_id_card_number || "";
+
+      // Ensure form state reflects authoritative student name
+      setStudentName(realStudentName);
+      if (studentNumericId) setSelectedStudentId(String(studentNumericId));
+
+      recordStudentUsage(selectedStudent);
+
+      const payload = {
+        student: studentNumericId || realStudentName,
+        student_name: realStudentName,
+        session: selectedSession.trim(),
+        session_name: selectedSession.trim(),
+        progress_mode: progressMode,
+        mode: progressMode,
+        book_title: progressMode === "BOOK" ? bookTitle.trim() : "",
+        curriculum_book_name: progressMode === "BOOK" ? bookTitle.trim() : "",
+        book_name: progressMode === "BOOK" ? bookTitle.trim() : "",
+        lesson_title: progressMode === "BOOK" ? lessonTitle.trim() : "",
+        lesson_covered: progressMode === "BOOK" ? lessonTitle.trim() : "",
+        report_date: selectedDate || getClassroomTodayDate(),
+        subject_course: progressMode === "BOOK" ? (bookTitle.trim() || "Book Progress") : (groupName || "General Group"),
+        juz_and_pages: activePages,
+        mistakes: cleanActiveMistakes,
+        stucks: cleanActiveStucks,
+        comment: comment,
+        overall_status: "Completed",
+        status: "Completed",
+        client_updated_at: editedAt,
+        ...(isEditing ? { edited_at: editedAt, is_edited: true } : {}),
+      };
+
+      if (isEditing) {
+        const repId = editingReport.id || editingReport.report_unique_id;
+        const repUniqueId = editingReport.report_unique_id || (typeof repId === "string" && repId.startsWith("REP-") ? repId : `REP-${String(repId).slice(0, 8)}`);
+
+        const allReports = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
+        const existingRepIndex = allReports.findIndex((r: any) => {
+          return (
+            (r.id && (String(r.id) === String(repId) || (editingReport.server_id && String(r.id) === String(editingReport.server_id)))) ||
+            (r.server_id && editingReport.server_id && String(r.server_id) === String(editingReport.server_id)) ||
+            (r.report_unique_id && (String(r.report_unique_id) === String(repUniqueId) || String(r.report_unique_id) === String(repId)))
+          );
+        });
+
+        const existingRep = existingRepIndex > -1 ? allReports[existingRepIndex] : null;
+        const resolvedServerId =
+          editingReport.server_id ||
+          existingRep?.server_id ||
+          (!isNaN(Number(editingReport.id)) && !String(editingReport.id).includes("-") ? Number(editingReport.id) : null) ||
+          (existingRep && !isNaN(Number(existingRep.id)) && !String(existingRep.id).includes("-") ? Number(existingRep.id) : null);
+
+        const updatedRecord = {
+          ...(existingRep || {}),
+          ...payload,
+          id: existingRep?.id || editingReport.id || crypto.randomUUID(),
+          server_id: resolvedServerId || undefined,
+          report_unique_id: existingRep?.report_unique_id || repUniqueId,
+          client_updated_at: editedAt,
+          student: studentNumericId || realStudentName,
+          studentId: studentNumericId,
+          studentName: realStudentName,
+          student_name: realStudentName,
+          student_details: selectedStudent || existingRep?.student_details || undefined,
+          rollNumber: studentRollNumber || existingRep?.rollNumber,
+          roll_number: studentRollNumber || existingRep?.roll_number,
+          uniqId: studentUniqId || existingRep?.uniqId,
+          uniq_id: studentUniqId || existingRep?.uniq_id,
+          className: selectedStudent?.student_class_name || selectedStudent?.class_name || existingRep?.className,
+          student_class_name: selectedStudent?.student_class_name || selectedStudent?.class_name || existingRep?.student_class_name,
+          sectionName: selectedStudent?.student_section_name || selectedStudent?.section_name || existingRep?.sectionName,
+          student_section_name: selectedStudent?.student_section_name || selectedStudent?.section_name || existingRep?.student_section_name,
+          departmentCode: selectedStudent?.department_code || selectedStudent?.dept_code || existingRep?.departmentCode,
+          groupName: groupName || "General Group",
+          progress_mode: progressMode,
+          mode: progressMode,
+          book_title: progressMode === "BOOK" ? bookTitle.trim() : "",
+          curriculum_book_name: progressMode === "BOOK" ? bookTitle.trim() : "",
+          book_name: progressMode === "BOOK" ? bookTitle.trim() : "",
+          lesson_title: progressMode === "BOOK" ? lessonTitle.trim() : "",
+          lesson_covered: progressMode === "BOOK" ? lessonTitle.trim() : "",
+          subject_course: progressMode === "BOOK" ? (bookTitle.trim() || "Book Progress") : (groupName || "General Group"),
+          selectedSession: selectedSession.trim(),
+          session_name: selectedSession.trim(),
+          selectedDate,
+          juz_and_pages: activePages,
+          mistakes: cleanActiveMistakes,
+          stucks: cleanActiveStucks,
+          juzPageData: progressMode === "BOOK" ? activePages : juzPageData,
+          bookPageData: progressMode === "BOOK" ? bookPageData : [],
+          mistakeData: progressMode === "BOOK" ? cleanActiveMistakes : cleanMistakes,
+          bookMistakeData: progressMode === "BOOK" ? cleanActiveMistakes : [],
+          stuckData: progressMode === "BOOK" ? cleanActiveStucks : cleanStucks,
+          bookStuckData: progressMode === "BOOK" ? cleanActiveStucks : [],
+        };
+
+        if (isOnline() && (authStore.getAccessToken() || authStore.getRefreshToken())) {
+          if (resolvedServerId) {
+            try {
+              const apiResult = await updateReport(resolvedServerId, payload);
+              if (apiResult.success && apiResult.data) {
+                const resData = apiResult.data;
+                saveReportLocally({ ...updatedRecord, ...resData, server_id: resolvedServerId, sync_status: "SYNCED" }, { skipGrace: true, syncStatus: "SYNCED" });
+                showToast(`Report #${repUniqueId} for "${realStudentName}" updated in Database!`, "success");
+                saveStatusStore.set("database", "Database Synced");
+                window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "database", data: resData } }));
+              } else {
+                saveReportLocally(updatedRecord, { skipGrace: true, syncStatus: "PENDING" });
+                showToast(`Report updated locally. Will sync when possible.`, "info");
+                saveStatusStore.set("local", "Saved (Local)");
+                window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: updatedRecord } }));
+              }
+            } catch (error: any) {
+              saveReportLocally(updatedRecord, { skipGrace: true, syncStatus: "PENDING" });
+              showToast("Updated locally: " + error.message, "info");
+              saveStatusStore.set("local", "Saved (Local)");
+              window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: updatedRecord } }));
+            }
+          } else {
+            // Local report without database server_id yet: commit to database directly!
+            saveReportLocally(updatedRecord, { skipGrace: true, syncStatus: "PENDING" });
+            const syncResult = await commitReportToCloud(updatedRecord.id);
+            if (syncResult && syncResult.success) {
+              const finalId = syncResult.data?.report_unique_id || repUniqueId;
+              showToast(`Report #${finalId} for "${realStudentName}" saved to Database!`, "success");
+              saveStatusStore.set("database", "Database Synced");
+            } else {
+              showToast(`Report #${repUniqueId} for "${realStudentName}" updated locally!`, "info");
+              saveStatusStore.set("local", "Saved (Local)");
+            }
+            window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: updatedRecord } }));
+          }
+        } else {
+          saveReportLocally(updatedRecord, { skipGrace: true, syncStatus: "PENDING" });
+          showToast(`Report #${repUniqueId} for "${realStudentName}" updated locally!`, "success");
+          saveStatusStore.set("local", "Saved (Local)");
+          window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: updatedRecord } }));
+        }
+
+        const savedSnapshot = JSON.stringify({
+          studentName: realStudentName,
+          selectedStudentId: studentNumericId,
+          groupName: groupName || "General Group",
+          selectedSession: selectedSession.trim(),
+          progressMode,
+          bookTitle: bookTitle.trim(),
+          lessonTitle: lessonTitle.trim(),
+          selectedDate,
+          juzPageData,
+          mistakeData,
+          stuckData,
+          bookPageData,
+          bookMistakeData,
+          bookStuckData,
+          comment,
+          savedReportId: updatedRecord.id,
+          savedReportKey: repUniqueId,
+          serverId: resolvedServerId,
+          isGracePeriod: false,
+        });
+        if (historyStackRef.current.length > 0) {
+          historyStackRef.current[historyStackRef.current.length - 1] = savedSnapshot;
+        } else {
+          historyStackRef.current.push(savedSnapshot);
+        }
+      } else {
+        const localSavedReport = saveReportLocally({
+          ...payload,
+          student: studentNumericId || realStudentName,
+          studentId: studentNumericId,
+          studentName: realStudentName,
+          student_name: realStudentName,
+          student_details: selectedStudent || undefined,
+          rollNumber: studentRollNumber,
+          roll_number: studentRollNumber,
+          uniqId: studentUniqId,
+          uniq_id: studentUniqId,
+          className: selectedStudent?.student_class_name || selectedStudent?.class_name,
+          student_class_name: selectedStudent?.student_class_name || selectedStudent?.class_name,
+          sectionName: selectedStudent?.student_section_name || selectedStudent?.section_name,
+          student_section_name: selectedStudent?.student_section_name || selectedStudent?.section_name,
+          departmentCode: selectedStudent?.department_code || selectedStudent?.dept_code,
+          groupName: groupName || "General Group",
+          progress_mode: progressMode,
+          mode: progressMode,
+          book_title: progressMode === "BOOK" ? bookTitle.trim() : "",
+          curriculum_book_name: progressMode === "BOOK" ? bookTitle.trim() : "",
+          book_name: progressMode === "BOOK" ? bookTitle.trim() : "",
+          lesson_title: progressMode === "BOOK" ? lessonTitle.trim() : "",
+          lesson_covered: progressMode === "BOOK" ? lessonTitle.trim() : "",
+          subject_course: progressMode === "BOOK" ? (bookTitle.trim() || "Book Progress") : (groupName || "General Group"),
+          selectedSession: selectedSession.trim(),
+          session_name: selectedSession.trim(),
+          selectedDate,
+          juz_and_pages: activePages,
+          mistakes: cleanActiveMistakes,
+          stucks: cleanActiveStucks,
+          juzPageData: progressMode === "BOOK" ? activePages : juzPageData,
+          bookPageData: progressMode === "BOOK" ? bookPageData : [],
+          mistakeData: progressMode === "BOOK" ? cleanActiveMistakes : cleanMistakes,
+          bookMistakeData: progressMode === "BOOK" ? cleanActiveMistakes : [],
+          stuckData: progressMode === "BOOK" ? cleanActiveStucks : cleanStucks,
+          bookStuckData: progressMode === "BOOK" ? cleanActiveStucks : [],
+        }, { skipGrace: true, syncStatus: "PENDING" });
+
+        // Enterprise Direct Cloud Commit: when online and authenticated, commit immediately to PostgreSQL!
+        let authoritativeServerId: any = null;
+        if (isOnline() && (authStore.getAccessToken() || authStore.getRefreshToken())) {
+          saveStatusStore.set("saving", "Saving to Database...");
+          const syncResult = await commitReportToCloud(localSavedReport.id);
+          if (syncResult && syncResult.success) {
+            authoritativeServerId = syncResult.data?.id || localSavedReport.server_id;
+            const finalId = syncResult.data?.report_unique_id || localSavedReport.report_unique_id;
+            showToast(`Report #${finalId} for "${realStudentName}" saved to Database!`, "success");
+            saveStatusStore.set("database", "Database Synced");
+          } else {
+            showToast(`Report #${localSavedReport.report_unique_id} for "${realStudentName}" added (will auto-sync)!`, "info");
+            saveStatusStore.set("local", "Saved (Local)");
+          }
+        } else {
+          showToast(`Report #${localSavedReport.report_unique_id} for "${realStudentName}" added to record (Offline)!`, "success");
+          saveStatusStore.set("local", "Saved (Local)");
+        }
+        window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: localSavedReport } }));
+
+        const savedSnapshot = JSON.stringify({
+          studentName: realStudentName,
+          selectedStudentId: studentNumericId,
+          groupName: groupName || "General Group",
+          selectedSession: selectedSession.trim(),
+          progressMode,
+          bookTitle: bookTitle.trim(),
+          lessonTitle: lessonTitle.trim(),
+          selectedDate,
+          juzPageData,
+          mistakeData,
+          stuckData,
+          bookPageData,
+          bookMistakeData,
+          bookStuckData,
+          comment,
+          savedReportId: localSavedReport.id,
+          savedReportKey: localSavedReport.report_unique_id,
+          serverId: authoritativeServerId || localSavedReport.server_id,
+          isGracePeriod: false,
+        });
+        if (historyStackRef.current.length > 0) {
+          historyStackRef.current[historyStackRef.current.length - 1] = savedSnapshot;
+        } else {
+          historyStackRef.current.push(savedSnapshot);
+        }
+      }
+
+      resetForm();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleJuzPageRefresh = () => {
+    setJuzPageData([
+      {
+        id: crypto.randomUUID(),
+        juz: "",
+        juzInputId: `juz-input-${crypto.randomUUID()}`,
+        ranges: [{ id: crypto.randomUUID(), start: "", end: "" }],
+      },
+    ]);
+    showToast("Juz & Page section reset", "info");
+  };
+
+  const handleBookPageReset = () => {
+    setBookPageData([
+      {
+        id: crypto.randomUUID(),
+        juz: "",
+        ranges: [{ id: crypto.randomUUID(), start: "", end: "" }],
+      },
+    ]);
+    showToast("Page section reset", "info");
+  };
+
+  const handleBookMistakeReset = () => {
+    setBookMistakeData([
+      { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] },
+    ]);
+    showToast("Mistakes section reset", "info");
+  };
+
+  const handleBookStuckReset = () => {
+    setBookStuckData([
+      { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] },
+    ]);
+    showToast("Stuck section reset", "info");
+  };
+
+  return {
+    selectedDate,
+    setSelectedDate,
+    studentName,
+    setStudentName,
+    selectedStudentId,
+    setSelectedStudentId,
+    groupName,
+    setGroupName,
+    selectedSession,
+    setSelectedSession,
+    progressMode,
+    setProgressMode,
+    bookTitle,
+    setBookTitle,
+    lessonTitle,
+    setLessonTitle,
+    juzPageData,
+    setJuzPageData,
+    mistakeData,
+    setMistakeData,
+    stuckData,
+    setStuckData,
+    bookPageData,
+    setBookPageData,
+    bookMistakeData,
+    setBookMistakeData,
+    bookStuckData,
+    setBookStuckData,
+    comment,
+    setComment,
+    savedComments,
+    setSavedComments,
+    studentDatabase,
+    sessionList,
+    isLoading,
+    isSaving,
+    draftInfo,
+    recoverDraft,
+    discardDraft,
+    editingReport,
+    cancelEditMode,
+    handleSaveRecord,
+    validateReportForm,
+    resolveStudentFromInputs,
+    handleJuzPageRefresh,
+    handleBookPageReset,
+    handleBookMistakeReset,
+    handleBookStuckReset,
+    handleUndo,
+    handleRedo,
+    canUndoDraft,
+    canRedoDraft,
+  };
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import CustomSelect from '@/components/ui/CustomSelect';
 import ReusableCalendar from '@/components/common/ReusableCalendar';
 import ClassPeriodSwitcherBar from './ClassPeriodSwitcherBar';
@@ -43,6 +43,7 @@ export interface DailyClassroomFilterProps {
 
   onBatchHierarchyChange?: (params: { departmentId?: string; classId?: string; sectionId?: string }) => void;
   setAcademicFilters?: (params: { departmentId?: string; classId?: string; sectionId?: string }) => void;
+  maxColumns?: 1 | 2 | 3 | 4 | 5 | 6;
   [key: string]: any;
 }
 
@@ -52,6 +53,7 @@ export interface DailyClassroomFilterControlsProps {
   wrapGrid?: boolean;
   gridClassName?: string;
   className?: string;
+  maxColumns?: 1 | 2 | 3 | 4 | 5 | 6;
 
   // Date configuration
   showDate?: boolean;
@@ -110,6 +112,7 @@ export default function DailyClassroomFilterControls({
   wrapGrid = false,
   gridClassName = '',
   className = '',
+  maxColumns,
 
   // Custom extensions
   searchControl,
@@ -280,15 +283,26 @@ export default function DailyClassroomFilterControls({
   );
 
   const hasExtra = Boolean(searchControl || customDateComponent || extraFields);
-  const responsiveGridCols = hasExtra
-    ? 'grid-cols-1 @[540px]:grid-cols-2 @[820px]:grid-cols-3 @[1100px]:grid-cols-4 @[1350px]:grid-cols-5'
-    : `grid-cols-2 ${
-        hasDepartments && hasSectionsForClass
-          ? '@[800px]:grid-cols-4'
-          : hasDepartments || hasSectionsForClass
-          ? '@[720px]:grid-cols-3'
-          : '@[480px]:grid-cols-2'
-      }`;
+  const effectiveMaxColumns = maxColumns ?? filterProps?.maxColumns;
+
+  const responsiveGridCols = useMemo(() => {
+    if (effectiveMaxColumns === 1) return 'grid-cols-1';
+    if (effectiveMaxColumns === 2) return 'grid-cols-1 @[480px]:grid-cols-2';
+    if (effectiveMaxColumns === 3) return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 @[480px]:grid-cols-2 @[720px]:grid-cols-3';
+    if (effectiveMaxColumns === 4) return 'grid-cols-1 @[480px]:grid-cols-2 @[720px]:grid-cols-3 @[940px]:grid-cols-4';
+    if (effectiveMaxColumns === 5) return 'grid-cols-1 @[480px]:grid-cols-2 @[720px]:grid-cols-3 @[940px]:grid-cols-4 @[1080px]:grid-cols-5';
+    if (effectiveMaxColumns === 6) return 'grid-cols-1 @[480px]:grid-cols-2 @[720px]:grid-cols-3 @[940px]:grid-cols-4 @[1080px]:grid-cols-5 @[1280px]:grid-cols-6';
+
+    return hasExtra
+      ? 'grid-cols-1 @[480px]:grid-cols-2 @[720px]:grid-cols-3 @[940px]:grid-cols-4 @[1080px]:grid-cols-5 @[1280px]:grid-cols-6'
+      : `grid-cols-2 ${
+          hasDepartments && hasSectionsForClass
+            ? '@[800px]:grid-cols-4'
+            : hasDepartments || hasSectionsForClass
+            ? '@[720px]:grid-cols-3'
+            : '@[480px]:grid-cols-2'
+        }`;
+  }, [effectiveMaxColumns, hasExtra, hasDepartments, hasSectionsForClass]);
 
   // 1. If showCardWrapper is true, render inside standard enterprise toolbar/filter background box
   if (showCardWrapper) {

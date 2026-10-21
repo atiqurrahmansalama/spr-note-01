@@ -3,7 +3,7 @@ import {
   getClassroomTodayDate,
   getTodayInTimezone,
   getClassroomEffectiveTimezone,
-} from '../../../constants/calendarConstants';
+} from '@/constants/calendarConstants';
 
 export { getClassroomTodayDate, getTodayInTimezone, getClassroomEffectiveTimezone };
 

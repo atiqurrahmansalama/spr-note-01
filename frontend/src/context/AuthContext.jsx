@@ -361,6 +361,15 @@ export function AuthProvider({ children }) {
     try {
       localStorage.removeItem('active_tenant_id');
     } catch {}
+
+    // Complete Offline Security Purge
+    try {
+      const { purgeAllUserData } = await import('../offline');
+      await purgeAllUserData();
+    } catch (err) {
+      console.warn('[AuthContext] Security purge warning:', err);
+    }
+
     setAccessToken(null);
     setUser(null);
     // Signal FeatureControlContext to clear flags and re-evaluate as anonymous

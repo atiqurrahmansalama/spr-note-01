@@ -119,7 +119,7 @@ export interface DataTableProps<T = any> {
   selectedIds?: (string | number)[] | Set<string | number>;
   selectedRows?: Set<string | number>;
   onSelectRow?: ((itemId: any, item?: T, checked?: boolean) => void) | null;
-  onSelectAll?: ((allIds: any[], checked: boolean) => void) | null;
+  onSelectAll?: ((allIds: any[], checked: boolean, allItemsOrIds?: any) => void) | null;
   idField?: string;
   selectionHeaderClassName?: string;
   selectionCellClassName?: string;
@@ -153,6 +153,9 @@ export interface DataTableProps<T = any> {
   renderExpandedRow?: ((item: T, idx: number, toggleExpand: () => void, level?: number) => React.ReactNode) | null;
   renderExpandedCells?: ((item: T, idx: number, toggleExpand: () => void, level?: number) => React.ReactNode) | null;
   renderExpandedFooter?: ((item: T, idx: number, toggleExpand: () => void, level?: number) => React.ReactNode) | null;
+  expandedFooterColSpan?: number;
+  expandedFooterClassName?: string;
+  expandedFooterSpacerClassName?: string;
   expandedColumns?: ExpandedColumn<T>[];
   expandedDividerClassName?: string;
   expandedRowIds?: Set<string | number> | (string | number)[] | null;
@@ -339,6 +342,9 @@ function DataTable<T = any>({
   renderExpandedRow = null,
   renderExpandedCells = null,
   renderExpandedFooter = null,
+  expandedFooterColSpan = undefined,
+  expandedFooterClassName = '',
+  expandedFooterSpacerClassName = '',
   expandedColumns = undefined,
   expandedDividerClassName = '',
   expandedRowIds = null,
@@ -1000,11 +1006,17 @@ function DataTable<T = any>({
                     />
                   )}
                   <td
-                    colSpan={columns.length}
-                    className="pl-0 pr-4 sm:pr-6 pt-2 pb-3 border-b theme-border"
+                    colSpan={expandedFooterColSpan ?? columns.length}
+                    className={expandedFooterClassName || "pl-0 pr-4 sm:pr-6 pt-2 pb-3 border-b theme-border"}
                   >
                     {renderExpandedFooter(item, rowIdx, () => toggleExpand(rowKey), level)}
                   </td>
+                  {expandedFooterColSpan !== undefined && expandedFooterColSpan < columns.length && (
+                    <td
+                      colSpan={columns.length - expandedFooterColSpan}
+                      className={expandedFooterSpacerClassName || "!w-[70px] !min-w-[70px] !max-w-[70px] p-0 border-b theme-border pointer-events-none select-none"}
+                    />
+                  )}
                 </tr>
               </>
             )}

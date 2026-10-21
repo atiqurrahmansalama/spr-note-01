@@ -79,8 +79,32 @@ export function useFormAutoSave({
           setStatus('saved');
         }
       } else {
-        // If no draft exists, record initial state snapshot
-        lastSavedSnapshotRef.current = JSON.stringify(formData);
+        // If not in localStorage, asynchronously check Central IndexedDB drafts
+        if (autoRestore && typeof setFormData === 'function') {
+          import('../offline').then(({ offlineDB, getActiveTenantId }) => {
+            const tenantId = getActiveTenantId();
+            const idbKey = `${tenantId}__draft__${fullKey}`;
+            offlineDB.drafts.get(idbKey).then((idbItem) => {
+              if (idbItem?.draftData && typeof idbItem.draftData === 'object') {
+                setFormData((prev) => ({
+                  ...prev,
+                  ...idbItem.draftData,
+                }));
+                setHasRestoredDraft(true);
+                setStatus('saved');
+                lastSavedSnapshotRef.current = JSON.stringify(idbItem.draftData);
+              } else {
+                lastSavedSnapshotRef.current = JSON.stringify(formData);
+              }
+            }).catch(() => {
+              lastSavedSnapshotRef.current = JSON.stringify(formData);
+            });
+          }).catch(() => {
+            lastSavedSnapshotRef.current = JSON.stringify(formData);
+          });
+        } else {
+          lastSavedSnapshotRef.current = JSON.stringify(formData);
+        }
       }
     } catch (err) {
       console.warn('Form auto-save draft read error:', err);
@@ -126,6 +150,18 @@ export function useFormAutoSave({
               timestamp: now.getTime(),
             })
           );
+
+          // Asynchronously persist to Central IndexedDB drafts
+          import('../offline').then(({ offlineDB, getActiveTenantId }) => {
+            const tenantId = getActiveTenantId();
+            offlineDB.drafts.put({
+              id: `${tenantId}__draft__${fullKey}`,
+              tenantId,
+              module: 'forms',
+              draftData: dataToSave,
+              updatedAt: now.getTime(),
+            }).catch(() => {});
+          }).catch(() => {});
         }
 
         setLastSavedAt(timeStr);
@@ -188,6 +224,12 @@ export function useFormAutoSave({
       } catch (err) {
         console.warn('Clear draft error:', err);
       }
+
+      // Asynchronously clear from Central IndexedDB drafts
+      import('../offline').then(({ offlineDB, getActiveTenantId }) => {
+        const tenantId = getActiveTenantId();
+        offlineDB.drafts.delete(`${tenantId}__draft__${fullKey}`).catch(() => {});
+      }).catch(() => {});
     }
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);

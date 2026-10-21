@@ -43,14 +43,22 @@ export interface EmptyStateProps {
   iconVariant?: EmptyStateIconVariant;
   /** Sizing of the icon box */
   iconSize?: EmptyStateIconSize;
+  /** Additional custom class for icon container */
+  iconClassName?: string;
   /** Primary headline/title */
   title?: React.ReactNode;
+  /** Custom class for title */
+  titleClassName?: string;
   /** Explanatory description */
   description?: React.ReactNode;
+  /** Custom class for description */
+  descriptionClassName?: string;
   /** Primary action button configuration or custom React node */
   action?: EmptyStateAction | React.ReactNode;
   /** Optional secondary action button configuration or custom React node */
   secondaryAction?: EmptyStateAction | React.ReactNode;
+  /** Multiple action buttons configuration or custom React nodes (rendered in order) */
+  actions?: (EmptyStateAction | React.ReactNode)[];
   /** Visual container style variant */
   variant?: EmptyStateVariant;
   /** Sizing & density profile */
@@ -79,10 +87,14 @@ export function EmptyState({
   icon,
   iconVariant = 'default',
   iconSize,
+  iconClassName = '',
   title,
+  titleClassName = '',
   description,
+  descriptionClassName = '',
   action,
   secondaryAction,
+  actions,
   variant = 'dashed',
   size = 'md',
   badge,
@@ -105,7 +117,7 @@ export function EmptyState({
   // ── Container Style Variants ──
   const variantClasses: Record<EmptyStateVariant, string> = {
     dashed: 'border border-dashed theme-border rounded-xl theme-bg-sub/10',
-    card: 'border theme-border rounded-2xl theme-bg-surface shadow-2xs',
+    card: 'border theme-border rounded-2xl theme-bg-surface shadow-xs',
     sub: 'border theme-border rounded-xl theme-bg-sub/30',
     flat: 'theme-bg-sub/20 rounded-xl',
     minimal: 'bg-transparent',
@@ -203,6 +215,7 @@ export function EmptyState({
             flex items-center justify-center shrink-0 transition-transform duration-200
             ${currentIconSize.box}
             ${iconVariantClasses[iconVariant] || iconVariantClasses.default}
+            ${iconClassName}
           `}
         >
           {isValidElement(icon) ? (
@@ -217,12 +230,15 @@ export function EmptyState({
 
       {/* Text Hierarchy */}
       {(title || description) && (
-        <div className="space-y-0.5 max-w-sm px-2">
+        <div className="space-y-1 max-w-sm px-2">
           {title && (
             <div
               className={`
                 font-bold theme-text-primary tracking-tight
-                ${isCompact ? 'text-xs' : isLarge ? 'text-base sm:text-lg' : 'text-xs sm:text-sm'}
+                ${
+                  titleClassName ||
+                  (isCompact ? 'text-xs' : isLarge ? 'text-sm sm:text-base' : 'text-xs sm:text-sm')
+                }
               `}
             >
               {title}
@@ -232,7 +248,10 @@ export function EmptyState({
             <div
               className={`
                 theme-text-secondary leading-relaxed
-                ${isCompact ? 'text-[11px] max-w-xs' : 'text-xs max-w-sm'}
+                ${
+                  descriptionClassName ||
+                  (isCompact ? 'text-[11px] max-w-xs' : 'text-xs max-w-sm')
+                }
               `}
             >
               {description}
@@ -242,10 +261,20 @@ export function EmptyState({
       )}
 
       {/* Action Slots */}
-      {(action || secondaryAction) && (
+      {((actions && actions.length > 0) || action || secondaryAction) && (
         <div className="pt-1 flex items-center justify-center gap-2 flex-wrap">
-          {renderActionNode(action, false)}
-          {renderActionNode(secondaryAction, true)}
+          {actions && actions.length > 0
+            ? actions.map((act, idx) => (
+                <React.Fragment key={idx}>
+                  {renderActionNode(act, idx > 0)}
+                </React.Fragment>
+              ))
+            : (
+                <>
+                  {renderActionNode(action, false)}
+                  {renderActionNode(secondaryAction, true)}
+                </>
+              )}
         </div>
       )}
 

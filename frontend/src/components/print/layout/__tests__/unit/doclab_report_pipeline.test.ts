@@ -1,7 +1,7 @@
 import assert from 'assert';
 import { mergeTemplateWithData, sanitizeDocxPlaceholders } from '../../../docxTemplateEngine';
 import { convertDocumentToPlainText } from '../../../docLabTextConverter';
-import '@/modules/learning/progress-management/daily-progress/dailyProgressDocLabKeys';
+import '@/modules/learning/daily-classroom/progress-management/daily-progress/dailyProgressDocLabKeys';
 
 export async function runDocLabReportPipelineUnitTests(): Promise<{
   passed: number;

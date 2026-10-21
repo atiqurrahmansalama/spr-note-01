@@ -6,6 +6,7 @@ import { PageContainer } from '@/components/layout';
 import {
   BookOpenIcon,
   ChecklistIcon,
+  LayersIcon,
   PlusIcon,
   TrendingUpIcon,
 } from '@/components/ui/Icons';
@@ -210,6 +211,33 @@ export default function DailyClassroomHubView({
     }
   }, [activeTabs, activeTab]);
 
+  // ── Progress Mode State (Quran vs Book/Subject) ───────────────────────────
+  const [progressMode, setProgressMode] = useState<'QURAN' | 'BOOK'>(() => {
+    try {
+      return (localStorage.getItem('spr_daily_progress_mode') as 'QURAN' | 'BOOK') || 'QURAN';
+    } catch {
+      return 'QURAN';
+    }
+  });
+
+  const handleProgressModeChange = useCallback((mode: 'QURAN' | 'BOOK') => {
+    setProgressMode(mode);
+    try {
+      localStorage.setItem('spr_daily_progress_mode', mode);
+      window.dispatchEvent(new CustomEvent('spr_daily_progress_mode_change', { detail: mode }));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const handleSync = (e: any) => {
+      if (e?.detail && (e.detail === 'QURAN' || e.detail === 'BOOK')) {
+        setProgressMode(e.detail);
+      }
+    };
+    window.addEventListener('spr_daily_progress_mode_change', handleSync);
+    return () => window.removeEventListener('spr_daily_progress_mode_change', handleSync);
+  }, []);
+
   // ── Global Academic Data ──────────────────────────────────────────────────────
   const {
     departments = [],
@@ -401,6 +429,17 @@ export default function DailyClassroomHubView({
     const query = dateParam ? `?date=${encodeURIComponent(dateParam)}` : '';
     navigate(`${targetPath}${query}`, { replace: true });
   };
+
+  // Sync tab when an existing report is selected for editing from Reports table
+  useEffect(() => {
+    const handleEditReportEvent = () => {
+      if (isProgressHub) {
+        handleTabChange('PROGRESS');
+      }
+    };
+    window.addEventListener('spr_edit_report', handleEditReportEvent);
+    return () => window.removeEventListener('spr_edit_report', handleEditReportEvent);
+  }, [isProgressHub]);
 
   // ── Drawer Registrations ──────────────────────────────────────────────────────
   useDrawerRegistration(
@@ -633,6 +672,7 @@ export default function DailyClassroomHubView({
   };
 
   const sharedFilterProps = useMemo(() => ({
+    maxColumns: (isProgressHub ? (3 as const) : undefined) as (1 | 2 | 3 | 4 | 5 | 6 | undefined),
     showDate: true,
     dateLabel: isProgressHub ? 'Progress Date' : 'Delivery Date',
     selectedDate,
@@ -709,6 +749,8 @@ export default function DailyClassroomHubView({
       }
       navigate(`?${params.toString()}`, { replace: true });
     },
+    progressMode,
+    onProgressModeChange: handleProgressModeChange,
   }), [
     isProgressHub,
     selectedDate,
@@ -729,6 +771,8 @@ export default function DailyClassroomHubView({
     activePeriodId,
     setActivePeriodId,
     getPeriodTimeForSlot,
+    progressMode,
+    handleProgressModeChange,
   ]);
 
   return (
@@ -764,6 +808,33 @@ export default function DailyClassroomHubView({
             >
               Evaluate Student
             </CustomButton>
+          ) : isProgressHub && activeTab === 'PROGRESS' ? (
+            <div className="flex items-center p-1 rounded-xl theme-bg-elevated border theme-border gap-1 shadow-xs">
+              <button
+                type="button"
+                onClick={() => handleProgressModeChange('QURAN')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  progressMode === 'QURAN'
+                    ? 'theme-bg-accent theme-text-accent-contrast shadow-xs'
+                    : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-surface'
+                }`}
+              >
+                <BookOpenIcon className="w-3.5 h-3.5" />
+                <span>Quran</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleProgressModeChange('BOOK')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  progressMode === 'BOOK'
+                    ? 'theme-bg-accent theme-text-accent-contrast shadow-xs'
+                    : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-surface'
+                }`}
+              >
+                <LayersIcon className="w-3.5 h-3.5" />
+                <span>Book</span>
+              </button>
+            </div>
           ) : null
         }
       />
