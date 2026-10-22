@@ -27,6 +27,7 @@ export interface UseRecordReportsColumnsOptions {
   onPrintPDF?: (rep: ReportItem) => void;
   onEdit?: (rep: ReportItem) => void;
   onDelete?: (rep: ReportItem) => void;
+  onSync?: (rep: ReportItem) => void;
 }
 
 /**
@@ -46,6 +47,7 @@ export function useRecordReportsColumns({
   onPrintPDF,
   onEdit,
   onDelete,
+  onSync,
 }: UseRecordReportsColumnsOptions): Column<ReportItem>[] {
   return useMemo<Column<ReportItem>[]>(() => [
     {
@@ -155,6 +157,7 @@ export function useRecordReportsColumns({
 
         const actionItems = getReportMenuItems({
           report: rep,
+          onSync,
           onCopyText,
           onExportCSV,
           onExportJSON,
@@ -211,5 +214,6 @@ export function useRecordReportsColumns({
     onPrintPDF,
     onEdit,
     onDelete,
+    onSync,
   ]);
 }

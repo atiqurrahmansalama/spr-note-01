@@ -319,7 +319,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
                 group_val = (
                     mutable_data.get('subject_course')
                     or mutable_data.get('group_name')
-                    or 'General Group'
+                    or ''
                 )
                 try:
                     student_obj = Student.objects.filter(name_en__iexact=name_clean).first()
@@ -464,7 +464,9 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         if client_uid:
             existing = StudentDailyReport.objects.filter(report_unique_id=client_uid).first()
             if existing:
-                return existing
+                validated_data['portions'] = portions_data
+                validated_data['error_details'] = error_details_data
+                return self.update(existing, validated_data)
             validated_data['report_unique_id'] = str(client_uid).strip()
 
         mistakes_input = initial.get('mistake_details') or initial.get('mistakes') or []

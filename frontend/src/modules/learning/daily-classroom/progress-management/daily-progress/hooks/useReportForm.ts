@@ -14,6 +14,7 @@ import {
 } from "@/utils/localStore";
 import {
   saveReportLocally,
+  getLocalReports,
   syncSessionsAndComments,
   scheduleGracePeriodSync,
   clearGracePeriodTimer,
@@ -1204,7 +1205,7 @@ export function useReportForm() {
         lessonTitle: (lessonTitle || "").trim(),
         lesson: (lessonTitle || "").trim(),
         report_date: selectedDate || getClassroomTodayDate(),
-        subject_course: (bookTitle.trim() || groupName || "General Group"),
+        subject_course: (bookTitle.trim() || groupName || ""),
         juz_and_pages: activePages,
         mistakes: cleanActiveMistakes,
         stucks: cleanActiveStucks,
@@ -1218,8 +1219,7 @@ export function useReportForm() {
       if (isEditing) {
         const repId = editingReport.id || editingReport.report_unique_id;
         const repUniqueId = editingReport.report_unique_id || (typeof repId === "string" && repId.startsWith("REP-") ? repId : `REP-${String(repId).slice(0, 8)}`);
-
-        const allReports = JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]");
+        const allReports = getLocalReports();
         const existingRepIndex = allReports.findIndex((r: any) => {
           return (
             (r.id && (String(r.id) === String(repId) || (editingReport.server_id && String(r.id) === String(editingReport.server_id)))) ||
@@ -1256,7 +1256,7 @@ export function useReportForm() {
           sectionName: selectedStudent?.student_section_name || selectedStudent?.section_name || existingRep?.sectionName,
           student_section_name: selectedStudent?.student_section_name || selectedStudent?.section_name || existingRep?.student_section_name,
           departmentCode: selectedStudent?.department_code || selectedStudent?.dept_code || existingRep?.departmentCode,
-          groupName: groupName || "General Group",
+          groupName: groupName || "",
           progress_mode: progressMode,
           mode: progressMode,
           book_title: (bookTitle || "").trim(),
@@ -1267,7 +1267,7 @@ export function useReportForm() {
           lesson_covered: (lessonTitle || "").trim(),
           lessonTitle: (lessonTitle || "").trim(),
           lesson: (lessonTitle || "").trim(),
-          subject_course: (bookTitle.trim() || groupName || "General Group"),
+          subject_course: (bookTitle.trim() || groupName || ""),
           selectedSession: selectedSession.trim(),
           session_name: selectedSession.trim(),
           selectedDate,
@@ -1328,7 +1328,7 @@ export function useReportForm() {
         const savedSnapshot = JSON.stringify({
           studentName: realStudentName,
           selectedStudentId: studentNumericId,
-          groupName: groupName || "General Group",
+          groupName: groupName || "",
           selectedSession: selectedSession.trim(),
           progressMode,
           bookTitle: bookTitle.trim(),
@@ -1365,7 +1365,7 @@ export function useReportForm() {
           sectionName: selectedStudent?.student_section_name || selectedStudent?.section_name,
           student_section_name: selectedStudent?.student_section_name || selectedStudent?.section_name,
           departmentCode: selectedStudent?.department_code || selectedStudent?.dept_code,
-          groupName: groupName || "General Group",
+          groupName: groupName || "",
           progress_mode: progressMode,
           mode: progressMode,
           book_title: (bookTitle || "").trim(),
@@ -1376,7 +1376,7 @@ export function useReportForm() {
           lesson_covered: (lessonTitle || "").trim(),
           lessonTitle: (lessonTitle || "").trim(),
           lesson: (lessonTitle || "").trim(),
-          subject_course: (bookTitle.trim() || groupName || "General Group"),
+          subject_course: (bookTitle.trim() || groupName || ""),
           selectedSession: selectedSession.trim(),
           session_name: selectedSession.trim(),
           selectedDate,
@@ -1414,7 +1414,7 @@ export function useReportForm() {
         const savedSnapshot = JSON.stringify({
           studentName: realStudentName,
           selectedStudentId: studentNumericId,
-          groupName: groupName || "General Group",
+          groupName: groupName || "",
           selectedSession: selectedSession.trim(),
           progressMode,
           bookTitle: bookTitle.trim(),

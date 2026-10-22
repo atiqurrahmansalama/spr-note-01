@@ -380,7 +380,7 @@ class StudentViewSet(viewsets.ModelViewSet):
                 "id": s.id,
                 "name": s.name_en or s.name or "Unnamed",
                 "roll": s.roll_number or "",
-                "group_name": s.group_name or "General Group"
+                "group_name": s.group_name or ""
             })
             
         guardian_data = {
@@ -424,7 +424,7 @@ class StudentViewSet(viewsets.ModelViewSet):
             "bangla_name": student.bangla_name or "",
             "uniq_id": student.uniq_id or "",
             "enrollment_date": student.admission_date or student.created_at.strftime('%Y-%m-%d') if student.created_at else "",
-            "department": student.group_name or "General Group",
+            "department": student.group_name or "",
             "status": student.status or "Active"
         }, status=status.HTTP_200_OK)
 

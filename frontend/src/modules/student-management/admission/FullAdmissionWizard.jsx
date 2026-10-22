@@ -1139,7 +1139,7 @@ export default function FullAdmissionWizard({
           id: String(studentId),
           name: sharedData.name,
           label: sharedData.name,
-          sub: selectedClassObj?.name || sharedData.education_status || "General Group",
+          sub: selectedClassObj?.name || sharedData.education_status || "",
         });
       } catch (e) {}
       window.dispatchEvent(new CustomEvent("spr_students_updated"));

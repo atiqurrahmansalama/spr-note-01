@@ -100,12 +100,16 @@ export function useDailyProgressHierarchy({
       setLocalClassId("");
       setLocalSectionId("");
     });
-  const departmentSelectOptions =
-    filterProps?.departmentSelectOptions ||
-    (departments || []).map((d: any) => ({
-      value: String(d.id),
-      label: d.name || d.department_name || `Department ${d.id}`,
-    }));
+  const departmentSelectOptions = useMemo(() => {
+    const raw =
+      filterProps?.departmentSelectOptions ||
+      (departments || []).map((d: any) => ({
+        value: String(d.id),
+        label: d.name || d.department_name || `Department ${d.id}`,
+      }));
+    return raw.filter((opt: any) => opt.value !== "" && opt.value !== "ALL" && !opt.label?.toLowerCase().startsWith("all "));
+  }, [filterProps?.departmentSelectOptions, departments]);
+
   const hasDepartments =
     filterProps?.hasDepartments !== undefined ? filterProps.hasDepartments : departments && departments.length > 0;
 
@@ -117,32 +121,56 @@ export function useDailyProgressHierarchy({
       setLocalClassId(val);
       setLocalSectionId("");
     });
-  const classSelectOptions =
-    filterProps?.classSelectOptions ||
-    (classes || [])
-      .filter((c: any) => !selectedDepartmentId || doesStudentMatchDepartment(c, selectedDepartmentId, departments, classes))
-      .map((c: any) => ({
-        value: String(c.id),
-        label: c.name || c.class_name || `Class ${c.id}`,
-      }));
+
+  const classSelectOptions = useMemo(() => {
+    const raw =
+      filterProps?.classSelectOptions ||
+      (classes || [])
+        .filter((c: any) => !selectedDepartmentId || doesStudentMatchDepartment(c, selectedDepartmentId, departments, classes))
+        .map((c: any) => ({
+          value: String(c.id),
+          label: c.name || c.class_name || `Class ${c.id}`,
+        }));
+    return raw.filter((opt: any) => opt.value !== "" && opt.value !== "ALL" && !opt.label?.toLowerCase().startsWith("all "));
+  }, [filterProps?.classSelectOptions, classes, selectedDepartmentId, departments]);
 
   const selectedSectionId =
     filterProps?.selectedSectionId !== undefined ? filterProps.selectedSectionId : localSectionId;
   const rawOnSectionChange = filterProps?.onSectionChange || setLocalSectionId;
 
-  const sectionSelectOptions =
-    filterProps?.sectionSelectOptions ||
-    (sections || [])
-      .filter((s: any) => !selectedClassId || doesStudentMatchClass(s, selectedClassId, classes))
-      .map((s: any) => ({
-        value: String(s.id),
-        label: s.section_name || s.name || `Section ${s.id}`,
-      }));
+  const sectionSelectOptions = useMemo(() => {
+    const raw =
+      filterProps?.sectionSelectOptions ||
+      (sections || [])
+        .filter((s: any) => !selectedClassId || doesStudentMatchClass(s, selectedClassId, classes))
+        .map((s: any) => ({
+          value: String(s.id),
+          label: s.section_name || s.name || `Section ${s.id}`,
+        }));
+    return raw.filter((opt: any) => {
+      if (!opt.value || opt.value === "" || opt.value === "ALL") return false;
+      const labelLower = (opt.label || "").toLowerCase().trim();
+      if (labelLower.startsWith("all ")) return false;
+      if (labelLower === "general group" || labelLower === "general") return false;
+      return true;
+    });
+  }, [filterProps?.sectionSelectOptions, sections, selectedClassId, classes]);
 
   const hasSectionsForClass =
     filterProps?.hasSectionsForClass !== undefined
       ? filterProps.hasSectionsForClass
-      : (sections || []).filter((s: any) => !selectedClassId || doesStudentMatchClass(s, selectedClassId, classes)).length > 0;
+      : (sectionSelectOptions || []).length > 0;
+
+  // Clear section if it was accidentally set to General Group
+  useEffect(() => {
+    if (localSectionId) {
+      const sec = (sections || []).find((s: any) => String(s.id) === String(localSectionId));
+      const secName = (sec?.section_name || sec?.name || "").toLowerCase().trim();
+      if (secName === "general group" || secName === "general") {
+        setLocalSectionId("");
+      }
+    }
+  }, [localSectionId, sections]);
 
   const updateHierarchy = (deptId: string, clsId: string, secId: string) => {
     const finalDept = deptId || "";

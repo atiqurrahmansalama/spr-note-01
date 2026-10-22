@@ -11,6 +11,7 @@ import {
 } from "./sharedReportCells";
 import { useTranslation } from "@/i18n";
 import { isReportUnsynced } from "@/utils/syncEngine";
+import { isBookReport } from "../utils/studentMetaResolver";
 import "../locales";
 
 export interface StudentSessionTimelineProps {
@@ -18,6 +19,7 @@ export interface StudentSessionTimelineProps {
   reports: ReportItem[];
   onEdit?: (report: ReportItem) => void;
   onDelete?: (report: ReportItem) => void;
+  onSync?: (report: ReportItem) => void;
   onCopyText?: (payload: any) => void;
   onExportCSV?: (payload: any) => void;
   onExportJSON?: (payload: any) => void;
@@ -34,6 +36,7 @@ export function StudentSessionTimeline({
   reports,
   onEdit,
   onDelete,
+  onSync,
   onCopyText,
   onExportCSV,
   onExportJSON,
@@ -41,6 +44,15 @@ export function StudentSessionTimeline({
   onContextMenu,
 }: StudentSessionTimelineProps) {
   const { t } = useTranslation("progressReports");
+
+  const isAllBook = useMemo(() => reports.length > 0 && reports.every(isBookReport), [reports]);
+  const hasBook = useMemo(() => reports.some(isBookReport), [reports]);
+
+  const portionHeaderTitle = isAllBook
+    ? t("bookAndPage", "Book & Pages")
+    : hasBook
+    ? `${t("sessionAndPortions", "Session & Portions")} / ${t("bookAndPage", "Book & Pages")}`
+    : t("sessionAndPortions", "Session & Portions");
 
   const childColumns = useMemo<Column<ReportItem>[]>(() => [
     {
@@ -71,10 +83,10 @@ export function StudentSessionTimeline({
               </span>
               {isPending && (
                 <span
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-500 dark:text-amber-400 shrink-0 shadow-2xs"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-500 dark:text-amber-400 shrink-0 shadow-2xs transition-all duration-200 animate-fade-in select-none"
                   title={t("pendingSync", "Pending Cloud Sync")}
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
                   <span>{t("pending", "Pending")}</span>
                 </span>
               )}
@@ -88,7 +100,7 @@ export function StudentSessionTimeline({
     },
     {
       key: "session_portions",
-      header: t("sessionAndPortions", "Session & Portions"),
+      header: portionHeaderTitle,
       align: "left",
       width: "18%",
       minWidth: "165px",
@@ -138,6 +150,7 @@ export function StudentSessionTimeline({
       render: (rep: ReportItem) => {
         const actionItems = getReportMenuItems({
           report: rep,
+          onSync,
           onCopyText,
           onExportCSV,
           onExportJSON,

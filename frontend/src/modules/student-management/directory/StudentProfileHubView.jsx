@@ -581,7 +581,7 @@ export default function StudentProfileHubView() {
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 text-xs theme-text-secondary font-medium">
                   <span>Class: <strong className="theme-text-primary font-semibold">{student.student_class_name || "General"}</strong></span>
                   <span>•</span>
-                  <span>Group: <strong className="theme-text-primary font-semibold">{student.group_name || student.student_group_name || "General Group"}</strong></span>
+                  <span>Group: <strong className="theme-text-primary font-semibold">{student.group_name || student.student_group_name || "—"}</strong></span>
                 </div>
               </div>
             </div>

@@ -58,5 +58,9 @@ export { default as Pagination } from './Pagination';
 export type { PaginationProps } from './Pagination';
 export { default as ActionMenu } from './ActionMenu';
 export type { ActionMenuProps, ActionMenuItem } from './ActionMenu';
+export { default as SegmentedSwitch } from './SegmentedSwitch';
+export type { SegmentedSwitchProps, SegmentedSwitchOption } from './SegmentedSwitch';
+export { default as SelectionActionBar } from './SelectionActionBar';
+export type { SelectionActionBarProps, SelectionActionItem } from './SelectionActionBar';
 export * from './Icons';
 

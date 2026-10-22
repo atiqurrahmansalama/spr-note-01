@@ -32,6 +32,7 @@ export default function StudentGroupedTable({
   onStudentContextMenu,
   onEdit,
   onDelete,
+  onSync,
   onCopyText,
   onExportCSV,
   onExportJSON,
@@ -237,6 +238,7 @@ export default function StudentGroupedTable({
             reports={stu.reports}
             onEdit={onEdit}
             onDelete={onDelete}
+            onSync={onSync}
             onCopyText={onCopyText}
             onExportCSV={onExportCSV}
             onExportJSON={onExportJSON}

@@ -7,6 +7,7 @@ export interface GetReportMenuItemsOptions {
   report: ReportItem;
   targetList?: ReportItem[];
   extraItems?: ActionMenuItem[];
+  onSync?: (report: ReportItem) => void;
   onCopyText?: (payload: any) => void;
   onExportCSV?: (payload: any) => void;
   onExportJSON?: (payload: any) => void;
@@ -23,6 +24,7 @@ export function getReportMenuItems({
   report,
   targetList,
   extraItems,
+  onSync,
   onCopyText,
   onExportCSV,
   onExportJSON,
@@ -36,6 +38,15 @@ export function getReportMenuItems({
   if (extraItems && extraItems.length > 0) {
     menuItems.push(...extraItems);
     menuItems.push({ label: "divider", divider: true });
+  }
+
+  if (onSync) {
+    menuItems.push({
+      label: "Sync to Database",
+      icon: CloudIcon,
+      iconClassName: "theme-accent",
+      onClick: () => onSync(report),
+    });
   }
 
   if (onCopyText) {
@@ -108,6 +119,7 @@ export default function ReportContextMenu({
   report,
   targetList,
   onClose,
+  onSync,
   onCopyText,
   onExportCSV,
   onExportJSON,
@@ -120,6 +132,7 @@ export default function ReportContextMenu({
   const menuItems = getReportMenuItems({
     report,
     targetList,
+    onSync,
     onCopyText,
     onExportCSV,
     onExportJSON,

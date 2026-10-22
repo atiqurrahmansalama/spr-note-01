@@ -36,7 +36,7 @@ export function useStudentGroupedData(
         if (!map.has(name)) {
           map.set(name, {
             student_name: name,
-            student_group: rep.student_group || "General Group",
+            student_group: rep.student_group || "",
             reports: [],
           });
         }

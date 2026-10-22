@@ -256,7 +256,7 @@ class StudentSerializer(serializers.ModelSerializer):
             validated_data.get('group_name')
             or self.initial_data.get('group')
             or self.initial_data.get('sub')
-            or 'General Group'
+            or ''
         )
         validated_data['group_name'] = group_val
 
@@ -458,7 +458,7 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
         section = validated_data.get('section')
         if section:
             if not validated_data.get('group_name'):
-                validated_data['group_name'] = getattr(section, 'section_name', None) or getattr(section, 'name', '') or 'General Group'
+                validated_data['group_name'] = getattr(section, 'section_name', None) or getattr(section, 'name', '') or ''
             if not validated_data.get('student_class') and getattr(section, 'student_class', None):
                 validated_data['student_class'] = section.student_class
 
@@ -694,7 +694,7 @@ class StudentFullProfileSerializer(serializers.ModelSerializer):
         section = validated_data.get('section')
         if section:
             if not validated_data.get('group_name'):
-                validated_data['group_name'] = getattr(section, 'section_name', None) or getattr(section, 'name', '') or 'General Group'
+                validated_data['group_name'] = getattr(section, 'section_name', None) or getattr(section, 'name', '') or ''
             if not validated_data.get('student_class') and getattr(section, 'student_class', None):
                 validated_data['student_class'] = section.student_class
 

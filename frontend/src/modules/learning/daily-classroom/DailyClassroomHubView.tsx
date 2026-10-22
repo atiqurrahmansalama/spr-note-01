@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback, Suspense, lazy } from
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { CollapsiblePageHeader } from '@/components/ui';
 import CustomButton from '@/components/ui/CustomButton';
+import SegmentedSwitch from '@/components/ui/SegmentedSwitch';
 import { PageContainer } from '@/components/layout';
 import {
   BookOpenIcon,
@@ -809,32 +810,15 @@ export default function DailyClassroomHubView({
               Evaluate Student
             </CustomButton>
           ) : isProgressHub && activeTab === 'PROGRESS' ? (
-            <div className="flex items-center p-1 rounded-xl theme-bg-sub border theme-border gap-1 shadow-2xs">
-              <button
-                type="button"
-                onClick={() => handleProgressModeChange('QURAN')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                  progressMode === 'QURAN'
-                    ? 'theme-bg-accent theme-accent-text shadow-sm scale-[1.01]'
-                    : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
-                }`}
-              >
-                <BookOpenIcon className="w-3.5 h-3.5 shrink-0" />
-                <span>Quran</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleProgressModeChange('BOOK')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                  progressMode === 'BOOK'
-                    ? 'theme-bg-accent theme-accent-text shadow-sm scale-[1.01]'
-                    : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
-                }`}
-              >
-                <LayersIcon className="w-3.5 h-3.5 shrink-0" />
-                <span>Book</span>
-              </button>
-            </div>
+            <SegmentedSwitch<'QURAN' | 'BOOK'>
+              value={progressMode}
+              onChange={handleProgressModeChange}
+              options={[
+                { value: 'QURAN', label: 'Quran', icon: BookOpenIcon },
+                { value: 'BOOK', label: 'Book', icon: LayersIcon },
+              ]}
+              size="sm"
+            />
           ) : null
         }
       />
@@ -925,7 +909,7 @@ export default function DailyClassroomHubView({
           className={(activeTab === 'PROGRESS_ASSESSMENT' || activeTab === 'PROGRESS_ASSESSMENTS') ? 'w-full pt-1' : 'hidden'}
           aria-hidden={activeTab !== 'PROGRESS_ASSESSMENT' && activeTab !== 'PROGRESS_ASSESSMENTS'}
         >
-          <Suspense fallback={<HubTabSkeletonLoader isProgress={true} />}>
+          <Suspense fallback={<HubTabSkeletonLoader isReports={true} />}>
             <StudentReportsView isEmbedded={true} filterProps={sharedFilterProps} />
           </Suspense>
         </div>

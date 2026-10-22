@@ -74,27 +74,48 @@ export const saveReportLocally = (reportData, options = {}) => {
     sync_status: initialStatus,
   };
 
-  const existingIndex = reports.findIndex(
-    (r) => (r.id && r.id === updatedReport.id) || (r.report_unique_id && r.report_unique_id === updatedReport.report_unique_id)
-  );
+  const existingIndex = reports.findIndex((r) => {
+    return (
+      (r.id && (r.id === updatedReport.id || (updatedReport.server_id && r.id === updatedReport.server_id))) ||
+      (updatedReport.server_id && r.server_id && r.server_id === updatedReport.server_id) ||
+      (r.report_unique_id && updatedReport.report_unique_id && r.report_unique_id === updatedReport.report_unique_id)
+    );
+  });
 
   if (existingIndex > -1) {
     reports[existingIndex] = {
       ...reports[existingIndex],
       ...updatedReport,
-      id: reports[existingIndex].id,
-      report_unique_id: reports[existingIndex].report_unique_id || updatedReport.report_unique_id,
+      id: updatedReport.id || reports[existingIndex].id,
+      server_id: updatedReport.server_id || reports[existingIndex].server_id,
+      report_unique_id: updatedReport.report_unique_id || reports[existingIndex].report_unique_id,
+      sync_status: initialStatus,
     };
   } else {
     reports.unshift(updatedReport);
   }
 
-  if (!pendingQueue.includes(updatedReport.id)) {
-    pendingQueue.push(updatedReport.id);
+  const pQueueId = updatedReport.id || updatedReport.report_unique_id;
+  if (initialStatus === "SYNCED") {
+    // If explicitly marked SYNCED, remove from pending queue
+    const filteredQueue = pendingQueue.filter(
+      (id) => id !== updatedReport.id && id !== updatedReport.report_unique_id && id !== updatedReport.server_id
+    );
+    localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(filteredQueue));
+  } else {
+    if (pQueueId && !pendingQueue.includes(pQueueId)) {
+      pendingQueue.push(pQueueId);
+    }
+    localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(pendingQueue));
   }
 
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reports));
-  localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(pendingQueue));
+
+  // Mirror into active tenant storage key to prevent tenant cache mismatch
+  try {
+    const tenantId = localStorage.getItem("spr_active_tenant_id") || "default";
+    localStorage.setItem(`spr_reports_local_${tenantId}_v1`, JSON.stringify(reports));
+  } catch {}
 
   // Mirror into Central Offline IndexedDB entities for high-capacity local persistence
   import("../offline").then(({ dailyProgressRepository }) => {
@@ -104,11 +125,42 @@ export const saveReportLocally = (reportData, options = {}) => {
   return existingIndex > -1 ? reports[existingIndex] : updatedReport;
 };
 
-// 2. Fetch All Local Reports
+// 2. Fetch All Local Reports with Multi-Tenant & Multi-Key Aggregation
 export const getLocalReports = () => {
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const reportMap = new Map();
+
+    // 1. Ingest global storage key
+    const rawGlobal = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (rawGlobal) {
+      const parsedGlobal = JSON.parse(rawGlobal);
+      if (Array.isArray(parsedGlobal)) {
+        parsedGlobal.forEach((r) => {
+          const k = String(r.id || r.report_unique_id || "");
+          if (k) reportMap.set(k, r);
+        });
+      }
+    }
+
+    // 2. Ingest active tenant storage key
+    const tenantId = localStorage.getItem("spr_active_tenant_id") || "default";
+    const rawTenant = localStorage.getItem(`spr_reports_local_${tenantId}_v1`);
+    if (rawTenant) {
+      const parsedTenant = JSON.parse(rawTenant);
+      if (Array.isArray(parsedTenant)) {
+        parsedTenant.forEach((r) => {
+          const k = String(r.id || r.report_unique_id || "");
+          if (k) {
+            const existing = reportMap.get(k);
+            if (!existing || (r.client_updated_at && (!existing.client_updated_at || r.client_updated_at >= existing.client_updated_at))) {
+              reportMap.set(k, { ...(existing || {}), ...r });
+            }
+          }
+        });
+      }
+    }
+
+    return Array.from(reportMap.values());
   } catch (error) {
     console.error("[SyncEngine] Failed to parse local storage:", error);
     return [];
@@ -120,7 +172,13 @@ export const getLocalReports = () => {
  */
 export const isReportUnsynced = (r) => {
   if (!r) return false;
+  // If explicitly marked SYNCED, it is synced
   if (r.sync_status === "SYNCED") return false;
+
+  // If explicitly marked PENDING, GRACE_PERIOD, or FAILED, it IS unsynced regardless of server_id
+  if (r.sync_status === "PENDING" || r.sync_status === "GRACE_PERIOD" || r.sync_status === "FAILED") {
+    return true;
+  }
 
   const hasNumericId =
     (typeof r.id === "number" && !isNaN(r.id)) ||
@@ -129,11 +187,12 @@ export const isReportUnsynced = (r) => {
     (typeof r.server_id === "number" && !isNaN(r.server_id)) ||
     (typeof r.server_id === "string" && /^\d+$/.test(r.server_id.trim()));
 
-  if (hasNumericServerId || (hasNumericId && r.sync_status !== "PENDING" && r.sync_status !== "GRACE_PERIOD")) {
-    return false;
+  // If it has no server ID and no numeric database ID, it was created offline and is unsynced
+  if (!hasNumericId && !hasNumericServerId) {
+    return true;
   }
 
-  return r.sync_status === "PENDING" || r.sync_status === "GRACE_PERIOD" || (!hasNumericId && !hasNumericServerId);
+  return false;
 };
 
 /**
@@ -264,7 +323,7 @@ let isSyncInProgress = false;
 export const triggerCloudSync = async (options = {}) => {
   const force = Boolean(options?.force);
 
-  if (isSyncInProgress) {
+  if (isSyncInProgress && !force) {
     console.log("[SyncEngine] Sync already in progress. Skipping redundant concurrent run.");
     return { success: false, inProgress: true, errors: [] };
   }
@@ -287,10 +346,34 @@ export const triggerCloudSync = async (options = {}) => {
       };
     }
 
-    const reports = getLocalReports();
+    let reports = getLocalReports();
+
+    // If caller explicitly passed reports (e.g. from ProgressReportsView reportsList), merge them authoritatively
+    if (Array.isArray(options?.reports) && options.reports.length > 0) {
+      const mergedMap = new Map();
+      reports.forEach((r) => {
+        const k = String(r.id || r.report_unique_id || "");
+        if (k) mergedMap.set(k, r);
+      });
+      options.reports.forEach((r) => {
+        const k = String(r.id || r.report_unique_id || "");
+        if (k) {
+          const existing = mergedMap.get(k);
+          mergedMap.set(k, { ...(existing || {}), ...r });
+        }
+      });
+      reports = Array.from(mergedMap.values());
+    }
+
     let pendingIds = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || "[]");
 
-    // Enterprise Resilience: Automatically detect and include any local reports that are unsynced
+    // Filter out any IDs in pendingQueue that are already SYNCED in local storage
+    pendingIds = pendingIds.filter((pId) => {
+      const found = reports.find((r) => r.id === pId || r.report_unique_id === pId);
+      return !found || isReportUnsynced(found);
+    });
+
+    // Gather all genuinely unsynced reports authoritatively
     const unsyncedReports = reports.filter(isReportUnsynced);
     unsyncedReports.forEach((r) => {
       const rId = r.id || r.report_unique_id;
@@ -299,19 +382,13 @@ export const triggerCloudSync = async (options = {}) => {
       }
     });
 
-    // Filter out any IDs in pendingQueue that are already SYNCED in local storage
-    pendingIds = pendingIds.filter((pId) => {
-      const found = reports.find((r) => r.id === pId || r.report_unique_id === pId);
-      return !found || isReportUnsynced(found);
-    });
-
-    if (pendingIds.length === 0) {
+    if (unsyncedReports.length === 0) {
       console.log("[SyncEngine] Local storage is in sync.");
       localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify([]));
       return { success: true, syncedCount: 0, failedCount: 0, remainingCount: 0, errors: [] };
     }
 
-    const pendingItems = reports.filter((r) => pendingIds.includes(r.id) || pendingIds.includes(r.report_unique_id));
+    const pendingItems = unsyncedReports;
     let updatedIds = [...pendingIds];
     let syncedCount = 0;
     const syncErrors = [];
@@ -332,9 +409,13 @@ export const triggerCloudSync = async (options = {}) => {
         (!item.student || item.student === "N/A") &&
         (!item.student_name || item.student_name === "N/A") &&
         (!item.juz_and_pages || item.juz_and_pages.length === 0) &&
+        (!item.bookPageData || item.bookPageData.length === 0) &&
         (!item.portions || item.portions.length === 0) &&
         (!item.mistakes || item.mistakes.length === 0) &&
-        (!item.stucks || item.stucks.length === 0)
+        (!item.bookMistakeData || item.bookMistakeData.length === 0) &&
+        (!item.stucks || item.stucks.length === 0) &&
+        (!item.bookStuckData || item.bookStuckData.length === 0) &&
+        (!item.book_title && !item.curriculum_book_name && !item.lesson_title)
       );
 
       if (isBlank) {
@@ -348,7 +429,15 @@ export const triggerCloudSync = async (options = {}) => {
       }
 
       try {
-        const targetServerId = item.server_id || (typeof item.id === "number" ? item.id : null);
+        let targetServerId = item.server_id || (typeof item.id === "number" ? item.id : null);
+        if (!targetServerId && item.report_unique_id) {
+          const match = reports.find(
+            (r) => r.report_unique_id === item.report_unique_id && (r.server_id || typeof r.id === "number")
+          );
+          if (match) {
+            targetServerId = match.server_id || (typeof match.id === "number" ? match.id : null);
+          }
+        }
         let apiResult;
         if (targetServerId) {
           apiResult = await updateReport(targetServerId, item);
@@ -413,7 +502,12 @@ export const triggerCloudSync = async (options = {}) => {
     }
 
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reports));
+    try {
+      const tenantId = localStorage.getItem("spr_active_tenant_id") || "default";
+      localStorage.setItem(`spr_reports_local_${tenantId}_v1`, JSON.stringify(reports));
+    } catch {}
     localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(updatedIds));
+
     if (syncedCount > 0) {
       window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "sync", count: syncedCount } }));
     }
@@ -692,4 +786,47 @@ export const syncTenantTaxonomies = async (tenantId) => {
   } catch (err) {
     console.warn("[SyncEngine] Failed to sync tenant taxonomies:", err);
   }
+};
+
+/**
+ * Permanently purge report(s) from local sync stores, queues, and grace timers.
+ */
+export const deleteReportFromSync = (identifiers, tenantId = null) => {
+  const targetIds = (Array.isArray(identifiers) ? identifiers : [identifiers])
+    .map((id) => String(id || '').trim().toLowerCase())
+    .filter(Boolean);
+
+  if (targetIds.length === 0) return;
+  const targetIdSet = new Set(targetIds);
+
+  // 1. Clear any active grace period timers
+  targetIds.forEach((id) => clearGracePeriodTimer(id));
+
+  // 2. Iterate through all localStorage keys that contain report caches
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith("spr_reports_local") || k === "spr_reports_cache" || k === "spr_local_reports")) {
+        try {
+          const raw = JSON.parse(localStorage.getItem(k) || "[]");
+          if (Array.isArray(raw)) {
+            const filtered = raw.filter((r) => {
+              const rId = String(r.id || '').trim().toLowerCase();
+              const rUniq = String(r.report_unique_id || '').trim().toLowerCase();
+              const rServer = String(r.server_id || '').trim().toLowerCase();
+              return !targetIdSet.has(rId) && !targetIdSet.has(rUniq) && !targetIdSet.has(rServer);
+            });
+            localStorage.setItem(k, JSON.stringify(filtered));
+          }
+        } catch {}
+      }
+    }
+  } catch {}
+
+  // 3. Remove from PENDING_SYNC_KEY ("spr_reports_pending_queue")
+  try {
+    const rawQueue = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || "[]");
+    const filteredQueue = rawQueue.filter((qId) => !targetIdSet.has(String(qId).trim().toLowerCase()));
+    localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(filteredQueue));
+  } catch {}
 };

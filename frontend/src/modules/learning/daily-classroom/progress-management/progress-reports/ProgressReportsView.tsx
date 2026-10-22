@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/context/ToastContext";
 import { fetchWithAuth } from "@/utils/authService";
 import { isOnline } from "@/utils/localStore";
-import { triggerCloudSync, isReportUnsynced, getLocalReports } from "@/utils/syncEngine";
+import { triggerCloudSync, isReportUnsynced, getLocalReports, deleteReportFromSync } from "@/utils/syncEngine";
 import { formatDate } from "@/utils/reportGenerator";
 import {
   CloudIcon,
@@ -14,22 +14,25 @@ import {
   RefreshIcon,
   ChecklistIcon,
   TrashIcon,
+  CopyIcon,
 } from "@/components/ui/Icons";
 import { ConfirmModal } from "@/components/ui/Modal";
 import { useTranslation } from "@/i18n";
 import CustomSelect from "@/components/ui/CustomSelect";
 import IconButton from "@/components/ui/IconButton";
+import SelectionActionBar from "@/components/ui/SelectionActionBar";
 import { DateRangePicker } from "@/components/selectors";
-import SkeletonLoader from "@/components/common/SkeletonLoader";
+import SegmentedSwitch from "@/components/ui/SegmentedSwitch";
 import DailyClassroomFilterControls from "../../components/DailyClassroomFilterControls";
 import { useAcademicData } from "@/hooks/useAcademicData";
 import { useTenant } from "@/context/TenantContext";
-import { dailyProgressRepository } from "@/offline";
+import { dailyProgressRepository, offlineDB } from "@/offline";
 import {
   RecordReportsTable,
   StudentGroupedTable,
   ReportContextMenu,
   SyncErrorsAlertBanner,
+  ReportsTableSkeleton,
 } from "./components";
 import {
   ProgressReportsViewProps,
@@ -53,12 +56,13 @@ export default function ProgressReportsView({
 
   // Primary data state
   const [reportsList, setReportsList] = useState<ReportItem[]>([]);
-  const [reportToDelete, setReportToDelete] = useState<ReportItem | null>(null);
+  const [reportToDelete, setReportToDelete] = useState<ReportItem | ReportItem[] | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [offline, setOffline] = useState(!isOnline());
   const [loading, setLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncErrors, setSyncErrors] = useState<SyncErrorItem[] | null>(null);
+  const recentlyDeletedIdsRef = useRef<Set<string>>(new Set());
 
   // View modes: "RECORD_REPORTS" | "STUDENT_VIEW"
   const [viewMode, setViewMode] = useState<"RECORD_REPORTS" | "STUDENT_VIEW">("RECORD_REPORTS");
@@ -500,7 +504,7 @@ export default function ProgressReportsView({
       (typeof rep.student === "object" ? rep.student?.group_name || rep.student?.group : null) ||
       studentSectionName ||
       studentClassName ||
-      "General Group";
+      "";
 
     const hasNumericId =
       (typeof rep.id === "number" && !isNaN(rep.id)) ||
@@ -567,9 +571,19 @@ export default function ProgressReportsView({
       if (!Array.isArray(list)) return;
       list.forEach((r) => {
         if (!r) return;
-        const key = String(r.id || r.report_unique_id || "");
-        if (key && !localMap.has(key)) {
-          localMap.set(key, r);
+        const key = String(r.id || r.report_unique_id || "").toLowerCase();
+        const serverKey = r.server_id ? String(r.server_id).toLowerCase() : "";
+        const uniqKey = r.report_unique_id ? String(r.report_unique_id).toLowerCase() : "";
+        if (
+          recentlyDeletedIdsRef.current.has(key) ||
+          (serverKey && recentlyDeletedIdsRef.current.has(serverKey)) ||
+          (uniqKey && recentlyDeletedIdsRef.current.has(uniqKey))
+        ) {
+          return;
+        }
+        const storeKey = String(r.id || r.report_unique_id || "");
+        if (storeKey && !localMap.has(storeKey)) {
+          localMap.set(storeKey, r);
         }
       });
     };
@@ -640,7 +654,18 @@ export default function ProgressReportsView({
       if (res && res.ok) {
         const raw = await res.json();
         const rawData = Array.isArray(raw) ? raw : (raw.results || raw.data || []);
-        const apiReports = rawData.map(normalizeReport);
+        const apiReports = rawData
+          .filter((r: any) => {
+            const k1 = String(r.id || "").toLowerCase();
+            const k2 = String(r.server_id || "").toLowerCase();
+            const k3 = String(r.report_unique_id || "").toLowerCase();
+            return (
+              !recentlyDeletedIdsRef.current.has(k1) &&
+              (!k2 || !recentlyDeletedIdsRef.current.has(k2)) &&
+              (!k3 || !recentlyDeletedIdsRef.current.has(k3))
+            );
+          })
+          .map(normalizeReport);
 
         // Map API reports by database id and report_unique_id
         const apiDbIds = new Set<string>();
@@ -652,9 +677,29 @@ export default function ProgressReportsView({
         });
 
         const merged = apiReports.map((apiRep: ReportItem) => {
-          const key = String(apiRep.id || apiRep.report_unique_id || "");
-          const localMatch = localMap.get(key);
+          const key1 = String(apiRep.id || "");
+          const key2 = String(apiRep.server_id || "");
+          const key3 = String(apiRep.report_unique_id || "");
+          const localMatch = localMap.get(key1) || (key2 ? localMap.get(key2) : null) || (key3 ? localMap.get(key3) : null);
+
           if (localMatch) {
+            // Enterprise Reconciliation: If local has unsynced changes or edits newer than server, preserve local edits!
+            const isLocalUnsynced = isReportUnsynced(localMatch);
+            const localUpdated = localMatch.client_updated_at ? new Date(localMatch.client_updated_at).getTime() : 0;
+            const serverUpdated = (apiRep.updated_at || apiRep.created_at) ? new Date(apiRep.updated_at || apiRep.created_at).getTime() : 0;
+
+            if (isLocalUnsynced || localMatch.is_edited || localUpdated > serverUpdated) {
+              return {
+                ...apiRep,
+                ...localMatch,
+                id: apiRep.id || localMatch.id,
+                server_id: apiRep.id || localMatch.server_id,
+                report_unique_id: apiRep.report_unique_id || localMatch.report_unique_id,
+                is_edited: true,
+                edited_at: localMatch.edited_at || apiRep.updated_at || localMatch.client_updated_at,
+                sync_status: isLocalUnsynced ? "PENDING" : "SYNCED",
+              };
+            }
             return {
               ...apiRep,
               is_edited: apiRep.is_edited || localMatch.is_edited,
@@ -748,6 +793,24 @@ export default function ProgressReportsView({
       if (e?.detail?.source === "sync") return;
       loadReports(true);
     };
+    const handleReportDeleted = (e: any) => {
+      // If deleted from this view directly, state is already updated
+      if (e?.detail?.source === "progress_reports_view") return;
+      const deletedKeys: string[] = e?.detail?.deletedKeys || [];
+      if (deletedKeys.length > 0) {
+        const delSet = new Set(deletedKeys.map((k) => String(k).toLowerCase()));
+        setReportsList((prev) =>
+          prev.filter((r) => {
+            const k1 = String(r.id || "").toLowerCase();
+            const k2 = String(r.server_id || "").toLowerCase();
+            const k3 = String(r.report_unique_id || "").toLowerCase();
+            return !delSet.has(k1) && (!k2 || !delSet.has(k2)) && (!k3 || !delSet.has(k3));
+          })
+        );
+      } else {
+        loadReports(true);
+      }
+    };
     const handleTenantChanged = () => {
       loadReports(true);
     };
@@ -755,12 +818,12 @@ export default function ProgressReportsView({
       setReportsList([]);
     };
     window.addEventListener("spr_report_saved", handleReportSaved);
-    window.addEventListener("spr_report_deleted", handleReportSaved);
+    window.addEventListener("spr_report_deleted", handleReportDeleted);
     window.addEventListener("spr_tenant_changed", handleTenantChanged);
     window.addEventListener("spr_offline_purged", handleOfflinePurged);
     return () => {
       window.removeEventListener("spr_report_saved", handleReportSaved);
-      window.removeEventListener("spr_report_deleted", handleReportSaved);
+      window.removeEventListener("spr_report_deleted", handleReportDeleted);
       window.removeEventListener("spr_tenant_changed", handleTenantChanged);
       window.removeEventListener("spr_offline_purged", handleOfflinePurged);
     };
@@ -959,16 +1022,19 @@ export default function ProgressReportsView({
     setIsSyncing(true);
     setSyncErrors(null);
     try {
-      const res = await triggerCloudSync({ force: true });
+      // Pass the active reportsList so the syncEngine knows exactly which reports are pending
+      const res = await triggerCloudSync({ force: true, reports: reportsList });
       if (res && res.errors && res.errors.length > 0) {
         setSyncErrors(res.errors);
         if (res.syncedCount && res.syncedCount > 0) {
           showToast(`Synced ${res.syncedCount} report(s), but ${res.errors.length} failed to sync.`, "warning");
         } else {
-          showToast(`Failed to sync ${res.errors.length} report(s) to Database.`, "error");
+          showToast(`Failed to sync ${res.errors.length} report(s) to Database. Check details above.`, "error");
         }
       } else if (res && res.syncedCount && res.syncedCount > 0) {
         showToast(`Successfully synced ${res.syncedCount} report(s) to Database!`, "success");
+      } else if (pendingSyncCount > 0) {
+        showToast(`Sync attempted, but ${pendingSyncCount} report(s) still require review or cloud approval.`, "warning");
       } else {
         showToast("All local reports are already in sync with Database", "info");
       }
@@ -1054,39 +1120,206 @@ export default function ProgressReportsView({
     setReportToDelete(rep);
   };
 
+  // Batch delete selected reports
+  const handleBatchDeleteReports = () => {
+    const selected = getActiveTargetReports();
+    if (selected.length === 0) return;
+    setReportToDelete(selected);
+  };
+
+  // Sync individual report directly from 3-dots action menu or context menu
+  const handleSyncSingleReport = async (report: ReportItem) => {
+    setIsSyncing(true);
+    setSyncErrors(null);
+    try {
+      const res = await triggerCloudSync({ force: true, reports: [report] });
+      if (res && res.errors && res.errors.length > 0) {
+        setSyncErrors(res.errors);
+        showToast(`Failed to sync report: ${res.errors[0]?.reason || "Cloud error"}`, "error");
+      } else if (res && res.syncedCount && res.syncedCount > 0) {
+        showToast(`Report for "${report.student_name}" synced to Database!`, "success");
+      } else {
+        showToast(`Report is already in sync with Database`, "info");
+      }
+    } catch (err: any) {
+      showToast("Sync failed: " + (err?.message || "Server error"), "error");
+    } finally {
+      setIsSyncing(false);
+      await loadReports(false);
+    }
+  };
+
+  // Sync all currently selected reports
+  const handleSyncSelectedReports = async () => {
+    const selectedReports = getActiveTargetReports();
+    if (selectedReports.length === 0) return;
+    setIsSyncing(true);
+    setSyncErrors(null);
+    try {
+      const res = await triggerCloudSync({ force: true, reports: selectedReports });
+      if (res && res.errors && res.errors.length > 0) {
+        setSyncErrors(res.errors);
+        if (res.syncedCount && res.syncedCount > 0) {
+          showToast(`Synced ${res.syncedCount} report(s), ${res.errors.length} failed.`, "warning");
+        } else {
+          showToast(`Failed to sync ${res.errors.length} selected report(s).`, "error");
+        }
+      } else if (res && res.syncedCount && res.syncedCount > 0) {
+        showToast(`Successfully synced ${res.syncedCount} selected report(s) to Database!`, "success");
+      } else {
+        showToast("Selected report(s) are already in sync with Database", "info");
+      }
+    } catch (err: any) {
+      showToast("Sync failed: " + (err?.message || "Server error"), "error");
+    } finally {
+      setIsSyncing(false);
+      await loadReports(false);
+    }
+  };
+
   const handleConfirmDelete = async () => {
     if (!reportToDelete) return;
-    const rep = reportToDelete;
-    const reportIdStr = rep.report_unique_id || `REP-#${rep.id}`;
+    const targetItems = Array.isArray(reportToDelete) ? reportToDelete : [reportToDelete];
+    if (targetItems.length === 0) return;
     setIsDeleting(true);
 
     try {
-      const updatedList = reportsList.filter((r) => {
-        if (rep.id && r.id) return r.id !== rep.id;
-        if (rep.report_unique_id && r.report_unique_id) return r.report_unique_id !== rep.report_unique_id;
-        return true;
+      // 1. Collect all possible unique keys (both strings and numbers)
+      const allTargetKeys: string[] = [];
+      const serverLookupIds: string[] = [];
+
+      targetItems.forEach((r) => {
+        if (r.id !== undefined && r.id !== null && String(r.id).trim()) {
+          const sId = String(r.id).trim();
+          allTargetKeys.push(sId);
+          serverLookupIds.push(sId);
+        }
+        if (r.server_id !== undefined && r.server_id !== null && String(r.server_id).trim()) {
+          const sId = String(r.server_id).trim();
+          allTargetKeys.push(sId);
+          serverLookupIds.push(sId);
+        }
+        if (r.report_unique_id && String(r.report_unique_id).trim()) {
+          const uniq = String(r.report_unique_id).trim();
+          allTargetKeys.push(uniq);
+          serverLookupIds.push(uniq);
+        }
       });
 
-      setReportsList(updatedList);
-      localStorage.setItem(`spr_reports_local_${activeTenantId || 'default'}_v1`, JSON.stringify(updatedList));
+      // 2. Track in recentlyDeletedIdsRef to prevent any background sync from re-injecting them
+      allTargetKeys.forEach((k) => recentlyDeletedIdsRef.current.add(k.toLowerCase()));
+      const deleteKeySet = new Set(allTargetKeys.map((k) => k.toLowerCase()));
 
-      // Remove from Central IndexedDB cache strictly for active tenant
-      const deleteKey = rep.id || rep.report_unique_id;
-      if (deleteKey) {
-        dailyProgressRepository.deleteOptimistic(deleteKey, "/reports/", { skipOutbox: true, tenantId: activeTenantId }).catch(() => {});
+      // 3. Purge immediately from syncEngine and all localStorage caches
+      deleteReportFromSync(allTargetKeys, activeTenantId);
+
+      // 4. Remove from Central IndexedDB cache (Dexie offlineDB)
+      try {
+        await offlineDB.entities
+          .where("module")
+          .equals("daily-progress")
+          .filter((e) => {
+            const eid = String(e.id || "").toLowerCase();
+            const dataId = String(e.data?.id || "").toLowerCase();
+            const dataServerId = String(e.data?.server_id || "").toLowerCase();
+            const dataUniq = String(e.data?.report_unique_id || "").toLowerCase();
+            return (
+              deleteKeySet.has(eid) ||
+              deleteKeySet.has(dataId) ||
+              deleteKeySet.has(dataServerId) ||
+              deleteKeySet.has(dataUniq)
+            );
+          })
+          .delete();
+      } catch (err) {
+        console.warn("[ProgressReportsView] IndexedDB purge error:", err);
       }
 
-      window.dispatchEvent(new CustomEvent("spr_report_saved"));
-      window.dispatchEvent(new CustomEvent("spr_project_changed"));
-      showToast(`Report ${reportIdStr} deleted!`, "success");
-
-      if (isOnline() && rep.id) {
-        try {
-          await fetchWithAuth(`/reports/${rep.id}/`, { method: "DELETE" });
-          window.dispatchEvent(new CustomEvent("spr_report_saved"));
-        } catch (err: any) {
-          console.warn("[ProgressReportsView] Delete API failed:", err?.message);
+      // Also call repository optimistic delete for both string and numeric variants
+      for (const key of allTargetKeys) {
+        dailyProgressRepository.deleteOptimistic(key, "/reports/", { skipOutbox: true, tenantId: activeTenantId }).catch(() => {});
+        if (!isNaN(Number(key))) {
+          dailyProgressRepository.deleteOptimistic(Number(key), "/reports/", { skipOutbox: true, tenantId: activeTenantId }).catch(() => {});
         }
+      }
+
+      // 5. Update local state immediately
+      setReportsList((prev) =>
+        prev.filter((r) => {
+          const id1 = String(r.id || "").toLowerCase();
+          const id2 = String(r.server_id || "").toLowerCase();
+          const id3 = String(r.report_unique_id || "").toLowerCase();
+          return (
+            (!id1 || !deleteKeySet.has(id1)) &&
+            (!id2 || !deleteKeySet.has(id2)) &&
+            (!id3 || !deleteKeySet.has(id3))
+          );
+        })
+      );
+
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        allTargetKeys.forEach((k) => {
+          next.delete(k);
+          if (!isNaN(Number(k))) next.delete(Number(k));
+        });
+        return next;
+      });
+
+      // 6. Delete from Cloud Database if online
+      if (isOnline()) {
+        const uniqueLookupIds = Array.from(new Set(serverLookupIds));
+
+        // Fast path: Try bulk-delete endpoint
+        let bulkSuccess = false;
+        try {
+          const bulkRes = await fetchWithAuth("/api/v1/reports/bulk-delete/", {
+            method: "POST",
+            body: JSON.stringify({ ids: uniqueLookupIds }),
+          });
+          if (bulkRes && (bulkRes.ok || bulkRes.status === 200 || bulkRes.status === 204)) {
+            bulkSuccess = true;
+          }
+        } catch {
+          bulkSuccess = false;
+        }
+
+        // Fallback: Delete individually if bulk endpoint did not complete
+        if (!bulkSuccess) {
+          for (const lookupId of uniqueLookupIds) {
+            const endpoints = [
+              `/api/v1/reports/${lookupId}/`,
+              `/api/reports/${lookupId}/`,
+              `/reports/${lookupId}/`,
+            ];
+            for (const ep of endpoints) {
+              try {
+                const res = await fetchWithAuth(ep, { method: "DELETE" });
+                if (res && (res.ok || res.status === 200 || res.status === 204 || res.status === 404)) {
+                  break;
+                }
+              } catch (err: any) {
+                console.warn(`[ProgressReportsView] Delete API failed for ${ep}:`, err?.message);
+              }
+            }
+          }
+        }
+      }
+
+      // 7. Dispatch events with source tag so this view does not re-fetch against itself
+      window.dispatchEvent(
+        new CustomEvent("spr_report_deleted", {
+          detail: { source: "progress_reports_view", deletedKeys: allTargetKeys },
+        })
+      );
+      window.dispatchEvent(new CustomEvent("spr_project_changed"));
+
+      if (targetItems.length === 1) {
+        const rep = targetItems[0];
+        const reportIdStr = rep.report_unique_id || `REP-#${rep.id}`;
+        showToast(`Report ${reportIdStr} deleted permanently!`, "success");
+      } else {
+        showToast(`${targetItems.length} reports deleted permanently!`, "success");
       }
     } finally {
       setIsDeleting(false);
@@ -1171,98 +1404,112 @@ export default function ProgressReportsView({
         }
       >
         {/* Filter Box Bottom Footer Row */}
-        <div className="pt-2.5 border-t theme-border grid grid-cols-1 sm:grid-cols-3 items-center gap-3 w-full">
-          {/* Left: Showing count without background or border */}
-          <div className="flex items-center justify-center sm:justify-start gap-2 text-xs font-semibold theme-text-secondary select-none">
-            <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse shrink-0" />
-            <span className="theme-text-primary font-bold">
-              {filteredReports.length} / {reportsList.length}
-            </span>
-            <span>Reports</span>
-          </div>
-
-          {/* Center: 2 View Mode Switcher Buttons */}
-          <div className="flex items-center justify-center">
-            <div className="flex p-1 theme-bg-sub border theme-border rounded-xl shadow-2xs gap-1 shrink-0">
-              <button
-                type="button"
-                onClick={() => setViewMode("RECORD_REPORTS")}
-                className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${
-                  viewMode === "RECORD_REPORTS"
-                    ? "theme-bg-accent theme-accent-text shadow-sm scale-[1.01]"
-                    : "theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50"
-                }`}
-              >
-                <CloudIcon className="w-3.5 h-3.5 shrink-0" />
-                <span>Record Reports</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setViewMode("STUDENT_VIEW")}
-                className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${
-                  viewMode === "STUDENT_VIEW"
-                    ? "theme-bg-accent theme-accent-text shadow-sm scale-[1.01]"
-                    : "theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50"
-                }`}
-              >
-                <UsersIcon className="w-3.5 h-3.5 shrink-0" />
-                <span>By Student</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Right: Actions / Selection + Only-icon Refresh Button */}
-          <div className="flex items-center justify-center sm:justify-end gap-2 shrink-0">
-            {selectedIds.size > 0 && (
-              <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 p-1 px-2.5 rounded-xl shrink-0 animate-fade-in">
-                <button
-                  type="button"
-                  onClick={toggleSelectAll}
-                  className="p-1 rounded-lg theme-text-secondary hover:theme-accent transition cursor-pointer flex items-center gap-1 font-semibold text-xs"
-                  title={
-                    selectedIds.size === filteredReports.length
-                      ? "Deselect All"
-                      : `Select All (${selectedIds.size})`
-                  }
-                >
-                  <CheckIcon className="w-3.5 h-3.5 theme-accent" />
-                  <span className="theme-accent text-xs font-bold">{selectedIds.size} Selected</span>
-                </button>
-              </div>
-            )}
-
-            {pendingSyncCount > 0 && !offline && (
-              <button
-                type="button"
-                onClick={handleSyncOfflineReports}
-                disabled={loading || isSyncing}
-                className="py-1 px-2.5 rounded-xl text-xs font-semibold theme-bg-amber/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                title="Sync offline reports to database"
-              >
-                {isSyncing ? (
-                  <RefreshIcon className="w-3.5 h-3.5 shrink-0 animate-spin" />
-                ) : (
-                  <CloudIcon className="w-3.5 h-3.5 shrink-0" />
-                )}
-                <span>
-                  {isSyncing ? "Syncing..." : `Sync to DB (${pendingSyncCount})`}
-                </span>
-              </button>
-            )}
-
-            <IconButton
-              icon={RefreshIcon}
-              onClick={handleRefresh}
-              loading={loading}
-              disabled={loading || isSyncing}
-              variant="sub"
-              size="sm"
-              shape="rounded"
-              title="Refresh Reports & Sync with Database"
-              ariaLabel="Refresh Reports & Sync with Database"
+        <div className="pt-2.5 border-t theme-border w-full">
+          {selectedIds.size > 0 ? (
+            /* Google Drive style: Selection bar completely replaces standard footer controls */
+            <SelectionActionBar
+              fullWidth={true}
+              selectedCount={selectedIds.size}
+              totalCount={filteredReports.length}
+              onToggleSelectAll={toggleSelectAll}
+              onClearSelection={handleDeselectAll}
+              actions={[
+                {
+                  id: "sync",
+                  label: `Sync to DB (${selectedIds.size})`,
+                  shortLabel: `Sync to DB (${selectedIds.size})`,
+                  icon: CloudIcon,
+                  variant: "accent",
+                  disabled: offline || isSyncing,
+                  loading: isSyncing,
+                  onClick: handleSyncSelectedReports,
+                },
+                {
+                  id: "copy",
+                  label: `Copy Summary (${selectedIds.size})`,
+                  shortLabel: "Copy Summary",
+                  icon: CopyIcon,
+                  variant: "sub",
+                  onClick: () => handleCopyTextReport(getActiveTargetReports()),
+                },
+                {
+                  id: "delete",
+                  label: `Delete (${selectedIds.size})`,
+                  shortLabel: `Delete (${selectedIds.size})`,
+                  icon: TrashIcon,
+                  variant: "danger",
+                  disabled: isDeleting,
+                  onClick: handleBatchDeleteReports,
+                },
+              ]}
             />
-          </div>
+          ) : (
+            /* Standard Bottom Controls when no items are selected (Count, View Mode, Refresh) */
+            <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-3 w-full">
+              {/* Left: Showing count without background or border */}
+              <div className="flex items-center justify-center sm:justify-start gap-2 text-xs font-semibold theme-text-secondary select-none">
+                <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse shrink-0" />
+                <span className="theme-text-primary font-bold">
+                  {filteredReports.length} / {reportsList.length}
+                </span>
+                <span>Reports</span>
+              </div>
+
+              {/* Center: Reusable Segmented Switch */}
+              <div className="flex items-center justify-center">
+                <SegmentedSwitch<"RECORD_REPORTS" | "STUDENT_VIEW">
+                  value={viewMode}
+                  onChange={setViewMode}
+                  options={[
+                    {
+                      value: "RECORD_REPORTS",
+                      label: "Record Reports",
+                      icon: CloudIcon,
+                    },
+                    {
+                      value: "STUDENT_VIEW",
+                      label: "By Student",
+                      icon: UsersIcon,
+                    },
+                  ]}
+                />
+              </div>
+
+              {/* Right: Actions / Pending Sync + Only-icon Refresh Button */}
+              <div className="flex items-center justify-center sm:justify-end gap-2 shrink-0">
+                {pendingSyncCount > 0 && !offline && (
+                  <button
+                    type="button"
+                    onClick={handleSyncOfflineReports}
+                    disabled={loading || isSyncing}
+                    className="py-1 px-2.5 rounded-xl text-xs font-semibold theme-bg-amber/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    title="Sync offline reports to database"
+                  >
+                    {isSyncing ? (
+                      <RefreshIcon className="w-3.5 h-3.5 shrink-0 animate-spin" />
+                    ) : (
+                      <CloudIcon className="w-3.5 h-3.5 shrink-0" />
+                    )}
+                    <span>
+                      {isSyncing ? "Syncing..." : `Sync to DB (${pendingSyncCount})`}
+                    </span>
+                  </button>
+                )}
+
+                <IconButton
+                  icon={RefreshIcon}
+                  onClick={handleRefresh}
+                  loading={loading}
+                  disabled={loading || isSyncing}
+                  variant="sub"
+                  size="sm"
+                  shape="rounded"
+                  title="Refresh Reports & Sync with Database"
+                  ariaLabel="Refresh Reports & Sync with Database"
+                />
+              </div>
+            </div>
+          )}
         </div>
       </DailyClassroomFilterControls>
 
@@ -1292,7 +1539,7 @@ export default function ProgressReportsView({
 
       {/* VIEW MODES */}
       {loading ? (
-        <SkeletonLoader type="list" count={4} />
+        <ReportsTableSkeleton />
       ) : (
         <>
           {viewMode === "RECORD_REPORTS" && (
@@ -1305,6 +1552,7 @@ export default function ProgressReportsView({
               onContextMenu={handleContextMenu}
               onEdit={handleEditReport}
               onDelete={handleDeleteReport}
+              onSync={handleSyncSingleReport}
               onCopyText={(rep) => handleCopyTextReport(rep)}
               onResetFilters={handleResetAllFilters}
               onRefresh={handleRefresh}
@@ -1322,6 +1570,7 @@ export default function ProgressReportsView({
               onStudentContextMenu={handleStudentContextMenu}
               onEdit={handleEditReport}
               onDelete={handleDeleteReport}
+              onSync={handleSyncSingleReport}
               onCopyText={(rep) => handleCopyTextReport(rep)}
               onResetFilters={handleResetAllFilters}
               onRefresh={handleRefresh}
@@ -1339,6 +1588,7 @@ export default function ProgressReportsView({
           report={contextMenu.report}
           targetList={contextMenu.targetList}
           onClose={() => setContextMenu(null)}
+          onSync={handleSyncSingleReport}
           onCopyText={() => handleCopyTextReport(contextMenu.targetList || contextMenu.report)}
           onEdit={handleEditReport}
           onDelete={handleDeleteReport}
@@ -1352,32 +1602,52 @@ export default function ProgressReportsView({
           onClose={() => !isDeleting && setReportToDelete(null)}
           onConfirm={handleConfirmDelete}
           confirmLoading={isDeleting}
-          title={t("deleteReportTitle", "Delete Progress Report")}
-          subtitle={t(
-            "deleteReportSubtitle",
-            `Are you sure you want to delete report "${reportToDelete.report_unique_id || `#${reportToDelete.id}`}" for ${reportToDelete.student_name}?`
-          )}
+          title={
+            Array.isArray(reportToDelete)
+              ? t("deleteBatchReportsTitle", `Delete ${reportToDelete.length} Progress Reports`)
+              : t("deleteReportTitle", "Delete Progress Report")
+          }
+          subtitle={
+            Array.isArray(reportToDelete)
+              ? t(
+                  "deleteBatchReportsSubtitle",
+                  `Are you sure you want to permanently delete ${reportToDelete.length} selected progress reports? This action cannot be undone.`
+                )
+              : t(
+                  "deleteReportSubtitle",
+                  `Are you sure you want to delete report "${reportToDelete.report_unique_id || `#${reportToDelete.id}`}" for ${reportToDelete.student_name}?`
+                )
+          }
           confirmText={t("delete", "Delete")}
           cancelText={t("cancel", "Cancel")}
           confirmVariant="danger"
           confirmIcon={TrashIcon}
-          summaryItems={[
-            {
-              label: t("student", "Student"),
-              value: reportToDelete.student_name,
-              subLabel:
-                reportToDelete.student_unique_id ||
-                (reportToDelete.student_roll ? `Roll ${reportToDelete.student_roll}` : undefined),
-            },
-            {
-              label: t("reportId", "Report ID"),
-              value: reportToDelete.report_unique_id || `#${reportToDelete.id}`,
-            },
-            {
-              label: t("date", "Date"),
-              value: formatDate(reportToDelete.date || reportToDelete.created_at || ""),
-            },
-          ]}
+          summaryItems={
+            Array.isArray(reportToDelete)
+              ? [
+                  {
+                    label: t("totalSelected", "Total Selected"),
+                    value: `${reportToDelete.length} reports`,
+                  },
+                ]
+              : [
+                  {
+                    label: t("student", "Student"),
+                    value: reportToDelete.student_name,
+                    subLabel:
+                      reportToDelete.student_unique_id ||
+                      (reportToDelete.student_roll ? `Roll ${reportToDelete.student_roll}` : undefined),
+                  },
+                  {
+                    label: t("reportId", "Report ID"),
+                    value: reportToDelete.report_unique_id || `#${reportToDelete.id}`,
+                  },
+                  {
+                    label: t("date", "Date"),
+                    value: formatDate(reportToDelete.date || reportToDelete.created_at || ""),
+                  },
+                ]
+          }
         />
       )}
     </div>

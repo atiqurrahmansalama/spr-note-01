@@ -2,11 +2,75 @@ import React from 'react';
 
 export interface HubTabSkeletonLoaderProps {
   isProgress?: boolean;
+  isReports?: boolean;
   className?: string;
 }
 
 export interface DrawerFallbackSkeletonProps {
   className?: string;
+}
+
+/**
+ * High-fidelity structural skeleton for Progress Reports Table tab
+ */
+export function ReportsTabSkeleton({ className = '' }: { className?: string }) {
+  return (
+    <div className={`w-full space-y-4 animate-pulse pt-1 ${className}`}>
+      {/* 1. Filter bar skeleton */}
+      <div className="w-full rounded-2xl theme-bg-surface border theme-border p-4 shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="h-10 rounded-xl bg-slate-400/10 border theme-border" />
+          <div className="h-10 rounded-xl bg-slate-400/10 border theme-border" />
+          <div className="h-10 rounded-xl bg-slate-400/10 border theme-border" />
+          <div className="h-10 rounded-xl bg-slate-400/10 border theme-border" />
+        </div>
+      </div>
+
+      {/* 2. Switcher toolbar skeleton */}
+      <div className="flex items-center justify-between gap-3 px-2">
+        <div className="h-5 w-32 rounded bg-slate-400/15" />
+        <div className="h-9 w-48 rounded-xl bg-slate-400/15 border theme-border" />
+        <div className="h-8 w-20 rounded-xl bg-slate-400/15" />
+      </div>
+
+      {/* 3. Table Rows Skeleton */}
+      <div className="w-full rounded-2xl theme-bg-surface border theme-border overflow-hidden shadow-xs divide-y theme-border">
+        <div className="h-11 bg-slate-400/5 px-4 flex items-center gap-3">
+          <div className="w-4 h-4 rounded bg-slate-400/20" />
+          <div className="w-28 h-3 rounded bg-slate-400/20" />
+          <div className="w-24 h-3 rounded bg-slate-400/20 hidden sm:block" />
+          <div className="w-20 h-3 rounded bg-slate-400/20 hidden md:block" />
+        </div>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="px-4 py-3.5 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-4 h-4 rounded bg-slate-400/15 shrink-0" />
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <div className="h-3.5 rounded bg-slate-400/20 w-32" />
+                <div className="h-2.5 rounded bg-slate-400/15 w-20" />
+              </div>
+            </div>
+            <div className="h-3 rounded bg-slate-400/15 w-24 hidden sm:block" />
+            <div className="h-3 rounded bg-slate-400/15 w-20 hidden md:block" />
+            <div className="h-5 w-16 rounded bg-slate-400/15 shrink-0" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Lightweight High-Fidelity Skeleton Fallback for Classroom Hub Async Sub-views
+ */
+export function HubTabSkeletonLoader({ isProgress = false, isReports = false, className = '' }: HubTabSkeletonLoaderProps) {
+  if (isReports) {
+    return <ReportsTabSkeleton className={className} />;
+  }
+  if (isProgress) {
+    return <ProgressTabSkeleton className={className} />;
+  }
+  return <LessonTabSkeleton className={className} />;
 }
 
 /**
@@ -89,15 +153,6 @@ export function LessonTabSkeleton({ className = '' }: { className?: string }) {
   );
 }
 
-/**
- * Lightweight High-Fidelity Skeleton Fallback for Classroom Hub Async Sub-views
- */
-export function HubTabSkeletonLoader({ isProgress = false, className = '' }: HubTabSkeletonLoaderProps) {
-  if (isProgress) {
-    return <ProgressTabSkeleton className={className} />;
-  }
-  return <LessonTabSkeleton className={className} />;
-}
 
 /**
  * Lightweight Drawer Fallback Skeleton

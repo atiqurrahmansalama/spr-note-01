@@ -369,7 +369,7 @@ export function ProgressNumberBox({
           id={id}
           type="number"
           variant="borderless"
-          scrollable={scrollable}
+          scrollable={Boolean(scrollable && !onWheel)}
           allowDecimals={false}
           value={value !== undefined && value !== null ? value : ""}
           onChange={onChange}
@@ -424,15 +424,17 @@ export function PageInputBox({
   showLabel = true,
   min = QURAN_RULES.MIN_PAGE,
   max = QURAN_RULES.MAX_PAGE,
+  onWheel,
   ...props
 }: PageInputBoxProps) {
   return (
     <ProgressNumberBox
       {...props}
+      onWheel={onWheel}
       label={showLabel ? "Page" : undefined}
       min={min}
       max={max}
-      scrollable={true}
+      scrollable={!onWheel}
     />
   );
 }
@@ -443,15 +445,17 @@ export function AyahInputBox({
   min = QURAN_RULES.MIN_AYAH,
   max = QURAN_RULES.MAX_AYAH,
   initialScrollValue = QURAN_RULES.MIN_AYAH,
+  onWheel,
   ...props
 }: AyahInputBoxProps) {
   return (
     <ProgressNumberBox
       {...props}
+      onWheel={onWheel}
       min={min}
       max={max}
       initialScrollValue={initialScrollValue}
-      scrollable={true}
+      scrollable={!onWheel}
     />
   );
 }

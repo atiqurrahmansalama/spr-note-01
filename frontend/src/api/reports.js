@@ -36,12 +36,12 @@ export const transformFormToApiPayload = (reportData) => {
   if (/^\d+$/.test(String(studentName).trim()) && reportData?.student_details) {
     studentName = reportData.student_details.name_en || reportData.student_details.name || reportData.student_details.label || studentName;
   }
-  const groupName = reportData?.groupName || reportData?.subject_course || "General Group";
+  const groupName = reportData?.groupName || reportData?.subject_course || "";
   const selectedSession = reportData?.selectedSession || reportData?.session_name || reportData?.session || "Subah";
   const selectedDate = reportData?.selectedDate || reportData?.report_date || reportData?.date;
-  const juzPageData = reportData?.juzPageData || reportData?.juz_and_pages || [];
-  const mistakeData = reportData?.mistakeData || reportData?.mistakes || [];
-  const stuckData = reportData?.stuckData || reportData?.stucks || [];
+  const juzPageData = reportData?.juzPageData || reportData?.bookPageData || reportData?.juz_and_pages || [];
+  const mistakeData = reportData?.mistakeData || reportData?.bookMistakeData || reportData?.mistakes || [];
+  const stuckData = reportData?.stuckData || reportData?.bookStuckData || reportData?.stucks || [];
   const comment = reportData?.comment || "";
   let status = "Completed";
   const rawStatus = String(reportData?.status || reportData?.overall_status || "").trim().toLowerCase();

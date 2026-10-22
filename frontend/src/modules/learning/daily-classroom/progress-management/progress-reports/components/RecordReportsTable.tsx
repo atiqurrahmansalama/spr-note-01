@@ -27,6 +27,7 @@ export default function RecordReportsTable({
   onContextMenu,
   onEdit,
   onDelete,
+  onSync,
   onCopyText,
   onExportCSV,
   onExportJSON,
@@ -83,6 +84,7 @@ export default function RecordReportsTable({
     onPrintPDF,
     onEdit,
     onDelete,
+    onSync,
   });
 
   // Sort and paginate

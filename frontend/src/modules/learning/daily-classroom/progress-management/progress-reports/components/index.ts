@@ -9,3 +9,4 @@ export * from "./RecordReportExpandedCells";
 export * from "./StudentSessionTimeline";
 export * from "./EmptyReportsState";
 export * from "./SyncErrorsAlertBanner";
+export { default as ReportsTableSkeleton } from "./ReportsTableSkeleton";

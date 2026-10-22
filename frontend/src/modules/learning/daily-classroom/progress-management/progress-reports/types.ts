@@ -138,6 +138,7 @@ export interface StudentGroupedTableProps {
   onStudentContextMenu?: (e: React.MouseEvent, studentObj: StudentGroupedItem) => void;
   onEdit?: (report: ReportItem) => void;
   onDelete?: (report: ReportItem) => void;
+  onSync?: (report: ReportItem) => void;
   onCopyText?: (payload: any) => void;
   onExportCSV?: (payload: any) => void;
   onExportJSON?: (payload: any) => void;
@@ -156,6 +157,7 @@ export interface RecordReportsTableProps {
   onContextMenu?: (e: React.MouseEvent, report: ReportItem) => void;
   onEdit?: (report: ReportItem) => void;
   onDelete?: (report: ReportItem) => void;
+  onSync?: (report: ReportItem) => void;
   onCopyText?: (payload: any) => void;
   onExportCSV?: (payload: any) => void;
   onExportJSON?: (payload: any) => void;
@@ -181,6 +183,7 @@ export interface ReportContextMenuProps {
   report: ReportItem | null;
   targetList?: ReportItem[];
   onClose: () => void;
+  onSync?: (report: ReportItem) => void;
   onCopyText?: (report: ReportItem | ReportItem[]) => void;
   onExportCSV?: (report: ReportItem | ReportItem[]) => void;
   onExportJSON?: (report: ReportItem | ReportItem[]) => void;

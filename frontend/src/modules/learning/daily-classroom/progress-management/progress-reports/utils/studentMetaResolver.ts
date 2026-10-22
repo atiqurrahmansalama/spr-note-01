@@ -266,13 +266,22 @@ export function useStudentMetaResolver() {
 }
 
 /**
- * Extracts recitation ranges in standard format: [{ juz, ranges: [{ start, end }] }]
+ * Extracts recitation / book ranges in standard format: [{ juz, ranges: [{ start, end }] }]
  */
 export function getPortions(report: ReportItem | null | undefined): ReportPortion[] {
   if (!report) return [];
+
+  // 1. Direct juz_and_pages
   if (Array.isArray(report.juz_and_pages) && report.juz_and_pages.length > 0) {
     return report.juz_and_pages;
   }
+
+  // 2. Book Page Data (unified Book engine)
+  if (Array.isArray((report as any).bookPageData) && (report as any).bookPageData.length > 0) {
+    return (report as any).bookPageData;
+  }
+
+  // 3. Normalized portions from server API or local storage
   if (Array.isArray(report.portions) && report.portions.length > 0) {
     const juzMap = new Map<number | string, Array<{ start: number | string; end: number | string }>>();
     report.portions.forEach((p) => {
@@ -293,6 +302,14 @@ export function getPortions(report: ReportItem | null | undefined): ReportPortio
       ranges,
     }));
   }
+
+  // 4. Single page range fallback
+  const startP = (report as any).start_page || (report as any).page_start;
+  const endP = (report as any).end_page || (report as any).page_end || startP;
+  if (startP) {
+    return [{ juz: (report as any).juz || "", ranges: [{ start: startP, end: endP }] }];
+  }
+
   return [];
 }
 
@@ -301,25 +318,45 @@ export function getPortions(report: ReportItem | null | undefined): ReportPortio
  */
 export function getMistakes(report: ReportItem | null | undefined): ReportMistakeDetail[] {
   if (!report) return [];
-  if (Array.isArray(report.mistakes) && report.mistakes.length > 0) {
-    const list: ReportMistakeDetail[] = [];
-    report.mistakes.forEach((row) => {
-      const juz = row.juz || "";
-      const page = row.page || "";
-      (row.ayahs || []).forEach((a: any) => {
-        const val = typeof a === "object" ? (a.value || a.ayah || "") : (a || "");
-        if (val && String(val).trim()) {
-          list.push({ juz, page, ayah: val });
+
+  const sources = [
+    report.mistakes,
+    (report as any).mistakeData,
+    (report as any).bookMistakeData,
+    report.mistake_details,
+  ];
+
+  for (const src of sources) {
+    if (Array.isArray(src) && src.length > 0) {
+      const list: ReportMistakeDetail[] = [];
+      src.forEach((row: any) => {
+        const juz = row.juz || "";
+        const page = row.page || "";
+        if (Array.isArray(row.ayahs)) {
+          row.ayahs.forEach((a: any) => {
+            const val = typeof a === "object" ? (a.value || a.ayah || "") : (a || "");
+            if (val && String(val).trim()) {
+              list.push({ juz, page, ayah: val });
+            }
+          });
+        } else if (row.ayah && String(row.ayah).trim()) {
+          list.push({ juz, page, ayah: row.ayah });
+        } else if (page && String(page).trim()) {
+          list.push({ juz, page, ayah: "" });
         }
       });
-    });
-    if (list.length > 0) return list;
+      if (list.length > 0) return list;
+    }
   }
-  if (Array.isArray(report.mistake_details) && report.mistake_details.length > 0) {
-    return report.mistake_details;
-  }
+
   if (Array.isArray(report.error_details)) {
-    const serverMistakes = report.error_details.filter((e) => e.type === "Mistake");
+    const serverMistakes = report.error_details
+      .filter((e: any) => e.type === "Mistake")
+      .map((e: any) => ({
+        juz: e.juz || "",
+        page: e.page || "",
+        ayah: e.ayah || "",
+      }));
     if (serverMistakes.length > 0) return serverMistakes;
   }
   return [];
@@ -330,25 +367,45 @@ export function getMistakes(report: ReportItem | null | undefined): ReportMistak
  */
 export function getStucks(report: ReportItem | null | undefined): ReportStuckDetail[] {
   if (!report) return [];
-  if (Array.isArray(report.stucks) && report.stucks.length > 0) {
-    const list: ReportStuckDetail[] = [];
-    report.stucks.forEach((row) => {
-      const juz = row.juz || "";
-      const page = row.page || "";
-      (row.ayahs || []).forEach((a: any) => {
-        const val = typeof a === "object" ? (a.value || a.ayah || "") : (a || "");
-        if (val && String(val).trim()) {
-          list.push({ juz, page, ayah: val });
+
+  const sources = [
+    report.stucks,
+    (report as any).stuckData,
+    (report as any).bookStuckData,
+    report.stuck_details,
+  ];
+
+  for (const src of sources) {
+    if (Array.isArray(src) && src.length > 0) {
+      const list: ReportStuckDetail[] = [];
+      src.forEach((row: any) => {
+        const juz = row.juz || "";
+        const page = row.page || "";
+        if (Array.isArray(row.ayahs)) {
+          row.ayahs.forEach((a: any) => {
+            const val = typeof a === "object" ? (a.value || a.ayah || "") : (a || "");
+            if (val && String(val).trim()) {
+              list.push({ juz, page, ayah: val });
+            }
+          });
+        } else if (row.ayah && String(row.ayah).trim()) {
+          list.push({ juz, page, ayah: row.ayah });
+        } else if (page && String(page).trim()) {
+          list.push({ juz, page, ayah: "" });
         }
       });
-    });
-    if (list.length > 0) return list;
+      if (list.length > 0) return list;
+    }
   }
-  if (Array.isArray(report.stuck_details) && report.stuck_details.length > 0) {
-    return report.stuck_details;
-  }
+
   if (Array.isArray(report.error_details)) {
-    const serverStucks = report.error_details.filter((e) => e.type === "Stuck");
+    const serverStucks = report.error_details
+      .filter((e: any) => e.type === "Stuck")
+      .map((e: any) => ({
+        juz: e.juz || "",
+        page: e.page || "",
+        ayah: e.ayah || "",
+      }));
     if (serverStucks.length > 0) return serverStucks;
   }
   return [];

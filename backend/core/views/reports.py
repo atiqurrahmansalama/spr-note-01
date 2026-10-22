@@ -182,6 +182,26 @@ class StudentDailyReportViewSet(viewsets.ModelViewSet):
 
         return qs
 
+    lookup_value_regex = r'[^/]+'
+
+    def get_object(self):
+        """Lookup by numeric ID or report_unique_id string."""
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        lookup_value = str(self.kwargs.get(lookup_url_kwarg, '')).strip()
+
+        qs = StudentDailyReport.objects.select_related('student', 'status_info')
+
+        if lookup_value.isdigit():
+            obj = qs.filter(pk=int(lookup_value)).first()
+        else:
+            obj = qs.filter(report_unique_id__iexact=lookup_value).first()
+
+        if not obj:
+            raise NotFound("No StudentDailyReport matches the given query.")
+
+        self.check_object_permissions(self.request, obj)
+        return obj
+
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
         report = serializer.save(created_by=user)
@@ -207,7 +227,44 @@ class StudentDailyReportViewSet(viewsets.ModelViewSet):
         status_obj.is_deleted = True
         status_obj.delete_time = timezone.now()
         status_obj.save()
-        return Response({"status": "Report soft-deleted successfully"}, status=status.HTTP_200_OK)
+        return Response({
+            "status": "Report soft-deleted successfully",
+            "id": instance.id,
+            "report_unique_id": instance.report_unique_id,
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post', 'delete'], url_path='bulk-delete')
+    def bulk_delete(self, request):
+        """Bulk soft-delete reports by numeric IDs or unique report IDs."""
+        ids = request.data.get('ids', [])
+        if not ids and isinstance(request.data, list):
+            ids = request.data
+
+        if not ids:
+            return Response({"error": "No report IDs provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+        clean_ids = [str(x).strip() for x in ids if str(x).strip()]
+        numeric_ids = [int(x) for x in clean_ids if x.isdigit()]
+        string_ids = [x for x in clean_ids if not x.isdigit()]
+
+        reports_to_delete = StudentDailyReport.objects.filter(
+            Q(id__in=numeric_ids) | Q(report_unique_id__in=string_ids)
+        )
+
+        deleted_count = 0
+        now = timezone.now()
+        for rep in reports_to_delete:
+            status_obj, _ = ReportStatus.objects.get_or_create(report=rep)
+            status_obj.is_deleted = True
+            status_obj.delete_time = now
+            status_obj.save()
+            deleted_count += 1
+
+        return Response({
+            "status": "success",
+            "deleted_count": deleted_count,
+            "message": f"Successfully soft-deleted {deleted_count} reports"
+        }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'])
     def restore(self, request, pk=None):

@@ -36,10 +36,10 @@ export function StudentInfoCell({
         </span>
         {hasPendingSync && (
           <span
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-500 dark:text-amber-400 shrink-0 shadow-2xs"
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-500 dark:text-amber-400 shrink-0 shadow-2xs transition-all duration-200 animate-fade-in select-none"
             title={t("pendingSync", "Pending Cloud Sync")}
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
             <span>{t("pending", "Pending")}</span>
           </span>
         )}
@@ -177,7 +177,7 @@ export function ReportPortionsCell({
 
   return (
     <div className="space-y-1 text-left min-w-0">
-      {!hideSessionHeader && (
+      {!hideSessionHeader && !isBook && (
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-xs font-bold theme-accent break-words leading-tight">
             {report.session_name || "General Session"}

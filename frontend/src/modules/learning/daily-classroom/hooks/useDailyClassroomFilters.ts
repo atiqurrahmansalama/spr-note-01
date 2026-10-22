@@ -144,8 +144,10 @@ export default function useDailyClassroomFilters({
     const cleanSecList: any[] = [];
     list.forEach((s) => {
       const name = (s.section_name || s.name || `Section ${s.id}`).trim();
-      if (name && !seenSecNames.has(name.toLowerCase())) {
-        seenSecNames.add(name.toLowerCase());
+      const lower = name.toLowerCase();
+      if (lower === 'general group' || lower === 'general') return;
+      if (name && !seenSecNames.has(lower)) {
+        seenSecNames.add(lower);
         cleanSecList.push(s);
       }
     });
