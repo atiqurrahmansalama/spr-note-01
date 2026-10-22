@@ -1,6 +1,7 @@
 # SPR Note — Enterprise Engineering Guidelines
 
 ## Core Principles
+
 1. **Zero Hardcoded Logic:** Never hardcode conditional colors, categories, types, or labels using inline `if-else` / ternary branches (e.g. `isHoliday ? "rose" : "amber"`). All taxonomy items and styling must be driven dynamically by their source schemas and stores.
 2. **Enriched Presets:** All dropdown options must encapsulate their full metadata (`type`, `category`, `color`, `repeats`, `description`, etc.) at creation time so handlers consume them cleanly.
 3. **Enterprise UI Consistency:** Use project design tokens only. No hardcoded colors or raw styles. Ensure seamless dynamic sync between Developer Tools and all application views.
@@ -40,3 +41,6 @@
      - `types.ts` — Shared interfaces, parameter contracts, and action types.
      - `index.ts` — Centralized module-level barrel re-exporting views, sub-components, and hooks cleanly.
    - **Zero Logic Bloat in Views:** Keep view files focused on orchestration by delegating heavy business logic, column constructions, and modal bodies to their respective subfolders.
+9. **Root-Cause First Resolution Standard (সমস্ত সমস্যার রুট কারণ বের করে স্থায়ী সমাধান):**
+   - **Zero Superficial Workarounds:** Whenever any bug, discrepancy, sync failure, or UI glitch is encountered, never mask symptoms with superficial patches, ad-hoc state overwrites, or blind timeouts. Always trace the entire data pipeline across PostgreSQL schemas, Django REST serializers, sync engine queues, IndexedDB repositories, and React component lifecycles to find and resolve the genuine root cause.
+   - **Architectural Permanence:** Every fix must be architecturally solid, thoroughly tested across cold starts and online/offline transitions, and documented with clear rationale in project guidelines to ensure it can never recur.

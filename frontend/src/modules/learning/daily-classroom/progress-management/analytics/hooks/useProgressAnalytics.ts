@@ -19,6 +19,8 @@ interface UseProgressAnalyticsProps {
   selectedDepartmentId?: string;
   selectedClassId?: string;
   selectedSectionId?: string;
+  selectedStudentId?: string | number | null;
+  selectedStudentName?: string;
   students?: any[];
   classes?: any[];
   sections?: any[];
@@ -39,6 +41,8 @@ export function useProgressAnalytics({
   selectedDepartmentId = "",
   selectedClassId = "",
   selectedSectionId = "",
+  selectedStudentId = null,
+  selectedStudentName = "",
   students = [],
   classes = [],
   sections = [],
@@ -253,7 +257,7 @@ export function useProgressAnalytics({
     });
   }, [allReports, studentMap]);
 
-  // 4. Filter by selected hierarchy and date
+  // 4. Filter by selected hierarchy, student, and date
   const filteredReports = useMemo(() => {
     return normalizedReports.filter((r) => {
       // Date range filter
@@ -275,18 +279,72 @@ export function useProgressAnalytics({
       if (selectedSectionId && r.sectionId && r.sectionId !== selectedSectionId) {
         return false;
       }
+
+      // Student filter
+      if (selectedStudentId) {
+        const matchesId =
+          String(r.studentId) === String(selectedStudentId) ||
+          String(r.student_id) === String(selectedStudentId) ||
+          String(r.student?.id) === String(selectedStudentId);
+        if (!matchesId) return false;
+      } else if (selectedStudentName && selectedStudentName.trim()) {
+        const q = selectedStudentName.toLowerCase().trim();
+        const sName = (r.studentName || r.student_name || "").toLowerCase();
+        const roll = String(r.rollNumber || r.roll_number || "").toLowerCase();
+        if (!sName.includes(q) && !roll.includes(q)) return false;
+      }
+
       return true;
     });
-  }, [normalizedReports, startDate, endDate, selectedDate, selectedDepartmentId, selectedClassId, selectedSectionId]);
+  }, [
+    normalizedReports,
+    startDate,
+    endDate,
+    selectedDate,
+    selectedDepartmentId,
+    selectedClassId,
+    selectedSectionId,
+    selectedStudentId,
+    selectedStudentName,
+  ]);
 
   // 5. Today's recitations / Selected period individual records
   const todayReports: TodayRecitationRecord[] = useMemo(() => {
     const todayTarget = selectedDate || formatLocalDate(new Date());
     const matched = normalizedReports.filter((r) => {
+      // Date filter
       if (startDate && endDate) {
-        return r.isoDate >= startDate && r.isoDate <= endDate;
+        if (r.isoDate < startDate || r.isoDate > endDate) return false;
+      } else if (r.isoDate !== todayTarget) {
+        return false;
       }
-      return r.isoDate === todayTarget;
+
+      // Hierarchy filters
+      if (selectedDepartmentId && r.departmentId && r.departmentId !== selectedDepartmentId) {
+        return false;
+      }
+      if (selectedClassId && r.classId && r.classId !== selectedClassId) {
+        return false;
+      }
+      if (selectedSectionId && r.sectionId && r.sectionId !== selectedSectionId) {
+        return false;
+      }
+
+      // Student filter
+      if (selectedStudentId) {
+        const matchesId =
+          String(r.studentId) === String(selectedStudentId) ||
+          String(r.student_id) === String(selectedStudentId) ||
+          String(r.student?.id) === String(selectedStudentId);
+        if (!matchesId) return false;
+      } else if (selectedStudentName && selectedStudentName.trim()) {
+        const q = selectedStudentName.toLowerCase().trim();
+        const sName = (r.studentName || r.student_name || "").toLowerCase();
+        const roll = String(r.rollNumber || r.roll_number || "").toLowerCase();
+        if (!sName.includes(q) && !roll.includes(q)) return false;
+      }
+
+      return true;
     });
 
     const listToUse = matched.length > 0 ? matched : filteredReports;
@@ -311,7 +369,18 @@ export function useProgressAnalytics({
       comment: r.comment,
       date: r.isoDate,
     }));
-  }, [normalizedReports, filteredReports, selectedDate, startDate, endDate]);
+  }, [
+    normalizedReports,
+    filteredReports,
+    selectedDate,
+    startDate,
+    endDate,
+    selectedDepartmentId,
+    selectedClassId,
+    selectedSectionId,
+    selectedStudentId,
+    selectedStudentName,
+  ]);
 
   // 6. Trend Trajectory (Weekly / Monthly / Yearly)
   const trendHistory: ProgressTrendPoint[] = useMemo(() => {

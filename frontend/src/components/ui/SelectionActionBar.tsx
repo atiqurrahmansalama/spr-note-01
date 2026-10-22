@@ -25,6 +25,7 @@ export interface SelectionActionBarProps {
   size?: 'xs' | 'sm' | 'md';
   fullWidth?: boolean;
   showLabelsOnDesktop?: boolean;
+  bordered?: boolean;
 }
 
 /**
@@ -76,24 +77,26 @@ export default function SelectionActionBar({
   size = 'sm',
   fullWidth = false,
   showLabelsOnDesktop = true,
+  bordered = true,
 }: SelectionActionBarProps) {
   if (selectedCount <= 0) return null;
 
   const isAllSelected = Boolean(totalCount && selectedCount === totalCount);
+  const borderClass = bordered ? 'border theme-border shadow-xs' : 'border-0 shadow-none';
 
   if (fullWidth) {
     return (
       <div
         role="toolbar"
         aria-label="Selection Actions"
-        className={`w-full flex flex-wrap items-center justify-between gap-2 p-1.5 px-3 rounded-xl theme-bg-sub/90 border theme-border shadow-xs animate-fade-in select-none ${className}`}
+        className={`w-full flex flex-wrap items-center justify-between gap-2 p-1.5 px-3 rounded-xl theme-bg-sub/90 ${borderClass} animate-fade-in select-none ${className}`}
       >
         {/* Left: Selected Count Indicator & Active View Context */}
         <div className="flex items-center gap-2.5 min-w-0">
           <button
             type="button"
             onClick={onToggleSelectAll || onClearSelection}
-            className="flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 hover:border-amber-500/50 transition cursor-pointer text-xs font-semibold shrink-0"
+            className="flex items-center gap-1.5 py-1 px-2.5 rounded-lg theme-bg-sub/80 border theme-border hover:theme-bg-elevated transition cursor-pointer text-xs font-semibold shrink-0"
             title={
               onToggleSelectAll
                 ? isAllSelected
@@ -104,8 +107,8 @@ export default function SelectionActionBar({
                 : 'Clear Selection'
             }
           >
-            <CheckIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
-            <span className="theme-accent font-bold whitespace-nowrap">
+            <CheckIcon className="w-3.5 h-3.5 theme-text-primary shrink-0" />
+            <span className="theme-text-primary font-bold whitespace-nowrap">
               {selectedCount} {selectedLabel}
             </span>
           </button>
@@ -173,13 +176,13 @@ export default function SelectionActionBar({
     <div
       role="toolbar"
       aria-label="Selection Actions"
-      className={`inline-flex items-center gap-1.5 p-1 px-2 rounded-xl theme-bg-sub/90 border theme-border shadow-2xs animate-fade-in select-none ${className}`}
+      className={`inline-flex items-center gap-1.5 p-1 px-2 rounded-xl theme-bg-sub/90 ${borderClass} animate-fade-in select-none ${className}`}
     >
       {/* 1. Selected Count Indicator (Clickable to Toggle Select All / Deselect) */}
       <button
         type="button"
         onClick={onToggleSelectAll || onClearSelection}
-        className="flex items-center gap-1.5 py-0.5 px-1.5 rounded-lg theme-text-secondary hover:theme-accent transition cursor-pointer text-xs font-semibold"
+        className="flex items-center gap-1.5 py-0.5 px-1.5 rounded-lg theme-text-secondary hover:theme-text-primary transition cursor-pointer text-xs font-semibold"
         title={
           onToggleSelectAll
             ? isAllSelected
@@ -190,8 +193,8 @@ export default function SelectionActionBar({
             : 'Clear Selection'
         }
       >
-        <CheckIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
-        <span className="theme-accent font-bold whitespace-nowrap">
+        <CheckIcon className="w-3.5 h-3.5 theme-text-primary shrink-0" />
+        <span className="theme-text-primary font-bold whitespace-nowrap">
           {selectedCount} {selectedLabel}
         </span>
       </button>

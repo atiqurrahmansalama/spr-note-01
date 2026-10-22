@@ -143,6 +143,11 @@ class StudentSerializer(serializers.ModelSerializer):
     student_section = serializers.PrimaryKeyRelatedField(source='section', read_only=True)
     student_group_name = serializers.CharField(source='student_group.name', read_only=True, default='')
     institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
+    department = serializers.CharField(source='student_class.department.id', read_only=True, default='')
+    department_id = serializers.CharField(source='student_class.department.id', read_only=True, default='')
+    department_name = serializers.CharField(source='student_class.department.name', read_only=True, default='')
+    academic_year = serializers.SerializerMethodField()
+    session_year = serializers.SerializerMethodField()
     sub = serializers.SerializerMethodField()
 
     # Backward compatibility aliases for legacy API consumers & frontend
@@ -151,6 +156,18 @@ class StudentSerializer(serializers.ModelSerializer):
     unique_id = serializers.CharField(source='uniq_id', required=False, allow_blank=True, allow_null=True)
     group = serializers.CharField(source='group_name', required=False, allow_blank=True, allow_null=True)
     is_active = serializers.BooleanField(read_only=True)
+
+    def get_academic_year(self, obj):
+        if hasattr(obj, 'academic_detail') and obj.academic_detail and obj.academic_detail.session_year:
+            return str(obj.academic_detail.session_year)
+        if obj.admission_date:
+            return str(obj.admission_date.year)
+        if obj.created_at:
+            return str(obj.created_at.year)
+        return ""
+
+    def get_session_year(self, obj):
+        return self.get_academic_year(obj)
 
     def get_sub(self, obj):
         if obj.section:
@@ -166,10 +183,12 @@ class StudentSerializer(serializers.ModelSerializer):
             'student_id_card_number',
             'roll_number', 'roll',
             'name_en', 'name', 'bangla_name', 'name_i18n',
+            'department', 'department_id', 'department_name',
             'student_class', 'student_class_name',
             'section', 'section_name', 'student_section', 'student_section_name',
             'student_group', 'student_group_name',
             'group_name', 'group', 'sub',
+            'academic_year', 'session_year',
             'admission_date', 'status', 'is_active', 'is_deleted',
             'education_status', 'target_status',
             'details',

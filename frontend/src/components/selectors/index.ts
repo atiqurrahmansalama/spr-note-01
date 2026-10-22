@@ -58,3 +58,6 @@ export { default as DormitoryRoomSelect } from './DormitoryRoomSelect';
 export { default as DepartmentSelect } from './DepartmentSelect';
 export { default as DepartmentSelector } from './DepartmentSelect';
 export type { DepartmentSelectProps, DepartmentItem } from './DepartmentSelect';
+
+export { default as StudentSelector } from '@/modules/learning/daily-classroom/components/StudentSelector';
+export type { StudentSelectorProps, StudentProfileOption } from '@/modules/learning/daily-classroom/components/StudentSelector';

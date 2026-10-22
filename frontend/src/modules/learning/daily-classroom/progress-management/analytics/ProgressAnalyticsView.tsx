@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import DailyClassroomFilterControls, {
   DailyClassroomFilterProps,
 } from "../../components/DailyClassroomFilterControls";
+import { StudentSelector } from "../../components";
 import { useProgressAnalytics } from "./hooks/useProgressAnalytics";
 import { useAcademicData } from "@/hooks/useAcademicData";
 import { DateRangePicker } from "@/components/selectors";
@@ -29,6 +30,8 @@ export const ProgressAnalyticsView: React.FC<ProgressAnalyticsViewProps> = ({
   const [timeHorizon, setTimeHorizon] = useState<"weekly" | "monthly" | "yearly">("weekly");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [selectedStudentName, setSelectedStudentName] = useState<string>("");
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   const selectedDate = filterProps?.selectedDate || "";
   const selectedDepartmentId = filterProps?.selectedDepartmentId || "";
@@ -43,6 +46,8 @@ export const ProgressAnalyticsView: React.FC<ProgressAnalyticsViewProps> = ({
     selectedDepartmentId,
     selectedClassId,
     selectedSectionId,
+    selectedStudentId,
+    selectedStudentName,
     students,
     classes,
     sections,
@@ -60,12 +65,36 @@ export const ProgressAnalyticsView: React.FC<ProgressAnalyticsViewProps> = ({
 
   return (
     <div className={`w-full space-y-4.5 animate-fade-in select-none ${className}`}>
-      {/* 1. Academic Hierarchy Scope Controls with Date Range Picker (replacing single date picker) */}
+      {/* 1. Academic Hierarchy Scope Controls with Student Selector & Date Range Picker */}
       <DailyClassroomFilterControls
         showCardWrapper={true}
         maxColumns={4}
         filterProps={filterProps}
         showPeriodSwitcher={false}
+        searchControl={
+          <StudentSelector
+            studentName={selectedStudentName}
+            studentId={selectedStudentId}
+            departmentId={selectedDepartmentId}
+            classId={selectedClassId}
+            sectionId={selectedSectionId}
+            size="md"
+            label="STUDENT"
+            placeholder="Search student or roll..."
+            onStudentSelect={(selected) => {
+              if (!selected) {
+                setSelectedStudentName("");
+                setSelectedStudentId(null);
+              } else if (typeof selected === "string") {
+                setSelectedStudentName(selected);
+                setSelectedStudentId(null);
+              } else {
+                setSelectedStudentName(selected.label || selected.name || "");
+                setSelectedStudentId(selected.id ? String(selected.id) : null);
+              }
+            }}
+          />
+        }
         customDateComponent={
           <DateRangePicker
             startDate={startDate}

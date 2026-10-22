@@ -3,12 +3,13 @@ import { fetchWithAuth } from "../../../../utils/authService";
 import { useToast } from "../../../../context/ToastContext";
 import { useTenant } from "../../../../context/TenantContext";
 import { readJSON, writeJSON } from "../../../../stores/coreStore";
+import { academicYearsStore } from "../../../../stores/academicStore";
 import { students as studentStore } from "../../../../utils/localStore";
 import { StudentRecord, StudentMetrics, BulkActionType } from "../types";
 
 /**
  * Normalizes student fields from either Django REST API or LocalStorage cache
- * into a single unified StudentRecord shape.
+ * into a single unified StudentRecord shape with full academic metadata.
  */
 function normalizeStudentRecord(s: any): StudentRecord {
   if (!s || typeof s !== "object") return s;
@@ -47,6 +48,33 @@ function normalizeStudentRecord(s: any): StudentRecord {
     (typeof s.student_group === "object" ? s.student_group?.id : s.student_group) ||
     "";
 
+  const deptId = String(
+    s.department_id ||
+    s.department ||
+    (typeof s.department === "object" ? s.department?.id : null) ||
+    (typeof s.student_class === "object"
+      ? s.student_class?.department?.id || s.student_class?.department_id || s.student_class?.department
+      : null) ||
+    ""
+  );
+
+  const deptName = String(
+    s.department_name ||
+    (typeof s.department === "object" ? s.department?.name : null) ||
+    (typeof s.student_class === "object"
+      ? s.student_class?.department?.name || s.student_class?.department_name
+      : null) ||
+    ""
+  );
+
+  const acadYear = String(
+    s.academic_year ||
+    s.session_year ||
+    (s.admission_date ? String(s.admission_date).split("-")[0] : "") ||
+    (s.created_at ? String(s.created_at).split("-")[0] : "") ||
+    ""
+  ).trim();
+
   return {
     ...s,
     id,
@@ -61,6 +89,11 @@ function normalizeStudentRecord(s: any): StudentRecord {
     student_group_id: studentGroupId,
     group_name: groupName,
     student_group_name: groupName,
+    department_id: deptId,
+    department: deptId,
+    department_name: deptName,
+    academic_year: acadYear,
+    session_year: acadYear,
     roll_number: roll,
     roll: roll,
     status,
@@ -99,9 +132,11 @@ export function useStudentDirectoryData(onTenantReset?: () => void) {
   }, [activeTenantId]);
 
   const [students, setStudents] = useState<StudentRecord[]>(() => getCachedStudents());
+  const [departments, setDepartments] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
+  const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(() => getCachedStudents().length === 0);
   const [metrics, setMetrics] = useState<StudentMetrics>(() => {
     const initial = getCachedStudents();
@@ -115,10 +150,11 @@ export function useStudentDirectoryData(onTenantReset?: () => void) {
 
   const loadClassesAndGroups = useCallback(async () => {
     try {
-      const [cRes, gRes, sRes] = await Promise.allSettled([
+      const [cRes, gRes, sRes, dRes] = await Promise.allSettled([
         fetchWithAuth("/api/v1/classes/?page_size=500&all=true"),
         fetchWithAuth("/api/v1/groups/?page_size=500&all=true"),
         fetchWithAuth("/api/v1/sections/?page_size=500&all=true"),
+        fetchWithAuth("/api/v1/departments/?page_size=500&all=true"),
       ]);
       if (cRes.status === "fulfilled" && cRes.value.ok) {
         const cData = await cRes.value.json();
@@ -132,8 +168,16 @@ export function useStudentDirectoryData(onTenantReset?: () => void) {
         const sData = await sRes.value.json();
         setSections(Array.isArray(sData) ? sData : sData.results || []);
       }
+      if (dRes.status === "fulfilled" && dRes.value.ok) {
+        const dData = await dRes.value.json();
+        setDepartments(Array.isArray(dData) ? dData : dData.results || []);
+      }
+
+      // Load Academic Years
+      const yearsList = academicYearsStore.getAcademicYears(activeTenantId) || [];
+      setAcademicYears(yearsList);
     } catch {}
-  }, []);
+  }, [activeTenantId]);
 
   const loadStudents = useCallback(async () => {
     try {
@@ -236,14 +280,6 @@ export function useStudentDirectoryData(onTenantReset?: () => void) {
   }, [refreshData, onTenantReset, getCachedStudents]);
 
   const handleDeleteSingle = async (id: string | number, studentName?: string) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete student record "${studentName || ""}"? This action cannot be undone.`
-      )
-    ) {
-      return false;
-    }
-
     try {
       const res = await fetchWithAuth(`/api/v1/students/${id}/`, {
         method: "DELETE",
@@ -315,9 +351,11 @@ export function useStudentDirectoryData(onTenantReset?: () => void) {
 
   return {
     students,
+    departments,
     classes,
     groups,
     sections,
+    academicYears,
     loading,
     metrics,
     refreshData,

@@ -348,7 +348,7 @@ export function useStudentTableColumns({
               <span
                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
                   isActive
-                    ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/20"
+                    ? "theme-bg-accent-soft theme-accent theme-border"
                     : isAlumni
                     ? "theme-bg-sub theme-text-primary theme-border"
                     : "theme-bg-sub theme-text-secondary theme-border"

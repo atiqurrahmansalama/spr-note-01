@@ -533,6 +533,9 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         status_obj, _ = ReportStatus.objects.get_or_create(report=instance)
         status_obj.is_edited = True
         status_obj.edit_time = timezone.now()
+        if status_obj.is_deleted:
+            status_obj.is_deleted = False
+            status_obj.delete_time = None
         status_obj.save()
 
         if portions_data is not None:

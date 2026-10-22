@@ -15,3 +15,7 @@ export * from './ClassroomConfigurationView';
 export { default as HubTabSkeletonLoader } from './DailyClassroomHubSkeletons';
 export * from './DailyClassroomHubSkeletons';
 
+export { default as StudentSelector } from './StudentSelector';
+export { default as StudentInputSection } from './StudentSelector';
+export * from './StudentSelector';
+

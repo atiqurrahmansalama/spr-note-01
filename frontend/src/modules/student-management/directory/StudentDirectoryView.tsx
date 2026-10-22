@@ -1,24 +1,25 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useFeatureControl } from "../../../context/FeatureControlContext";
 import {
   StudentIcon,
   ClassIcon,
-  GroupIcon,
+  SectionIcon,
+  DepartmentIcon,
   PlusIcon,
   TrashIcon,
-  SectionControlIcon,
   BookOpenIcon,
   CheckCircleIcon,
   TransferIcon,
 } from "../../../components/ui/Icons";
 import DataTable from "../../../components/ui/DataTable";
 import DataCardGrid from "../../../components/ui/DataCardGrid";
-import ActionMenu from "../../../components/ui/ActionMenu";
 import CustomSelect from "../../../components/ui/CustomSelect";
 import DataViewToolbar from "../../../components/ui/DataViewToolbar";
 import Pagination from "../../../components/ui/Pagination";
-import { ClassSelect, GroupSelect } from "../../../components/selectors";
+import SelectionActionBar from "../../../components/ui/SelectionActionBar";
+import { ConfirmModal } from "../../../components/ui/Modal";
+import { DepartmentSelect, ClassSelect, SectionSelect } from "../../../components/selectors";
 import MetricsGrid from "../../../components/ui/MetricsGrid";
 import PageHeader from "../../../components/ui/PageHeader";
 import { PageContainer } from "../../../components/layout";
@@ -62,12 +63,18 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
   const [isBulkTransferModalOpen, setIsBulkTransferModalOpen] = useState<boolean>(false);
   const [transferringStudent, setTransferringStudent] = useState<StudentRecord | null>(null);
 
-  // Data hook
+  // Single deletion modal state
+  const [studentToDelete, setStudentToDelete] = useState<StudentRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+
+  // 1. Data hook
   const {
     students,
+    departments,
     classes,
     groups,
     sections,
+    academicYears,
     loading,
     metrics,
     refreshData,
@@ -75,26 +82,57 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
     handleBulkAction,
   } = useStudentDirectoryData();
 
-  // Filters hook
+  // 2. Filters hook (SEARCH, DEPARTMENT, CLASS, SECTION, STATUS, ACADEMIC YEAR)
   const {
     searchQuery,
     setSearchQuery,
-    groupFilter,
+    departmentFilter,
     classFilter,
+    sectionFilter,
     statusFilter,
-    setStatusFilter,
-    handleGroupFilterChange,
+    academicYearFilter,
+    handleDepartmentFilterChange,
     handleClassFilterChange,
+    handleSectionFilterChange,
+    handleStatusFilterChange,
+    handleAcademicYearFilterChange,
     resetAllFilters,
     filteredStudents,
+    availableClasses,
+    availableSections,
     hasActiveFilters,
     activeFilterCount,
-  } = useStudentFilters(students, classes, groups);
+  } = useStudentFilters(students, departments, classes, sections, academicYears);
 
-  // Reset pagination to page 1 whenever filters change
+  // Reset pagination to page 1 whenever any filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, classFilter, groupFilter, statusFilter]);
+  }, [searchQuery, departmentFilter, classFilter, sectionFilter, statusFilter, academicYearFilter]);
+
+  // Dynamic Academic Year options
+  const academicYearOptions = useMemo(() => {
+    const list = Array.isArray(academicYears) ? academicYears : [];
+    if (list.length > 0) {
+      return list.map((y) => ({
+        value: String(y.id || y.name || y.year),
+        label: y.name || (y.year ? `Academic Year ${y.year}` : String(y.id)),
+      }));
+    }
+    // Fallback: extract unique academic years from loaded student records
+    const setYears = new Set<string>();
+    students.forEach((s) => {
+      if (s.academic_year) setYears.add(s.academic_year);
+      else if (s.session_year) setYears.add(s.session_year);
+      else if (s.admission_date) setYears.add(String(s.admission_date).split("-")[0]);
+    });
+    return Array.from(setYears)
+      .sort()
+      .reverse()
+      .map((y) => ({
+        value: y,
+        label: `Academic Year ${y}`,
+      }));
+  }, [academicYears, students]);
 
   // Pagination calculations
   const totalItems = filteredStudents.length;
@@ -166,7 +204,10 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
     onNavigateProfile: (id) => navigate(`/students/${id}/profile`),
     onEditStudent: (student) => navigate(`/admission?edit=${student.id}`),
     onTransferStudent: (student) => setTransferringStudent(student),
-    onDeleteStudent: handleDeleteSingle,
+    onDeleteStudent: (id, name) => {
+      const found = students.find((s) => String(s.id) === String(id));
+      setStudentToDelete(found || ({ id, name_en: name } as any));
+    },
   });
 
   // Synchronize active highlight from URL param and automatically clear after 2.4 seconds
@@ -257,13 +298,24 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
     }
   };
 
+  const handleConfirmSingleDelete = async () => {
+    if (!studentToDelete) return;
+    setIsDeleting(true);
+    try {
+      await handleDeleteSingle(studentToDelete.id, studentToDelete.name_en || studentToDelete.name);
+    } finally {
+      setIsDeleting(false);
+      setStudentToDelete(null);
+    }
+  };
+
   return (
     <PageContainer>
-      {/* 1. Header */}
+      {/* 1. Page Header */}
       <PageHeader
         icon={StudentIcon}
         title="Student Roster"
-        subtitle="Directory of enrolled students, academic classes, guardian contacts, and status"
+        subtitle="Directory of enrolled students, academic classes, sections, guardian contacts, and status"
       />
 
       {/* 2. Metrics Cards */}
@@ -300,14 +352,14 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
         ]}
       />
 
-      {/* 3. Search & View Mode Switcher Toolbar */}
+      {/* 3. Search & 6 Primary Filter Controls (SEARCH, DEPARTMENT, CLASS, SECTION, STATUS, ACADEMIC YEAR) */}
       <DataViewToolbar
-        searchLabel="Search Directory"
+        searchLabel="Search"
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder="Search student, roll, guardian..."
+        searchPlaceholder="Search student, roll, ID..."
         stackedSwitcher={true}
-        filterGridClassName="grid-cols-1 sm:grid-cols-2 md:grid-cols-4"
+        filterGridClassName="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3"
         searchSpanClassName="col-span-1"
         viewMode={displayMode}
         onToggleViewMode={handleToggleDisplayMode}
@@ -318,55 +370,30 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
         hasActiveFilters={hasActiveFilters}
         activeFilterCount={activeFilterCount}
         onResetFilters={resetAllFilters}
-        selectedCount={selectedIds.length}
-        selectedLabel="Student"
-        onClearSelection={() => setSelectedIds([])}
-        selectionActions={
-          <ActionMenu
-            label="Bulk Actions"
-            icon={SectionControlIcon}
-            size="sm"
-            variant="ghost"
-            buttonClassName="bg-transparent border-transparent shadow-none px-2 py-1 text-xs font-bold theme-accent hover:opacity-80 transition-all cursor-pointer flex items-center gap-1.5"
-            align="right"
-            items={[
-              {
-                label: `Academic Transfer (${selectedIds.length})`,
-                icon: TransferIcon,
-                onClick: () => setIsBulkTransferModalOpen(true),
-              },
-              {
-                label: "Change Enrollment Status",
-                icon: CheckCircleIcon,
-                onClick: () => {
-                  setBulkActionType("change_status");
-                  setShowBulkModal(true);
-                },
-              },
-              {
-                divider: true,
-              },
-              {
-                label: "Delete Selected",
-                icon: TrashIcon,
-                danger: true,
-                onClick: () => {
-                  setBulkActionType("bulk_delete");
-                  setShowBulkModal(true);
-                },
-              },
-            ]}
-          />
-        }
         customFilters={
           <>
-            <div>
+            {/* 1. DEPARTMENT Filter */}
+            <div className="col-span-1">
+              <DepartmentSelect
+                label="Department"
+                size="md"
+                value={departmentFilter === "ALL" ? "" : departmentFilter}
+                onChange={(val: string) => handleDepartmentFilterChange(val || "ALL")}
+                departments={departments}
+                allowAll={true}
+                allLabel="All Departments"
+                placeholder="All Departments"
+              />
+            </div>
+
+            {/* 2. CLASS Filter (Cascaded by Department) */}
+            <div className="col-span-1">
               <ClassSelect
                 label="Class"
                 size="md"
                 value={classFilter === "ALL" ? "" : classFilter}
                 onChange={(val: string) => handleClassFilterChange(val || "ALL")}
-                classes={classes}
+                classes={availableClasses}
                 allowAll={true}
                 allLabel="All Classes"
                 placeholder="All Classes"
@@ -374,41 +401,108 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
               />
             </div>
 
-            <div>
-              <GroupSelect
-                label="Group"
+            {/* 3. SECTION Filter (Cascaded by Class) */}
+            <div className="col-span-1">
+              <SectionSelect
+                label="Section"
                 size="md"
-                value={groupFilter === "ALL" ? "" : groupFilter}
-                onChange={(val: string) => handleGroupFilterChange(val || "ALL")}
-                classId={classFilter === "ALL" ? "" : classFilter}
-                groups={groups}
+                value={sectionFilter === "ALL" ? "" : sectionFilter}
+                onChange={(val: string) => handleSectionFilterChange(val || "ALL")}
+                sections={availableSections}
+                classId={classFilter === "ALL" ? null : classFilter}
                 allowAll={true}
-                allLabel="All Groups"
-                placeholder="All Groups"
-                icon={GroupIcon}
+                allLabel="All Sections"
+                placeholder="All Sections"
+                icon={SectionIcon}
               />
             </div>
 
-            <div>
+            {/* 4. STATUS Filter */}
+            <div className="col-span-1">
               <CustomSelect
-                label="Enrollment Status"
+                label="Status"
                 size="md"
                 value={statusFilter}
-                onChange={(val: string) => setStatusFilter(val)}
+                onChange={(val: string) => handleStatusFilterChange(val || "ALL")}
                 options={[
                   { value: "ALL", label: "All Status" },
-                  { value: "ACTIVE", label: "Active Only" },
-                  { value: "INACTIVE", label: "Inactive Only" },
+                  { value: "ACTIVE", label: "Active" },
+                  { value: "INACTIVE", label: "Inactive" },
                   { value: "ALUMNI", label: "Alumni / TC" },
                 ]}
                 placeholder="All Status"
+              />
+            </div>
+
+            {/* 5. ACADEMIC YEAR Filter */}
+            <div className="col-span-1">
+              <CustomSelect
+                label="Academic Year"
+                size="md"
+                value={academicYearFilter}
+                onChange={(val: string) => handleAcademicYearFilterChange(val || "ALL")}
+                options={[
+                  { value: "ALL", label: "All Academic Years" },
+                  ...academicYearOptions,
+                ]}
+                placeholder="All Academic Years"
               />
             </div>
           </>
         }
       />
 
-      {/* 4. Data View (Table or Grid) with Integrated Enterprise Pagination */}
+      {/* 4. Google Drive-Style Selection Action Bar for Selected Students */}
+      {selectedIds.length > 0 && (
+        <SelectionActionBar
+          fullWidth={true}
+          bordered={true}
+          selectedCount={selectedIds.length}
+          totalCount={paginatedStudents.length}
+          onToggleSelectAll={() => {
+            if (selectedIds.length >= paginatedStudents.length) {
+              setSelectedIds([]);
+            } else {
+              setSelectedIds(paginatedStudents.map((s) => s.id));
+            }
+          }}
+          onClearSelection={() => setSelectedIds([])}
+          actions={[
+            {
+              id: "transfer",
+              label: `Academic Transfer (${selectedIds.length})`,
+              shortLabel: "Transfer",
+              icon: TransferIcon,
+              variant: "sub",
+              onClick: () => setIsBulkTransferModalOpen(true),
+            },
+            {
+              id: "status",
+              label: `Change Status (${selectedIds.length})`,
+              shortLabel: "Status",
+              icon: CheckCircleIcon,
+              variant: "sub",
+              onClick: () => {
+                setBulkActionType("change_status");
+                setShowBulkModal(true);
+              },
+            },
+            {
+              id: "delete",
+              label: `Delete (${selectedIds.length})`,
+              shortLabel: "Delete",
+              icon: TrashIcon,
+              variant: "danger",
+              onClick: () => {
+                setBulkActionType("bulk_delete");
+                setShowBulkModal(true);
+              },
+            },
+          ]}
+        />
+      )}
+
+      {/* 5. Data View (Table or Grid) with Enterprise Pagination */}
       <div className="space-y-4">
         {displayMode === "table" ? (
           <DataTable
@@ -425,7 +519,7 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
             emptyIcon={StudentIcon}
             emptyTitle="No Students Found"
             emptySubMessage={
-              searchQuery || classFilter !== "ALL" || groupFilter !== "ALL" || statusFilter !== "ALL"
+              hasActiveFilters
                 ? "No student records match your active filter criteria."
                 : "No students registered in this academy roster."
             }
@@ -451,7 +545,7 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
             emptyIcon={StudentIcon}
             emptyTitle="No Students Found"
             emptySubMessage={
-              searchQuery || classFilter !== "ALL" || groupFilter !== "ALL" || statusFilter !== "ALL"
+              hasActiveFilters
                 ? "No student records match your active filter criteria."
                 : "No students registered in this academy roster."
             }
@@ -459,7 +553,7 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
           />
         )}
 
-        {/* 5. Enterprise Reusable Pagination Controls */}
+        {/* 6. Enterprise Reusable Pagination Controls */}
         {!loading && filteredStudents.length > 0 && (
           <Pagination
             currentPage={safeCurrentPage}
@@ -473,7 +567,7 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
         )}
       </div>
 
-      {/* 5. Bulk Operations Modal */}
+      {/* 7. Bulk Operations Modal */}
       <StudentBulkModal
         isOpen={showBulkModal}
         onClose={() => setShowBulkModal(false)}
@@ -485,7 +579,20 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
         onSubmit={onExecuteBulkAction}
       />
 
-      {/* 6. Student Transfer Modal (Single & Bulk) */}
+      {/* 8. Single Student Deletion ConfirmModal (Zero browser window.confirm) */}
+      <ConfirmModal
+        isOpen={Boolean(studentToDelete)}
+        title="Delete Student Record"
+        message={`Are you sure you want to delete student "${studentToDelete?.name_en || studentToDelete?.name || ""}"? This action cannot be undone.`}
+        confirmText={isDeleting ? "Deleting..." : "Delete Student"}
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isDeleting}
+        onCancel={() => setStudentToDelete(null)}
+        onConfirm={handleConfirmSingleDelete}
+      />
+
+      {/* 9. Student Transfer Modal (Single & Bulk) */}
       {(isBulkTransferModalOpen || Boolean(transferringStudent)) && (
         <StudentTransferModal
           isOpen={isBulkTransferModalOpen || Boolean(transferringStudent)}

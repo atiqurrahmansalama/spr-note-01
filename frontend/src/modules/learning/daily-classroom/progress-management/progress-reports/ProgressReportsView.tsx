@@ -24,6 +24,7 @@ import SelectionActionBar from "@/components/ui/SelectionActionBar";
 import { DateRangePicker } from "@/components/selectors";
 import SegmentedSwitch from "@/components/ui/SegmentedSwitch";
 import DailyClassroomFilterControls from "../../components/DailyClassroomFilterControls";
+import { StudentSelector } from "../../components";
 import { useAcademicData } from "@/hooks/useAcademicData";
 import { useTenant } from "@/context/TenantContext";
 import { dailyProgressRepository, offlineDB } from "@/offline";
@@ -63,6 +64,10 @@ export default function ProgressReportsView({
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncErrors, setSyncErrors] = useState<SyncErrorItem[] | null>(null);
   const recentlyDeletedIdsRef = useRef<Set<string>>(new Set());
+  const reportsListRef = useRef<ReportItem[]>([]);
+  useEffect(() => {
+    reportsListRef.current = reportsList;
+  }, [reportsList]);
 
   // View modes: "RECORD_REPORTS" | "STUDENT_VIEW"
   const [viewMode, setViewMode] = useState<"RECORD_REPORTS" | "STUDENT_VIEW">("RECORD_REPORTS");
@@ -110,6 +115,7 @@ export default function ProgressReportsView({
 
   // Local filters state
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [selectedGroupFilter, setSelectedGroupFilter] = useState("ALL");
   const [selectedSessionFilter, setSelectedSessionFilter] = useState("ALL");
 
@@ -571,19 +577,32 @@ export default function ProgressReportsView({
       if (!Array.isArray(list)) return;
       list.forEach((r) => {
         if (!r) return;
-        const key = String(r.id || r.report_unique_id || "").toLowerCase();
-        const serverKey = r.server_id ? String(r.server_id).toLowerCase() : "";
-        const uniqKey = r.report_unique_id ? String(r.report_unique_id).toLowerCase() : "";
-        if (
-          recentlyDeletedIdsRef.current.has(key) ||
-          (serverKey && recentlyDeletedIdsRef.current.has(serverKey)) ||
-          (uniqKey && recentlyDeletedIdsRef.current.has(uniqKey))
-        ) {
+        const uniqKey = r.report_unique_id ? String(r.report_unique_id).trim() : "";
+        const idKey = r.id !== undefined && r.id !== null ? String(r.id).trim() : "";
+        const serverKey = r.server_id ? String(r.server_id).trim() : "";
+
+        // Canonical identity prioritizes report_unique_id, then server_id, then id
+        const canonicalKey = uniqKey || (serverKey ? `srv_${serverKey}` : idKey);
+        if (!canonicalKey) return;
+
+        const lowerKeys = [uniqKey.toLowerCase(), idKey.toLowerCase(), serverKey.toLowerCase()].filter(Boolean);
+        if (lowerKeys.some((k) => recentlyDeletedIdsRef.current.has(k))) {
           return;
         }
-        const storeKey = String(r.id || r.report_unique_id || "");
-        if (storeKey && !localMap.has(storeKey)) {
-          localMap.set(storeKey, r);
+
+        const existing = localMap.get(canonicalKey);
+        if (!existing) {
+          localMap.set(canonicalKey, r);
+        } else {
+          // Merge keeping numeric server id and newest updates
+          const existingHasServer = !isNaN(Number(existing.id)) || Boolean(existing.server_id);
+          const currentHasServer = !isNaN(Number(r.id)) || Boolean(r.server_id);
+          const existingTime = new Date(existing.updated_at || existing.client_updated_at || 0).getTime();
+          const currentTime = new Date(r.updated_at || r.client_updated_at || 0).getTime();
+
+          if ((!existingHasServer && currentHasServer) || currentTime >= existingTime) {
+            localMap.set(canonicalKey, { ...existing, ...r });
+          }
         }
       });
     };
@@ -613,13 +632,20 @@ export default function ProgressReportsView({
       } catch {}
 
       localReps = Array.from(localMap.values());
-      if (localReps.length > 0) {
-        setReportsList(localReps.map(normalizeReport));
-      } else {
-        setReportsList([]);
+      // Prevent UI flickering / jumping:
+      // Only set localReps immediately on initial cold boot (when current list is empty) or when offline.
+      // When online with active reports, preserve current table rows until server reconciles.
+      if (!isOnline() || reportsListRef.current.length === 0) {
+        if (localReps.length > 0) {
+          setReportsList(localReps.map(normalizeReport));
+        } else {
+          setReportsList([]);
+        }
       }
     } catch {
-      setReportsList([]);
+      if (!isOnline() || reportsListRef.current.length === 0) {
+        setReportsList([]);
+      }
     }
 
     if (!isSilent && localReps.length === 0) {
@@ -676,11 +702,20 @@ export default function ProgressReportsView({
           if (r.report_unique_id) apiUniqueIds.add(String(r.report_unique_id));
         });
 
+        const getLocalMatch = (apiRep: ReportItem) => {
+          const uniq = apiRep.report_unique_id ? String(apiRep.report_unique_id).trim() : "";
+          const srv = apiRep.server_id ? String(apiRep.server_id).trim() : "";
+          const idStr = apiRep.id !== undefined && apiRep.id !== null ? String(apiRep.id).trim() : "";
+          return (
+            (uniq && localMap.get(uniq)) ||
+            (srv && (localMap.get(`srv_${srv}`) || localMap.get(srv))) ||
+            (idStr && (localMap.get(`srv_${idStr}`) || localMap.get(idStr))) ||
+            null
+          );
+        };
+
         const merged = apiReports.map((apiRep: ReportItem) => {
-          const key1 = String(apiRep.id || "");
-          const key2 = String(apiRep.server_id || "");
-          const key3 = String(apiRep.report_unique_id || "");
-          const localMatch = localMap.get(key1) || (key2 ? localMap.get(key2) : null) || (key3 ? localMap.get(key3) : null);
+          const localMatch = getLocalMatch(apiRep);
 
           if (localMatch) {
             // Enterprise Reconciliation: If local has unsynced changes or edits newer than server, preserve local edits!
@@ -887,6 +922,14 @@ export default function ProgressReportsView({
       const passesGroup = selectedGroupFilter === "ALL" || groupName === selectedGroupFilter.toLowerCase();
       const passesSession = selectedSessionFilter === "ALL" || sessionName === selectedSessionFilter.toLowerCase();
 
+      let passesStudent = true;
+      if (selectedStudentId) {
+        const repStudentId = String(rep.studentId || rep.student_id || rep.student?.id || "");
+        passesStudent =
+          repStudentId === String(selectedStudentId) ||
+          studentName === searchQuery.toLowerCase().trim();
+      }
+
       let passesDateRange = true;
       if (startDate && rep.isoDateOnly) {
         passesDateRange = passesDateRange && rep.isoDateOnly >= startDate;
@@ -906,9 +949,9 @@ export default function ProgressReportsView({
         return false;
       }
 
-      return passesSearch && passesGroup && passesSession && passesDateRange;
+      return passesSearch && passesStudent && passesGroup && passesSession && passesDateRange;
     });
-  }, [reportsList, searchQuery, selectedGroupFilter, selectedSessionFilter, startDate, endDate, selectedDeptFilter, selectedClsFilter, selectedSecFilter]);
+  }, [reportsList, searchQuery, selectedStudentId, selectedGroupFilter, selectedSessionFilter, startDate, endDate, selectedDeptFilter, selectedClsFilter, selectedSecFilter]);
 
   // Grouped by Student calculation for STUDENT_VIEW
   const studentGroupedData: StudentGroupedItem[] = useMemo(() => {
@@ -973,6 +1016,7 @@ export default function ProgressReportsView({
 
   const handleResetAllFilters = () => {
     setSearchQuery("");
+    setSelectedStudentId(null);
     setSelectedGroupFilter("ALL");
     setSelectedSessionFilter("ALL");
     setStartDate("");
@@ -988,6 +1032,7 @@ export default function ProgressReportsView({
 
   const handleRefresh = async () => {
     setSearchQuery("");
+    setSelectedStudentId(null);
     setSelectedGroupFilter("ALL");
     setSelectedSessionFilter("ALL");
     setStartDate("");
@@ -1060,12 +1105,13 @@ export default function ProgressReportsView({
     }
     if (selectedIds.size > 0) {
       return filteredReports.filter((r) => {
-        const id = r.id ?? r.report_unique_id;
-        if (!id) return false;
+        const id = r.id;
+        const uniqId = r.report_unique_id;
+        const srvId = r.server_id;
         return (
-          selectedIds.has(id) ||
-          selectedIds.has(String(id)) ||
-          (!isNaN(Number(id)) && selectedIds.has(Number(id)))
+          (id !== undefined && id !== null && (selectedIds.has(id) || selectedIds.has(String(id)) || (!isNaN(Number(id)) && selectedIds.has(Number(id))))) ||
+          (uniqId && (selectedIds.has(uniqId) || selectedIds.has(String(uniqId)))) ||
+          (srvId !== undefined && srvId !== null && (selectedIds.has(srvId) || selectedIds.has(String(srvId)) || (!isNaN(Number(srvId)) && selectedIds.has(Number(srvId)))))
         );
       });
     }
@@ -1152,7 +1198,10 @@ export default function ProgressReportsView({
   // Sync all currently selected reports
   const handleSyncSelectedReports = async () => {
     const selectedReports = getActiveTargetReports();
-    if (selectedReports.length === 0) return;
+    if (selectedReports.length === 0) {
+      showToast("No reports selected for syncing", "warning");
+      return;
+    }
     setIsSyncing(true);
     setSyncErrors(null);
     try {
@@ -1162,7 +1211,7 @@ export default function ProgressReportsView({
         if (res.syncedCount && res.syncedCount > 0) {
           showToast(`Synced ${res.syncedCount} report(s), ${res.errors.length} failed.`, "warning");
         } else {
-          showToast(`Failed to sync ${res.errors.length} selected report(s).`, "error");
+          showToast(`Failed to sync ${res.errors.length} selected report(s): ${res.errors[0]?.reason || "Cloud error"}`, "error");
         }
       } else if (res && res.syncedCount && res.syncedCount > 0) {
         showToast(`Successfully synced ${res.syncedCount} selected report(s) to Database!`, "success");
@@ -1341,33 +1390,28 @@ export default function ProgressReportsView({
         filterProps={effectiveFilterProps}
         showPeriodSwitcher={false}
         searchControl={
-          <div className="space-y-1.5 w-full">
-            <label className="text-[11px] font-bold uppercase tracking-wider theme-text-secondary block">
-              Search Student
-            </label>
-            <div className="relative w-full">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none theme-text-secondary">
-                <SearchIcon className="w-4 h-4" />
-              </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search student, session, roll..."
-                className="w-full h-[42px] theme-bg-sub border theme-border theme-text-primary pl-9 pr-8 py-2 rounded-xl text-xs focus:outline-none focus:border-[var(--accent-main)]/60 transition-all duration-200 shadow-sm"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-xs theme-text-secondary hover:theme-text-primary cursor-pointer"
-                  title="Clear search"
-                >
-                  <CloseIcon className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
+          <StudentSelector
+            studentName={searchQuery}
+            studentId={selectedStudentId}
+            departmentId={selectedDeptFilter}
+            classId={selectedClsFilter}
+            sectionId={selectedSecFilter}
+            size="md"
+            label="STUDENT"
+            placeholder="Search student, session, roll..."
+            onStudentSelect={(selected) => {
+              if (!selected) {
+                setSearchQuery("");
+                setSelectedStudentId(null);
+              } else if (typeof selected === "string") {
+                setSearchQuery(selected);
+                setSelectedStudentId(null);
+              } else {
+                setSearchQuery(selected.label || selected.name || "");
+                setSelectedStudentId(selected.id ? String(selected.id) : null);
+              }
+            }}
+          />
         }
         customDateComponent={
           <DateRangePicker
@@ -1409,6 +1453,7 @@ export default function ProgressReportsView({
             /* Google Drive style: Selection bar completely replaces standard footer controls */
             <SelectionActionBar
               fullWidth={true}
+              bordered={false}
               selectedCount={selectedIds.size}
               totalCount={filteredReports.length}
               onToggleSelectAll={toggleSelectAll}
@@ -1419,7 +1464,7 @@ export default function ProgressReportsView({
                   label: `Sync to DB (${selectedIds.size})`,
                   shortLabel: `Sync to DB (${selectedIds.size})`,
                   icon: CloudIcon,
-                  variant: "accent",
+                  variant: "sub",
                   disabled: offline || isSyncing,
                   loading: isSyncing,
                   onClick: handleSyncSelectedReports,

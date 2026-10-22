@@ -125,39 +125,60 @@ export const saveReportLocally = (reportData, options = {}) => {
   return existingIndex > -1 ? reports[existingIndex] : updatedReport;
 };
 
-// 2. Fetch All Local Reports with Multi-Tenant & Multi-Key Aggregation
+// 2. Fetch All Local Reports with Canonical Deduplication & Multi-Tenant Aggregation
 export const getLocalReports = () => {
   try {
     const reportMap = new Map();
 
+    const ingestItem = (r) => {
+      if (!r || typeof r !== "object") return;
+      const uniqKey = r.report_unique_id ? String(r.report_unique_id).trim().toUpperCase() : "";
+      const k = uniqKey || String(r.id || "").trim();
+      if (!k) return;
+
+      const existing = reportMap.get(k);
+      if (!existing) {
+        reportMap.set(k, r);
+      } else {
+        const hasNumericId = typeof r.id === "number" || (!isNaN(Number(r.id)) && !String(r.id).includes("-"));
+        const existingHasNumeric = typeof existing.id === "number" || (!isNaN(Number(existing.id)) && !String(existing.id).includes("-"));
+        const chosenId = hasNumericId ? r.id : (existingHasNumeric ? existing.id : (r.id || existing.id));
+        const chosenServerId = r.server_id || existing.server_id;
+        const isSynced = r.sync_status === "SYNCED" || existing.sync_status === "SYNCED";
+
+        reportMap.set(k, {
+          ...existing,
+          ...r,
+          id: chosenId,
+          server_id: chosenServerId,
+          report_unique_id: r.report_unique_id || existing.report_unique_id,
+          sync_status: isSynced ? "SYNCED" : (r.sync_status || existing.sync_status),
+          client_updated_at: r.client_updated_at || existing.client_updated_at,
+        });
+      }
+    };
+
     // 1. Ingest global storage key
     const rawGlobal = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (rawGlobal) {
-      const parsedGlobal = JSON.parse(rawGlobal);
-      if (Array.isArray(parsedGlobal)) {
-        parsedGlobal.forEach((r) => {
-          const k = String(r.id || r.report_unique_id || "");
-          if (k) reportMap.set(k, r);
-        });
-      }
+      try {
+        const parsedGlobal = JSON.parse(rawGlobal);
+        if (Array.isArray(parsedGlobal)) {
+          parsedGlobal.forEach(ingestItem);
+        }
+      } catch {}
     }
 
     // 2. Ingest active tenant storage key
     const tenantId = localStorage.getItem("spr_active_tenant_id") || "default";
     const rawTenant = localStorage.getItem(`spr_reports_local_${tenantId}_v1`);
     if (rawTenant) {
-      const parsedTenant = JSON.parse(rawTenant);
-      if (Array.isArray(parsedTenant)) {
-        parsedTenant.forEach((r) => {
-          const k = String(r.id || r.report_unique_id || "");
-          if (k) {
-            const existing = reportMap.get(k);
-            if (!existing || (r.client_updated_at && (!existing.client_updated_at || r.client_updated_at >= existing.client_updated_at))) {
-              reportMap.set(k, { ...(existing || {}), ...r });
-            }
-          }
-        });
-      }
+      try {
+        const parsedTenant = JSON.parse(rawTenant);
+        if (Array.isArray(parsedTenant)) {
+          parsedTenant.forEach(ingestItem);
+        }
+      } catch {}
     }
 
     return Array.from(reportMap.values());
@@ -365,31 +386,47 @@ export const triggerCloudSync = async (options = {}) => {
       reports = Array.from(mergedMap.values());
     }
 
-    let pendingIds = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || "[]");
-
-    // Filter out any IDs in pendingQueue that are already SYNCED in local storage
-    pendingIds = pendingIds.filter((pId) => {
-      const found = reports.find((r) => r.id === pId || r.report_unique_id === pId);
-      return !found || isReportUnsynced(found);
-    });
-
-    // Gather all genuinely unsynced reports authoritatively
-    const unsyncedReports = reports.filter(isReportUnsynced);
-    unsyncedReports.forEach((r) => {
-      const rId = r.id || r.report_unique_id;
-      if (rId && !pendingIds.includes(rId)) {
-        pendingIds.push(rId);
-      }
-    });
-
-    if (unsyncedReports.length === 0) {
-      console.log("[SyncEngine] Local storage is in sync.");
-      localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify([]));
-      return { success: true, syncedCount: 0, failedCount: 0, remainingCount: 0, errors: [] };
+    let pendingIds = [];
+    try {
+      pendingIds = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || "[]");
+      if (!Array.isArray(pendingIds)) pendingIds = [];
+    } catch {
+      pendingIds = [];
     }
 
-    const pendingItems = unsyncedReports;
+    const isExplicitSync = Array.isArray(options?.reports) && options.reports.length > 0;
+
+    let pendingItems;
     let updatedIds = [...pendingIds];
+
+    if (isExplicitSync) {
+      pendingItems = options.reports;
+    } else {
+      // Filter out any IDs in pendingQueue that are already SYNCED in local storage
+      pendingIds = pendingIds.filter((pId) => {
+        const found = reports.find((r) => r.id === pId || r.report_unique_id === pId);
+        return !found || isReportUnsynced(found);
+      });
+
+      // Gather all genuinely unsynced reports authoritatively
+      const unsyncedReports = reports.filter(isReportUnsynced);
+      unsyncedReports.forEach((r) => {
+        const rId = r.id || r.report_unique_id;
+        if (rId && !pendingIds.includes(rId)) {
+          pendingIds.push(rId);
+        }
+      });
+
+      if (unsyncedReports.length === 0) {
+        console.log("[SyncEngine] Local storage is in sync.");
+        localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify([]));
+        return { success: true, syncedCount: 0, failedCount: 0, remainingCount: 0, errors: [] };
+      }
+
+      pendingItems = unsyncedReports;
+      updatedIds = [...pendingIds];
+    }
+
     let syncedCount = 0;
     const syncErrors = [];
 
@@ -447,21 +484,65 @@ export const triggerCloudSync = async (options = {}) => {
 
         if (apiResult.success && apiResult.data) {
           const serverReport = apiResult.data;
-          const itemIdx = reports.findIndex(
-            (r) => r.id === item.id || (item.report_unique_id && r.report_unique_id === item.report_unique_id)
-          );
-          if (itemIdx > -1) {
-            reports[itemIdx] = {
-              ...reports[itemIdx],
+          const oldLocalId = item.id;
+          const canonicalUniqId = serverReport.report_unique_id || item.report_unique_id;
+
+          // Replace or consolidate in local reports list
+          let replaced = false;
+          reports = reports.map((r) => {
+            if (
+              (oldLocalId && r.id === oldLocalId) ||
+              (canonicalUniqId && r.report_unique_id === canonicalUniqId) ||
+              (serverReport.id && (r.server_id === serverReport.id || r.id === serverReport.id))
+            ) {
+              replaced = true;
+              return {
+                ...r,
+                ...serverReport,
+                id: serverReport.id,
+                server_id: serverReport.id,
+                report_unique_id: canonicalUniqId,
+                sync_status: "SYNCED",
+                sync_error: null,
+                grace_expires_at: null,
+              };
+            }
+            return r;
+          });
+
+          if (!replaced) {
+            reports.unshift({
+              ...item,
               ...serverReport,
               id: serverReport.id,
               server_id: serverReport.id,
-              report_unique_id: serverReport.report_unique_id || reports[itemIdx].report_unique_id,
+              report_unique_id: canonicalUniqId,
               sync_status: "SYNCED",
               sync_error: null,
               grace_expires_at: null,
-            };
+            });
           }
+
+          // Deduplicate reports by report_unique_id so ghost records never linger
+          const deduped = [];
+          const seenIds = new Set();
+          reports.forEach((r) => {
+            const k = (r.report_unique_id || r.id || "").toLowerCase();
+            if (k && !seenIds.has(k)) {
+              seenIds.add(k);
+              deduped.push(r);
+            }
+          });
+          reports = deduped;
+
+          // Prune old local UUID key from IndexedDB if it differed from server ID
+          if (oldLocalId && String(oldLocalId) !== String(serverReport.id)) {
+            import("../offline").then(({ offlineDB, getActiveTenantId }) => {
+              const tenantId = getActiveTenantId();
+              offlineDB.entities.delete([tenantId, "daily_progress", oldLocalId]).catch(() => {});
+            }).catch(() => {});
+          }
+
           updatedIds = updatedIds.filter((id) => id !== item.id && id !== item.report_unique_id && id !== serverReport.id);
           syncedCount += 1;
         } else {

@@ -3,13 +3,14 @@ import { ChevronIcon } from "@/components/ui/Icons";
 
 export interface TableBatchToolbarProps {
   totalItems: number;
-  selectedCount: number;
+  selectedCount?: number;
   isAllExpanded: boolean;
   onToggleExpandAll: () => void;
   expandAllLabel: string;
   collapseAllLabel: string;
   showingLabel?: string;
   selectedBadgeLabel?: string;
+  showSelectedBadge?: boolean;
   children?: React.ReactNode;
 }
 
@@ -19,13 +20,14 @@ export interface TableBatchToolbarProps {
  */
 export function TableBatchToolbar({
   totalItems,
-  selectedCount,
+  selectedCount = 0,
   isAllExpanded,
   onToggleExpandAll,
   expandAllLabel,
   collapseAllLabel,
   showingLabel,
   selectedBadgeLabel = "selected",
+  showSelectedBadge = false,
   children,
 }: TableBatchToolbarProps) {
   return (
@@ -50,7 +52,7 @@ export function TableBatchToolbar({
           </button>
         )}
 
-        {selectedCount > 0 && (
+        {showSelectedBadge && selectedCount > 0 && (
           <span className="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-lg theme-bg-accent-soft theme-accent border border-current/20">
             {selectedCount} {selectedBadgeLabel}
           </span>

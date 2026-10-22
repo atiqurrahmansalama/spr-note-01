@@ -24,6 +24,11 @@ export interface StudentRecord {
   group_name?: string;
   group?: string;
   sub?: string;
+  department?: string | number | { id: string | number; name: string; [key: string]: any };
+  department_id?: string | number;
+  department_name?: string;
+  academic_year?: string;
+  session_year?: string;
   status?: string;
   father_name?: string;
   guardian_name?: string;
