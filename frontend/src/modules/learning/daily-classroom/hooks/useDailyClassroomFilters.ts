@@ -78,7 +78,9 @@ export default function useDailyClassroomFilters({
   // ── Select Options (Clean & Deduplicated — Zero "ALL" Options) ─────────────
 
   const departmentSelectOptions = useMemo(() => {
-    const opts: Array<{ value: string; label: string }> = [];
+    const opts: Array<{ value: string; label: string }> = [
+      { value: '', label: 'All Departments' },
+    ];
     const seenNames = new Set<string>();
     (departments || []).forEach((d) => {
       const name = (d.name || d.department_name || '').trim();
@@ -108,17 +110,23 @@ export default function useDailyClassroomFilters({
   }, [classes, departments, hasDepartments, selectedDepartmentId]);
 
   const classSelectOptions = useMemo(() => {
-    return filteredClassList.map((c) => ({
-      value: String(c.id),
-      label: c.name || c.class_name,
-    }));
+    const opts: Array<{ value: string; label: string }> = [
+      { value: '', label: 'All Classes' },
+    ];
+    filteredClassList.forEach((c) => {
+      opts.push({
+        value: String(c.id),
+        label: c.name || c.class_name,
+      });
+    });
+    return opts;
   }, [filteredClassList]);
 
   const selectedClassObj = useMemo(() => {
-    if (!effectiveClassId) return filteredClassList[0] || null;
+    if (!effectiveClassId) return null;
     return (classes || []).find((c) => String(c.id) === String(effectiveClassId)) ||
            (classes || []).find((c) => (c.name || c.class_name || '').toLowerCase().trim() === String(effectiveClassId).toLowerCase()) || null;
-  }, [classes, effectiveClassId, filteredClassList]);
+  }, [classes, effectiveClassId]);
 
   const filteredSectionsForClass = useMemo(() => {
     let list = sections || [];
@@ -147,10 +155,16 @@ export default function useDailyClassroomFilters({
   const hasSectionsForClass = filteredSectionsForClass.length > 0;
 
   const sectionSelectOptions = useMemo(() => {
-    return filteredSectionsForClass.map((s) => ({
-      value: String(s.id),
-      label: s.section_name || s.name || `Section ${s.id}`,
-    }));
+    const opts: Array<{ value: string; label: string }> = [
+      { value: '', label: 'All Sections' },
+    ];
+    filteredSectionsForClass.forEach((s) => {
+      opts.push({
+        value: String(s.id),
+        label: s.section_name || s.name || `Section ${s.id}`,
+      });
+    });
+    return opts;
   }, [filteredSectionsForClass]);
 
   // ── Dynamic Routine Period Slots ──

@@ -10,6 +10,7 @@ import {
   ReportCommentsCell,
 } from "./sharedReportCells";
 import { useTranslation } from "@/i18n";
+import { isReportUnsynced } from "@/utils/syncEngine";
 import "../locales";
 
 export interface StudentSessionTimelineProps {
@@ -60,16 +61,30 @@ export function StudentSessionTimeline({
       minWidth: "150px",
       headerClassName: "!pl-0 theme-bg-sub/40 border-t border-b theme-border",
       cellClassName: "!pl-0 align-top",
-      render: (rep: ReportItem) => (
-        <div className="space-y-0.5 font-mono">
-          <span className="text-xs font-semibold theme-text-primary block break-words">
-            {rep.formattedReportDate || rep.formattedDate || "—"}
-          </span>
-          <span className="text-[11px] theme-text-secondary block break-words opacity-85">
-            {rep.formattedGenerateTime || rep.formattedTime || rep.time || "—"}
-          </span>
-        </div>
-      ),
+      render: (rep: ReportItem) => {
+        const isPending = isReportUnsynced(rep);
+        return (
+          <div className="space-y-0.5 font-mono">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-semibold theme-text-primary block break-words">
+                {rep.formattedReportDate || rep.formattedDate || "—"}
+              </span>
+              {isPending && (
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-500 dark:text-amber-400 shrink-0 shadow-2xs"
+                  title={t("pendingSync", "Pending Cloud Sync")}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                  <span>{t("pending", "Pending")}</span>
+                </span>
+              )}
+            </div>
+            <span className="text-[11px] theme-text-secondary block break-words opacity-85">
+              {rep.formattedGenerateTime || rep.formattedTime || rep.time || "—"}
+            </span>
+          </div>
+        );
+      },
     },
     {
       key: "session_portions",

@@ -887,15 +887,3 @@ export function DetailSection({
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// 7. BACKWARD COMPATIBILITY EXPORTS FOR BOOK SECTIONS
-// ══════════════════════════════════════════════════════════════════════════════
-
-export function BookPageSection(props: any) {
-  return <JuzPageSection {...props} showJuz={false} title="PAGE DETAILS" />;
-}
-
-export function BookDetailSection(props: any) {
-  return <DetailSection {...props} showJuz={false} unitLabel="Line" />;
-}
-

@@ -809,29 +809,29 @@ export default function DailyClassroomHubView({
               Evaluate Student
             </CustomButton>
           ) : isProgressHub && activeTab === 'PROGRESS' ? (
-            <div className="flex items-center p-1 rounded-xl theme-bg-elevated border theme-border gap-1 shadow-xs">
+            <div className="flex items-center p-1 rounded-xl theme-bg-sub border theme-border gap-1 shadow-2xs">
               <button
                 type="button"
                 onClick={() => handleProgressModeChange('QURAN')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                   progressMode === 'QURAN'
-                    ? 'theme-bg-accent theme-text-accent-contrast shadow-xs'
-                    : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-surface'
+                    ? 'theme-bg-accent theme-accent-text shadow-sm scale-[1.01]'
+                    : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
                 }`}
               >
-                <BookOpenIcon className="w-3.5 h-3.5" />
+                <BookOpenIcon className="w-3.5 h-3.5 shrink-0" />
                 <span>Quran</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleProgressModeChange('BOOK')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                   progressMode === 'BOOK'
-                    ? 'theme-bg-accent theme-text-accent-contrast shadow-xs'
-                    : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-surface'
+                    ? 'theme-bg-accent theme-accent-text shadow-sm scale-[1.01]'
+                    : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
                 }`}
               >
-                <LayersIcon className="w-3.5 h-3.5" />
+                <LayersIcon className="w-3.5 h-3.5 shrink-0" />
                 <span>Book</span>
               </button>
             </div>

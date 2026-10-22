@@ -8,3 +8,4 @@ export * from "./TableBatchToolbar";
 export * from "./RecordReportExpandedCells";
 export * from "./StudentSessionTimeline";
 export * from "./EmptyReportsState";
+export * from "./SyncErrorsAlertBanner";

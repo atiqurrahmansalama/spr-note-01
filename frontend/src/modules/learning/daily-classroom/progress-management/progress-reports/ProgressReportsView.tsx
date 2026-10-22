@@ -3,20 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/context/ToastContext";
 import { fetchWithAuth } from "@/utils/authService";
 import { isOnline } from "@/utils/localStore";
-import { triggerCloudSync, isReportUnsynced } from "@/utils/syncEngine";
+import { triggerCloudSync, isReportUnsynced, getLocalReports } from "@/utils/syncEngine";
 import { formatDate } from "@/utils/reportGenerator";
 import {
   CloudIcon,
   UsersIcon,
   CheckIcon,
   SearchIcon,
-  PrinterIcon,
   CloseIcon,
   RefreshIcon,
   ChecklistIcon,
   TrashIcon,
-  CopyIcon,
-  EditIcon,
 } from "@/components/ui/Icons";
 import { ConfirmModal } from "@/components/ui/Modal";
 import { useTranslation } from "@/i18n";
@@ -32,12 +29,14 @@ import {
   RecordReportsTable,
   StudentGroupedTable,
   ReportContextMenu,
+  SyncErrorsAlertBanner,
 } from "./components";
 import {
   ProgressReportsViewProps,
   ReportItem,
   StudentGroupedItem,
   ContextMenuState,
+  SyncErrorItem,
 } from "./types";
 
 export default function ProgressReportsView({
@@ -59,13 +58,7 @@ export default function ProgressReportsView({
   const [offline, setOffline] = useState(!isOnline());
   const [loading, setLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncErrors, setSyncErrors] = useState<Array<{
-    id?: string | number;
-    report_unique_id?: string;
-    student_name?: string;
-    status?: number;
-    reason: string;
-  }> | null>(null);
+  const [syncErrors, setSyncErrors] = useState<SyncErrorItem[] | null>(null);
 
   // View modes: "RECORD_REPORTS" | "STUDENT_VIEW"
   const [viewMode, setViewMode] = useState<"RECORD_REPORTS" | "STUDENT_VIEW">("RECORD_REPORTS");
@@ -564,25 +557,48 @@ export default function ProgressReportsView({
   }, [normalizeReport]);
 
   // Load Reports from IndexedDB / LocalStorage & API with multi-endpoint fallback
+  // Load Reports from IndexedDB / LocalStorage & API with multi-endpoint fallback
   const loadReports = useCallback(async (isSilent = false) => {
     let localReps: any[] = [];
     const tenantScopedStorageKey = `spr_reports_local_${activeTenantId || 'default'}_v1`;
+    const localMap = new Map<string, any>();
+
+    const ingestLocal = (list: any[]) => {
+      if (!Array.isArray(list)) return;
+      list.forEach((r) => {
+        if (!r) return;
+        const key = String(r.id || r.report_unique_id || "");
+        if (key && !localMap.has(key)) {
+          localMap.set(key, r);
+        }
+      });
+    };
+
     try {
       // 1. Instant read from Central IndexedDB strictly isolated to active tenant
       const idbReps = await dailyProgressRepository.list(undefined, { tenantId: activeTenantId });
-      if (idbReps && idbReps.length > 0) {
-        localReps = idbReps;
-      } else {
-        // Fallback to localStorage migration
-        localReps = JSON.parse(
-          localStorage.getItem(tenantScopedStorageKey) ||
-          (activeTenantId === 'default' ? localStorage.getItem("spr_reports_local_v1") : null) ||
-          "[]"
-        );
-        if (localReps.length > 0) {
-          dailyProgressRepository.bulkHydrate(localReps, { tenantId: activeTenantId }).catch(() => {});
-        }
+      ingestLocal(idbReps);
+
+      // 2. Central IndexedDB default fallback
+      if (activeTenantId && activeTenantId !== 'default') {
+        const defaultIdbReps = await dailyProgressRepository.list(undefined, { tenantId: 'default' });
+        ingestLocal(defaultIdbReps);
       }
+
+      // 3. Fallback to localStorage migration & tenant cache
+      try {
+        ingestLocal(JSON.parse(localStorage.getItem(tenantScopedStorageKey) || "[]"));
+      } catch {}
+
+      // 4. Central syncEngine storage ("spr_reports_local_v1")
+      try {
+        ingestLocal(JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]"));
+      } catch {}
+      try {
+        ingestLocal(getLocalReports());
+      } catch {}
+
+      localReps = Array.from(localMap.values());
       if (localReps.length > 0) {
         setReportsList(localReps.map(normalizeReport));
       } else {
@@ -626,10 +642,13 @@ export default function ProgressReportsView({
         const rawData = Array.isArray(raw) ? raw : (raw.results || raw.data || []);
         const apiReports = rawData.map(normalizeReport);
 
-        const localMap = new Map<string, any>();
-        localReps.forEach((r) => {
-          const key = String(r.id || r.report_unique_id || "");
-          if (key) localMap.set(key, r);
+        // Map API reports by database id and report_unique_id
+        const apiDbIds = new Set<string>();
+        const apiUniqueIds = new Set<string>();
+        apiReports.forEach((r: ReportItem) => {
+          if (r.id !== undefined && r.id !== null) apiDbIds.add(String(r.id));
+          if (r.server_id !== undefined && r.server_id !== null) apiDbIds.add(String(r.server_id));
+          if (r.report_unique_id) apiUniqueIds.add(String(r.report_unique_id));
         });
 
         const merged = apiReports.map((apiRep: ReportItem) => {
@@ -645,32 +664,57 @@ export default function ProgressReportsView({
           return apiRep;
         });
 
-        const apiKeys = new Set(apiReports.map((r: ReportItem) => String(r.id || r.report_unique_id || "")).filter(Boolean));
+        // Retain ALL pending/unsynced local reports
+        let pendingQueue = new Set<string>();
+        try {
+          pendingQueue = new Set(
+            JSON.parse(localStorage.getItem("spr_reports_pending_queue") || "[]").map(String)
+          );
+        } catch {}
+
         const localOnly = localReps
           .filter((r) => {
-            const hasDbId = r.id && !isNaN(Number(r.id)) && !String(r.id).includes("-");
-            const existsOnServer = apiKeys.has(String(r.id || r.report_unique_id || ""));
+            const rId = String(r.id || "");
+            const rUniqId = String(r.report_unique_id || "");
+            const rServerId = r.server_id ? String(r.server_id) : "";
 
-            const matchesApiReport = apiReports.some((apiR: ReportItem) => {
-              const sameStudent =
-                (apiR.student_name || "").toLowerCase().trim() ===
-                (r.student_name || "").toLowerCase().trim();
-              const apiDate = (apiR.isoDateOnly || apiR.report_date || "").split("T")[0];
-              const localDate = (r.isoDateOnly || r.report_date || r.selectedDate || "").split("T")[0];
-              const sameDate = apiDate && localDate && apiDate === localDate;
-              const sameSession =
-                (apiR.session_name || "").toLowerCase().trim() ===
-                (r.session_name || r.selectedSession || r.session || "").toLowerCase().trim();
-              return sameStudent && sameDate && sameSession;
-            });
+            // If already present in server responses, skip adding as local duplicate
+            const existsOnServer =
+              (rId && apiDbIds.has(rId)) ||
+              (rUniqId && apiUniqueIds.has(rUniqId)) ||
+              (rServerId && apiDbIds.has(rServerId));
 
-            return !existsOnServer && !hasDbId && !matchesApiReport;
+            if (existsOnServer) return false;
+
+            // Retain all unsynced, queued, or local-draft reports with high priority
+            const isUnsynced =
+              isReportUnsynced(r) ||
+              pendingQueue.has(rId) ||
+              pendingQueue.has(rUniqId) ||
+              r.sync_status === "PENDING" ||
+              r.sync_status === "GRACE_PERIOD";
+
+            if (isUnsynced) {
+              return true;
+            }
+
+            // If it had an explicit numeric DB ID but server doesn't have it, it's deleted on server
+            const hasNumericDbId = r.id && !isNaN(Number(r.id)) && !String(r.id).includes("-");
+            if (hasNumericDbId) return false;
+
+            return true;
           })
-          .map(normalizeReport);
+          .map((r) =>
+            normalizeReport({
+              ...r,
+              sync_status: r.sync_status || "PENDING",
+            })
+          );
 
         const finalMerged = [...merged, ...localOnly];
         setReportsList(finalMerged);
         localStorage.setItem(tenantScopedStorageKey, JSON.stringify(finalMerged));
+        localStorage.setItem("spr_reports_local_v1", JSON.stringify(finalMerged));
 
         // Hydrate Central IndexedDB with fresh merged dataset strictly isolated to the active tenant
         dailyProgressRepository.bulkHydrate(finalMerged, { tenantId: activeTenantId }).catch(() => {});
@@ -943,25 +987,7 @@ export default function ProgressReportsView({
     }
   };
 
-  const handleCopyErrorItem = (err: any) => {
-    const text = `${err.student_name || "Record"}: ${err.reason || "Validation or database error"}${err.status ? ` (HTTP ${err.status})` : ""}`;
-    navigator.clipboard.writeText(text);
-    showToast(`Copied error for "${err.student_name || 'Record'}" to clipboard`, "info");
-  };
-
-  const handleCopyAllErrors = () => {
-    if (!syncErrors || syncErrors.length === 0) return;
-    const text = syncErrors
-      .map(
-        (err) =>
-          `${err.student_name || "Record"}: ${err.reason || "Validation or database error"}${err.status ? ` (HTTP ${err.status})` : ""}`
-      )
-      .join("\n");
-    navigator.clipboard.writeText(text);
-    showToast(`Copied all ${syncErrors.length} error message(s) to clipboard`, "info");
-  };
-
-  const getActiveExportReports = (targetReports: any = null): ReportItem[] => {
+  const getActiveTargetReports = (targetReports: any = null): ReportItem[] => {
     if (Array.isArray(targetReports)) return targetReports;
     if (targetReports && typeof targetReports === "object" && !Array.isArray(targetReports)) {
       return [targetReports];
@@ -1003,7 +1029,7 @@ export default function ProgressReportsView({
 
   // Action: Copy Text Report Summary
   const handleCopyTextReport = (target: any) => {
-    const reportsToCopy = getActiveExportReports(target);
+    const reportsToCopy = getActiveTargetReports(target);
     if (reportsToCopy.length === 0) return;
 
     const formattedTexts = reportsToCopy.map(
@@ -1013,140 +1039,6 @@ export default function ProgressReportsView({
 
     navigator.clipboard.writeText(formattedTexts.join("\n\n---\n\n"));
     showToast(`Copied summary for ${reportsToCopy.length} report(s)!`, "info");
-  };
-
-  // Export to CSV
-  const handleExportCSV = (target: any = null) => {
-    const targetReports = getActiveExportReports(target);
-    if (targetReports.length === 0) return;
-
-    const headers = [
-      "Report ID",
-      "Date",
-      "Time",
-      "Student Name",
-      "Group",
-      "Session",
-      "Pages",
-      "Mistakes",
-      "Stucks",
-      "Comment",
-    ];
-    const rows = targetReports.map((r) => [
-      `"${r.report_unique_id || r.id || ""}"`,
-      `"${r.formattedDate || ""}"`,
-      `"${r.formattedTime || ""}"`,
-      `"${(r.student_name || "").replace(/"/g, '""')}"`,
-      `"${(r.student_group || "").replace(/"/g, '""')}"`,
-      `"${(r.session_name || "").replace(/"/g, '""')}"`,
-      r.totalPages || 0,
-      r.mistakesCount || 0,
-      r.stucksCount || 0,
-      `"${(r.comment || "").replace(/"/g, '""')}"`,
-    ]);
-
-    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `student_reports_${new Date().toISOString().split("T")[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast(`Exported ${targetReports.length} report(s) to CSV!`, "success");
-  };
-
-  // Export to JSON
-  const handleExportJSON = (target: any = null) => {
-    const targetReports = getActiveExportReports(target);
-    if (targetReports.length === 0) return;
-
-    const blob = new Blob([JSON.stringify(targetReports, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `student_reports_${new Date().toISOString().split("T")[0]}.json`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast(`Exported ${targetReports.length} report(s) to JSON!`, "success");
-  };
-
-  // Print / Save PDF
-  const handlePrintPDF = (target: any = null) => {
-    const targetReports = getActiveExportReports(target);
-    if (targetReports.length === 0) return;
-
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      showToast("Popup blocked! Please allow popups to print.", "error");
-      return;
-    }
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Student Progress Reports</title>
-          <style>
-            body { font-family: system-ui, sans-serif; padding: 20px; color: #111; }
-            h1 { font-size: 18px; margin-bottom: 5px; }
-            p.sub { font-size: 12px; color: #666; margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
-            th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; }
-            th { background-color: #f3f4f6; font-weight: bold; }
-            tr:nth-child(even) { background-color: #fafafa; }
-            .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
-            .badge-page { background: #e0f2fe; color: #0369a1; }
-            .badge-mistake { background: #fee2e2; color: #b91c1c; }
-            .badge-stuck { background: #fef3c7; color: #b45309; }
-          </style>
-        </head>
-        <body>
-          <h1>Student Daily Progress Reports</h1>
-          <p class="sub">Generated on ${new Date().toLocaleString()} | Total Records: ${targetReports.length}</p>
-          <table>
-            <thead>
-              <tr>
-                <th>Date & Time</th>
-                <th>Student Name</th>
-                <th>Group</th>
-                <th>Session</th>
-                <th>Pages</th>
-                <th>Mistakes</th>
-                <th>Stucks</th>
-                <th>Comment</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${targetReports
-                .map(
-                  (r) => `
-                <tr>
-                  <td>${r.formattedDate || ""} ${r.formattedTime || ""}</td>
-                  <td><strong>${r.student_name || ""}</strong></td>
-                  <td>${r.student_group || ""}</td>
-                  <td>${r.session_name || ""}</td>
-                  <td><span class="badge badge-page">${r.totalPages || 0}p</span></td>
-                  <td><span class="badge badge-mistake">M ${r.mistakesCount || 0}</span></td>
-                  <td><span class="badge badge-stuck">S ${r.stucksCount || 0}</span></td>
-                  <td>${r.comment || "—"}</td>
-                </tr>
-              `
-                )
-                .join("")}
-            </tbody>
-          </table>
-          <script>
-            window.onload = function() { window.print(); };
-          </script>
-        </body>
-      </html>
-    `;
-
-    printWindow.document.write(html);
-    printWindow.document.close();
   };
 
   // Edit single report
@@ -1337,15 +1229,6 @@ export default function ProgressReportsView({
                   <CheckIcon className="w-3.5 h-3.5 theme-accent" />
                   <span className="theme-accent text-xs font-bold">{selectedIds.size} Selected</span>
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => handlePrintPDF()}
-                  className="p-1 rounded-lg theme-text-secondary hover:theme-accent hover:theme-bg-sub transition cursor-pointer"
-                  title={`Print Selected (${selectedIds.size})`}
-                >
-                  <PrinterIcon className="w-3.5 h-3.5 theme-accent" />
-                </button>
               </div>
             )}
 
@@ -1385,118 +1268,16 @@ export default function ProgressReportsView({
 
       {/* 2a. Sync Errors Alert Banner */}
       {syncErrors && syncErrors.length > 0 && (
-        <div className="w-full rounded-2xl p-4 theme-bg-sub border theme-border text-xs shadow-2xs animate-fade-in space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full theme-bg-accent animate-pulse shrink-0" />
-              <span className="font-bold theme-text-primary text-sm">
-                Database Sync Incomplete ({syncErrors.length} failed)
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleCopyAllErrors}
-                className="px-3 py-1.5 rounded-xl theme-bg-elevated hover:theme-bg-surface border theme-border theme-text-primary font-bold text-xs shadow-2xs cursor-pointer transition-all flex items-center gap-1.5"
-                title="Copy all error messages"
-              >
-                <CopyIcon className="w-3.5 h-3.5 theme-text-secondary" />
-                <span>Copy All</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleSyncOfflineReports}
-                disabled={loading || isSyncing}
-                className="px-3 py-1.5 rounded-xl theme-bg-accent theme-text-accent-contrast font-bold text-xs shadow-xs cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90"
-              >
-                <RefreshIcon className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-                <span>Retry Sync</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSyncErrors(null)}
-                className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated cursor-pointer transition"
-                title="Dismiss alert"
-              >
-                <CloseIcon className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-2 pt-1 border-t theme-border max-h-48 overflow-y-auto pr-1">
-            {syncErrors.map((err, idx) => {
-              const targetReport = reportsList.find(
-                (r) =>
-                  (err.id && (r.id === err.id || r.report_unique_id === err.id)) ||
-                  (err.report_unique_id &&
-                    (r.report_unique_id === err.report_unique_id || r.id === err.report_unique_id))
-              );
-
-              return (
-                <div
-                  key={idx}
-                  onClick={() => handleCopyErrorItem(err)}
-                  title="Click to copy error message"
-                  className="group flex items-center justify-between gap-3 text-xs py-2 px-3 rounded-xl theme-bg-elevated hover:theme-bg-surface border theme-border shadow-2xs transition-all cursor-pointer select-none"
-                >
-                  <div className="flex items-start gap-2 flex-1 min-w-0">
-                    <span className="font-bold theme-text-primary shrink-0">
-                      {err.student_name || "Record"}:
-                    </span>
-                    <span className="theme-text-secondary group-hover:theme-text-primary break-words flex-1 leading-relaxed transition-colors">
-                      {err.reason || "Validation or database error"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {err.status && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-md font-mono font-semibold theme-bg-sub theme-text-secondary border theme-border">
-                        HTTP {err.status}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCopyErrorItem(err);
-                      }}
-                      className="p-1 rounded-lg theme-text-secondary hover:theme-text-primary transition"
-                      title="Copy error message"
-                    >
-                      <CopyIcon className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100" />
-                    </button>
-                    {targetReport && (
-                      <div className="flex items-center gap-1 pl-1 border-l theme-border">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditReport(targetReport);
-                          }}
-                          className="px-2 py-0.5 rounded-lg theme-bg-sub hover:theme-accent hover:theme-text-accent-contrast theme-text-primary transition-all flex items-center gap-1 text-[11px] font-semibold"
-                          title="Edit report to enter missing Juz and save"
-                        >
-                          <EditIcon className="w-3 h-3" />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteReport(targetReport);
-                          }}
-                          className="p-1 rounded-lg theme-text-secondary hover:text-red-400 hover:theme-bg-sub transition"
-                          title="Delete draft report"
-                        >
-                          <TrashIcon className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <SyncErrorsAlertBanner
+          syncErrors={syncErrors}
+          reportsList={reportsList}
+          isSyncing={isSyncing}
+          loading={loading}
+          onRetrySync={handleSyncOfflineReports}
+          onDismiss={() => setSyncErrors(null)}
+          onEditReport={handleEditReport}
+          onDeleteReport={handleDeleteReport}
+        />
       )}
 
       {/* 2b. Offline Banner (if offline) */}
@@ -1525,9 +1306,6 @@ export default function ProgressReportsView({
               onEdit={handleEditReport}
               onDelete={handleDeleteReport}
               onCopyText={(rep) => handleCopyTextReport(rep)}
-              onExportCSV={(rep) => handleExportCSV(rep)}
-              onExportJSON={(rep) => handleExportJSON(rep)}
-              onPrintPDF={(rep) => handlePrintPDF(rep)}
               onResetFilters={handleResetAllFilters}
               onRefresh={handleRefresh}
             />
@@ -1545,9 +1323,6 @@ export default function ProgressReportsView({
               onEdit={handleEditReport}
               onDelete={handleDeleteReport}
               onCopyText={(rep) => handleCopyTextReport(rep)}
-              onExportCSV={(rep) => handleExportCSV(rep)}
-              onExportJSON={(rep) => handleExportJSON(rep)}
-              onPrintPDF={(rep) => handlePrintPDF(rep)}
               onResetFilters={handleResetAllFilters}
               onRefresh={handleRefresh}
             />
@@ -1565,9 +1340,6 @@ export default function ProgressReportsView({
           targetList={contextMenu.targetList}
           onClose={() => setContextMenu(null)}
           onCopyText={() => handleCopyTextReport(contextMenu.targetList || contextMenu.report)}
-          onExportCSV={() => handleExportCSV(contextMenu.targetList || contextMenu.report)}
-          onExportJSON={() => handleExportJSON(contextMenu.targetList || contextMenu.report)}
-          onPrintPDF={() => handlePrintPDF(contextMenu.targetList || contextMenu.report)}
           onEdit={handleEditReport}
           onDelete={handleDeleteReport}
         />

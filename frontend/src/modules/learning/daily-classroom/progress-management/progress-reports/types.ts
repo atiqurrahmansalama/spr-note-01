@@ -94,6 +94,25 @@ export interface StudentGroupedItem {
   reports: ReportItem[];
 }
 
+export interface SyncErrorItem {
+  id?: string | number;
+  report_unique_id?: string;
+  student_name?: string;
+  status?: number;
+  reason: string;
+}
+
+export interface SyncErrorsAlertBannerProps {
+  syncErrors: SyncErrorItem[];
+  reportsList: ReportItem[];
+  isSyncing: boolean;
+  loading: boolean;
+  onRetrySync: () => void;
+  onDismiss: () => void;
+  onEditReport?: (report: ReportItem) => void;
+  onDeleteReport?: (report: ReportItem) => void;
+}
+
 export interface ContextMenuState {
   x: number;
   y: number;

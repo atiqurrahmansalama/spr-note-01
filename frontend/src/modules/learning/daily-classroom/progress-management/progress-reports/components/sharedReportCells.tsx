@@ -30,15 +30,18 @@ export function StudentInfoCell({
 
   return (
     <div className="space-y-0.5 min-w-0">
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 flex-wrap">
         <span className="font-bold theme-text-primary block break-words leading-tight">
           {name}
         </span>
         {hasPendingSync && (
           <span
-            className="w-2 h-2 rounded-full bg-amber-400 shrink-0"
-            title="Pending Cloud Sync"
-          />
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-500 dark:text-amber-400 shrink-0 shadow-2xs"
+            title={t("pendingSync", "Pending Cloud Sync")}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            <span>{t("pending", "Pending")}</span>
+          </span>
         )}
       </div>
       <div className="text-[11px] theme-text-secondary font-mono flex flex-wrap items-center gap-1.5">
