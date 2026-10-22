@@ -62,14 +62,38 @@ export const transformFormToApiPayload = (reportData) => {
     reportData?.lesson_title
   );
 
-  // 1. Transform Juz Page Data into `portions` array (or preserve pre-existing valid portions)
+  // 1. Transform Juz Page Data into `portions` array
   const portions = [];
   if (Array.isArray(reportData?.portions) && reportData.portions.length > 0) {
-    portions.push(...reportData.portions);
+    reportData.portions.forEach((p) => {
+      const sJuz = p.start_juz !== null && p.start_juz !== undefined && !isNaN(parseInt(p.start_juz, 10))
+        ? parseInt(p.start_juz, 10)
+        : (p.juz !== null && p.juz !== undefined && !isNaN(parseInt(p.juz, 10)) ? parseInt(p.juz, 10) : null);
+      const eJuz = p.end_juz !== null && p.end_juz !== undefined && !isNaN(parseInt(p.end_juz, 10))
+        ? parseInt(p.end_juz, 10)
+        : sJuz;
+      const sPage = p.start_page !== null && p.start_page !== undefined && !isNaN(parseInt(p.start_page, 10))
+        ? parseInt(p.start_page, 10)
+        : 1;
+      const ePage = p.end_page !== null && p.end_page !== undefined && !isNaN(parseInt(p.end_page, 10))
+        ? parseInt(p.end_page, 10)
+        : sPage;
+
+      portions.push({
+        ...p,
+        start_juz: sJuz,
+        end_juz: eJuz,
+        start_page: sPage,
+        end_page: ePage,
+        start_ayah: p.start_ayah || 1,
+        end_ayah: p.end_ayah || 30,
+        juz: sJuz,
+      });
+    });
   } else if (Array.isArray(juzPageData) && juzPageData.length > 0) {
     juzPageData.forEach((row) => {
       const rawJuz = row.juz !== undefined && row.juz !== null ? String(row.juz).trim() : "";
-      const juzNum = rawJuz && !isNaN(parseInt(rawJuz, 10)) ? parseInt(rawJuz, 10) : (isBookMode ? null : 1);
+      const juzNum = rawJuz && !isNaN(parseInt(rawJuz, 10)) ? parseInt(rawJuz, 10) : null;
 
       (row.ranges || []).forEach((r) => {
         const sPage = parseInt(r.start || r.page_start, 10);
@@ -90,17 +114,33 @@ export const transformFormToApiPayload = (reportData) => {
     });
   }
 
-  // 2. Transform Mistake & Stuck data into `error_details` array (or preserve pre-existing valid errors)
+  // 2. Transform Mistake & Stuck data into `error_details` array
   const error_details = [];
+  const sessionJuz = portions[0]?.start_juz || null;
+
   if (Array.isArray(reportData?.error_details) && reportData.error_details.length > 0) {
-    error_details.push(...reportData.error_details);
+    reportData.error_details.forEach((err) => {
+      const jVal = err.juz !== null && err.juz !== undefined && !isNaN(parseInt(err.juz, 10))
+        ? parseInt(err.juz, 10)
+        : sessionJuz;
+      const pVal = err.page !== null && err.page !== undefined && !isNaN(parseInt(err.page, 10))
+        ? parseInt(err.page, 10)
+        : 1;
+      error_details.push({
+        ...err,
+        type: err.type || "Mistake",
+        juz: jVal,
+        page: pVal,
+        ayah: err.ayah || 1,
+      });
+    });
   } else {
     // Mistakes
     mistakeData.forEach((row) => {
       if (!row.page || String(row.page).trim() === "") return;
       const pNum = parseInt(row.page, 10);
       const rawJuz = row.juz !== undefined && row.juz !== null ? String(row.juz).trim() : "";
-      const jNum = rawJuz && !isNaN(parseInt(rawJuz, 10)) ? parseInt(rawJuz, 10) : null;
+      const jNum = rawJuz && !isNaN(parseInt(rawJuz, 10)) ? parseInt(rawJuz, 10) : sessionJuz;
 
       (row.ayahs || []).forEach((a) => {
         const aVal = typeof a === "object" ? parseInt(a.value || a.ayah, 10) : parseInt(a, 10);
@@ -120,7 +160,7 @@ export const transformFormToApiPayload = (reportData) => {
       if (!row.page || String(row.page).trim() === "") return;
       const pNum = parseInt(row.page, 10);
       const rawJuz = row.juz !== undefined && row.juz !== null ? String(row.juz).trim() : "";
-      const jNum = rawJuz && !isNaN(parseInt(rawJuz, 10)) ? parseInt(rawJuz, 10) : null;
+      const jNum = rawJuz && !isNaN(parseInt(rawJuz, 10)) ? parseInt(rawJuz, 10) : sessionJuz;
 
       (row.ayahs || []).forEach((a) => {
         const aVal = typeof a === "object" ? parseInt(a.value || a.ayah, 10) : parseInt(a, 10);
@@ -152,11 +192,11 @@ export const transformFormToApiPayload = (reportData) => {
     juz_and_pages: juzPageData,
     progress_mode: isBookMode ? "BOOK" : (reportData?.progress_mode || "QURAN"),
     mode: isBookMode ? "BOOK" : (reportData?.mode || "QURAN"),
-    book_title: reportData?.book_title || reportData?.curriculum_book_name || reportData?.book_name || "",
-    curriculum_book_name: reportData?.curriculum_book_name || reportData?.book_title || "",
-    book_name: reportData?.book_name || reportData?.book_title || "",
-    lesson_title: reportData?.lesson_title || reportData?.lesson_covered || "",
-    lesson_covered: reportData?.lesson_covered || reportData?.lesson_title || "",
+    book_title: (reportData?.book_title || reportData?.curriculum_book_name || reportData?.book_name || reportData?.bookTitle || reportData?.book || "").trim(),
+    curriculum_book_name: (reportData?.curriculum_book_name || reportData?.book_title || reportData?.book_name || reportData?.bookTitle || reportData?.book || "").trim(),
+    book_name: (reportData?.book_name || reportData?.book_title || reportData?.curriculum_book_name || reportData?.bookTitle || reportData?.book || "").trim(),
+    lesson_title: (reportData?.lesson_title || reportData?.lesson_covered || reportData?.lessonTitle || reportData?.lesson || "").trim(),
+    lesson_covered: (reportData?.lesson_covered || reportData?.lesson_title || reportData?.lessonTitle || reportData?.lesson || "").trim(),
   };
 
   // Only pass numeric student foreign key ID; string IDs like 'stu_...' would cause DRF type validation error

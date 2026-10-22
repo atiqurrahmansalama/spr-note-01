@@ -106,7 +106,7 @@ export function generateReportText({
   if (featureConfig.studentSelect !== false) {
     lines.push(`Student Name: ${studentName || "N/A"}`);
   }
-  if (isBookMode && lessonTitle) {
+  if (lessonTitle) {
     lines.push(`Lesson: ${lessonTitle}`);
   }
   lines.push("");

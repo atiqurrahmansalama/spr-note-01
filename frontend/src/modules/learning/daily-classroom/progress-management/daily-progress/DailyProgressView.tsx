@@ -37,8 +37,6 @@ import {
   BookSubjectInputSection,
   JuzPageSection,
   DetailSection,
-  BookPageSection,
-  BookDetailSection,
   CommentSection,
 } from "./components";
 import { BookOpenIcon, LayersIcon } from "@/components/ui/Icons";
@@ -197,9 +195,9 @@ export default function DailyProgressView({
         lessonTitle,
         progressMode,
         selectedDate,
-        juzPageData: progressMode === "BOOK" ? bookPageData : juzPageData,
-        mistakeData: progressMode === "BOOK" ? bookMistakeData : mistakeData,
-        stuckData: progressMode === "BOOK" ? bookStuckData : stuckData,
+        juzPageData,
+        mistakeData,
+        stuckData,
         comment,
       },
       resolvedAcademicContext
@@ -215,9 +213,6 @@ export default function DailyProgressView({
     juzPageData,
     mistakeData,
     stuckData,
-    bookPageData,
-    bookMistakeData,
-    bookStuckData,
     comment,
   ]);
 
@@ -261,46 +256,16 @@ export default function DailyProgressView({
   }, []);
 
   const handleMakeReportClick = () => {
-    const safeStudent = (studentName || "").trim();
-    const safeSession = (selectedSession || "").trim();
-
-    if (sectionConfig.studentSelect?.enabled) {
-      if (!safeStudent) {
-        showToast("Please specify a student name first", "warning");
-        return;
-      }
-      const isValid = validateReportForm({
-        departmentId: selectedDepartmentId,
-        classId: selectedClassId,
-        sectionId: selectedSectionId,
-        allStudents: allStudentDatabase,
-        departments,
-        classes,
-        sections,
-      });
-      if (!isValid) return;
-    }
-    if (sectionConfig.sessionSelect?.enabled && !safeSession) {
-      showToast("Please select a session first", "warning");
-      return;
-    }
-    const activePageData = progressMode === "BOOK" ? bookPageData : juzPageData;
-    const hasActivePageData = activePageData.some(
-      (d) =>
-        String(d.juz || "").trim() !== "" ||
-        (d.ranges || []).some(
-          (r) => String(r.start || "").trim() !== "" || String(r.end || "").trim() !== ""
-        )
-    );
-    if (sectionConfig.juzPageInput?.enabled && !hasActivePageData) {
-      showToast(
-        progressMode === "BOOK"
-          ? "Please enter Page Details first"
-          : "Please enter Juz & Page information first",
-        "warning"
-      );
-      return;
-    }
+    const isValid = validateReportForm({
+      departmentId: selectedDepartmentId,
+      classId: selectedClassId,
+      sectionId: selectedSectionId,
+      allStudents: allStudentDatabase,
+      departments,
+      classes,
+      sections,
+    });
+    if (!isValid) return;
 
     setIsReportModalOpen(true);
   };
@@ -530,84 +495,15 @@ export default function DailyProgressView({
         </div>
       )}
 
-      {/* ── Quran Mode: Unified Progress Card (JUZ / PAGE DETAILS -> MISTAKE DETAILS -> STUCK DETAILS) ── */}
-      {progressMode === "QURAN" &&
-        (sectionConfig.juzPageInput?.enabled ||
-          sectionConfig.mistakeTracker?.enabled ||
-          sectionConfig.stuckTracker?.enabled) && (
-          <div className="theme-bg-surface rounded-2xl p-3.5 sm:p-5 shadow-xl border theme-border space-y-3.5 sm:space-y-4">
-            {sectionConfig.juzPageInput?.enabled && (
-              <JuzPageSection
-                data={juzPageData}
-                onChange={setJuzPageData}
-                onReset={handleJuzPageRefresh}
-                onNextSection={focusFirstMistakePage}
-                draggedItem={draggedItem}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onReorderRows={handleReorderRows}
-              />
-            )}
-
-            {sectionConfig.juzPageInput?.enabled &&
-              (sectionConfig.mistakeTracker?.enabled || sectionConfig.stuckTracker?.enabled) && (
-                <div className="border-t theme-border border-opacity-30 my-3.5 sm:my-4" />
-              )}
-
-            {sectionConfig.mistakeTracker?.enabled && (
-              <DetailSection
-                title="MISTAKE DETAILS"
-                listType="mistake"
-                data={mistakeData}
-                onChange={setMistakeData}
-                availableJuzs={availableJuzs}
-                juzPageData={juzPageData}
-                draggedItem={draggedItem}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onReorderRows={handleReorderRows}
-                onReset={handleMistakeRefresh}
-                onNextSection={focusFirstStuckPage}
-              />
-            )}
-
-            {sectionConfig.mistakeTracker?.enabled && sectionConfig.stuckTracker?.enabled && (
-              <div className="border-t theme-border border-opacity-30 my-2.5 sm:my-3" />
-            )}
-
-            {sectionConfig.stuckTracker?.enabled && (
-              <DetailSection
-                title="STUCK DETAILS"
-                listType="stuck"
-                data={stuckData}
-                onChange={setStuckData}
-                availableJuzs={availableJuzs}
-                juzPageData={juzPageData}
-                draggedItem={draggedItem}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onReorderRows={handleReorderRows}
-                onReset={handleStuckRefresh}
-                onNextSection={focusComments}
-              />
-            )}
-          </div>
-        )}
-
-      {/* ── Book / Subject Mode: Card 1 (Book / Subject, Lesson & Page Details) & Card 2 (Mistakes & Stuck) ── */}
-      {progressMode === "BOOK" && (
-        <>
-          {/* Card 1: Book / Subject Name, Lesson & Page Details in a single unified box */}
-          {(sectionConfig.lessonSelect?.enabled !== false ||
-            sectionConfig.juzPageInput?.enabled) && (
-            <div className="theme-bg-surface rounded-2xl p-3.5 sm:p-5 shadow-xl border theme-border space-y-3.5 sm:space-y-4">
-              {/* Top Book / Subject Name & Lesson Controls - Perfectly Aligned */}
+      {/* ── Unified Progress Card: Page / Lesson Details -> Mistakes -> Stuck (Adaptive Quran / Book Mode) ── */}
+      {(sectionConfig.juzPageInput?.enabled ||
+        sectionConfig.mistakeTracker?.enabled ||
+        sectionConfig.stuckTracker?.enabled ||
+        progressMode === "BOOK") && (
+        <div className="theme-bg-surface rounded-2xl p-3.5 sm:p-5 shadow-xl border theme-border space-y-3.5 sm:space-y-4">
+          {/* Top Book / Subject Name & Lesson Controls - Displayed when in Book / Subject mode */}
+          {progressMode === "BOOK" && (
+            <>
               <div className="@container grid grid-cols-1 @[480px]:grid-cols-2 gap-3 sm:gap-4 items-start pb-2 sm:pb-3">
                 <div className="w-full">
                   <BookSubjectInputSection
@@ -630,72 +526,83 @@ export default function DailyProgressView({
                 )}
               </div>
 
-              {/* Divider between Book/Lesson and Page Details */}
               {sectionConfig.juzPageInput?.enabled && (
                 <div className="border-t theme-border border-opacity-30 my-3.5 sm:my-4" />
               )}
-
-              {/* Page Details Section */}
-              {sectionConfig.juzPageInput?.enabled && (
-                <BookPageSection
-                  data={bookPageData}
-                  onChange={setBookPageData}
-                  onReset={handleBookPageReset}
-                  onNextSection={focusFirstMistakePage}
-                  draggedItem={draggedItem}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                  onReorderRows={handleReorderRows}
-                />
-              )}
-            </div>
+            </>
           )}
 
-          {/* Card 2: Mistake & Stuck Progress Details for Book */}
-          {(sectionConfig.mistakeTracker?.enabled || sectionConfig.stuckTracker?.enabled) && (
-            <div className="theme-bg-surface rounded-2xl p-3.5 sm:p-5 shadow-xl border theme-border space-y-3.5 sm:space-y-4">
-              {sectionConfig.mistakeTracker?.enabled && (
-                <BookDetailSection
-                  title="MISTAKE DETAILS"
-                  listType="mistake"
-                  data={bookMistakeData}
-                  onChange={setBookMistakeData}
-                  draggedItem={draggedItem}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                  onReorderRows={handleReorderRows}
-                  onReset={handleBookMistakeReset}
-                  onNextSection={focusFirstStuckPage}
-                />
-              )}
-
-              {sectionConfig.mistakeTracker?.enabled && sectionConfig.stuckTracker?.enabled && (
-                <div className="border-t theme-border border-opacity-30 my-2.5 sm:my-3" />
-              )}
-
-              {sectionConfig.stuckTracker?.enabled && (
-                <BookDetailSection
-                  title="STUCK DETAILS"
-                  listType="stuck"
-                  data={bookStuckData}
-                  onChange={setBookStuckData}
-                  draggedItem={draggedItem}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                  onReorderRows={handleReorderRows}
-                  onReset={handleBookStuckReset}
-                  onNextSection={focusComments}
-                />
-              )}
-            </div>
+          {/* Unified Page Details Section */}
+          {sectionConfig.juzPageInput?.enabled && (
+            <JuzPageSection
+              title={progressMode === "BOOK" ? "PAGE DETAILS" : "JUZ / PAGE DETAILS"}
+              showJuz={progressMode === "QURAN"}
+              data={juzPageData}
+              onChange={setJuzPageData}
+              onReset={handleJuzPageRefresh}
+              onNextSection={focusFirstMistakePage}
+              draggedItem={draggedItem}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onReorderRows={handleReorderRows}
+            />
           )}
-        </>
+
+          {sectionConfig.juzPageInput?.enabled &&
+            (sectionConfig.mistakeTracker?.enabled || sectionConfig.stuckTracker?.enabled) && (
+              <div className="border-t theme-border border-opacity-30 my-3.5 sm:my-4" />
+            )}
+
+          {/* Unified Mistake Tracker Section */}
+          {sectionConfig.mistakeTracker?.enabled && (
+            <DetailSection
+              title="MISTAKE DETAILS"
+              listType="mistake"
+              data={mistakeData}
+              onChange={setMistakeData}
+              availableJuzs={progressMode === "QURAN" ? availableJuzs : undefined}
+              juzPageData={progressMode === "QURAN" ? juzPageData : undefined}
+              showJuz={progressMode === "QURAN"}
+              unitLabel={progressMode === "BOOK" ? "Line" : "Ayah"}
+              draggedItem={draggedItem}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onReorderRows={handleReorderRows}
+              onReset={handleMistakeRefresh}
+              onNextSection={focusFirstStuckPage}
+            />
+          )}
+
+          {sectionConfig.mistakeTracker?.enabled && sectionConfig.stuckTracker?.enabled && (
+            <div className="border-t theme-border border-opacity-30 my-2.5 sm:my-3" />
+          )}
+
+          {/* Unified Stuck Tracker Section */}
+          {sectionConfig.stuckTracker?.enabled && (
+            <DetailSection
+              title="STUCK DETAILS"
+              listType="stuck"
+              data={stuckData}
+              onChange={setStuckData}
+              availableJuzs={progressMode === "QURAN" ? availableJuzs : undefined}
+              juzPageData={progressMode === "QURAN" ? juzPageData : undefined}
+              showJuz={progressMode === "QURAN"}
+              unitLabel={progressMode === "BOOK" ? "Line" : "Ayah"}
+              draggedItem={draggedItem}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onReorderRows={handleReorderRows}
+              onReset={handleStuckRefresh}
+              onNextSection={focusComments}
+            />
+          )}
+        </div>
       )}
 
       {/* Card 3: Comment Section & Action Buttons */}

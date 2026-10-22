@@ -48,6 +48,10 @@ class ReportPortionSerializer(serializers.ModelSerializer):
             'end_juz',   'end_page',   'end_surah_number',   'end_ayah',
         ]
         extra_kwargs = {
+            'start_juz':          {'required': False, 'allow_null': True},
+            'end_juz':            {'required': False, 'allow_null': True},
+            'start_page':         {'required': False},
+            'end_page':           {'required': False},
             'start_surah_number': {'required': False, 'allow_null': True},
             'end_surah_number':   {'required': False, 'allow_null': True},
             'start_ayah':         {'required': False},
@@ -60,6 +64,8 @@ class ReportErrorDetailSerializer(serializers.ModelSerializer):
         model = ReportErrorDetail
         fields = ['id', 'type', 'juz', 'page', 'surah_number', 'ayah']
         extra_kwargs = {
+            'juz':          {'required': False, 'allow_null': True},
+            'page':         {'required': False},
             'surah_number': {'required': False, 'allow_null': True},
             'ayah':         {'required': False},
         }
@@ -110,6 +116,14 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
     created_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", read_only=True)
     updated_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", read_only=True)
 
+    # ── Lesson & Book progress metadata ──────────────────────
+    lesson_title = serializers.CharField(required=False, allow_blank=True, default='')
+    book_title = serializers.CharField(required=False, allow_blank=True, default='')
+    progress_mode = serializers.CharField(required=False, allow_blank=True, default='QURAN')
+    lesson_covered = serializers.CharField(source='lesson_title', read_only=True)
+    curriculum_book_name = serializers.CharField(source='book_title', read_only=True)
+    book_name = serializers.CharField(source='book_title', read_only=True)
+
     # ── Display helpers ───────────────────────────────────────
     date_time     = serializers.SerializerMethodField()
     report_date   = serializers.SerializerMethodField()
@@ -133,6 +147,8 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
             'status_info',
             'report_status',
             'comment',
+            'lesson_title', 'book_title', 'progress_mode',
+            'lesson_covered', 'curriculum_book_name', 'book_name',
             'juz_and_pages',
             'portions',
             'error_details',
@@ -265,6 +281,33 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         if 'session_name' not in mutable_data and 'session' in mutable_data:
             mutable_data['session_name'] = mutable_data['session']
 
+        # ── Normalize Lesson Title, Book Title & Progress Mode ─────────────
+        raw_lesson = (
+            mutable_data.get('lesson_title')
+            or mutable_data.get('lesson_covered')
+            or mutable_data.get('lessonTitle')
+            or mutable_data.get('lesson')
+            or ''
+        )
+        mutable_data['lesson_title'] = str(raw_lesson).strip()
+
+        raw_book = (
+            mutable_data.get('book_title')
+            or mutable_data.get('curriculum_book_name')
+            or mutable_data.get('book_name')
+            or mutable_data.get('bookTitle')
+            or mutable_data.get('book')
+            or ''
+        )
+        mutable_data['book_title'] = str(raw_book).strip()
+
+        raw_mode = str(
+            mutable_data.get('progress_mode')
+            or mutable_data.get('mode')
+            or ('BOOK' if mutable_data['book_title'] or mutable_data['lesson_title'] else 'QURAN')
+        ).upper().strip()
+        mutable_data['progress_mode'] = 'BOOK' if 'BOOK' in raw_mode else 'QURAN'
+
         student_input = mutable_data.get('student') or mutable_data.get('student_name')
         if student_input:
             if isinstance(student_input, int):
@@ -367,6 +410,32 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         tot_mistakes = _process(mistakes_input, 'Mistake')
         tot_stucks   = _process(stucks_input,   'Stuck')
         return tot_mistakes, tot_stucks
+
+    def validate(self, attrs):
+        initial = self.initial_data or {}
+        progress_mode = str(attrs.get('progress_mode') or initial.get('progress_mode') or 'QURAN').upper()
+        portions = attrs.get('portions', [])
+
+        if progress_mode != 'BOOK' and portions:
+            for idx, p in enumerate(portions):
+                if p.get('start_juz') is None:
+                    raise serializers.ValidationError({
+                        'portions': f"Recitation portion #{idx + 1} must include a valid Juz number (1–30)."
+                    })
+                if p.get('end_juz') is None:
+                    raise serializers.ValidationError({
+                        'portions': f"Recitation portion #{idx + 1} must include a valid end Juz number (1–30)."
+                    })
+
+        error_details = attrs.get('error_details', [])
+        if progress_mode != 'BOOK' and error_details:
+            for idx, err in enumerate(error_details):
+                if err.get('juz') is None:
+                    raise serializers.ValidationError({
+                        'error_details': f"Error detail #{idx + 1} must specify a valid Juz number (1–30)."
+                    })
+
+        return super().validate(attrs)
 
     def _create_normalized_errors(self, report, error_details_data):
         """Create ReportErrorDetail rows from new v2 payload."""

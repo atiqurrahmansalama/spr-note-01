@@ -15,6 +15,8 @@ import {
   RefreshIcon,
   ChecklistIcon,
   TrashIcon,
+  CopyIcon,
+  EditIcon,
 } from "@/components/ui/Icons";
 import { ConfirmModal } from "@/components/ui/Modal";
 import { useTranslation } from "@/i18n";
@@ -941,6 +943,24 @@ export default function ProgressReportsView({
     }
   };
 
+  const handleCopyErrorItem = (err: any) => {
+    const text = `${err.student_name || "Record"}: ${err.reason || "Validation or database error"}${err.status ? ` (HTTP ${err.status})` : ""}`;
+    navigator.clipboard.writeText(text);
+    showToast(`Copied error for "${err.student_name || 'Record'}" to clipboard`, "info");
+  };
+
+  const handleCopyAllErrors = () => {
+    if (!syncErrors || syncErrors.length === 0) return;
+    const text = syncErrors
+      .map(
+        (err) =>
+          `${err.student_name || "Record"}: ${err.reason || "Validation or database error"}${err.status ? ` (HTTP ${err.status})` : ""}`
+      )
+      .join("\n");
+    navigator.clipboard.writeText(text);
+    showToast(`Copied all ${syncErrors.length} error message(s) to clipboard`, "info");
+  };
+
   const getActiveExportReports = (targetReports: any = null): ReportItem[] => {
     if (Array.isArray(targetReports)) return targetReports;
     if (targetReports && typeof targetReports === "object" && !Array.isArray(targetReports)) {
@@ -1365,20 +1385,29 @@ export default function ProgressReportsView({
 
       {/* 2a. Sync Errors Alert Banner */}
       {syncErrors && syncErrors.length > 0 && (
-        <div className="w-full rounded-2xl p-4 bg-rose-500/10 border border-rose-500/30 dark:bg-rose-950/20 dark:border-rose-500/25 text-xs shadow-2xs animate-fade-in space-y-3">
+        <div className="w-full rounded-2xl p-4 theme-bg-sub border theme-border text-xs shadow-2xs animate-fade-in space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
-              <span className="font-bold text-rose-800 dark:text-rose-200 text-sm">
+              <span className="w-2.5 h-2.5 rounded-full theme-bg-accent animate-pulse shrink-0" />
+              <span className="font-bold theme-text-primary text-sm">
                 Database Sync Incomplete ({syncErrors.length} failed)
               </span>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                onClick={handleCopyAllErrors}
+                className="px-3 py-1.5 rounded-xl theme-bg-elevated hover:theme-bg-surface border theme-border theme-text-primary font-bold text-xs shadow-2xs cursor-pointer transition-all flex items-center gap-1.5"
+                title="Copy all error messages"
+              >
+                <CopyIcon className="w-3.5 h-3.5 theme-text-secondary" />
+                <span>Copy All</span>
+              </button>
+              <button
+                type="button"
                 onClick={handleSyncOfflineReports}
                 disabled={loading || isSyncing}
-                className="px-3 py-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-50"
+                className="px-3 py-1.5 rounded-xl theme-bg-accent theme-text-accent-contrast font-bold text-xs shadow-xs cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90"
               >
                 <RefreshIcon className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
                 <span>Retry Sync</span>
@@ -1386,7 +1415,7 @@ export default function ProgressReportsView({
               <button
                 type="button"
                 onClick={() => setSyncErrors(null)}
-                className="p-1 rounded-lg text-rose-600 dark:text-rose-400 hover:text-rose-900 dark:hover:text-rose-100 hover:bg-rose-500/15 cursor-pointer transition"
+                className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated cursor-pointer transition"
                 title="Dismiss alert"
               >
                 <CloseIcon className="w-4 h-4" />
@@ -1394,27 +1423,78 @@ export default function ProgressReportsView({
             </div>
           </div>
 
-          <div className="space-y-2 pt-1 border-t border-rose-500/20 max-h-48 overflow-y-auto pr-1">
-            {syncErrors.map((err, idx) => (
-              <div
-                key={idx}
-                className="flex items-start justify-between gap-3 text-xs py-2 px-3 rounded-xl bg-white dark:bg-rose-950/40 border border-rose-200 dark:border-rose-500/20 shadow-2xs transition-all"
-              >
-                <div className="flex items-start gap-2 flex-1 min-w-0">
-                  <span className="font-bold text-rose-900 dark:text-rose-200 shrink-0">
-                    {err.student_name || "Record"}:
-                  </span>
-                  <span className="text-rose-800 dark:text-rose-300 break-words flex-1 leading-relaxed">
-                    {err.reason || "Validation or database error"}
-                  </span>
+          <div className="space-y-2 pt-1 border-t theme-border max-h-48 overflow-y-auto pr-1">
+            {syncErrors.map((err, idx) => {
+              const targetReport = reportsList.find(
+                (r) =>
+                  (err.id && (r.id === err.id || r.report_unique_id === err.id)) ||
+                  (err.report_unique_id &&
+                    (r.report_unique_id === err.report_unique_id || r.id === err.report_unique_id))
+              );
+
+              return (
+                <div
+                  key={idx}
+                  onClick={() => handleCopyErrorItem(err)}
+                  title="Click to copy error message"
+                  className="group flex items-center justify-between gap-3 text-xs py-2 px-3 rounded-xl theme-bg-elevated hover:theme-bg-surface border theme-border shadow-2xs transition-all cursor-pointer select-none"
+                >
+                  <div className="flex items-start gap-2 flex-1 min-w-0">
+                    <span className="font-bold theme-text-primary shrink-0">
+                      {err.student_name || "Record"}:
+                    </span>
+                    <span className="theme-text-secondary group-hover:theme-text-primary break-words flex-1 leading-relaxed transition-colors">
+                      {err.reason || "Validation or database error"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {err.status && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-md font-mono font-semibold theme-bg-sub theme-text-secondary border theme-border">
+                        HTTP {err.status}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCopyErrorItem(err);
+                      }}
+                      className="p-1 rounded-lg theme-text-secondary hover:theme-text-primary transition"
+                      title="Copy error message"
+                    >
+                      <CopyIcon className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100" />
+                    </button>
+                    {targetReport && (
+                      <div className="flex items-center gap-1 pl-1 border-l theme-border">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditReport(targetReport);
+                          }}
+                          className="px-2 py-0.5 rounded-lg theme-bg-sub hover:theme-accent hover:theme-text-accent-contrast theme-text-primary transition-all flex items-center gap-1 text-[11px] font-semibold"
+                          title="Edit report to enter missing Juz and save"
+                        >
+                          <EditIcon className="w-3 h-3" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteReport(targetReport);
+                          }}
+                          className="p-1 rounded-lg theme-text-secondary hover:text-red-400 hover:theme-bg-sub transition"
+                          title="Delete draft report"
+                        >
+                          <TrashIcon className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                {err.status && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-md font-mono font-semibold bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800/40 shrink-0">
-                    HTTP {err.status}
-                  </span>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

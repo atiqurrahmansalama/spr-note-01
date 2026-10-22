@@ -151,20 +151,31 @@ export const parseErrorReason = (errorData) => {
   if (target.message && typeof target.message === "string") return target.message;
   if (target.error && typeof target.error === "string") return target.error;
 
+  const formatValue = (v) => {
+    if (v === null || v === undefined) return "";
+    if (typeof v === "string") return v;
+    if (Array.isArray(v)) {
+      return v.map(formatValue).filter(Boolean).join(", ");
+    }
+    if (typeof v === "object") {
+      return Object.entries(v)
+        .map(([k, subVal]) => {
+          const prettyKey = k.replace(/_/g, " ");
+          const formattedSub = formatValue(subVal);
+          return `${prettyKey}: ${formattedSub}`;
+        })
+        .join("; ");
+    }
+    return String(v);
+  };
+
   if (typeof target === "object" && target !== null) {
     const entries = Object.entries(target)
       .filter(([key]) => !["success", "status_code", "error_type", "request_id", "timestamp"].includes(key))
       .map(([key, val]) => {
-        let msg = "";
-        if (Array.isArray(val)) {
-          msg = val.map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v))).join(", ");
-        } else if (typeof val === "object" && val !== null) {
-          msg = JSON.stringify(val);
-        } else {
-          msg = String(val);
-        }
         const formattedKey = key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, " ");
-        return `${formattedKey}: ${msg}`;
+        const formattedVal = formatValue(val);
+        return `${formattedKey}: ${formattedVal}`;
       });
 
     if (entries.length > 0) return entries.join(" • ");

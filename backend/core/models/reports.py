@@ -33,6 +33,9 @@ class StudentDailyReport(models.Model):
     total_stuck = models.IntegerField(default=0)
     comment = models.TextField(null=True, blank=True)
     juz_and_pages = models.JSONField(default=list, blank=True)
+    lesson_title = models.CharField(max_length=255, blank=True, default='')
+    book_title = models.CharField(max_length=255, blank=True, default='')
+    progress_mode = models.CharField(max_length=20, blank=True, default='QURAN')
 
     # New normalized fields (added in schema v2)
     score = models.CharField(max_length=10, null=True, blank=True)
@@ -121,11 +124,11 @@ class ReportPortion(models.Model):
         on_delete=models.CASCADE,
         related_name='portions'
     )
-    start_juz = models.IntegerField()
+    start_juz = models.IntegerField(null=True, blank=True)
     start_page = models.IntegerField()
     start_surah_number = models.IntegerField(null=True, blank=True)
     start_ayah = models.IntegerField(default=1)
-    end_juz = models.IntegerField()
+    end_juz = models.IntegerField(null=True, blank=True)
     end_page = models.IntegerField()
     end_surah_number = models.IntegerField(null=True, blank=True)
     end_ayah = models.IntegerField(default=1)
@@ -154,7 +157,7 @@ class ReportErrorDetail(models.Model):
         related_name='error_details'
     )
     type = models.CharField(max_length=10, choices=TYPE_CHOICES)
-    juz = models.IntegerField()
+    juz = models.IntegerField(null=True, blank=True)
     page = models.IntegerField()
     surah_number = models.IntegerField(null=True, blank=True)
     ayah = models.IntegerField(default=1)

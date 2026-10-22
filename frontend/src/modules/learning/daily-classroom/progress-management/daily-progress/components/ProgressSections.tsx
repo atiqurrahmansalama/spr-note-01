@@ -43,6 +43,8 @@ export function JuzRow({
   onAddJuz,
   onNextSection,
   index,
+  showJuz = true,
+  maxPage = 9999,
   draggedItem,
   onDragStart,
   onDragEnd,
@@ -56,6 +58,8 @@ export function JuzRow({
   onAddJuz?: () => void;
   onNextSection?: () => void;
   index: number;
+  showJuz?: boolean;
+  maxPage?: number;
   draggedItem?: { listType: string; index: number } | null;
   onDragStart?: (e: React.DragEvent | React.PointerEvent, listType: string, index: number) => void;
   onDragEnd?: () => void;
@@ -70,7 +74,7 @@ export function JuzRow({
   ) => void;
 }) {
   const { dropPosition, isDragging, rowContainerProps, dragHandleProps } = useRowDragDrop({
-    listType: "juz",
+    listType: showJuz ? "juz" : "page",
     index,
     draggedItem,
     onDragStart,
@@ -133,27 +137,29 @@ export function JuzRow({
       rowContainerProps={rowContainerProps}
       dropPosition={dropPosition}
       dragHandleProps={dragHandleProps}
-      dragTitle="Drag to reorder Juz"
+      dragTitle={showJuz ? "Drag to reorder Juz" : "Drag to reorder Page"}
       onRemove={onRemoveJuz}
-      removeTitle="Remove Juz Row"
+      removeTitle={showJuz ? "Remove Juz Row" : "Remove Page Row"}
       isDragging={isDragging}
     >
-      <JuzInputBox
-        id={rowData.juzInputId || `juz-input-${rowData.id}`}
-        value={rowData.juz}
-        onChange={handleJuzChange}
-        onBlur={handleJuzBlur}
-        onEnter={handleEnterFocusNext}
-        onShiftEnter={onNextSection}
-        onAdd={onAddJuz}
-        onAddShift={onAddJuz}
-        onEmptyBackspace={(e: any) => {
-          if (onRemoveJuz) onRemoveJuz();
-          handleBackspaceFocusPrev(e, true);
-        }}
-        min={QURAN_RULES.MIN_JUZ}
-        max={QURAN_RULES.MAX_JUZ}
-      />
+      {showJuz && (
+        <JuzInputBox
+          id={rowData.juzInputId || `juz-input-${rowData.id}`}
+          value={rowData.juz}
+          onChange={handleJuzChange}
+          onBlur={handleJuzBlur}
+          onEnter={handleEnterFocusNext}
+          onShiftEnter={onNextSection}
+          onAdd={onAddJuz}
+          onAddShift={onAddJuz}
+          onEmptyBackspace={(e: any) => {
+            if (onRemoveJuz) onRemoveJuz();
+            handleBackspaceFocusPrev(e, true);
+          }}
+          min={QURAN_RULES.MIN_JUZ}
+          max={QURAN_RULES.MAX_JUZ}
+        />
+      )}
 
       <div className="flex-1 flex flex-wrap items-center gap-2 sm:gap-2.5 min-w-0">
         {(rowData.ranges || []).map((range, rangeIndex) => {
@@ -169,7 +175,7 @@ export function JuzRow({
                 size="md"
                 width="w-24 sm:w-28"
                 min={QURAN_RULES.MIN_PAGE}
-                max={getMaxPageForJuz(rowData.juz)}
+                max={showJuz ? getMaxPageForJuz(rowData.juz) : maxPage}
                 onChange={(newRange) => handleRangeChange(rangeIndex, newRange)}
                 onRemove={rangeIndex > 0 ? () => removeRange(rangeIndex) : undefined}
                 onAdd={addRange}
@@ -209,6 +215,9 @@ export function JuzRow({
 // ══════════════════════════════════════════════════════════════════════════════
 
 export function JuzPageSection({
+  title,
+  showJuz = true,
+  maxPage = 9999,
   data,
   onChange,
   onReset,
@@ -220,6 +229,9 @@ export function JuzPageSection({
   onDrop,
   onReorderRows,
 }: {
+  title?: string;
+  showJuz?: boolean;
+  maxPage?: number;
   data: JuzRowData[];
   onChange: (updater: JuzRowData[] | ((prevData: JuzRowData[]) => JuzRowData[])) => void;
   onReset?: () => void;
@@ -246,19 +258,22 @@ export function JuzPageSection({
   };
 
   const addJuzRow = () => {
-    const newJuzId = `juz-input-${crypto.randomUUID()}`;
+    const newId = crypto.randomUUID();
+    const newJuzId = `juz-input-${newId}`;
+    const firstRangeId = `range-${newId}-0`;
     onChange((prevData) => [
       ...prevData,
       {
-        id: crypto.randomUUID(),
+        id: newId,
         juz: "",
         juzInputId: newJuzId,
-        ranges: [{ id: crypto.randomUUID(), start: "", end: "" }],
+        ranges: [{ id: firstRangeId, start: "", end: "" }],
       },
     ]);
 
     setTimeout(() => {
-      const el = document.getElementById(newJuzId);
+      const targetId = showJuz ? newJuzId : `${firstRangeId}-start`;
+      const el = document.getElementById(targetId);
       if (el) {
         el.focus();
         if (typeof (el as HTMLInputElement).select === "function") (el as HTMLInputElement).select();
@@ -268,8 +283,10 @@ export function JuzPageSection({
 
   const totalPages = useMemo(() => {
     return (data || []).reduce((sum, row) => {
-      const hasJuz = row.juz && String(row.juz).trim() !== "";
-      if (!hasJuz) return sum;
+      if (showJuz) {
+        const hasJuz = row.juz && String(row.juz).trim() !== "";
+        if (!hasJuz) return sum;
+      }
 
       const rowSum = (row.ranges || []).reduce((rSum, range) => {
         const hasStart = range.start !== undefined && String(range.start).trim() !== "";
@@ -285,13 +302,13 @@ export function JuzPageSection({
       }, 0);
       return sum + rowSum;
     }, 0);
-  }, [data]);
+  }, [data, showJuz]);
 
   const hasJuzData =
     (data || []).length > 1 ||
     (data || []).some(
       (row) =>
-        Boolean(row.juz && String(row.juz).trim() !== "") ||
+        (showJuz && Boolean(row.juz && String(row.juz).trim() !== "")) ||
         (row.ranges || []).some(
           (r) =>
             Boolean(r.start !== undefined && String(r.start).trim() !== "") ||
@@ -299,14 +316,16 @@ export function JuzPageSection({
         )
     );
 
+  const sectionTitle = title || (showJuz ? "JUZ / PAGE DETAILS" : "PAGE DETAILS");
+
   return (
     <div className="relative">
       <SectionHeaderBar
-        title="JUZ / PAGE DETAILS"
+        title={sectionTitle}
         count={totalPages}
         showReset={hasJuzData}
         onReset={onReset}
-        resetTitle="Reset Juz & Page Section"
+        resetTitle={`Reset ${sectionTitle}`}
       />
 
       <div className="space-y-1 sm:space-y-1.5">
@@ -315,6 +334,8 @@ export function JuzPageSection({
             key={row.id || index}
             rowData={row}
             index={index}
+            showJuz={showJuz}
+            maxPage={maxPage}
             onChange={(updater) => handleRowChange(index, updater)}
             onRemoveJuz={data.length > 1 ? () => handleRemoveJuz(index) : undefined}
             onAddJuz={index === data.length - 1 ? addJuzRow : undefined}
@@ -349,6 +370,9 @@ export function DetailRow({
   listType = "mistake",
   index,
   isLastRow = false,
+  showJuz = true,
+  unitLabel,
+  maxPage = 9999,
   draggedItem,
   onDragStart,
   onDragEnd,
@@ -366,6 +390,9 @@ export function DetailRow({
   listType?: string;
   index: number;
   isLastRow?: boolean;
+  showJuz?: boolean;
+  unitLabel?: string;
+  maxPage?: number;
   draggedItem?: { listType: string; index: number } | null;
   onDragStart?: (e: React.DragEvent | React.PointerEvent, listType: string, index: number) => void;
   onDragEnd?: () => void;
@@ -380,7 +407,7 @@ export function DetailRow({
   ) => void;
 }) {
   const { dropPosition, isDragging, rowContainerProps, dragHandleProps } = useRowDragDrop({
-    listType,
+    listType: showJuz ? listType : `book-${listType}`,
     index,
     draggedItem,
     onDragStart,
@@ -391,13 +418,15 @@ export function DetailRow({
   });
 
   const { lastPage, lastAyah } = useQuranTrackingSession();
+  const effectiveUnitLabel = unitLabel || (showJuz ? "Ayah" : "Line");
 
   const validAvailableJuzNumbers = useMemo(() => {
+    if (!showJuz) return [];
     return (availableJuzs || [])
       .map((j) => parseInt(String(j), 10))
       .filter((n) => !isNaN(n) && n >= QURAN_RULES.MIN_JUZ && n <= QURAN_RULES.MAX_JUZ)
       .sort((a, b) => a - b);
-  }, [availableJuzs]);
+  }, [availableJuzs, showJuz]);
 
   const minJuz = validAvailableJuzNumbers.length > 0 ? Math.min(...validAvailableJuzNumbers) : QURAN_RULES.MIN_JUZ;
   const maxJuz = validAvailableJuzNumbers.length > 0 ? Math.max(...validAvailableJuzNumbers) : QURAN_RULES.MAX_JUZ;
@@ -407,13 +436,21 @@ export function DetailRow({
       ? availableJuzs[0]
       : (rowData.juz || (availableJuzs && availableJuzs.length > 0 ? availableJuzs[0] : (juzPageData?.find((r) => r.juz && String(r.juz).trim() !== "")?.juz || "")));
 
-  const { minPage, maxPage, allowedPages } = getJuzPageBounds(effectiveJuz, juzPageData);
+  const quranBounds = useMemo(() => {
+    if (!showJuz) return { minPage: 1, maxPage: maxPage || 9999, allowedPages: null };
+    return getJuzPageBounds(effectiveJuz, juzPageData);
+  }, [showJuz, effectiveJuz, juzPageData, maxPage]);
+
+  const minPage = quranBounds.minPage;
+  const maxPageVal = quranBounds.maxPage;
+  const allowedPages = quranBounds.allowedPages;
 
   const allowedPagesKey = useMemo(() => (allowedPages || []).join(","), [allowedPages]);
   const availableJuzsKey = useMemo(() => (validAvailableJuzNumbers || []).join(","), [validAvailableJuzNumbers]);
 
   // Sync Juz when parent availableJuzs / juzPageData change
   useEffect(() => {
+    if (!showJuz) return;
     if (validAvailableJuzNumbers.length > 0) {
       onChange((prev) => {
         if (prev.juz === "" || prev.juz === undefined || prev.juz === null) {
@@ -426,7 +463,7 @@ export function DetailRow({
         return prev;
       });
     }
-  }, [availableJuzsKey]);
+  }, [availableJuzsKey, showJuz]);
 
   // Sync Page when parent bounds change
   useEffect(() => {
@@ -434,13 +471,13 @@ export function DetailRow({
       if (prev.page === "" || prev.page === undefined || prev.page === null) {
         return prev;
       }
-      const clamped = clampToAllowedOrRange(prev.page, allowedPages, minPage, maxPage);
+      const clamped = clampToAllowedOrRange(prev.page, allowedPages, minPage, maxPageVal);
       if (clamped !== null && clamped !== Number(prev.page)) {
         return { ...prev, page: clamped };
       }
       return prev;
     });
-  }, [minPage, maxPage, allowedPagesKey]);
+  }, [minPage, maxPageVal, allowedPagesKey]);
 
   const handleJuzChange = (val: string | number) => {
     onChange((prev) => ({ ...prev, juz: val }));
@@ -501,7 +538,7 @@ export function DetailRow({
   };
 
   const handlePageBlur = () => {
-    const clamped = clampToAllowedOrRange(rowData.page, allowedPages, minPage, maxPage);
+    const clamped = clampToAllowedOrRange(rowData.page, allowedPages, minPage, maxPageVal);
     if (clamped !== null) {
       if (clamped !== Number(rowData.page)) {
         handlePageChange(clamped);
@@ -518,13 +555,13 @@ export function DetailRow({
         direction,
         allowedPages,
         minPage,
-        maxPage,
+        maxPageVal,
         lastPage
       );
       quranTrackingSession.setLastPage(nextVal);
       return { ...prev, page: nextVal };
     });
-  }, [allowedPages, minPage, maxPage, lastPage, onChange]);
+  }, [allowedPages, minPage, maxPageVal, lastPage, onChange]);
 
   const handlePageWheel = (e: React.WheelEvent | WheelEvent) => {
     e?.preventDefault?.();
@@ -561,7 +598,8 @@ export function DetailRow({
   const handleAyahBlur = (ayahIndex: number) => {
     const ayah = rowData.ayahs[ayahIndex];
     if (ayah && ayah.value !== "" && ayah.value !== undefined && ayah.value !== null) {
-      const clamped = clampToAllowedOrRange(ayah.value, null, QURAN_RULES.MIN_AYAH, QURAN_RULES.MAX_AYAH);
+      const maxLimit = showJuz ? QURAN_RULES.MAX_AYAH : 9999;
+      const clamped = clampToAllowedOrRange(ayah.value, null, 1, maxLimit);
       if (clamped !== null) {
         if (clamped !== Number(ayah.value)) {
           handleAyahChange(ayahIndex, clamped);
@@ -606,7 +644,7 @@ export function DetailRow({
     });
   };
 
-  const hasMultiJuz = Boolean(availableJuzs && availableJuzs.length > 1);
+  const hasMultiJuz = showJuz && Boolean(availableJuzs && availableJuzs.length > 1);
 
   return (
     <DraggableRowWrapper
@@ -650,9 +688,9 @@ export function DetailRow({
           handleBackspaceFocusPrev(e, true);
         }}
         min={minPage}
-        max={maxPage}
+        max={maxPageVal}
         initialScrollValue={
-          lastPage !== null && lastPage >= minPage && lastPage <= maxPage
+          lastPage !== null && lastPage >= minPage && lastPage <= maxPageVal
             ? lastPage
             : minPage
         }
@@ -660,7 +698,7 @@ export function DetailRow({
 
       <div className="flex-1 flex flex-wrap items-center gap-2 sm:gap-2.5 min-w-0">
         <label className="text-[11px] sm:text-xs font-semibold theme-text-secondary shrink-0 h-10 flex items-center select-none">
-          Ayah
+          {effectiveUnitLabel}
         </label>
         {(rowData.ayahs || []).map((ayah, aIdx) => {
           const isLastAyah = aIdx === (rowData.ayahs?.length || 0) - 1;
@@ -679,13 +717,13 @@ export function DetailRow({
                   if (aIdx > 0) removeAyah(aIdx);
                   handleBackspaceFocusPrev(e, true);
                 }}
-                initialScrollValue={lastAyah !== null ? lastAyah : QURAN_RULES.MIN_AYAH}
+                initialScrollValue={lastAyah !== null ? lastAyah : 1}
               />
               {!isLastAyah && <ItemCommaSeparator />}
               {isLastAyah && (
                 <RowAddCircleButton
                   onAdd={addAyah}
-                  title="Add another Ayah"
+                  title={`Add another ${effectiveUnitLabel}`}
                 />
               )}
             </div>
@@ -707,6 +745,9 @@ export function DetailSection({
   onChange,
   availableJuzs,
   juzPageData,
+  showJuz = true,
+  unitLabel,
+  maxPage = 9999,
   draggedItem,
   onDragStart,
   onDragEnd,
@@ -722,6 +763,9 @@ export function DetailSection({
   onChange: (updater: DetailRowData[] | ((prevData: DetailRowData[]) => DetailRowData[])) => void;
   availableJuzs?: (string | number)[];
   juzPageData?: any[];
+  showJuz?: boolean;
+  unitLabel?: string;
+  maxPage?: number;
   draggedItem?: { listType: string; index: number } | null;
   onDragStart?: (e: React.DragEvent | React.PointerEvent, listType: string, index: number) => void;
   onDragEnd?: () => void;
@@ -740,19 +784,21 @@ export function DetailSection({
   const addRow = () => {
     const newId = crypto.randomUUID();
     onChange((prevData) => {
-      const defaultJuz =
-        (availableJuzs && availableJuzs.length > 0 ? availableJuzs[0] : "") ||
-        (juzPageData?.find((r) => r.juz && String(r.juz).trim() !== "")?.juz || "");
+      const defaultJuz = showJuz
+        ? ((availableJuzs && availableJuzs.length > 0 ? availableJuzs[0] : "") ||
+          (juzPageData?.find((r) => r.juz && String(r.juz).trim() !== "")?.juz || ""))
+        : "";
       const lastJuz =
         prevData.length > 0 && prevData[prevData.length - 1].juz
           ? prevData[prevData.length - 1].juz
           : defaultJuz;
-      const rowJuz =
-        availableJuzs && availableJuzs.length === 1
-          ? availableJuzs[0]
-          : availableJuzs && availableJuzs.length > 1
-          ? (lastJuz && availableJuzs.some((j) => String(j) === String(lastJuz)) ? lastJuz : availableJuzs[0])
-          : (lastJuz || defaultJuz);
+      const rowJuz = showJuz
+        ? (availableJuzs && availableJuzs.length === 1
+            ? availableJuzs[0]
+            : availableJuzs && availableJuzs.length > 1
+            ? (lastJuz && availableJuzs.some((j) => String(j) === String(lastJuz)) ? lastJuz : availableJuzs[0])
+            : (lastJuz || defaultJuz))
+        : "";
       return [
         ...prevData,
         {
@@ -823,6 +869,9 @@ export function DetailSection({
             listType={listType}
             index={index}
             isLastRow={index === data.length - 1}
+            showJuz={showJuz}
+            unitLabel={unitLabel}
+            maxPage={maxPage}
             draggedItem={draggedItem}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
@@ -837,3 +886,16 @@ export function DetailSection({
     </div>
   );
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 7. BACKWARD COMPATIBILITY EXPORTS FOR BOOK SECTIONS
+// ══════════════════════════════════════════════════════════════════════════════
+
+export function BookPageSection(props: any) {
+  return <JuzPageSection {...props} showJuz={false} title="PAGE DETAILS" />;
+}
+
+export function BookDetailSection(props: any) {
+  return <DetailSection {...props} showJuz={false} unitLabel="Line" />;
+}
+

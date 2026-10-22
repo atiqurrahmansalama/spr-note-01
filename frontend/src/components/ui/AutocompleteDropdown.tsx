@@ -393,6 +393,11 @@ export default function AutocompleteDropdown({
               }
             }}
             onClick={handleOpen}
+            onBlur={(e) => {
+              const term = (e.target.value || '').trim();
+              if (onQueryChange) onQueryChange(term);
+              if (onChange && term) onChange(term);
+            }}
             placeholder={placeholder}
             className={`w-full bg-transparent border-0 outline-none p-0 font-medium theme-text-primary placeholder:theme-text-secondary placeholder:opacity-50 text-xs sm:text-sm ${
               readOnly ? 'cursor-pointer select-none' : ''

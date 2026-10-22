@@ -286,6 +286,7 @@ export function LessonInputSection({
         value={lessonTitle}
         onChange={handleSelectOption}
         onQueryChange={(val) => onLessonChange && onLessonChange(val || "")}
+        onAddNew={(val) => onLessonChange && onLessonChange(val || "")}
         placeholder={placeholder}
         label={label}
         // actionLabel="+ Plan Lesson"
@@ -374,6 +375,7 @@ export function BookSubjectInputSection({
         value={bookTitle}
         onChange={handleSelectOption}
         onQueryChange={(val) => onBookChange && onBookChange(val || "")}
+        onAddNew={(val) => onBookChange && onBookChange(val || "")}
         placeholder={placeholder}
         label={label}
         actionLabel="+ Add Book"

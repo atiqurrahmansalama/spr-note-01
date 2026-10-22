@@ -144,19 +144,21 @@ class OutboxService:
 
         try:
             from core.models import DataMutationOutbox
+            from django.db import transaction
 
             payload = {}
             if operation in ('INSERT', 'UPDATE'):
                 payload = serialize_model_instance(instance)
 
-            DataMutationOutbox.objects.create(
-                table_name=table,
-                record_pk=record_pk,
-                operation=operation,
-                payload=payload,
-                tenant_id=t_id,
-                status='PENDING'
-            )
+            with transaction.atomic():
+                DataMutationOutbox.objects.create(
+                    table_name=table,
+                    record_pk=record_pk,
+                    operation=operation,
+                    payload=payload,
+                    tenant_id=t_id,
+                    status='PENDING'
+                )
         except Exception as err:
             logger.warning(
                 f"[OutboxService] Non-blocking outbox capture error on {table}#{record_pk}: {err}"

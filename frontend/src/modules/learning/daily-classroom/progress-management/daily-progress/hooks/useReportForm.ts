@@ -86,6 +86,7 @@ export function useReportForm() {
   const [bookTitle, setBookTitle] = useState<string>("");
   const [lessonTitle, setLessonTitle] = useState<string>("");
 
+  // Single Unified Form Engine State
   const [juzPageData, setJuzPageData] = useState<JuzRowData[]>([
     {
       id: crypto.randomUUID(),
@@ -102,22 +103,13 @@ export function useReportForm() {
     { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] },
   ]);
 
-  // Book Progress States (General Book / Kitab / Subject)
-  const [bookPageData, setBookPageData] = useState<JuzRowData[]>([
-    {
-      id: crypto.randomUUID(),
-      juz: "",
-      ranges: [{ id: crypto.randomUUID(), start: "", end: "" }],
-    },
-  ]);
-
-  const [bookMistakeData, setBookMistakeData] = useState<DetailRowData[]>([
-    { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] },
-  ]);
-
-  const [bookStuckData, setBookStuckData] = useState<DetailRowData[]>([
-    { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] },
-  ]);
+  // Backward-compatible unified aliases
+  const bookPageData = juzPageData;
+  const setBookPageData = setJuzPageData;
+  const bookMistakeData = mistakeData;
+  const setBookMistakeData = setMistakeData;
+  const bookStuckData = stuckData;
+  const setBookStuckData = setStuckData;
 
   const [comment, setComment] = useState<string>("");
   const [savedComments, setSavedComments] = useState<string[]>(() => commentStore.getAll());
@@ -245,49 +237,43 @@ export function useReportForm() {
         setLessonTitle(data.lessonTitle || "");
         if (data.selectedDate) setSelectedDate(data.selectedDate);
 
-        // Restore Quran page & mistake/stuck data
-        if (Array.isArray(data.juzPageData) && data.juzPageData.length > 0) {
-          setJuzPageData(data.juzPageData);
+        // Restore pages (unified engine)
+        const resolvedPages =
+          (Array.isArray(data.juzPageData) && data.juzPageData.length > 0)
+            ? data.juzPageData
+            : (Array.isArray(data.bookPageData) && data.bookPageData.length > 0)
+            ? data.bookPageData
+            : [];
+        if (resolvedPages.length > 0) {
+          setJuzPageData(resolvedPages);
         } else {
           setJuzPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
         }
-        if (Array.isArray(data.mistakeData) && data.mistakeData.length > 0) {
-          setMistakeData(data.mistakeData);
+
+        // Restore mistakes
+        const resolvedMistakes =
+          (Array.isArray(data.mistakeData) && data.mistakeData.length > 0)
+            ? data.mistakeData
+            : (Array.isArray(data.bookMistakeData) && data.bookMistakeData.length > 0)
+            ? data.bookMistakeData
+            : [];
+        if (resolvedMistakes.length > 0) {
+          setMistakeData(resolvedMistakes);
         } else {
           setMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
         }
-        if (Array.isArray(data.stuckData) && data.stuckData.length > 0) {
-          setStuckData(data.stuckData);
+
+        // Restore stucks
+        const resolvedStucks =
+          (Array.isArray(data.stuckData) && data.stuckData.length > 0)
+            ? data.stuckData
+            : (Array.isArray(data.bookStuckData) && data.bookStuckData.length > 0)
+            ? data.bookStuckData
+            : [];
+        if (resolvedStucks.length > 0) {
+          setStuckData(resolvedStucks);
         } else {
           setStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
-        }
-
-        // Restore Book page & mistake/stuck data (with fallback to generic arrays if book arrays were omitted)
-        const resolvedBookPages = (Array.isArray(data.bookPageData) && data.bookPageData.length > 0)
-          ? data.bookPageData
-          : (data.progressMode === "BOOK" && Array.isArray(data.juzPageData) && data.juzPageData.length > 0 ? data.juzPageData : []);
-        if (resolvedBookPages.length > 0) {
-          setBookPageData(resolvedBookPages);
-        } else {
-          setBookPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
-        }
-
-        const resolvedBookMistakes = (Array.isArray(data.bookMistakeData) && data.bookMistakeData.length > 0)
-          ? data.bookMistakeData
-          : (data.progressMode === "BOOK" && Array.isArray(data.mistakeData) && data.mistakeData.length > 0 ? data.mistakeData : []);
-        if (resolvedBookMistakes.length > 0) {
-          setBookMistakeData(resolvedBookMistakes);
-        } else {
-          setBookMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
-        }
-
-        const resolvedBookStucks = (Array.isArray(data.bookStuckData) && data.bookStuckData.length > 0)
-          ? data.bookStuckData
-          : (data.progressMode === "BOOK" && Array.isArray(data.stuckData) && data.stuckData.length > 0 ? data.stuckData : []);
-        if (resolvedBookStucks.length > 0) {
-          setBookStuckData(resolvedBookStucks);
-        } else {
-          setBookStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
         }
 
         setComment(data.comment || "");
@@ -338,49 +324,43 @@ export function useReportForm() {
       setLessonTitle(data.lessonTitle || "");
       if (data.selectedDate) setSelectedDate(data.selectedDate);
 
-      // Restore Quran page & mistake/stuck data
-      if (Array.isArray(data.juzPageData) && data.juzPageData.length > 0) {
-        setJuzPageData(data.juzPageData);
+      // Restore pages (unified engine)
+      const resolvedPages =
+        (Array.isArray(data.juzPageData) && data.juzPageData.length > 0)
+          ? data.juzPageData
+          : (Array.isArray(data.bookPageData) && data.bookPageData.length > 0)
+          ? data.bookPageData
+          : [];
+      if (resolvedPages.length > 0) {
+        setJuzPageData(resolvedPages);
       } else {
         setJuzPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
       }
-      if (Array.isArray(data.mistakeData) && data.mistakeData.length > 0) {
-        setMistakeData(data.mistakeData);
+
+      // Restore mistakes
+      const resolvedMistakes =
+        (Array.isArray(data.mistakeData) && data.mistakeData.length > 0)
+          ? data.mistakeData
+          : (Array.isArray(data.bookMistakeData) && data.bookMistakeData.length > 0)
+          ? data.bookMistakeData
+          : [];
+      if (resolvedMistakes.length > 0) {
+        setMistakeData(resolvedMistakes);
       } else {
         setMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
       }
-      if (Array.isArray(data.stuckData) && data.stuckData.length > 0) {
-        setStuckData(data.stuckData);
+
+      // Restore stucks
+      const resolvedStucks =
+        (Array.isArray(data.stuckData) && data.stuckData.length > 0)
+          ? data.stuckData
+          : (Array.isArray(data.bookStuckData) && data.bookStuckData.length > 0)
+          ? data.bookStuckData
+          : [];
+      if (resolvedStucks.length > 0) {
+        setStuckData(resolvedStucks);
       } else {
         setStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
-      }
-
-      // Restore Book page & mistake/stuck data
-      const resolvedBookPages = (Array.isArray(data.bookPageData) && data.bookPageData.length > 0)
-        ? data.bookPageData
-        : (data.progressMode === "BOOK" && Array.isArray(data.juzPageData) && data.juzPageData.length > 0 ? data.juzPageData : []);
-      if (resolvedBookPages.length > 0) {
-        setBookPageData(resolvedBookPages);
-      } else {
-        setBookPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
-      }
-
-      const resolvedBookMistakes = (Array.isArray(data.bookMistakeData) && data.bookMistakeData.length > 0)
-        ? data.bookMistakeData
-        : (data.progressMode === "BOOK" && Array.isArray(data.mistakeData) && data.mistakeData.length > 0 ? data.mistakeData : []);
-      if (resolvedBookMistakes.length > 0) {
-        setBookMistakeData(resolvedBookMistakes);
-      } else {
-        setBookMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
-      }
-
-      const resolvedBookStucks = (Array.isArray(data.bookStuckData) && data.bookStuckData.length > 0)
-        ? data.bookStuckData
-        : (data.progressMode === "BOOK" && Array.isArray(data.stuckData) && data.stuckData.length > 0 ? data.stuckData : []);
-      if (resolvedBookStucks.length > 0) {
-        setBookStuckData(resolvedBookStucks);
-      } else {
-        setBookStuckData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
       }
 
       setComment(data.comment || "");
@@ -523,7 +503,7 @@ export function useReportForm() {
       setProgressMode("BOOK");
       const bookPagesSource = rep.bookPageData || rep.juz_and_pages || rep.portions || [];
       if (Array.isArray(bookPagesSource) && bookPagesSource.length > 0) {
-        setBookPageData(
+        setJuzPageData(
           bookPagesSource.map((jp: any) => ({
             id: crypto.randomUUID(),
             juz: "",
@@ -539,7 +519,7 @@ export function useReportForm() {
       }
       const bookMistakesSource = rep.bookMistakeData || rep.mistakes || (Array.isArray(rep.error_details) ? rep.error_details.filter((e: any) => e.type === "Mistake") : []);
       if (Array.isArray(bookMistakesSource) && bookMistakesSource.length > 0) {
-        setBookMistakeData(
+        setMistakeData(
           bookMistakesSource.map((m: any) => ({
             id: crypto.randomUUID(),
             juz: "",
@@ -552,7 +532,7 @@ export function useReportForm() {
       }
       const bookStucksSource = rep.bookStuckData || rep.stucks || (Array.isArray(rep.error_details) ? rep.error_details.filter((e: any) => e.type === "Stuck") : []);
       if (Array.isArray(bookStucksSource) && bookStucksSource.length > 0) {
-        setBookStuckData(
+        setStuckData(
           bookStucksSource.map((s: any) => ({
             id: crypto.randomUUID(),
             juz: "",
@@ -589,6 +569,12 @@ export function useReportForm() {
         if (recovered.juzPageData?.length) setJuzPageData(recovered.juzPageData);
         if (recovered.mistakeData?.length) setMistakeData(recovered.mistakeData);
         if (recovered.stuckData?.length) setStuckData(recovered.stuckData);
+        if (recovered.progressMode) setProgressMode(recovered.progressMode);
+        if (recovered.bookTitle !== undefined) setBookTitle(recovered.bookTitle);
+        if (recovered.lessonTitle !== undefined) setLessonTitle(recovered.lessonTitle);
+        if (recovered.bookPageData?.length) setBookPageData(recovered.bookPageData);
+        if (recovered.bookMistakeData?.length) setBookMistakeData(recovered.bookMistakeData);
+        if (recovered.bookStuckData?.length) setBookStuckData(recovered.bookStuckData);
         if (recovered.comment !== undefined) setComment(recovered.comment);
 
         const newUrl = window.location.pathname;
@@ -603,9 +589,15 @@ export function useReportForm() {
         if (recovered.groupName !== undefined) setGroupName(recovered.groupName);
         if (recovered.selectedSession !== undefined) setSelectedSession(recovered.selectedSession);
         if (recovered.selectedDate !== undefined) setSelectedDate(recovered.selectedDate);
+        if (recovered.progressMode) setProgressMode(recovered.progressMode);
+        if (recovered.bookTitle !== undefined) setBookTitle(recovered.bookTitle);
+        if (recovered.lessonTitle !== undefined) setLessonTitle(recovered.lessonTitle);
         if (recovered.juzPageData?.length) setJuzPageData(recovered.juzPageData);
         if (recovered.mistakeData?.length) setMistakeData(recovered.mistakeData);
         if (recovered.stuckData?.length) setStuckData(recovered.stuckData);
+        if (recovered.bookPageData?.length) setBookPageData(recovered.bookPageData);
+        if (recovered.bookMistakeData?.length) setBookMistakeData(recovered.bookMistakeData);
+        if (recovered.bookStuckData?.length) setBookStuckData(recovered.bookStuckData);
         if (recovered.comment !== undefined) setComment(recovered.comment);
       } else {
         // Asynchronously check Central IndexedDB drafts
@@ -616,9 +608,15 @@ export function useReportForm() {
             if (idbDraft.groupName !== undefined) setGroupName(idbDraft.groupName);
             if (idbDraft.selectedSession !== undefined) setSelectedSession(idbDraft.selectedSession);
             if (idbDraft.selectedDate !== undefined) setSelectedDate(idbDraft.selectedDate);
+            if (idbDraft.progressMode) setProgressMode(idbDraft.progressMode);
+            if (idbDraft.bookTitle !== undefined) setBookTitle(idbDraft.bookTitle);
+            if (idbDraft.lessonTitle !== undefined) setLessonTitle(idbDraft.lessonTitle);
             if (idbDraft.juzPageData?.length) setJuzPageData(idbDraft.juzPageData);
             if (idbDraft.mistakeData?.length) setMistakeData(idbDraft.mistakeData);
             if (idbDraft.stuckData?.length) setStuckData(idbDraft.stuckData);
+            if (idbDraft.bookPageData?.length) setBookPageData(idbDraft.bookPageData);
+            if (idbDraft.bookMistakeData?.length) setBookMistakeData(idbDraft.bookMistakeData);
+            if (idbDraft.bookStuckData?.length) setBookStuckData(idbDraft.bookStuckData);
             if (idbDraft.comment !== undefined) setComment(idbDraft.comment);
           }
         }).catch(() => {});
@@ -963,13 +961,154 @@ export function useReportForm() {
       return false;
     }
 
-    const hasProgressData = progressMode === "BOOK"
-      ? bookPageData.some((d) => (d.ranges || []).some((r) => r.start || r.end))
-      : juzPageData.some((d) => d.juz || (d.ranges || []).some((r) => r.start || r.end));
+    if (progressMode === "BOOK") {
+      if (!bookTitle.trim()) {
+        showToast("Please specify a Book / Subject Title first", "warning");
+        return false;
+      }
+      const hasBookData = juzPageData.some(
+        (d) => (d.ranges || []).some((r) => (r.start && String(r.start).trim()) || (r.end && String(r.end).trim()))
+      );
+      if (!hasBookData) {
+        showToast("Please enter Book Page details first", "warning");
+        return false;
+      }
+      for (let i = 0; i < juzPageData.length; i++) {
+        const row = juzPageData[i];
+        const validRanges = (row.ranges || []).filter(
+          (r) => (r.start && String(r.start).trim()) || (r.end && String(r.end).trim())
+        );
+        for (const r of validRanges) {
+          const sPage = parseInt(String(r.start || ""), 10);
+          if (isNaN(sPage) || sPage < 1) {
+            showToast(`Please enter a valid start page for row #${i + 1}.`, "warning");
+            return false;
+          }
+          if (r.end && String(r.end).trim()) {
+            const ePage = parseInt(String(r.end), 10);
+            if (isNaN(ePage) || ePage < sPage) {
+              showToast(`End page cannot be less than start page for row #${i + 1}.`, "warning");
+              return false;
+            }
+          }
+        }
+      }
 
-    if (!hasProgressData) {
-      showToast(progressMode === "BOOK" ? "Please enter Page details first" : "Please enter Juz & Page information first", "warning");
-      return false;
+      // Check Mistake pages for Book mode
+      const cleanMistakes = mistakeData.filter(
+        (m) => (m.page && String(m.page).trim()) || ((m.ayahs || []).some((a) => a.value && String(a.value).trim()))
+      );
+      for (let i = 0; i < cleanMistakes.length; i++) {
+        const m = cleanMistakes[i];
+        if (!m.page || String(m.page).trim() === "") {
+          showToast(`Please specify a valid Page number for Mistake entry #${i + 1}.`, "warning");
+          return false;
+        }
+      }
+
+      // Check Stuck pages for Book mode
+      const cleanStucks = stuckData.filter(
+        (s) => (s.page && String(s.page).trim()) || ((s.ayahs || []).some((a) => a.value && String(a.value).trim()))
+      );
+      for (let i = 0; i < cleanStucks.length; i++) {
+        const s = cleanStucks[i];
+        if (!s.page || String(s.page).trim() === "") {
+          showToast(`Please specify a valid Page number for Stuck entry #${i + 1}.`, "warning");
+          return false;
+        }
+      }
+    } else {
+      // QURAN MODE: Strict Juz & Page Validation
+      const activeJuzRows = juzPageData.filter(
+        (row) => (row.juz && String(row.juz).trim() !== "") || (row.ranges || []).some((r) => r.start || r.end)
+      );
+
+      if (activeJuzRows.length === 0) {
+        showToast("Please enter Juz & Page information first", "warning");
+        return false;
+      }
+
+      // Check each recitation entry for valid Juz number (1-30) and valid page ranges
+      for (let i = 0; i < activeJuzRows.length; i++) {
+        const row = activeJuzRows[i];
+        const rawJuz = String(row.juz || "").trim();
+        const jNum = parseInt(rawJuz, 10);
+
+        if (!rawJuz || isNaN(jNum) || jNum < 1 || jNum > 30) {
+          showToast(`Please enter a valid Juz number (1–30) for recitation entry #${i + 1}.`, "warning");
+          return false;
+        }
+
+        const validRanges = (row.ranges || []).filter(
+          (r) => (r.start && String(r.start).trim()) || (r.end && String(r.end).trim())
+        );
+
+        if (validRanges.length === 0) {
+          showToast(`Please enter page range for Juz ${jNum}.`, "warning");
+          return false;
+        }
+
+        for (const range of validRanges) {
+          const sPage = parseInt(String(range.start || ""), 10);
+          if (isNaN(sPage) || sPage < 1) {
+            showToast(`Please enter a valid start page for Juz ${jNum}.`, "warning");
+            return false;
+          }
+          if (range.end && String(range.end).trim()) {
+            const ePage = parseInt(String(range.end), 10);
+            if (isNaN(ePage) || ePage < sPage) {
+              showToast(`End page cannot be less than start page for Juz ${jNum}.`, "warning");
+              return false;
+            }
+          }
+        }
+      }
+
+      // Strict Validation for Mistakes: each recorded mistake row must have a valid Juz and Page
+      const cleanMistakes = mistakeData.filter(
+        (m) => (m.page && String(m.page).trim()) || ((m.ayahs || []).some((a) => a.value && String(a.value).trim()))
+      );
+      for (let i = 0; i < cleanMistakes.length; i++) {
+        const m = cleanMistakes[i];
+        if (!m.page || String(m.page).trim() === "") {
+          showToast(`Please specify a valid Page number for Mistake entry #${i + 1}.`, "warning");
+          return false;
+        }
+        const rawJuz = String(m.juz || "").trim();
+        const jNum = parseInt(rawJuz, 10);
+        if (!rawJuz || isNaN(jNum) || jNum < 1 || jNum > 30) {
+          const inheritedJuz = parseInt(String(activeJuzRows[0]?.juz || ""), 10);
+          if (inheritedJuz >= 1 && inheritedJuz <= 30) {
+            m.juz = inheritedJuz;
+          } else {
+            showToast(`Please specify a valid Juz number (1–30) for Mistake entry #${i + 1}.`, "warning");
+            return false;
+          }
+        }
+      }
+
+      // Strict Validation for Stucks: each recorded stuck row must have a valid Juz and Page
+      const cleanStucks = stuckData.filter(
+        (s) => (s.page && String(s.page).trim()) || ((s.ayahs || []).some((a) => a.value && String(a.value).trim()))
+      );
+      for (let i = 0; i < cleanStucks.length; i++) {
+        const s = cleanStucks[i];
+        if (!s.page || String(s.page).trim() === "") {
+          showToast(`Please specify a valid Page number for Stuck entry #${i + 1}.`, "warning");
+          return false;
+        }
+        const rawJuz = String(s.juz || "").trim();
+        const jNum = parseInt(rawJuz, 10);
+        if (!rawJuz || isNaN(jNum) || jNum < 1 || jNum > 30) {
+          const inheritedJuz = parseInt(String(activeJuzRows[0]?.juz || ""), 10);
+          if (inheritedJuz >= 1 && inheritedJuz <= 30) {
+            s.juz = inheritedJuz;
+          } else {
+            showToast(`Please specify a valid Juz number (1–30) for Stuck entry #${i + 1}.`, "warning");
+            return false;
+          }
+        }
+      }
     }
 
     return true;
@@ -1018,24 +1157,13 @@ export function useReportForm() {
         return;
       }
 
-      const cleanMistakes = mistakeData.filter(
+      const cleanActiveMistakes = mistakeData.filter(
         (m) => (m.page && String(m.page).trim()) || ((m.ayahs || []).some((a) => a.value && String(a.value).trim()))
       );
-      const cleanStucks = stuckData.filter(
+      const cleanActiveStucks = stuckData.filter(
         (s) => (s.page && String(s.page).trim()) || ((s.ayahs || []).some((a) => a.value && String(a.value).trim()))
       );
-
-      const activePages = progressMode === "BOOK" ? bookPageData : juzPageData;
-      const activeRawMistakes = progressMode === "BOOK" ? bookMistakeData : mistakeData;
-      const activeRawStucks = progressMode === "BOOK" ? bookStuckData : stuckData;
-
-      const cleanActiveMistakes = activeRawMistakes.filter(
-        (m) => (m.page && String(m.page).trim()) || ((m.ayahs || []).some((a) => a.value && String(a.value).trim()))
-      );
-
-      const cleanActiveStucks = activeRawStucks.filter(
-        (s) => (s.page && String(s.page).trim()) || ((s.ayahs || []).some((a) => a.value && String(a.value).trim()))
-      );
+      const activePages = juzPageData;
 
       const editedAt = new Date().toISOString();
       const isEditing = Boolean(editingReport);
@@ -1067,13 +1195,16 @@ export function useReportForm() {
         session_name: selectedSession.trim(),
         progress_mode: progressMode,
         mode: progressMode,
-        book_title: progressMode === "BOOK" ? bookTitle.trim() : "",
-        curriculum_book_name: progressMode === "BOOK" ? bookTitle.trim() : "",
-        book_name: progressMode === "BOOK" ? bookTitle.trim() : "",
-        lesson_title: progressMode === "BOOK" ? lessonTitle.trim() : "",
-        lesson_covered: progressMode === "BOOK" ? lessonTitle.trim() : "",
+        book_title: (bookTitle || "").trim(),
+        curriculum_book_name: (bookTitle || "").trim(),
+        book_name: (bookTitle || "").trim(),
+        bookTitle: (bookTitle || "").trim(),
+        lesson_title: (lessonTitle || "").trim(),
+        lesson_covered: (lessonTitle || "").trim(),
+        lessonTitle: (lessonTitle || "").trim(),
+        lesson: (lessonTitle || "").trim(),
         report_date: selectedDate || getClassroomTodayDate(),
-        subject_course: progressMode === "BOOK" ? (bookTitle.trim() || "Book Progress") : (groupName || "General Group"),
+        subject_course: (bookTitle.trim() || groupName || "General Group"),
         juz_and_pages: activePages,
         mistakes: cleanActiveMistakes,
         stucks: cleanActiveStucks,
@@ -1128,23 +1259,26 @@ export function useReportForm() {
           groupName: groupName || "General Group",
           progress_mode: progressMode,
           mode: progressMode,
-          book_title: progressMode === "BOOK" ? bookTitle.trim() : "",
-          curriculum_book_name: progressMode === "BOOK" ? bookTitle.trim() : "",
-          book_name: progressMode === "BOOK" ? bookTitle.trim() : "",
-          lesson_title: progressMode === "BOOK" ? lessonTitle.trim() : "",
-          lesson_covered: progressMode === "BOOK" ? lessonTitle.trim() : "",
-          subject_course: progressMode === "BOOK" ? (bookTitle.trim() || "Book Progress") : (groupName || "General Group"),
+          book_title: (bookTitle || "").trim(),
+          curriculum_book_name: (bookTitle || "").trim(),
+          book_name: (bookTitle || "").trim(),
+          bookTitle: (bookTitle || "").trim(),
+          lesson_title: (lessonTitle || "").trim(),
+          lesson_covered: (lessonTitle || "").trim(),
+          lessonTitle: (lessonTitle || "").trim(),
+          lesson: (lessonTitle || "").trim(),
+          subject_course: (bookTitle.trim() || groupName || "General Group"),
           selectedSession: selectedSession.trim(),
           session_name: selectedSession.trim(),
           selectedDate,
           juz_and_pages: activePages,
           mistakes: cleanActiveMistakes,
           stucks: cleanActiveStucks,
-          juzPageData: progressMode === "BOOK" ? activePages : juzPageData,
-          bookPageData: progressMode === "BOOK" ? bookPageData : [],
-          mistakeData: progressMode === "BOOK" ? cleanActiveMistakes : cleanMistakes,
+          juzPageData: activePages,
+          bookPageData: progressMode === "BOOK" ? activePages : [],
+          mistakeData: cleanActiveMistakes,
           bookMistakeData: progressMode === "BOOK" ? cleanActiveMistakes : [],
-          stuckData: progressMode === "BOOK" ? cleanActiveStucks : cleanStucks,
+          stuckData: cleanActiveStucks,
           bookStuckData: progressMode === "BOOK" ? cleanActiveStucks : [],
         };
 
@@ -1203,9 +1337,6 @@ export function useReportForm() {
           juzPageData,
           mistakeData,
           stuckData,
-          bookPageData,
-          bookMistakeData,
-          bookStuckData,
           comment,
           savedReportId: updatedRecord.id,
           savedReportKey: repUniqueId,
@@ -1237,23 +1368,26 @@ export function useReportForm() {
           groupName: groupName || "General Group",
           progress_mode: progressMode,
           mode: progressMode,
-          book_title: progressMode === "BOOK" ? bookTitle.trim() : "",
-          curriculum_book_name: progressMode === "BOOK" ? bookTitle.trim() : "",
-          book_name: progressMode === "BOOK" ? bookTitle.trim() : "",
-          lesson_title: progressMode === "BOOK" ? lessonTitle.trim() : "",
-          lesson_covered: progressMode === "BOOK" ? lessonTitle.trim() : "",
-          subject_course: progressMode === "BOOK" ? (bookTitle.trim() || "Book Progress") : (groupName || "General Group"),
+          book_title: (bookTitle || "").trim(),
+          curriculum_book_name: (bookTitle || "").trim(),
+          book_name: (bookTitle || "").trim(),
+          bookTitle: (bookTitle || "").trim(),
+          lesson_title: (lessonTitle || "").trim(),
+          lesson_covered: (lessonTitle || "").trim(),
+          lessonTitle: (lessonTitle || "").trim(),
+          lesson: (lessonTitle || "").trim(),
+          subject_course: (bookTitle.trim() || groupName || "General Group"),
           selectedSession: selectedSession.trim(),
           session_name: selectedSession.trim(),
           selectedDate,
           juz_and_pages: activePages,
           mistakes: cleanActiveMistakes,
           stucks: cleanActiveStucks,
-          juzPageData: progressMode === "BOOK" ? activePages : juzPageData,
-          bookPageData: progressMode === "BOOK" ? bookPageData : [],
-          mistakeData: progressMode === "BOOK" ? cleanActiveMistakes : cleanMistakes,
+          juzPageData: activePages,
+          bookPageData: progressMode === "BOOK" ? activePages : [],
+          mistakeData: cleanActiveMistakes,
           bookMistakeData: progressMode === "BOOK" ? cleanActiveMistakes : [],
-          stuckData: progressMode === "BOOK" ? cleanActiveStucks : cleanStucks,
+          stuckData: cleanActiveStucks,
           bookStuckData: progressMode === "BOOK" ? cleanActiveStucks : [],
         }, { skipGrace: true, syncStatus: "PENDING" });
 

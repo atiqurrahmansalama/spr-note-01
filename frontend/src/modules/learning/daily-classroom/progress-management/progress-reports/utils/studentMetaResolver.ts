@@ -417,6 +417,12 @@ export function getBookTitle(report: ReportItem | null | undefined): string {
  */
 export function getLessonTitle(report: ReportItem | null | undefined): string {
   if (!report) return "";
-  return (report.lesson_title || report.lesson_covered || "").trim();
+  return (
+    report.lesson_title ||
+    report.lesson_covered ||
+    (report as any)?.lessonTitle ||
+    (report as any)?.lesson ||
+    ""
+  ).trim();
 }
 
