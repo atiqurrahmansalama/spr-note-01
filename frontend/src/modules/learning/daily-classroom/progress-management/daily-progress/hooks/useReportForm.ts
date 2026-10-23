@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useToast } from "@/context/ToastContext";
+import { useAuth } from "@/context/AuthContext";
 import {
   auth as authStore,
   students as studentStore,
@@ -30,6 +31,7 @@ import {
   doesStudentMatchDepartment,
   doesStudentMatchClass,
   doesStudentMatchSection,
+  normalizeToISODate,
 } from "@/modules/learning/daily-classroom/utils/dailyClassroomUtils";
 import type { JuzRowData, DetailRowData, DailyProgressDraft } from "../types";
 
@@ -53,12 +55,59 @@ export function useReportForm() {
     students: defaultAcademicStudents = [],
   } = academicData;
 
-  const [selectedDate, setSelectedDate] = useState<string>(() => getClassroomTodayDate());
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlDate = params.get("date");
+      if (urlDate) {
+        const norm = normalizeToISODate(urlDate);
+        if (norm) return norm;
+      }
+    }
+    return getClassroomTodayDate();
+  });
   const [studentName, setStudentName] = useState<string>("");
   const [selectedStudentId, setSelectedStudentId] = useState<string | number | null>(null);
   const [groupName, setGroupName] = useState<string>("");
   const [selectedSession, setSelectedSession] = useState<string>("");
+
+  // Current logged-in user as default teacher
+  const authContext = (useAuth() as any) || {};
+  const user = authContext.user;
+
+  const defaultTeacherId = useMemo(() => {
+    if (user?.id) return String(user.id);
+    if (user?.staff_id) return String(user.staff_id);
+    return "";
+  }, [user]);
+
+  const defaultTeacherName = useMemo(() => {
+    if (user?.full_name) return String(user.full_name);
+    if (user?.name) return String(user.name);
+    if (user?.first_name || user?.last_name) {
+      return [user.first_name, user.last_name].filter(Boolean).join(" ");
+    }
+    if (user?.username) return String(user.username);
+    return "";
+  }, [user]);
+
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>(defaultTeacherId);
+  const [selectedTeacherName, setSelectedTeacherName] = useState<string>(defaultTeacherName);
+
+  useEffect(() => {
+    if (defaultTeacherId && !selectedTeacherId) {
+      setSelectedTeacherId(defaultTeacherId);
+    }
+    if (defaultTeacherName && !selectedTeacherName) {
+      setSelectedTeacherName(defaultTeacherName);
+    }
+  }, [defaultTeacherId, defaultTeacherName]);
+
   const [progressMode, setProgressModeState] = useState<"QURAN" | "BOOK">(() => {
+    if (typeof window !== "undefined") {
+      if (window.location.pathname.includes("/daily-progress/book")) return "BOOK";
+      if (window.location.pathname.includes("/daily-progress/quran")) return "QURAN";
+    }
     try {
       return (localStorage.getItem("spr_daily_progress_mode") as "QURAN" | "BOOK") || "QURAN";
     } catch {
@@ -71,6 +120,15 @@ export function useReportForm() {
     try {
       localStorage.setItem("spr_daily_progress_mode", mode);
       window.dispatchEvent(new CustomEvent("spr_daily_progress_mode_change", { detail: mode }));
+      if (typeof window !== "undefined") {
+        const curPath = window.location.pathname;
+        if (curPath.includes("/daily-progress/")) {
+          const target = `/studies/daily-progress/${mode.toLowerCase()}${window.location.search}`;
+          if (curPath !== `/studies/daily-progress/${mode.toLowerCase()}`) {
+            window.history.replaceState(null, "", target);
+          }
+        }
+      }
     } catch {}
   }, []);
 
@@ -82,6 +140,20 @@ export function useReportForm() {
     };
     window.addEventListener("spr_daily_progress_mode_change", handleSync);
     return () => window.removeEventListener("spr_daily_progress_mode_change", handleSync);
+  }, []);
+
+  useEffect(() => {
+    const handleUrlSync = () => {
+      if (typeof window !== "undefined") {
+        if (window.location.pathname.includes("/daily-progress/book")) {
+          setProgressModeState("BOOK");
+        } else if (window.location.pathname.includes("/daily-progress/quran")) {
+          setProgressModeState("QURAN");
+        }
+      }
+    };
+    window.addEventListener("popstate", handleUrlSync);
+    return () => window.removeEventListener("popstate", handleUrlSync);
   }, []);
 
   const [bookTitle, setBookTitle] = useState<string>("");
@@ -417,25 +489,34 @@ export function useReportForm() {
       }
     }
 
-    let rawDate = rep.report_date || rep.record_date || rep.date || rep.isoDateOnly || rep.date_time || rep.created_at;
-    let rDate = "";
-    if (rawDate) {
-      if (typeof rawDate === "string") {
-        rDate = rawDate.split("T")[0].split(" ")[0];
-      } else {
-        try {
-          rDate = new Date(rawDate).toISOString().split("T")[0];
-        } catch {
-          rDate = "";
-        }
-      }
-    }
+    const rDate = normalizeToISODate(
+      rep.report_date ||
+      rep.isoDateOnly ||
+      rep.date ||
+      rep.record_date ||
+      rep.selectedDate ||
+      rep.date_time ||
+      rep.created_at
+    );
 
     setStudentName(sName);
     setSelectedStudentId(sId != null ? String(sId) : null);
     setGroupName(gName);
     setSelectedSession(sSession);
     if (rDate) setSelectedDate(rDate);
+
+    const repTeacherId =
+      rep.teacher_id ||
+      rep.teacher?.id ||
+      (typeof rep.teacher === "number" || (typeof rep.teacher === "string" && /^\d+$/.test(rep.teacher)) ? String(rep.teacher) : "");
+    const repTeacherName =
+      rep.teacher_name ||
+      rep.teacher?.name ||
+      rep.teacher?.user_name ||
+      (typeof rep.teacher === "string" && isNaN(Number(rep.teacher)) ? rep.teacher : "");
+
+    setSelectedTeacherId(repTeacherId || defaultTeacherId);
+    setSelectedTeacherName(repTeacherName || defaultTeacherName);
 
     if (Array.isArray(rep.juz_and_pages) && rep.juz_and_pages.length > 0) {
       setJuzPageData(
@@ -518,7 +599,7 @@ export function useReportForm() {
           }))
         );
       }
-      const bookMistakesSource = rep.bookMistakeData || rep.mistakes || (Array.isArray(rep.error_details) ? rep.error_details.filter((e: any) => e.type === "Mistake") : []);
+      const bookMistakesSource = rep.bookMistakeData || rep.mistake_details || rep.mistakes || (Array.isArray(rep.error_details) ? rep.error_details.filter((e: any) => e.type === "Mistake") : []);
       if (Array.isArray(bookMistakesSource) && bookMistakesSource.length > 0) {
         setMistakeData(
           bookMistakesSource.map((m: any) => ({
@@ -531,7 +612,7 @@ export function useReportForm() {
           }))
         );
       }
-      const bookStucksSource = rep.bookStuckData || rep.stucks || (Array.isArray(rep.error_details) ? rep.error_details.filter((e: any) => e.type === "Stuck") : []);
+      const bookStucksSource = rep.bookStuckData || rep.stuck_details || rep.stucks || (Array.isArray(rep.error_details) ? rep.error_details.filter((e: any) => e.type === "Stuck") : []);
       if (Array.isArray(bookStucksSource) && bookStucksSource.length > 0) {
         setStuckData(
           bookStucksSource.map((s: any) => ({
@@ -1121,6 +1202,8 @@ export function useReportForm() {
     setSelectedStudentId(null);
     setGroupName("");
     setSelectedSession("");
+    setSelectedTeacherId(defaultTeacherId);
+    setSelectedTeacherName(defaultTeacherName);
     setSelectedDate(getClassroomTodayDate());
     setJuzPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
     setMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
@@ -1189,9 +1272,17 @@ export function useReportForm() {
 
       recordStudentUsage(selectedStudent);
 
+      const resolvedTeacherId =
+        selectedTeacherId && !isNaN(Number(selectedTeacherId))
+          ? Number(selectedTeacherId)
+          : selectedTeacherId || null;
+
       const payload = {
         student: studentNumericId || realStudentName,
         student_name: realStudentName,
+        teacher: resolvedTeacherId,
+        teacher_id: resolvedTeacherId,
+        teacher_name: selectedTeacherName || defaultTeacherName || "",
         session: selectedSession.trim(),
         session_name: selectedSession.trim(),
         progress_mode: progressMode,
@@ -1242,6 +1333,9 @@ export function useReportForm() {
           server_id: resolvedServerId || undefined,
           report_unique_id: existingRep?.report_unique_id || repUniqueId,
           client_updated_at: editedAt,
+          teacher: resolvedTeacherId || existingRep?.teacher,
+          teacher_id: resolvedTeacherId || existingRep?.teacher_id,
+          teacher_name: selectedTeacherName || defaultTeacherName || existingRep?.teacher_name || "",
           student: studentNumericId || realStudentName,
           studentId: studentNumericId,
           studentName: realStudentName,
@@ -1351,6 +1445,9 @@ export function useReportForm() {
       } else {
         const localSavedReport = saveReportLocally({
           ...payload,
+          teacher: resolvedTeacherId,
+          teacher_id: resolvedTeacherId,
+          teacher_name: selectedTeacherName || defaultTeacherName || "",
           student: studentNumericId || realStudentName,
           studentId: studentNumericId,
           studentName: realStudentName,
@@ -1493,6 +1590,10 @@ export function useReportForm() {
     setGroupName,
     selectedSession,
     setSelectedSession,
+    selectedTeacherId,
+    setSelectedTeacherId,
+    selectedTeacherName,
+    setSelectedTeacherName,
     progressMode,
     setProgressMode,
     bookTitle,

@@ -1,11 +1,13 @@
-import React, { useId } from 'react';
+import React, { useId, useRef, useEffect } from 'react';
 import { SleekCheckIcon } from './Icons';
 
 export interface CustomCheckboxProps {
   id?: string;
   name?: string;
   checked?: boolean;
+  indeterminate?: boolean;
   onChange?: (checked: boolean, e?: React.ChangeEvent<HTMLInputElement>) => void;
+  onClick?: (e: React.MouseEvent) => void;
   label?: React.ReactNode;
   subLabel?: React.ReactNode;
   description?: React.ReactNode;
@@ -20,7 +22,9 @@ export default function CustomCheckbox({
   id = undefined,
   name = undefined,
   checked = false,
+  indeterminate = false,
   onChange = undefined,
+  onClick = undefined,
   label = undefined,
   subLabel = undefined,
   description = undefined,
@@ -32,6 +36,13 @@ export default function CustomCheckbox({
 }: CustomCheckboxProps) {
   const autoId = useId();
   const inputId = id || autoId;
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.indeterminate = Boolean(indeterminate);
+    }
+  }, [indeterminate]);
 
   const sizeBoxClasses =
     size === 'sm'
@@ -53,6 +64,9 @@ export default function CustomCheckbox({
   };
 
   const handleContainerClick = (e: React.MouseEvent) => {
+    if (onClick) {
+      onClick(e);
+    }
     if (disabled || readOnly) {
       e.preventDefault();
       e.stopPropagation();
@@ -61,6 +75,7 @@ export default function CustomCheckbox({
   };
 
   const hasMultipleLines = Boolean(subLabel || description);
+  const isFilled = Boolean(checked || indeterminate);
 
   return (
     <label
@@ -72,6 +87,7 @@ export default function CustomCheckbox({
     >
       <div className={`relative flex items-center justify-center shrink-0 ${hasMultipleLines ? 'mt-0.5' : ''}`}>
         <input
+          ref={inputRef}
           type="checkbox"
           id={inputId}
           name={name}
@@ -82,16 +98,20 @@ export default function CustomCheckbox({
         />
         <div
           className={`flex items-center justify-center border transition-all duration-150 shadow-2xs ${sizeBoxClasses} ${
-            checked
+            isFilled
               ? 'theme-bg-accent theme-accent-text border-[var(--accent-main)] shadow-xs scale-100'
               : 'theme-bg-surface theme-border group-hover:border-[var(--accent-main)]/60'
           } ${boxClassName}`}
         >
-          <SleekCheckIcon
-            className={`${iconSizeClasses} transition-transform duration-150 ${
-              checked ? 'scale-100 opacity-100 stroke-[2.5]' : 'scale-50 opacity-0'
-            }`}
-          />
+          {indeterminate ? (
+            <span className="w-2 h-0.5 bg-current rounded-full" />
+          ) : (
+            <SleekCheckIcon
+              className={`${iconSizeClasses} transition-transform duration-150 ${
+                checked ? 'scale-100 opacity-100 stroke-[2.5]' : 'scale-50 opacity-0'
+              }`}
+            />
+          )}
         </div>
       </div>
 

@@ -113,8 +113,8 @@ export function StudentSessionTimeline({
       header: t("mistakeDetails", "Mistake Details"),
       headerClassName: "text-rose-400 theme-bg-sub/40 border-t border-b theme-border",
       align: "left",
-      width: "18%",
-      minWidth: "165px",
+      width: "16%",
+      minWidth: "150px",
       cellClassName: "align-top",
       render: (rep: ReportItem) => <ReportMistakesCell report={rep} />,
     },
@@ -123,20 +123,25 @@ export function StudentSessionTimeline({
       header: t("stuckDetails", "Stuck Details"),
       headerClassName: "text-amber-400 theme-bg-sub/40 border-t border-b theme-border",
       align: "left",
-      width: "18%",
-      minWidth: "165px",
+      width: "20%",
+      minWidth: "175px",
       cellClassName: "align-top",
       render: (rep: ReportItem) => <ReportStucksCell report={rep} />,
     },
     {
       key: "comments",
-      header: t("commentsRemarks", "Comments"),
+      header: t("commentsReporter", "Comments & Reporter"),
       headerClassName: "theme-bg-sub/40 border-t border-b theme-border",
       align: "left",
       width: "16%",
       minWidth: "150px",
       cellClassName: "align-top",
-      render: (rep: ReportItem) => <ReportCommentsCell comment={rep.comment} />,
+      render: (rep: ReportItem) => (
+        <ReportCommentsCell
+          comment={rep.comment}
+          teacherName={rep.teacher_name || rep.teacher}
+        />
+      ),
     },
     {
       key: "actions",

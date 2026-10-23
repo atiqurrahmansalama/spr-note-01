@@ -127,7 +127,7 @@ export function RecordReportExpandedFooter({
   onEdit,
   onDelete,
 }: RecordReportExpandedFooterProps) {
-  const isEdited = Boolean(report.is_edited || report.edited_at);
+  const isEdited = Boolean(report.is_edited && (report.edited_at || report.edit_time));
 
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2.5 -mt-2 border-t theme-border text-[11px] font-mono theme-text-secondary select-none">
@@ -137,14 +137,21 @@ export function RecordReportExpandedFooter({
           {report.report_unique_id || `#${report.id}`}
         </span>
 
+        <span className="inline-flex items-center gap-1 text-[10px] font-mono opacity-90 pl-1 border-l theme-border">
+          <span className="font-bold opacity-75">REPORTED BY:</span>
+          <span className="theme-text-primary font-semibold">
+            {report.teacher_name || report.teacher || "—"}
+          </span>
+        </span>
+
         {isEdited && (
           <span className="inline-flex items-center gap-1 theme-accent text-[10px] font-semibold">
             <EditIcon className="w-3 h-3 theme-accent" />
             <span>Edited</span>
-            {report.edited_at && (
+            {(report.edited_at || report.edit_time) && (
               <span className="theme-text-secondary font-mono font-normal opacity-80">
                 ·{" "}
-                {new Date(report.edited_at).toLocaleString("en-US", {
+                {new Date((report.edited_at || report.edit_time) as string).toLocaleString("en-US", {
                   month: "short",
                   day: "numeric",
                   year: "numeric",

@@ -8,6 +8,48 @@ import {
 export { getClassroomTodayDate, getTodayInTimezone, getClassroomEffectiveTimezone };
 
 /**
+ * Normalizes any date representation (ISO, YYYY-MM-DD, DD/MM/YYYY, Timestamp, Date object)
+ * into a strict YYYY-MM-DD format suitable for HTML5 date inputs and API contracts.
+ */
+export function normalizeToISODate(dateVal: any): string {
+  if (!dateVal) return '';
+  if (typeof dateVal === 'string') {
+    const trimmed = dateVal.trim();
+    if (!trimmed) return '';
+    // Match YYYY-MM-DD...
+    const isoMatch = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (isoMatch) {
+      const y = isoMatch[1];
+      const m = isoMatch[2].padStart(2, '0');
+      const d = isoMatch[3].padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    // Match DD/MM/YYYY or DD-MM-YYYY
+    const dmyMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+    if (dmyMatch) {
+      const d = dmyMatch[1].padStart(2, '0');
+      const m = dmyMatch[2].padStart(2, '0');
+      const y = dmyMatch[3];
+      return `${y}-${m}-${d}`;
+    }
+    try {
+      const parsed = new Date(trimmed.includes(' ') ? trimmed.replace(' ', 'T') : trimmed);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString().split('T')[0];
+      }
+    } catch {}
+    return trimmed.split('T')[0].split(' ')[0];
+  }
+  try {
+    const d = new Date(dateVal);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().split('T')[0];
+    }
+  } catch {}
+  return '';
+}
+
+/**
  * Helper to resolve period slot by ID, Order number, or Name from periodSlots list.
  */
 export function findMatchingPeriodSlot(pId: string | number, periodSlots: any[] = []) {

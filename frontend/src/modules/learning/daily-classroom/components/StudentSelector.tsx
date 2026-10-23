@@ -74,42 +74,17 @@ export default function StudentSelector({
 }: StudentSelectorProps) {
   const { students: academicStudents } = useAcademicData();
 
-  // 1. Resolve effective student dataset with academic + local fallback
+  // 1. Resolve effective student dataset with academic + local fallback and canonical deduplication
   const effectiveStudents = useMemo(() => {
+    const sourceList: any[] = [];
     if (Array.isArray(studentDatabase) && studentDatabase.length > 0) {
-      return studentDatabase;
-    }
-
-    const result: any[] = [];
-    const seen = new Set<string>();
-
-    const append = (s: any) => {
-      if (!s) return;
-      const key = String(
-        s.id ||
-        s.student_id ||
-        s.uniq_id ||
-        s.roll_number ||
-        s.name_en ||
-        s.name ||
-        ""
-      );
-      if (key && !seen.has(key)) {
-        seen.add(key);
-        result.push(s);
-      }
-    };
-
-    (academicStudents || []).forEach(append);
-
-    try {
-      const local = studentStore.getAll?.() || [];
-      if (Array.isArray(local)) local.forEach(append);
-    } catch {
-      // Fallback
-    }
-
-    if (result.length === 0) {
+      sourceList.push(...studentDatabase);
+    } else {
+      if (Array.isArray(academicStudents)) sourceList.push(...academicStudents);
+      try {
+        const local = studentStore.getAll?.() || [];
+        if (Array.isArray(local)) sourceList.push(...local);
+      } catch {}
       try {
         const tenantId = typeof localStorage !== "undefined"
           ? localStorage.getItem("spr_active_tenant_id") || "default"
@@ -117,18 +92,75 @@ export default function StudentSelector({
         const fromCache = JSON.parse(
           localStorage.getItem(`spr_students_cache_${tenantId}`) || "[]"
         );
-        if (Array.isArray(fromCache)) fromCache.forEach(append);
-      } catch {
-        // Fallback
-      }
+        if (Array.isArray(fromCache)) sourceList.push(...fromCache);
+      } catch {}
     }
 
+    const result: any[] = [];
+    const seenIds = new Set<string>();
+    const seenUniqs = new Set<string>();
+    const seenCards = new Set<string>();
+    const seenNameMap = new Map<string, number>();
+
+    const append = (s: any) => {
+      if (!s) return;
+      const sName = (typeof s === "object" ? s.name_en || s.name || s.label : String(s || "")).trim();
+      if (!sName) return;
+
+      const rawId = typeof s === "object" ? (s.id ?? s.student_id ?? s.originalData?.id) : null;
+      const roll = typeof s === "object" ? (s.roll_number ?? s.originalData?.roll_number) : undefined;
+      const cardNo = typeof s === "object" ? (s.student_id_card_number ?? s.originalData?.student_id_card_number) : undefined;
+      const uniq = typeof s === "object" ? (s.uniq_id ?? s.originalData?.uniq_id) : undefined;
+      const clsId = typeof s === "object" ? (s.student_class || s.class_id || s.class) : undefined;
+      const secId = typeof s === "object" ? (s.student_section || s.section_id || s.section) : undefined;
+
+      const normName = sName.toLowerCase();
+      const nameKey = `${normName}_cls_${clsId || ""}_sec_${secId || ""}_roll_${roll != null ? roll : ""}`;
+      const looseNameKey = `${normName}_cls_${clsId || ""}`;
+
+      const isDupId = Boolean(rawId != null && seenIds.has(String(rawId)));
+      const isDupUniq = Boolean(uniq && seenUniqs.has(String(uniq)));
+      const isDupCard = Boolean(cardNo && seenCards.has(String(cardNo)));
+      const existingIdx = seenNameMap.has(nameKey)
+        ? seenNameMap.get(nameKey)
+        : roll == null && seenNameMap.has(looseNameKey)
+        ? seenNameMap.get(looseNameKey)
+        : roll == null && !clsId && seenNameMap.has(normName)
+        ? seenNameMap.get(normName)
+        : undefined;
+
+      if (isDupId || isDupUniq || isDupCard || existingIdx !== undefined) {
+        if (existingIdx !== undefined && result[existingIdx]) {
+          const target = result[existingIdx];
+          if (!target.id && rawId) target.id = rawId;
+          if (!target.roll_number && roll != null) target.roll_number = roll;
+          if (!target.student_id_card_number && cardNo) target.student_id_card_number = cardNo;
+          if (!target.uniq_id && uniq) target.uniq_id = uniq;
+          if (!target.student_class && clsId) target.student_class = clsId;
+          if (!target.student_section && secId) target.student_section = secId;
+        }
+        return;
+      }
+
+      if (rawId != null) seenIds.add(String(rawId));
+      if (uniq) seenUniqs.add(String(uniq));
+      if (cardNo) seenCards.add(String(cardNo));
+
+      const newIdx = result.length;
+      seenNameMap.set(nameKey, newIdx);
+      if (roll == null) seenNameMap.set(looseNameKey, newIdx);
+      if (!clsId && roll == null) seenNameMap.set(normName, newIdx);
+
+      result.push(s);
+    };
+
+    sourceList.forEach(append);
     return result;
   }, [studentDatabase, academicStudents]);
 
-  // 2. Build enriched autocomplete options
+  // 2. Build enriched autocomplete options with strict deduplication
   const options: AutocompleteOption[] = useMemo(() => {
-    return (effectiveStudents || []).map((s: any) => {
+    const rawOptions = (effectiveStudents || []).map((s: any) => {
       const clsName =
         typeof s === "object"
           ? s.student_class_name ||
@@ -187,18 +219,28 @@ export default function StudentSelector({
           ? s.id ?? s.student_id ?? s.originalData?.id
           : undefined;
 
-      const badge =
-        typeof s === "object" && s.badge
-          ? s.badge
-          : roll != null
-          ? `Roll: ${roll}`
-          : cardNo
-          ? `ID: ${cardNo}`
-          : uniq
-          ? `ID: ${uniq}`
-          : rawId != null
-          ? `ID: ${rawId}`
-          : undefined;
+      // Find matching student in Student Directory (academicStudents)
+      const matched = (academicStudents || []).find((as: any) => {
+        if (rawId != null && String(as.id) === String(rawId)) return true;
+        if (uniq && (String(as.uniq_id) === String(uniq) || String(as.unique_id) === String(uniq))) return true;
+        if (cardNo && String(as.student_id_card_number) === String(cardNo)) return true;
+        return false;
+      });
+
+      // Canonical Student Directory ID resolution (Strict 'STU-B1BD3C86' standard)
+      const canonicalStudentId =
+        (typeof uniq === "string" && uniq.trim().toUpperCase().startsWith("STU-") ? uniq.trim() : null) ||
+        (typeof s.unique_id === "string" && s.unique_id.trim().toUpperCase().startsWith("STU-") ? s.unique_id.trim() : null) ||
+        (typeof cardNo === "string" && cardNo.trim().toUpperCase().startsWith("STU-") ? cardNo.trim() : null) ||
+        (typeof matched?.uniq_id === "string" && matched.uniq_id.trim().toUpperCase().startsWith("STU-") ? matched.uniq_id.trim() : null) ||
+        (typeof matched?.unique_id === "string" && matched.unique_id.trim().toUpperCase().startsWith("STU-") ? matched.unique_id.trim() : null) ||
+        (typeof matched?.student_id_card_number === "string" && matched.student_id_card_number.trim().toUpperCase().startsWith("STU-") ? matched.student_id_card_number.trim() : null) ||
+        (uniq ? `STU-${String(uniq).replace(/^STU[-_]?/i, "")}` : null) ||
+        (cardNo ? `STU-${String(cardNo).replace(/^STU[-_]?/i, "")}` : null) ||
+        (matched?.uniq_id ? `STU-${String(matched.uniq_id).replace(/^STU[-_]?/i, "")}` : null) ||
+        (rawId != null ? `STU-${String(rawId).padStart(8, "0")}` : undefined);
+
+      const badge = canonicalStudentId || undefined;
 
       return {
         id: rawId != null ? String(rawId) : undefined,
@@ -220,6 +262,21 @@ export default function StudentSelector({
         originalData: s,
       };
     });
+
+    // Zero-duplicate guarantee: deduplicate options by id and normalized label + sub
+    const deduplicated: AutocompleteOption[] = [];
+    const seenOptionKeys = new Set<string>();
+
+    rawOptions.forEach((opt) => {
+      const optKey = `${(opt.label || "").trim().toLowerCase()}_${(opt.sub || "").trim().toLowerCase()}_${opt.roll_number != null ? opt.roll_number : ""}`;
+      const idKey = opt.id ? `id_${opt.id}` : null;
+      if (seenOptionKeys.has(optKey) || (idKey && seenOptionKeys.has(idKey))) return;
+      seenOptionKeys.add(optKey);
+      if (idKey) seenOptionKeys.add(idKey);
+      deduplicated.push(opt);
+    });
+
+    return deduplicated;
   }, [effectiveStudents]);
 
   // 3. Selection handler

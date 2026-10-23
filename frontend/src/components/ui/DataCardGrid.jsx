@@ -8,7 +8,7 @@ export default function DataCardGrid({
   loadingMessage = 'Loading records...',
   emptyTitle = 'No Records Found',
   emptySubMessage = 'No matching cards available to display.',
-  emptyIcon: EmptyIcon,
+  emptyIcon: EmptyIcon = null,
   gridClassName = 'grid grid-cols-1 @lg:grid-cols-2 @4xl:grid-cols-3 gap-3.5 @md:gap-5',
   wrapperClassName = '',
 }) {

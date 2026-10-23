@@ -125,6 +125,7 @@ export interface ProgressReportsViewProps {
   isEmbedded?: boolean;
   className?: string;
   filterProps?: any;
+  defaultReportView?: "RECORD_REPORTS" | "STUDENT_VIEW";
 }
 
 export interface StudentGroupedTableProps {

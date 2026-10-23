@@ -68,8 +68,8 @@ export function useStudentGroupedColumns({
       header: t("sec", "Sec"),
       sortable: true,
       align: "left",
-      width: "18%",
-      minWidth: "165px",
+      width: "16%",
+      minWidth: "150px",
       sortValue: (stu: EnrichedStudentRow) => stu.meta.sectionName,
       render: (stu: EnrichedStudentRow) => {
         const hasSec = Boolean(stu.meta.sectionName && stu.meta.sectionName.trim() !== "");
@@ -88,8 +88,8 @@ export function useStudentGroupedColumns({
       header: t("totalReports", "Total Reports"),
       sortable: true,
       align: "left",
-      width: "18%",
-      minWidth: "165px",
+      width: "20%",
+      minWidth: "175px",
       sortValue: (stu: EnrichedStudentRow) => stu.totalReports,
       render: (stu: EnrichedStudentRow) => (
         <span className="text-xs font-bold font-mono theme-accent block">

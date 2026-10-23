@@ -86,6 +86,10 @@ export default function DailyProgressView({
     setGroupName,
     selectedSession,
     setSelectedSession,
+    selectedTeacherId,
+    setSelectedTeacherId,
+    selectedTeacherName,
+    setSelectedTeacherName,
     progressMode,
     setProgressMode,
     bookTitle,
@@ -178,10 +182,10 @@ export default function DailyProgressView({
   ]);
 
   useEffect(() => {
-    if (filterProps?.selectedDate && filterProps.selectedDate !== selectedDate) {
+    if (!editingReport && filterProps?.selectedDate && filterProps.selectedDate !== selectedDate) {
       setSelectedDate(filterProps.selectedDate);
     }
-  }, [filterProps?.selectedDate, selectedDate, setSelectedDate]);
+  }, [filterProps?.selectedDate, selectedDate, setSelectedDate, editingReport]);
 
   const dailyProgressReportData = useMemo(() => {
     return buildDailyProgressReportData(
@@ -404,10 +408,10 @@ export default function DailyProgressView({
         onDiscard={discardDraft}
       />
 
-      {/* Classroom Filter Controls Box (Max 3 items per line: Date/Dept/Class, Section/Student/Session) */}
+      {/* Classroom Filter Controls Box (Line 1: Date | Student | Session; Line 2: Dept | Class | Sec | Teacher) */}
       <DailyClassroomFilterControls
         showCardWrapper={true}
-        maxColumns={3}
+        collapsible={true}
         filterProps={filterProps ? {
           ...filterProps,
           departmentSelectOptions,
@@ -433,32 +437,36 @@ export default function DailyProgressView({
         selectedSectionId={selectedSectionId}
         onSectionChange={handleSectionChange}
         sectionSelectOptions={sectionSelectOptions}
+        hasTeachers={true}
+        selectedTeacherId={selectedTeacherId}
+        onTeacherChange={(tId: any, tObj?: any) => {
+          setSelectedTeacherId(tId ? String(tId) : "");
+          if (tObj) {
+            setSelectedTeacherName(tObj.name_en || tObj.name || tObj.user_name || "");
+          }
+        }}
         showPeriodSwitcher={false}
-        extraFields={
-          <>
-            {sectionConfig.studentSelect?.enabled && (
-              <div className="col-span-1">
-                <StudentInputSection
-                  studentDatabase={allStudentDatabase}
-                  studentName={studentName}
-                  studentId={selectedStudentId}
-                  departmentId={selectedDepartmentId}
-                  classId={selectedClassId}
-                  sectionId={selectedSectionId}
-                  onStudentSelect={handleStudentSelect}
-                />
-              </div>
-            )}
-            {sectionConfig.sessionSelect?.enabled && (
-              <div className="col-span-1">
-                <SessionInputSection
-                  sessionList={sessionList}
-                  selectedSession={selectedSession}
-                  onSessionChange={setSelectedSession}
-                />
-              </div>
-            )}
-          </>
+        studentControl={
+          sectionConfig.studentSelect?.enabled && (
+            <StudentInputSection
+              studentDatabase={allStudentDatabase}
+              studentName={studentName}
+              studentId={selectedStudentId}
+              departmentId={selectedDepartmentId}
+              classId={selectedClassId}
+              sectionId={selectedSectionId}
+              onStudentSelect={handleStudentSelect}
+            />
+          )
+        }
+        sessionControl={
+          sectionConfig.sessionSelect?.enabled && (
+            <SessionInputSection
+              sessionList={sessionList}
+              selectedSession={selectedSession}
+              onSessionChange={setSelectedSession}
+            />
+          )
         }
       />
 

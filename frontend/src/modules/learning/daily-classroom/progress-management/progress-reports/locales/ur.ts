@@ -14,6 +14,7 @@ export default {
   mistakeDetails: "غلطیوں کی تفصیل",
   stuckDetails: "اٹکاؤ کی تفصیل",
   commentsRemarks: "تبصرے",
+  commentsReporter: "تبصرے اور رپورٹر",
   actions: "اقدامات",
   noReportsFound: "کوئی رپورٹ نہیں ملی",
   noReportsDesc: "موجودہ فلٹرز یا تاریخ کے مطابق کوئی رپورٹ نہیں ملی۔",

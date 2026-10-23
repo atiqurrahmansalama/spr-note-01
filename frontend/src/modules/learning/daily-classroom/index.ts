@@ -7,6 +7,8 @@ export * from './utils';
 export * from './lesson-management';
 export * from './progress-management';
 
+export type { StudentProfileOption } from './components';
+
 export { default as DailyClassroomHubView, LearningHubView } from './DailyClassroomHubView';
 export { default as StudentDiaryFeedCard } from './StudentDiaryFeedCard';
 export { default } from './DailyClassroomHubView';

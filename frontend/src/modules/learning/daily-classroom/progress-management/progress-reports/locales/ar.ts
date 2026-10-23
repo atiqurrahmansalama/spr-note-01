@@ -14,6 +14,7 @@ export default {
   mistakeDetails: "تفاصيل الأخطاء",
   stuckDetails: "تفاصيل التردد والتوقف",
   commentsRemarks: "الملاحظات",
+  commentsReporter: "التعليقات والمُبلِغ",
   actions: "الإجراءات",
   noReportsFound: "لم يتم العثور على تقارير التقدم",
   noReportsDesc: "لا توجد تقارير تقدم يومية تطابق عوامل التصفية الحالية.",

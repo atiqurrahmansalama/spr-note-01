@@ -138,6 +138,43 @@ export function useDailyProgressHierarchy({
     filterProps?.selectedSectionId !== undefined ? filterProps.selectedSectionId : localSectionId;
   const rawOnSectionChange = filterProps?.onSectionChange || setLocalSectionId;
 
+  // Sync academic hierarchy when an existing report is loaded for editing
+  useEffect(() => {
+    const syncFromReport = (rep: any) => {
+      if (!rep || typeof rep !== "object") return;
+      const deptId = rep.departmentId || rep.department_id || rep.department;
+      const clsId = rep.classId || rep.class_id || rep.academic_class_id || rep.academic_class;
+      const secId = rep.sectionId || rep.section_id || rep.section;
+      if (deptId) {
+        setLocalDeptId(String(deptId));
+        if (rawOnDepartmentChange) rawOnDepartmentChange(String(deptId));
+      }
+      if (clsId) {
+        setLocalClassId(String(clsId));
+        if (rawOnClassChange) rawOnClassChange(String(clsId));
+      }
+      if (secId) {
+        setLocalSectionId(String(secId));
+        if (rawOnSectionChange) rawOnSectionChange(String(secId));
+      }
+    };
+
+    const handleEditSync = (e: any) => {
+      syncFromReport(e?.detail);
+    };
+
+    try {
+      const pendingRaw = localStorage.getItem("spr_editing_report");
+      if (pendingRaw) {
+        const pending = JSON.parse(pendingRaw);
+        syncFromReport(pending);
+      }
+    } catch {}
+
+    window.addEventListener("spr_edit_report", handleEditSync);
+    return () => window.removeEventListener("spr_edit_report", handleEditSync);
+  }, [rawOnDepartmentChange, rawOnClassChange, rawOnSectionChange]);
+
   const sectionSelectOptions = useMemo(() => {
     const raw =
       filterProps?.sectionSelectOptions ||
@@ -200,7 +237,10 @@ export function useDailyProgressHierarchy({
 
   const allStudentDatabase = useMemo(() => {
     const fullList: any[] = [];
-    const seenKeys = new Set<string>();
+    const seenIds = new Set<string>();
+    const seenUniqs = new Set<string>();
+    const seenCards = new Set<string>();
+    const seenNameMap = new Map<string, number>();
 
     const appendStudent = (st: any) => {
       const stName = (typeof st === "object" ? st.name_en || st.name || st.label : String(st || "")).trim();
@@ -221,17 +261,49 @@ export function useDailyProgressHierarchy({
       const cardNo = typeof st === "object" ? (st.student_id_card_number ?? st.originalData?.student_id_card_number) : undefined;
       const uniq = typeof st === "object" ? (st.uniq_id ?? st.originalData?.uniq_id) : undefined;
       const rawId = typeof st === "object" && (st?.id != null ? String(st.id) : (st?.student_id != null ? String(st.student_id) : null));
-      const key = rawId
-        ? `id_${rawId}`
-        : uniq
-        ? `uniq_${uniq}`
-        : cardNo
-        ? `card_${cardNo}`
-        : roll != null
-        ? `roll_${stName.toLowerCase()}_${secSub.toLowerCase()}_${roll}`
-        : `raw_${stName.toLowerCase()}_${secSub.toLowerCase()}`;
-      if (seenKeys.has(key)) return;
-      seenKeys.add(key);
+
+      const stClsId = typeof st === "object" ? getClassId(st) || (st.student_class || st.class_id) : undefined;
+      const stSecId = typeof st === "object" ? getSectionId(st) || (st.student_section || st.section_id) : undefined;
+      const stDeptId = typeof st === "object" ? getDepartmentId(st) || (st.department || st.department_id) : undefined;
+
+      const normName = stName.toLowerCase();
+      const nameKey = `${normName}_cls_${stClsId || ""}_sec_${stSecId || ""}_roll_${roll != null ? roll : ""}`;
+      const looseNameKey = `${normName}_cls_${stClsId || ""}`;
+
+      const isDuplicateId = Boolean(rawId && seenIds.has(String(rawId)));
+      const isDuplicateUniq = Boolean(uniq && seenUniqs.has(String(uniq)));
+      const isDuplicateCard = Boolean(cardNo && seenCards.has(String(cardNo)));
+      const existingIdx = seenNameMap.has(nameKey)
+        ? seenNameMap.get(nameKey)
+        : roll == null && seenNameMap.has(looseNameKey)
+        ? seenNameMap.get(looseNameKey)
+        : roll == null && !stClsId && seenNameMap.has(normName)
+        ? seenNameMap.get(normName)
+        : undefined;
+
+      if (isDuplicateId || isDuplicateUniq || isDuplicateCard || existingIdx !== undefined) {
+        if (existingIdx !== undefined && fullList[existingIdx]) {
+          const target = fullList[existingIdx];
+          if (!target.id && rawId) target.id = rawId;
+          if (!target.roll_number && roll != null) target.roll_number = roll;
+          if (!target.student_id_card_number && cardNo) target.student_id_card_number = cardNo;
+          if (!target.uniq_id && uniq) target.uniq_id = uniq;
+          if (!target.student_class && stClsId) target.student_class = stClsId;
+          if (!target.student_section && stSecId) target.student_section = stSecId;
+          if (!target.department && stDeptId) target.department = stDeptId;
+          if (!target.sub && secSub) target.sub = secSub;
+        }
+        return;
+      }
+
+      if (rawId) seenIds.add(String(rawId));
+      if (uniq) seenUniqs.add(String(uniq));
+      if (cardNo) seenCards.add(String(cardNo));
+
+      const newIdx = fullList.length;
+      seenNameMap.set(nameKey, newIdx);
+      if (roll == null) seenNameMap.set(looseNameKey, newIdx);
+      if (!stClsId && roll == null) seenNameMap.set(normName, newIdx);
 
       const badge =
         typeof st === "object" && st.badge
@@ -245,10 +317,6 @@ export function useDailyProgressHierarchy({
           : rawId != null
           ? `ID: ${rawId}`
           : undefined;
-
-      const stClsId = typeof st === "object" ? getClassId(st) || (st.student_class || st.class_id) : undefined;
-      const stSecId = typeof st === "object" ? getSectionId(st) || (st.student_section || st.section_id) : undefined;
-      const stDeptId = typeof st === "object" ? getDepartmentId(st) || (st.department || st.department_id) : undefined;
 
       fullList.push({
         id: rawId || undefined,

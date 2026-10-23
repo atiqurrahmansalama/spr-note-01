@@ -19,7 +19,7 @@ import { useDailyClassroomAssessment } from './lesson-management/lesson-assessme
 import useDailyClassroomData from './hooks/useDailyClassroomData';
 import useDailyClassroomFilters from './hooks/useDailyClassroomFilters';
 import { getClassroomTodayDate } from '@/constants/calendarConstants';
-import { doesLessonMatchClass } from './utils/dailyClassroomUtils';
+import { doesLessonMatchClass, normalizeToISODate } from './utils/dailyClassroomUtils';
 import { HubTabSkeletonLoader, DrawerFallbackSkeleton } from './components';
 
 // ── Lazy-Loaded Feature Views & Drawers for Instant Sub-50ms Mounts ──────────
@@ -55,7 +55,7 @@ const LESSON_MANAGEMENT_TABS = [
 ];
 
 const PROGRESS_MANAGEMENT_TABS = [
-  { id: 'PROGRESS', label: 'Daily Progress', icon: TrendingUpIcon, path: '/studies/daily-progress', featureKey: 'progress_tab_daily_progress' },
+  { id: 'PROGRESS', label: 'Daily Progress', icon: TrendingUpIcon, path: '/studies/daily-progress/quran', featureKey: 'progress_tab_daily_progress' },
   { id: 'PROGRESS_ASSESSMENT', label: 'Progress Reports', icon: ChecklistIcon, path: '/studies/progress-reports', featureKey: 'progress_tab_reports' },
   { id: 'PROGRESS_ANALYTICS', label: 'Analytics', icon: TrendingUpIcon, path: '/studies/progress-analytics', featureKey: 'progress_tab_analytics' },
 ];
@@ -98,6 +98,8 @@ export interface DailyClassroomHubViewProps {
   isEmbedded?: boolean;
   hubType?: 'AUTO' | 'LESSON_MANAGEMENT' | 'PROGRESS_MANAGEMENT' | string;
   defaultTab?: string | null;
+  defaultMode?: 'QURAN' | 'BOOK';
+  defaultReportView?: 'RECORD_REPORTS' | 'STUDENT_VIEW';
 }
 
 export default function DailyClassroomHubView({
@@ -105,6 +107,8 @@ export default function DailyClassroomHubView({
   isEmbedded = false,
   hubType = 'AUTO',
   defaultTab = null,
+  defaultMode,
+  defaultReportView,
 }: DailyClassroomHubViewProps) {
   const { activeTenantId } = useTenant();
   const { openDrawer, closeDrawer } = useRightSidebar();
@@ -214,6 +218,9 @@ export default function DailyClassroomHubView({
 
   // ── Progress Mode State (Quran vs Book/Subject) ───────────────────────────
   const [progressMode, setProgressMode] = useState<'QURAN' | 'BOOK'>(() => {
+    if (path.includes('/daily-progress/book')) return 'BOOK';
+    if (path.includes('/daily-progress/quran')) return 'QURAN';
+    if (defaultMode) return defaultMode;
     try {
       return (localStorage.getItem('spr_daily_progress_mode') as 'QURAN' | 'BOOK') || 'QURAN';
     } catch {
@@ -221,13 +228,27 @@ export default function DailyClassroomHubView({
     }
   });
 
+  // Sync mode on URL path changes
+  useEffect(() => {
+    if (path.includes('/daily-progress/book')) {
+      setProgressMode('BOOK');
+      try { localStorage.setItem('spr_daily_progress_mode', 'BOOK'); } catch {}
+    } else if (path.includes('/daily-progress/quran')) {
+      setProgressMode('QURAN');
+      try { localStorage.setItem('spr_daily_progress_mode', 'QURAN'); } catch {}
+    }
+  }, [path]);
+
   const handleProgressModeChange = useCallback((mode: 'QURAN' | 'BOOK') => {
     setProgressMode(mode);
     try {
       localStorage.setItem('spr_daily_progress_mode', mode);
       window.dispatchEvent(new CustomEvent('spr_daily_progress_mode_change', { detail: mode }));
     } catch {}
-  }, []);
+    const dateParam = searchParams.get('date');
+    const query = dateParam ? `?date=${encodeURIComponent(dateParam)}` : '';
+    navigate(`/studies/daily-progress/${mode.toLowerCase()}${query}`, { replace: true });
+  }, [navigate, searchParams]);
 
   useEffect(() => {
     const handleSync = (e: any) => {
@@ -414,7 +435,8 @@ export default function DailyClassroomHubView({
       } else if (tabId === 'PROGRESS_ASSESSMENT') {
         targetPath = '/studies/progress-reports';
       } else {
-        targetPath = '/studies/daily-progress';
+        const mode = progressMode === 'BOOK' ? 'book' : 'quran';
+        targetPath = `/studies/daily-progress/${mode}`;
       }
     } else {
       if (tabId === 'LESSON_ANALYTICS') {
@@ -431,16 +453,50 @@ export default function DailyClassroomHubView({
     navigate(`${targetPath}${query}`, { replace: true });
   };
 
-  // Sync tab when an existing report is selected for editing from Reports table
+  // Sync tab and state when an existing report is selected for editing from Reports table
   useEffect(() => {
-    const handleEditReportEvent = () => {
+    const handleEditReportEvent = (e: any) => {
       if (isProgressHub) {
-        handleTabChange('PROGRESS');
+        const rep = e?.detail;
+        if (!rep) return;
+        const isBook = Boolean(
+          rep.mode === "BOOK" ||
+          rep.progress_mode === "BOOK" ||
+          rep.curriculum_book_name ||
+          rep.book_name ||
+          rep.book_title ||
+          rep.lesson_title ||
+          rep.lesson_covered ||
+          (Array.isArray(rep.bookPageData) && rep.bookPageData.length > 0)
+        );
+        const mode = isBook ? 'BOOK' : 'QURAN';
+        setProgressMode(mode);
+        setActiveTab('PROGRESS');
+        setVisitedTabs((prev) => new Set(prev).add('PROGRESS'));
+
+        // 1. Strict Date Sync
+        const rawDate = rep.report_date || rep.isoDateOnly || rep.date || rep.record_date || rep.selectedDate || rep.created_at;
+        const normalizedDate = normalizeToISODate(rawDate);
+        if (normalizedDate) {
+          setSelectedDate(normalizedDate);
+        }
+
+        // 2. Strict Academic Hierarchy Sync
+        const deptId = rep.departmentId || rep.department_id || rep.department;
+        const clsId = rep.classId || rep.class_id || rep.academic_class_id || rep.academic_class;
+        const secId = rep.sectionId || rep.section_id || rep.section;
+        if (deptId) setSelectedDepartmentId(String(deptId));
+        if (clsId) setSelectedClassId(String(clsId));
+        if (secId) setSelectedSectionId(String(secId));
+
+        const targetDate = normalizedDate || selectedDate;
+        const query = targetDate ? `?date=${encodeURIComponent(targetDate)}` : '';
+        navigate(`/studies/daily-progress/${mode.toLowerCase()}${query}`, { replace: true });
       }
     };
     window.addEventListener('spr_edit_report', handleEditReportEvent);
     return () => window.removeEventListener('spr_edit_report', handleEditReportEvent);
-  }, [isProgressHub]);
+  }, [isProgressHub, navigate, selectedDate]);
 
   // ── Drawer Registrations ──────────────────────────────────────────────────────
   useDrawerRegistration(
@@ -910,7 +966,11 @@ export default function DailyClassroomHubView({
           aria-hidden={activeTab !== 'PROGRESS_ASSESSMENT' && activeTab !== 'PROGRESS_ASSESSMENTS'}
         >
           <Suspense fallback={<HubTabSkeletonLoader isReports={true} />}>
-            <StudentReportsView isEmbedded={true} filterProps={sharedFilterProps} />
+            <StudentReportsView
+              isEmbedded={true}
+              filterProps={sharedFilterProps}
+              defaultReportView={defaultReportView}
+            />
           </Suspense>
         </div>
       )}

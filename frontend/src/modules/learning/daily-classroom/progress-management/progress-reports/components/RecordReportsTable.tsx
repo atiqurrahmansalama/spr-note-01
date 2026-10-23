@@ -140,21 +140,16 @@ export default function RecordReportsTable({
         onSelectAll={(ids: any[], checked: boolean) => {
           if (!onBatchSelect) return;
           const nextSet = new Set(selectedIds);
-          if (checked) {
-            paginatedReports.forEach((r) => {
-              const id = r.id ?? r.report_unique_id;
-              if (id !== undefined && id !== null && id !== "") nextSet.add(id);
-            });
-          } else {
-            paginatedReports.forEach((r) => {
-              const id = r.id ?? r.report_unique_id;
-              if (id !== undefined && id !== null && id !== "") {
-                nextSet.delete(id);
-                nextSet.delete(String(id));
-                if (!isNaN(Number(id))) nextSet.delete(Number(id));
-              }
-            });
-          }
+          paginatedReports.forEach((r) => {
+            const id = r.id ?? r.report_unique_id;
+            const strKey = String(id ?? "");
+            nextSet.delete(id);
+            nextSet.delete(strKey);
+            if (!isNaN(Number(id))) nextSet.delete(Number(id));
+            if (checked && strKey) {
+              nextSet.add(strKey);
+            }
+          });
           onBatchSelect(nextSet);
         }}
         keyExtractor={(rep) => rep.id ?? rep.report_unique_id ?? ""}

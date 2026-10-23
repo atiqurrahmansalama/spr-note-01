@@ -1,9 +1,11 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { ChevronIcon, CalendarIcon, CheckIcon } from "../ui/Icons";
 import ReusableCalendar from "../common/ReusableCalendar";
 import { calendarSettings } from "../../utils/localStore";
 import { getCurrentHijriMonthRange } from "../../utils/hijriUtils";
+import { getEnrichedTimezoneList, getTimezoneOffsetString } from "@/constants/calendarConstants";
 
 const formatLocalDate = (d: Date | null | undefined): string => {
   if (!d) return "";
@@ -21,10 +23,18 @@ export interface DateRangePickerProps {
   maxDate?: string;
   onReset?: () => void;
   isHijriEnabled?: boolean;
+  showTimezone?: boolean;
+  timezoneLink?: string;
+  timeZone?: string;
   label?: string;
   placeholder?: string;
   className?: string;
   size?: "sm" | "md" | "lg" | string;
+  actionLabel?: string | null;
+  actionTo?: string;
+  actionTitle?: string;
+  onActionClick?: () => void;
+  headerAction?: React.ReactNode;
 }
 
 /**
@@ -40,10 +50,18 @@ export default function DateRangePicker({
   maxDate = "",
   onReset,
   isHijriEnabled,
+  showTimezone = false,
+  timezoneLink = "/admin-tools?tab=classroom-config",
+  timeZone = "",
   label = "Select Date Range",
   placeholder = "Select Date Range...",
   className = "",
   size = "md",
+  actionLabel = null,
+  actionTo,
+  actionTitle,
+  onActionClick,
+  headerAction,
 }: DateRangePickerProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showCustomCalendar, setShowCustomCalendar] = useState(false);
@@ -438,6 +456,14 @@ export default function DateRangePicker({
         )
       : null;
 
+  const resolvedTzOffset = useMemo(() => {
+    if (!showTimezone) return null;
+    const effectiveTz = timeZone || (calendarSettings?.getTimezone?.() ?? "UTC");
+    const tzList = typeof getEnrichedTimezoneList === "function" ? getEnrichedTimezoneList() : [];
+    const tzObj = tzList.find((t: any) => t?.id === effectiveTz);
+    return tzObj?.offset || (typeof getTimezoneOffsetString === "function" ? getTimezoneOffsetString(effectiveTz) : effectiveTz);
+  }, [showTimezone, timeZone]);
+
   return (
     <div ref={containerRef} className={`w-full relative ${className}`}>
       {label && (
@@ -445,21 +471,57 @@ export default function DateRangePicker({
           <label className="block text-xs font-bold theme-text-secondary uppercase tracking-wider">
             {label}
           </label>
-          {(startDate || endDate) && onReset && (
-            <button
-              type="button"
-              onClick={() => {
-                onReset();
-                setIsDropdownOpen(false);
-                setShowCustomCalendar(false);
-                setIsCustomPicking(false);
-              }}
-              className="text-[10px] font-bold theme-accent hover:underline cursor-pointer transition uppercase tracking-wider"
-              title="Reset date filter"
-            >
-              Clear
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {headerAction ? (
+              headerAction
+            ) : actionTo ? (
+              <Link
+                to={actionTo}
+                className="text-[10px] font-semibold theme-accent hover:underline hover:opacity-80 transition-all flex items-center gap-1 cursor-pointer"
+                title={actionTitle || (typeof actionLabel === "string" ? actionLabel : undefined)}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span>{actionLabel || "+ Add"}</span>
+              </Link>
+            ) : onActionClick || actionLabel ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onActionClick?.();
+                }}
+                className="text-[10px] font-semibold theme-accent hover:underline cursor-pointer flex items-center gap-1"
+                title={actionTitle || (typeof actionLabel === "string" ? actionLabel : undefined)}
+              >
+                <span>{actionLabel || "Manage"}</span>
+              </button>
+            ) : null}
+            {showTimezone && resolvedTzOffset && (
+              <Link
+                to={timezoneLink || "/admin-tools?tab=classroom-config"}
+                className="text-[11px] font-semibold theme-accent hover:underline cursor-pointer transition-all"
+                title="Configure Classroom Timezone"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {resolvedTzOffset}
+              </Link>
+            )}
+            {(startDate || endDate) && onReset && (
+              <button
+                type="button"
+                onClick={() => {
+                  onReset();
+                  setIsDropdownOpen(false);
+                  setShowCustomCalendar(false);
+                  setIsCustomPicking(false);
+                }}
+                className="text-[10px] font-bold theme-accent hover:underline cursor-pointer transition uppercase tracking-wider"
+                title="Reset date filter"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
       )}
 

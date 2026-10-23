@@ -21,6 +21,7 @@ interface UseProgressAnalyticsProps {
   selectedSectionId?: string;
   selectedStudentId?: string | number | null;
   selectedStudentName?: string;
+  selectedTeacherId?: string;
   students?: any[];
   classes?: any[];
   sections?: any[];
@@ -43,6 +44,7 @@ export function useProgressAnalytics({
   selectedSectionId = "",
   selectedStudentId = null,
   selectedStudentName = "",
+  selectedTeacherId = "ALL",
   students = [],
   classes = [],
   sections = [],
@@ -243,6 +245,8 @@ export function useProgressAnalytics({
         className: matchedStudent?.student_class?.name || rep.class_name || "",
         sectionName: matchedStudent?.student_section?.name || rep.section_name || "",
         groupName: matchedStudent?.group_name || rep.student_group || "",
+        teacherId: String(rep.teacher_id || (typeof rep.teacher === "object" ? rep.teacher?.id : rep.teacher) || ""),
+        teacherName: String(rep.teacher_name || (typeof rep.teacher === "object" ? rep.teacher?.name : (typeof rep.teacher === "string" && isNaN(Number(rep.teacher)) ? rep.teacher : "")) || ""),
         totalPages,
         mistakesCount,
         stucksCount,
@@ -294,6 +298,14 @@ export function useProgressAnalytics({
         if (!sName.includes(q) && !roll.includes(q)) return false;
       }
 
+      // Teacher filter
+      if (selectedTeacherId && selectedTeacherId !== "ALL") {
+        const matchesTeacher =
+          (r.teacherId && String(r.teacherId) === String(selectedTeacherId)) ||
+          (r.teacherName && (r.teacherName.toLowerCase() === selectedTeacherId.toLowerCase() || r.teacherName.toLowerCase().includes(selectedTeacherId.toLowerCase())));
+        if (!matchesTeacher) return false;
+      }
+
       return true;
     });
   }, [
@@ -306,6 +318,7 @@ export function useProgressAnalytics({
     selectedSectionId,
     selectedStudentId,
     selectedStudentName,
+    selectedTeacherId,
   ]);
 
   // 5. Today's recitations / Selected period individual records

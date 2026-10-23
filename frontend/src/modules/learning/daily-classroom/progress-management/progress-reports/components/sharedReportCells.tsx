@@ -344,18 +344,38 @@ export function ReportStucksCell({ report }: { report: ReportItem }) {
 /**
  * Shared Report Comments Cell
  */
-export function ReportCommentsCell({ comment }: { comment?: string }) {
-  if (!comment || !comment.trim()) {
+export function ReportCommentsCell({
+  comment,
+  teacherName,
+}: {
+  comment?: string;
+  teacherName?: string;
+}) {
+  const hasComment = Boolean(comment && comment.trim());
+  const hasTeacher = Boolean(teacherName && String(teacherName).trim());
+
+  if (!hasComment && !hasTeacher) {
     return <span className="text-xs theme-text-secondary opacity-60">—</span>;
   }
 
   return (
-    <p
-      className="text-xs theme-text-primary leading-relaxed break-words whitespace-pre-wrap italic line-clamp-3"
-      title={comment.trim()}
-    >
-      "{comment.trim()}"
-    </p>
+    <div className="space-y-1 text-left min-w-0">
+      {hasComment ? (
+        <p
+          className="text-xs theme-text-primary leading-relaxed break-words whitespace-pre-wrap italic line-clamp-3"
+          title={comment!.trim()}
+        >
+          "{comment!.trim()}"
+        </p>
+      ) : (
+        <span className="text-xs theme-text-secondary opacity-60">—</span>
+      )}
+      {hasTeacher && (
+        <div className="text-[10px] font-mono theme-text-secondary leading-tight truncate">
+          - <span className="font-semibold theme-text-primary">{String(teacherName).trim()}</span>
+        </div>
+      )}
+    </div>
   );
 }
 

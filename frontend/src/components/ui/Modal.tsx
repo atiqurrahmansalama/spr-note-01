@@ -183,17 +183,21 @@ export const Modal: React.FC<ModalProps> = ({
 
 export interface ConfirmModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose?: () => void;
+  onCancel?: () => void; // Ergonomic alias for onClose
   onConfirm: () => void | Promise<void>;
   title?: string;
   subtitle?: string;
+  message?: React.ReactNode; // Ergonomic alias for subtitle or text body
   icon?: React.ComponentType<{ className?: string }>;
   badge?: React.ReactNode;
   confirmText?: string;
   cancelText?: string;
   confirmVariant?: 'primary' | 'secondary' | 'sub' | 'surface' | 'outline' | 'soft' | 'danger' | 'danger-solid' | 'success' | 'success-solid' | 'warning' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'sub' | 'surface' | 'outline' | 'soft' | 'danger' | 'danger-solid' | 'success' | 'success-solid' | 'warning' | 'ghost'; // Ergonomic alias for confirmVariant
   confirmIcon?: React.ComponentType<{ className?: string }>;
   confirmLoading?: boolean;
+  isLoading?: boolean; // Ergonomic alias for confirmLoading
   confirmLoadingText?: string;
   confirmDisabled?: boolean;
   showCancelButton?: boolean;
@@ -225,16 +229,20 @@ export interface ConfirmModalProps {
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   isOpen,
   onClose,
+  onCancel,
   onConfirm,
   title = 'Confirmation Required',
   subtitle,
+  message,
   icon = AlertCircleIcon,
   badge,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
   confirmVariant = 'primary',
+  variant,
   confirmIcon = CheckIcon,
   confirmLoading = false,
+  isLoading = false,
   confirmLoadingText,
   confirmDisabled = false,
   showCancelButton = true,
@@ -246,6 +254,11 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   children,
   className = '',
 }) => {
+  const handleClose = onClose || onCancel || (() => {});
+  const effectiveSubtitle = subtitle || (typeof message === 'string' ? message : undefined);
+  const effectiveVariant = (variant || confirmVariant) as 'primary' | 'secondary' | 'sub' | 'surface' | 'outline' | 'soft' | 'danger' | 'danger-solid' | 'success' | 'success-solid' | 'warning' | 'ghost';
+  const effectiveLoading = confirmLoading || isLoading;
+
   const calloutStyles: Record<string, { border: string; bg: string; text: string; icon: string }> = {
     info: { border: 'theme-border-info', bg: 'theme-bg-info-soft', text: 'theme-text-primary', icon: 'theme-text-info' },
     warning: { border: 'theme-border-warning', bg: 'theme-bg-warning-soft', text: 'theme-text-primary', icon: 'theme-text-warning' },
@@ -259,17 +272,17 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         <CustomButton
           variant="sub"
           size="sm"
-          onClick={onClose}
-          disabled={confirmLoading}
+          onClick={handleClose}
+          disabled={effectiveLoading}
         >
           {cancelText}
         </CustomButton>
       )}
       <CustomButton
-        variant={confirmVariant}
+        variant={effectiveVariant}
         size="sm"
         icon={confirmIcon}
-        loading={confirmLoading}
+        loading={effectiveLoading}
         loadingText={confirmLoadingText || 'Processing...'}
         disabled={confirmDisabled}
         onClick={onConfirm}
@@ -286,9 +299,9 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={title}
-      subtitle={subtitle}
+      subtitle={effectiveSubtitle}
       icon={icon}
       badge={badge}
       size={size}

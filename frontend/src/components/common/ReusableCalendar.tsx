@@ -12,7 +12,8 @@ import IconButton from '../ui/IconButton';
 import CustomInput from '../ui/CustomInput';
 import { getHijriDetails } from '../../utils/hijriUtils';
 import { useTranslation } from '../../i18n';
-import { getTodayInTimezone } from '../../constants/calendarConstants';
+import { Link } from 'react-router-dom';
+import { getTodayInTimezone, getEnrichedTimezoneList, getTimezoneOffsetString } from '../../constants/calendarConstants';
 
 // ─── LOCALIZED MONTH & WEEKDAY DICTIONARIES ──────────────────────────────────
 const LOCALIZED_MONTHS: Record<string, { full: string[]; short: string[] }> = {
@@ -71,11 +72,16 @@ export interface ReusableCalendarProps {
   dateFormat?: string;
   timeZone?: string;
   showHijri?: boolean;
+  showTimezone?: boolean;
+  timezoneLink?: string | null;
   headerAction?: React.ReactNode;
   onManage?: () => void;
   onActionClick?: () => void;
   actionLabel?: string | null;
+  actionTo?: string | ((searchTerm: string) => string) | null;
+  actionTitle?: string | null;
   manageLabel?: string | null;
+  manageTitle?: string | null;
   badge?: React.ReactNode;
   error?: string | null;
   helperText?: string | null;
@@ -123,14 +129,19 @@ export default function ReusableCalendar({
   required = false,
   optional = false,
   badge = null,
-  headerAction = null,
+  headerAction,
   onManage = null,
   onActionClick = null,
   actionLabel = null,
+  actionTo = null,
+  actionTitle = null,
   manageLabel = null,
+  manageTitle = null,
   dateFormat = '',
   timeZone = '',
   showHijri = false,
+  showTimezone = false,
+  timezoneLink = '/admin-tools?tab=classroom-config',
   error = null,
   helperText = null,
   disabled = false,
@@ -160,6 +171,34 @@ export default function ReusableCalendar({
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     })();
   }, [timeZone]);
+
+  // Built-in Reusable TimeZone Action Resolution
+  const resolvedHeaderAction = useMemo(() => {
+    if (headerAction) return headerAction;
+    if (!showTimezone) return undefined;
+
+    const effectiveTz = timeZone || 'UTC';
+    const tzList = typeof getEnrichedTimezoneList === 'function' ? getEnrichedTimezoneList() : [];
+    const tzObj = tzList.find((t: any) => t?.id === effectiveTz);
+    const tzOffset = tzObj?.offset || (typeof getTimezoneOffsetString === 'function' ? getTimezoneOffsetString(effectiveTz) : effectiveTz);
+
+    const targetLink = timezoneLink !== undefined ? timezoneLink : '/admin-tools?tab=classroom-config';
+
+    if (targetLink) {
+      return (
+        <Link
+          to={targetLink}
+          onClick={(e) => e.stopPropagation()}
+          className="text-xs font-semibold theme-accent hover:underline transition-all cursor-pointer opacity-90 hover:opacity-100"
+          title="Configure Classroom Timezone"
+        >
+          {tzOffset}
+        </Link>
+      );
+    }
+
+    return <span className="text-xs font-semibold theme-accent">{tzOffset}</span>;
+  }, [headerAction, showTimezone, timeZone, timezoneLink]);
 
   const activeDate = selectedDate || startDate || todayStr;
   const initDate = new Date(activeDate);
@@ -826,11 +865,14 @@ export default function ReusableCalendar({
             required={required}
             optional={optional}
             badge={badge}
-            headerAction={headerAction}
+            headerAction={resolvedHeaderAction}
             onManage={onManage}
             onActionClick={onActionClick}
             actionLabel={actionLabel}
+            actionTo={typeof actionTo === 'string' ? actionTo : undefined}
+            actionTitle={actionTitle}
             manageLabel={manageLabel}
+            manageTitle={manageTitle}
             placeholder={placeholder}
             value={getLabel() === placeholder ? '' : getLabel()}
             readOnly={true}

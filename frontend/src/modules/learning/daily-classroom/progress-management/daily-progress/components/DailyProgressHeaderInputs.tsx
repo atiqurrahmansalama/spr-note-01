@@ -5,7 +5,6 @@ import { useTenant } from "@/context/TenantContext";
 import type { StudentProfileOption, SessionItem } from "../types";
 
 import StudentSelector, {
-  type StudentProfileOption,
   type StudentSelectorProps as StudentInputSectionProps,
 } from "../../../components/StudentSelector";
 

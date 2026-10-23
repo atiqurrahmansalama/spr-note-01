@@ -32,6 +32,7 @@ export const ProgressAnalyticsView: React.FC<ProgressAnalyticsViewProps> = ({
   const [endDate, setEndDate] = useState<string>("");
   const [selectedStudentName, setSelectedStudentName] = useState<string>("");
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>("ALL");
 
   const selectedDate = filterProps?.selectedDate || "";
   const selectedDepartmentId = filterProps?.selectedDepartmentId || "";
@@ -48,6 +49,7 @@ export const ProgressAnalyticsView: React.FC<ProgressAnalyticsViewProps> = ({
     selectedSectionId,
     selectedStudentId,
     selectedStudentName,
+    selectedTeacherId,
     students,
     classes,
     sections,
@@ -65,12 +67,15 @@ export const ProgressAnalyticsView: React.FC<ProgressAnalyticsViewProps> = ({
 
   return (
     <div className={`w-full space-y-4.5 animate-fade-in select-none ${className}`}>
-      {/* 1. Academic Hierarchy Scope Controls with Student Selector & Date Range Picker */}
+      {/* 1. Academic Hierarchy Scope Controls with Student Selector, Teacher, & Date Range Picker */}
       <DailyClassroomFilterControls
         showCardWrapper={true}
-        maxColumns={4}
+        collapsible={true}
         filterProps={filterProps}
         showPeriodSwitcher={false}
+        hasTeachers={true}
+        selectedTeacherId={selectedTeacherId}
+        onTeacherChange={(tId: any) => setSelectedTeacherId(tId ? String(tId) : "ALL")}
         searchControl={
           <StudentSelector
             studentName={selectedStudentName}
@@ -101,6 +106,8 @@ export const ProgressAnalyticsView: React.FC<ProgressAnalyticsViewProps> = ({
             endDate={endDate}
             onRangeSelect={handleRangeSelect}
             onReset={handleResetDates}
+            showTimezone={true}
+            timezoneLink="/admin-tools?tab=classroom-config"
             label="Date Range"
             placeholder="Select Range..."
             size="md"

@@ -583,12 +583,12 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
       <ConfirmModal
         isOpen={Boolean(studentToDelete)}
         title="Delete Student Record"
-        message={`Are you sure you want to delete student "${studentToDelete?.name_en || studentToDelete?.name || ""}"? This action cannot be undone.`}
+        subtitle={`Are you sure you want to delete student "${studentToDelete?.name_en || studentToDelete?.name || ""}"? This action cannot be undone.`}
         confirmText={isDeleting ? "Deleting..." : "Delete Student"}
         cancelText="Cancel"
-        variant="danger"
-        isLoading={isDeleting}
-        onCancel={() => setStudentToDelete(null)}
+        confirmVariant="danger"
+        confirmLoading={isDeleting}
+        onClose={() => setStudentToDelete(null)}
         onConfirm={handleConfirmSingleDelete}
       />
 

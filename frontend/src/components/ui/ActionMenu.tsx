@@ -377,11 +377,17 @@ export default function ActionMenu({
                   type="button"
                   role="menuitem"
                   disabled={isDisabled}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                  }}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (isDisabled) return;
-                    closeMenu();
-                    item.onClick?.(e);
+                    try {
+                      item.onClick?.(e);
+                    } finally {
+                      closeMenu();
+                    }
                   }}
                   className={`w-full px-3 py-2 text-xs font-semibold rounded-xl flex items-center gap-2.5 transition-all duration-150 cursor-pointer text-left select-none group/item ${
                     isDisabled

@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import CustomSelect from '@/components/ui/CustomSelect';
 import ReusableCalendar from '@/components/common/ReusableCalendar';
+import TeacherSelect from '@/components/selectors/TeacherSelect';
+import { FilterIcon, ChevronIcon } from '@/components/ui/Icons';
 import ClassPeriodSwitcherBar from './ClassPeriodSwitcherBar';
 import { classroomSettings, calendarSettings } from '@/stores';
 import { getEnrichedTimezoneList, getSystemTimezone, getTimezoneOffsetString } from '@/constants/calendarConstants';
+import { useAcademicData } from '@/hooks/useAcademicData';
 
 export interface DailyClassroomFilterProps {
   showDate?: boolean;
@@ -33,6 +36,13 @@ export interface DailyClassroomFilterProps {
   sectionLabel?: string;
   sectionPlaceholder?: string;
 
+  hasTeachers?: boolean;
+  selectedTeacherId?: string;
+  onTeacherChange?: (val: any) => void;
+  teacherSelectOptions?: Array<{ value: string; label: string; [key: string]: any }>;
+  teacherLabel?: string;
+  teacherPlaceholder?: string;
+
   showPeriodSwitcher?: boolean;
   periodSwitcherTitle?: string;
   allPeriodFilterOptions?: Array<{ value: string; label: string; [key: string]: any }>;
@@ -41,8 +51,8 @@ export interface DailyClassroomFilterProps {
   getSlotCount?: (periodId: string) => number;
   getPeriodSubtitle?: (periodId: string) => string;
 
-  onBatchHierarchyChange?: (params: { departmentId?: string; classId?: string; sectionId?: string }) => void;
-  setAcademicFilters?: (params: { departmentId?: string; classId?: string; sectionId?: string }) => void;
+  onBatchHierarchyChange?: (params: { departmentId?: string; classId?: string; sectionId?: string; teacherId?: string }) => void;
+  setAcademicFilters?: (params: { departmentId?: string; classId?: string; sectionId?: string; teacherId?: string }) => void;
   maxColumns?: 1 | 2 | 3 | 4 | 5 | 6;
   [key: string]: any;
 }
@@ -55,6 +65,10 @@ export interface DailyClassroomFilterControlsProps {
   className?: string;
   maxColumns?: 1 | 2 | 3 | 4 | 5 | 6;
 
+  // Collapsible configuration
+  collapsible?: boolean;
+  defaultExpanded?: boolean;
+
   // Date configuration
   showDate?: boolean;
   dateLabel?: string;
@@ -62,6 +76,11 @@ export interface DailyClassroomFilterControlsProps {
   onDateChange?: (date: string) => void;
   dateFormat?: string;
   datePlaceholder?: string;
+  dateActionLabel?: string | null;
+  dateActionTo?: string | ((searchTerm: string) => string) | null;
+  dateActionTitle?: string | null;
+  onDateActionClick?: () => void;
+  dateHeaderAction?: React.ReactNode;
 
   // Department configuration
   hasDepartments?: boolean;
@@ -86,6 +105,15 @@ export interface DailyClassroomFilterControlsProps {
   sectionLabel?: string;
   sectionPlaceholder?: string;
 
+  // Teacher configuration
+  hasTeachers?: boolean;
+  selectedTeacherId?: string;
+  onTeacherChange?: (val: any) => void;
+  teacherSelectOptions?: Array<{ value: string; label: string; [key: string]: any }>;
+  teacherLabel?: string;
+  teacherPlaceholder?: string;
+  teacherControl?: React.ReactNode;
+
   // Period Switcher Bar configuration
   showPeriodSwitcher?: boolean;
   periodSwitcherTitle?: string;
@@ -97,6 +125,8 @@ export interface DailyClassroomFilterControlsProps {
 
   // Custom filter extensions
   searchControl?: React.ReactNode;
+  studentControl?: React.ReactNode;
+  sessionControl?: React.ReactNode;
   customDateComponent?: React.ReactNode;
   extraFields?: React.ReactNode;
   children?: React.ReactNode;
@@ -105,6 +135,9 @@ export interface DailyClassroomFilterControlsProps {
 /**
  * DailyClassroomFilterControls (also LearningFilterControls)
  * Enterprise Reusable Filter Grid for Learning & Classroom modules.
+ * Line 1 (Always Visible): Date | Student | Session (with Academic & Teacher Collapsible Toggle)
+ * Line 2 (Collapsible): Department | Class | Section | Teacher
+ * Bottom: Read-only summary when collapsed, with children / action bar support.
  */
 export default function DailyClassroomFilterControls({
   filterProps = null,
@@ -114,8 +147,14 @@ export default function DailyClassroomFilterControls({
   className = '',
   maxColumns,
 
+  // Collapsible configuration
+  collapsible = true,
+  defaultExpanded = false,
+
   // Custom extensions
   searchControl,
+  studentControl,
+  sessionControl,
   customDateComponent,
   extraFields,
   children,
@@ -127,6 +166,11 @@ export default function DailyClassroomFilterControls({
   onDateChange = filterProps?.onDateChange,
   dateFormat = filterProps?.dateFormat ?? 'DD/MM/YYYY',
   datePlaceholder = filterProps?.datePlaceholder ?? 'Select Date',
+  dateActionLabel = null,
+  dateActionTo = null,
+  dateActionTitle = null,
+  onDateActionClick = null,
+  dateHeaderAction = null,
 
   // Department configuration
   hasDepartments = filterProps?.hasDepartments ?? false,
@@ -151,6 +195,15 @@ export default function DailyClassroomFilterControls({
   sectionLabel = filterProps?.sectionLabel ?? 'Section',
   sectionPlaceholder = filterProps?.sectionPlaceholder ?? 'Select Section...',
 
+  // Teacher configuration
+  hasTeachers = filterProps?.hasTeachers ?? true,
+  selectedTeacherId = filterProps?.selectedTeacherId ?? '',
+  onTeacherChange = filterProps?.onTeacherChange,
+  teacherSelectOptions = filterProps?.teacherSelectOptions ?? [],
+  teacherLabel = filterProps?.teacherLabel ?? 'Teacher',
+  teacherPlaceholder = filterProps?.teacherPlaceholder ?? 'Select Teacher...',
+  teacherControl,
+
   // Period Switcher Bar configuration
   showPeriodSwitcher = filterProps?.showPeriodSwitcher ?? true,
   periodSwitcherTitle = filterProps?.periodSwitcherTitle ?? 'CLASS ROUTINE PERIODS',
@@ -160,6 +213,8 @@ export default function DailyClassroomFilterControls({
   getSlotCount = filterProps?.getSlotCount,
   getPeriodSubtitle = filterProps?.getPeriodSubtitle,
 }: DailyClassroomFilterControlsProps) {
+  const academicData: any = useAcademicData() || {};
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [isTimezoneEnabled, setIsTimezoneEnabled] = useState(() => classroomSettings?.getTimezoneEnabled?.() ?? true);
   const [classroomTz, setClassroomTz] = useState(() => classroomSettings?.getTimezone?.() ?? 'APP_DEFAULT');
   const [appTz, setAppTz] = useState(() => calendarSettings?.getTimezone?.() ?? (typeof getSystemTimezone === 'function' ? getSystemTimezone() : 'UTC'));
@@ -197,124 +252,225 @@ export default function DailyClassroomFilterControls({
   }, []);
 
   const effectiveTimezone = classroomTz && classroomTz !== 'APP_DEFAULT' ? classroomTz : appTz || 'UTC';
-  const timezoneList = typeof getEnrichedTimezoneList === 'function' ? getEnrichedTimezoneList() : [];
-  const tzObj = timezoneList.find((t: any) => t?.id === effectiveTimezone);
-  const tzAbbr = tzObj?.offset || (typeof getTimezoneOffsetString === 'function' ? getTimezoneOffsetString(effectiveTimezone) : '');
 
-  // Clean grid-span layout calculations (1 cell per control)
-  const dateSpanClass = 'col-span-1';
-  const deptSpanClass = 'col-span-1';
-  const classSpanClass = 'col-span-1';
-  const sectionSpanClass = 'col-span-1';
+  // Active labels calculation for footer summary
+  const activeDepartmentLabel = useMemo(() => {
+    if (!selectedDepartmentId || selectedDepartmentId === 'ALL') return '';
+    const opt = departmentSelectOptions.find((d) => String(d.value) === String(selectedDepartmentId));
+    if (opt) return opt.label;
+    const fromData = (academicData.departments || []).find((d: any) => String(d.id) === String(selectedDepartmentId));
+    return fromData?.name || '';
+  }, [selectedDepartmentId, departmentSelectOptions, academicData.departments]);
 
-  const filterFields = (
-    <>
-      {/* 0. Optional Search Bar */}
-      {searchControl && (
-        <div className="col-span-1">
-          {searchControl}
-        </div>
-      )}
+  const activeClassLabel = useMemo(() => {
+    if (!selectedClassId || selectedClassId === 'ALL') return '';
+    const opt = classSelectOptions.find((c) => String(c.value) === String(selectedClassId));
+    if (opt) return opt.label;
+    const fromData = (academicData.classes || []).find((c: any) => String(c.id) === String(selectedClassId));
+    return fromData?.name || '';
+  }, [selectedClassId, classSelectOptions, academicData.classes]);
 
-      {/* 1. Date Picker or Custom Date Component */}
-      {customDateComponent ? (
-        <div className="col-span-1">
-          {customDateComponent}
-        </div>
-      ) : showDate ? (
-        <div className={dateSpanClass}>
-          <ReusableCalendar
-            label={dateLabel}
-            headerAction={isTimezoneEnabled ? <span className="text-xs font-semibold theme-accent">{tzAbbr}</span> : undefined}
-            dateFormat={dateFormat}
-            timeZone={effectiveTimezone}
-            showHijri={false}
-            selectedDate={selectedDate}
-            onSelectDate={onDateChange}
-            placeholder={datePlaceholder}
-            size="md"
-          />
-        </div>
-      ) : null}
+  const activeSectionLabel = useMemo(() => {
+    if (!selectedSectionId || selectedSectionId === 'ALL') return '';
+    const opt = sectionSelectOptions.find((s) => String(s.value) === String(selectedSectionId));
+    if (opt) return opt.label;
+    const fromData = (academicData.sections || []).find((s: any) => String(s.id) === String(selectedSectionId));
+    return fromData?.name || '';
+  }, [selectedSectionId, sectionSelectOptions, academicData.sections]);
 
-      {/* 2. Academic Department Selector */}
-      {hasDepartments && (
-        <div className={deptSpanClass}>
-          <CustomSelect
-            label={departmentLabel}
-            placeholder={departmentPlaceholder}
-            options={departmentSelectOptions}
-            value={selectedDepartmentId}
-            onChange={onDepartmentChange}
-            size="md"
-          />
-        </div>
-      )}
+  const activeTeacherLabel = useMemo(() => {
+    if (!selectedTeacherId || selectedTeacherId === 'ALL') return '';
+    const opt = teacherSelectOptions.find((t) => String(t.value) === String(selectedTeacherId));
+    if (opt) return opt.label;
+    const fromStaff = (academicData.staff || academicData.teachers || []).find(
+      (s: any) => String(s.id) === String(selectedTeacherId) || String(s.user) === String(selectedTeacherId)
+    );
+    return fromStaff?.name_en || fromStaff?.name || fromStaff?.full_name || '';
+  }, [selectedTeacherId, teacherSelectOptions, academicData]);
 
-      {/* 3. Target Class Selector */}
-      <div className={classSpanClass}>
-        <CustomSelect
-          label={classLabel}
-          placeholder={classPlaceholder}
-          options={classSelectOptions}
-          value={selectedClassId}
-          onChange={onClassChange}
-          size="md"
-        />
-      </div>
+  const hiddenActiveCount = useMemo(() => {
+    let count = 0;
+    if (activeDepartmentLabel) count += 1;
+    if (activeClassLabel) count += 1;
+    if (activeSectionLabel) count += 1;
+    if (activeTeacherLabel) count += 1;
+    return count;
+  }, [activeDepartmentLabel, activeClassLabel, activeSectionLabel, activeTeacherLabel]);
 
-      {/* 4. Target Section Selector */}
-      {hasSectionsForClass && (
-        <div className={sectionSpanClass}>
-          <CustomSelect
-            label={sectionLabel}
-            placeholder={sectionPlaceholder}
-            options={sectionSelectOptions}
-            value={selectedSectionId}
-            onChange={onSectionChange}
-            size="md"
-          />
-        </div>
-      )}
+  const effectiveStudent = studentControl || searchControl;
+  const effectiveSession = sessionControl || extraFields;
 
-      {/* 5. Extra Fields */}
-      {extraFields}
-    </>
-  );
-
-  const hasExtra = Boolean(searchControl || customDateComponent || extraFields);
-  const effectiveMaxColumns = maxColumns ?? filterProps?.maxColumns;
-
-  const responsiveGridCols = useMemo(() => {
-    if (effectiveMaxColumns === 1) return 'grid-cols-1';
-    if (effectiveMaxColumns === 2) return 'grid-cols-1 @[480px]:grid-cols-2';
-    if (effectiveMaxColumns === 3) return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 @[480px]:grid-cols-2 @[720px]:grid-cols-3';
-    if (effectiveMaxColumns === 4) return 'grid-cols-1 @[480px]:grid-cols-2 @[720px]:grid-cols-3 @[940px]:grid-cols-4';
-    if (effectiveMaxColumns === 5) return 'grid-cols-1 @[480px]:grid-cols-2 @[720px]:grid-cols-3 @[940px]:grid-cols-4 @[1080px]:grid-cols-5';
-    if (effectiveMaxColumns === 6) return 'grid-cols-1 @[480px]:grid-cols-2 @[720px]:grid-cols-3 @[940px]:grid-cols-4 @[1080px]:grid-cols-5 @[1280px]:grid-cols-6';
-
-    return hasExtra
-      ? 'grid-cols-1 @[480px]:grid-cols-2 @[720px]:grid-cols-3 @[940px]:grid-cols-4 @[1080px]:grid-cols-5 @[1280px]:grid-cols-6'
-      : `grid-cols-2 ${
-          hasDepartments && hasSectionsForClass
-            ? '@[800px]:grid-cols-4'
-            : hasDepartments || hasSectionsForClass
-            ? '@[720px]:grid-cols-3'
-            : '@[480px]:grid-cols-2'
-        }`;
-  }, [effectiveMaxColumns, hasExtra, hasDepartments, hasSectionsForClass]);
-
-  // 1. If showCardWrapper is true, render inside standard enterprise toolbar/filter background box
+  // ── Render Form in Collapsible Enterprise Mode ──
   if (showCardWrapper) {
     return (
       <div
         className={`@container p-3 sm:p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3 w-full min-w-0 ${className}`}
       >
-        <div
-          className={`grid ${responsiveGridCols} gap-2.5 sm:gap-3 w-full items-end ${gridClassName}`}
-        >
-          {filterFields}
+        {/* 1st Line (Primary Row — Always Visible): Date | Student | Session */}
+        <div className="grid grid-cols-1 @[640px]:grid-cols-3 gap-2.5 sm:gap-3 w-full items-end">
+          {/* Slot 1: Date */}
+          <div className="col-span-1">
+            {customDateComponent ? (
+              customDateComponent
+            ) : showDate ? (
+              <ReusableCalendar
+                label={dateLabel}
+                showTimezone={isTimezoneEnabled}
+                timezoneLink="/admin-tools?tab=classroom-config"
+                dateFormat={dateFormat}
+                timeZone={effectiveTimezone}
+                showHijri={false}
+                selectedDate={selectedDate}
+                onSelectDate={onDateChange}
+                placeholder={datePlaceholder}
+                actionLabel={dateActionLabel}
+                actionTo={dateActionTo}
+                actionTitle={dateActionTitle}
+                onActionClick={onDateActionClick}
+                headerAction={dateHeaderAction}
+                size="md"
+              />
+            ) : null}
+          </div>
+
+          {/* Slot 2: Student */}
+          <div className="col-span-1">
+            {effectiveStudent}
+          </div>
+
+          {/* Slot 3: Session */}
+          <div className="col-span-1">
+            {effectiveSession}
+          </div>
         </div>
+
+        {/* 2nd Line (Collapsible Secondary Row): Department | Class | Section | Teacher */}
+        {(!collapsible || isExpanded) && (
+          <div className="grid grid-cols-1 @[480px]:grid-cols-2 @[800px]:grid-cols-4 gap-2.5 sm:gap-3 w-full items-end pt-2.5 border-t theme-border animate-fade-in">
+            {/* Slot 1: Department */}
+            <div className="col-span-1">
+              <CustomSelect
+                label={departmentLabel}
+                placeholder={departmentPlaceholder}
+                options={departmentSelectOptions}
+                value={selectedDepartmentId}
+                onChange={onDepartmentChange}
+                size="md"
+                disabled={!hasDepartments}
+              />
+            </div>
+
+            {/* Slot 2: Class */}
+            <div className="col-span-1">
+              <CustomSelect
+                label={classLabel}
+                placeholder={classPlaceholder}
+                options={classSelectOptions}
+                value={selectedClassId}
+                onChange={onClassChange}
+                size="md"
+              />
+            </div>
+
+            {/* Slot 3: Section */}
+            <div className="col-span-1">
+              <CustomSelect
+                label={sectionLabel}
+                placeholder={sectionPlaceholder}
+                options={sectionSelectOptions}
+                value={selectedSectionId}
+                onChange={onSectionChange}
+                size="md"
+                disabled={!hasSectionsForClass}
+              />
+            </div>
+
+            {/* Slot 4: Teacher */}
+            <div className="col-span-1">
+              {teacherControl ? (
+                teacherControl
+              ) : hasTeachers ? (
+                teacherSelectOptions.length > 0 ? (
+                  <CustomSelect
+                    label={teacherLabel}
+                    placeholder={teacherPlaceholder}
+                    options={teacherSelectOptions}
+                    value={selectedTeacherId}
+                    onChange={onTeacherChange}
+                    size="md"
+                  />
+                ) : (
+                  <TeacherSelect
+                    value={selectedTeacherId}
+                    onChange={(val) => {
+                      const v = typeof val === 'object' ? (val?.value ?? val?.id) : val;
+                      if (onTeacherChange) onTeacherChange(v);
+                    }}
+                    label={teacherLabel}
+                    placeholder={teacherPlaceholder}
+                    allowAll={true}
+                    allLabel="All Teachers"
+                    size="md"
+                  />
+                )
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        {/* Footer: Bottom Scope Summary & Expand/Collapse Toggle Button */}
+        {collapsible && (
+          <div className="pt-2.5 border-t theme-border flex items-center justify-between text-xs font-mono theme-text-secondary flex-wrap gap-2 animate-fade-in select-none">
+            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+              {!isExpanded && hiddenActiveCount > 0 ? (
+                <>
+                  <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">Selected Scope:</span>
+                  {activeDepartmentLabel && (
+                    <span className="text-[11px] font-mono">
+                      Dept: <strong className="theme-text-primary font-semibold">{activeDepartmentLabel}</strong>
+                    </span>
+                  )}
+                  {activeDepartmentLabel && (activeClassLabel || activeSectionLabel || activeTeacherLabel) && (
+                    <span className="opacity-40">·</span>
+                  )}
+                  {activeClassLabel && (
+                    <span className="text-[11px] font-mono">
+                      Class: <strong className="theme-text-primary font-semibold">{activeClassLabel}</strong>
+                    </span>
+                  )}
+                  {activeClassLabel && (activeSectionLabel || activeTeacherLabel) && (
+                    <span className="opacity-40">·</span>
+                  )}
+                  {activeSectionLabel && (
+                    <span className="text-[11px] font-mono">
+                      Sec: <strong className="theme-text-primary font-semibold">{activeSectionLabel}</strong>
+                    </span>
+                  )}
+                  {activeSectionLabel && activeTeacherLabel && (
+                    <span className="opacity-40">·</span>
+                  )}
+                  {activeTeacherLabel && (
+                    <span className="text-[11px] font-mono">
+                      Teacher: <strong className="theme-text-primary font-semibold">{activeTeacherLabel}</strong>
+                    </span>
+                  )}
+                </>
+              ) : null}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsExpanded((prev) => !prev)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary border theme-border transition-colors cursor-pointer active:scale-95 text-xs font-semibold shrink-0 ml-auto select-none"
+              title={isExpanded ? 'Collapse More Filters' : 'Expand More Filters'}
+            >
+              <span>{isExpanded ? 'Hide More' : 'More'}</span>
+              <ChevronIcon isOpen={isExpanded} className="w-3 h-3 theme-text-secondary" />
+            </button>
+          </div>
+        )}
+
+        {/* Custom Action Children (e.g., SelectionActionBar) */}
         {children}
 
         {/* Routine Period Fast Selector Bar */}
@@ -332,32 +488,67 @@ export default function DailyClassroomFilterControls({
     );
   }
 
-  // 2. If wrapGrid is true, render wrapped in container query grid
-  if (wrapGrid) {
-    return (
-      <div
-        className={`@container grid ${responsiveGridCols} gap-3 ${gridClassName}`}
-      >
-        {filterFields}
-        {children}
-        {showPeriodSwitcher && (
-          <ClassPeriodSwitcherBar
-            title={periodSwitcherTitle}
-            allPeriodFilterOptions={allPeriodFilterOptions}
-            activePeriodId={activePeriodId}
-            onPeriodChange={onPeriodChange}
-            getSlotCount={getSlotCount}
-            getPeriodSubtitle={getPeriodSubtitle}
-          />
-        )}
-      </div>
-    );
-  }
-
-  // 3. Management Grid mode
+  // ── Render Form in Generic Grid Mode ──
   return (
-    <>
-      {filterFields}
+    <div className={`@container grid grid-cols-1 @[480px]:grid-cols-2 @[720px]:grid-cols-3 @[940px]:grid-cols-4 gap-3 ${gridClassName}`}>
+      {customDateComponent || (showDate && (
+        <div className="col-span-1">
+          <ReusableCalendar
+            label={dateLabel}
+            showTimezone={isTimezoneEnabled}
+            timezoneLink="/admin-tools?tab=classroom-config"
+            dateFormat={dateFormat}
+            timeZone={effectiveTimezone}
+            showHijri={false}
+            selectedDate={selectedDate}
+            onSelectDate={onDateChange}
+            placeholder={datePlaceholder}
+            actionLabel={dateActionLabel}
+            actionTo={dateActionTo}
+            actionTitle={dateActionTitle}
+            onActionClick={onDateActionClick}
+            headerAction={dateHeaderAction}
+            size="md"
+          />
+        </div>
+      ))}
+      {effectiveStudent && <div className="col-span-1">{effectiveStudent}</div>}
+      {effectiveSession && <div className="col-span-1">{effectiveSession}</div>}
+      {hasDepartments && (
+        <div className="col-span-1">
+          <CustomSelect
+            label={departmentLabel}
+            placeholder={departmentPlaceholder}
+            options={departmentSelectOptions}
+            value={selectedDepartmentId}
+            onChange={onDepartmentChange}
+            size="md"
+          />
+        </div>
+      )}
+      <div className="col-span-1">
+        <CustomSelect
+          label={classLabel}
+          placeholder={classPlaceholder}
+          options={classSelectOptions}
+          value={selectedClassId}
+          onChange={onClassChange}
+          size="md"
+        />
+      </div>
+      {hasSectionsForClass && (
+        <div className="col-span-1">
+          <CustomSelect
+            label={sectionLabel}
+            placeholder={sectionPlaceholder}
+            options={sectionSelectOptions}
+            value={selectedSectionId}
+            onChange={onSectionChange}
+            size="md"
+          />
+        </div>
+      )}
+      {children}
       {showPeriodSwitcher && (
         <ClassPeriodSwitcherBar
           title={periodSwitcherTitle}
@@ -368,7 +559,7 @@ export default function DailyClassroomFilterControls({
           getPeriodSubtitle={getPeriodSubtitle}
         />
       )}
-    </>
+    </div>
   );
 }
 

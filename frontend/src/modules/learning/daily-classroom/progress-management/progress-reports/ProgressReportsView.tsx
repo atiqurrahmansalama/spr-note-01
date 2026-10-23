@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/context/ToastContext";
 import { fetchWithAuth } from "@/utils/authService";
 import { isOnline } from "@/utils/localStore";
@@ -15,6 +15,8 @@ import {
   ChecklistIcon,
   TrashIcon,
   CopyIcon,
+  TableIcon,
+  Squares2X2Icon,
 } from "@/components/ui/Icons";
 import { ConfirmModal } from "@/components/ui/Modal";
 import { useTranslation } from "@/i18n";
@@ -25,12 +27,15 @@ import { DateRangePicker } from "@/components/selectors";
 import SegmentedSwitch from "@/components/ui/SegmentedSwitch";
 import DailyClassroomFilterControls from "../../components/DailyClassroomFilterControls";
 import { StudentSelector } from "../../components";
+import { normalizeToISODate } from "../../utils/dailyClassroomUtils";
 import { useAcademicData } from "@/hooks/useAcademicData";
 import { useTenant } from "@/context/TenantContext";
 import { dailyProgressRepository, offlineDB } from "@/offline";
 import {
   RecordReportsTable,
+  RecordReportsCardGrid,
   StudentGroupedTable,
+  StudentGroupedCardGrid,
   ReportContextMenu,
   SyncErrorsAlertBanner,
   ReportsTableSkeleton,
@@ -48,11 +53,13 @@ export default function ProgressReportsView({
   isEmbedded = false,
   className = "",
   filterProps = null,
+  defaultReportView,
 }: ProgressReportsViewProps) {
   const { t } = useTranslation("progressReports");
   const { showToast } = useToast();
   const { activeTenantId } = useTenant();
   const navigate = useNavigate();
+  const location = useLocation();
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Primary data state
@@ -62,6 +69,7 @@ export default function ProgressReportsView({
   const [offline, setOffline] = useState(!isOnline());
   const [loading, setLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [syncErrors, setSyncErrors] = useState<SyncErrorItem[] | null>(null);
   const recentlyDeletedIdsRef = useRef<Set<string>>(new Set());
   const reportsListRef = useRef<ReportItem[]>([]);
@@ -69,8 +77,51 @@ export default function ProgressReportsView({
     reportsListRef.current = reportsList;
   }, [reportsList]);
 
-  // View modes: "RECORD_REPORTS" | "STUDENT_VIEW"
-  const [viewMode, setViewMode] = useState<"RECORD_REPORTS" | "STUDENT_VIEW">("RECORD_REPORTS");
+  // View modes resolution: "RECORD_REPORTS" | "STUDENT_VIEW" synced with URL
+  const getResolvedViewMode = useCallback((): "RECORD_REPORTS" | "STUDENT_VIEW" => {
+    const p = location.pathname.toLowerCase();
+    if (p.includes("/by-student")) return "STUDENT_VIEW";
+    if (p.includes("/records")) return "RECORD_REPORTS";
+    if (defaultReportView) return defaultReportView;
+    return "RECORD_REPORTS";
+  }, [location.pathname, defaultReportView]);
+
+  const [viewMode, setViewMode] = useState<"RECORD_REPORTS" | "STUDENT_VIEW">(getResolvedViewMode);
+
+  // Keep viewMode synchronized when browser navigation (back/forward) occurs
+  useEffect(() => {
+    const resolved = getResolvedViewMode();
+    setViewMode((prev) => (prev !== resolved ? resolved : prev));
+  }, [getResolvedViewMode]);
+
+  const handleViewModeChange = (newMode: "RECORD_REPORTS" | "STUDENT_VIEW") => {
+    setViewMode(newMode);
+    const targetSub = newMode === "STUDENT_VIEW" ? "by-student" : "records";
+    const p = location.pathname.toLowerCase();
+    if (p.includes("/by-student") || p.includes("/records")) {
+      navigate(location.pathname.replace(/\/by-student|\/records/i, `/${targetSub}`) + location.search);
+    } else if (p.includes("/progress-reports")) {
+      navigate(`${location.pathname.replace(/\/$/, "")}/${targetSub}${location.search}`);
+    } else {
+      navigate(`/studies/progress-reports/${targetSub}${location.search}`);
+    }
+  };
+
+  // Layout mode: "table" | "card" (persisted across sessions)
+  const [layoutMode, setLayoutMode] = useState<"table" | "card">(() => {
+    try {
+      return (localStorage.getItem("spr_progress_reports_layout") as "table" | "card") || "table";
+    } catch {
+      return "table";
+    }
+  });
+
+  const handleLayoutModeChange = (mode: "table" | "card") => {
+    setLayoutMode(mode);
+    try {
+      localStorage.setItem("spr_progress_reports_layout", mode);
+    } catch {}
+  };
 
   // Local academic fallback state when filterProps is not supplied
   const academicData: any = useAcademicData() || {};
@@ -118,6 +169,7 @@ export default function ProgressReportsView({
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [selectedGroupFilter, setSelectedGroupFilter] = useState("ALL");
   const [selectedSessionFilter, setSelectedSessionFilter] = useState("ALL");
+  const [selectedTeacherFilter, setSelectedTeacherFilter] = useState("ALL");
 
   // Date Range state
   const [startDate, setStartDate] = useState("");
@@ -237,12 +289,8 @@ export default function ProgressReportsView({
         ? Number(rep.total_page)
         : (calculatedPages || rep.total_pages || rep.pages || 0);
 
-    const hasEditedFlag = Boolean(
-      rep.is_edited ||
-      rep.edited_at ||
-      (rep.updated_at && rep.created_at && Math.abs(new Date(rep.updated_at).getTime() - new Date(rep.created_at).getTime()) > 5000)
-    );
-    const editedAtTime = rep.edited_at || (hasEditedFlag ? rep.updated_at : null) || rep.client_updated_at || null;
+    const hasEditedFlag = Boolean(rep.is_edited);
+    const editedAtTime = hasEditedFlag ? (rep.edited_at || rep.edit_time || null) : null;
 
     // Mistakes count (strictly 0 if no real mistakes)
     let mistakesCount = 0;
@@ -553,6 +601,9 @@ export default function ProgressReportsView({
       book_name: rep.book_name || rep.book_title || rep.curriculum_book_name || "",
       lesson_title: rep.lesson_title || rep.lesson_covered || "",
       lesson_covered: rep.lesson_covered || rep.lesson_title || "",
+      teacher: rep.teacher || rep.teacher_name || "",
+      teacher_id: rep.teacher_id || (typeof rep.teacher === "object" ? rep.teacher?.id : (typeof rep.teacher === "number" || (typeof rep.teacher === "string" && /^\d+$/.test(rep.teacher)) ? rep.teacher : "")) || "",
+      teacher_name: rep.teacher_name || (typeof rep.teacher === "object" ? rep.teacher?.name || rep.teacher?.name_en : (typeof rep.teacher === "string" && isNaN(Number(rep.teacher)) ? rep.teacher : "")) || "",
     };
   }, [
     academicData.students,
@@ -723,22 +774,23 @@ export default function ProgressReportsView({
             const localUpdated = localMatch.client_updated_at ? new Date(localMatch.client_updated_at).getTime() : 0;
             const serverUpdated = (apiRep.updated_at || apiRep.created_at) ? new Date(apiRep.updated_at || apiRep.created_at).getTime() : 0;
 
-            if (isLocalUnsynced || localMatch.is_edited || localUpdated > serverUpdated) {
+            const isEditedLocal = Boolean(localMatch.is_edited);
+            if (isLocalUnsynced || isEditedLocal || localUpdated > serverUpdated) {
               return {
                 ...apiRep,
                 ...localMatch,
                 id: apiRep.id || localMatch.id,
                 server_id: apiRep.id || localMatch.server_id,
                 report_unique_id: apiRep.report_unique_id || localMatch.report_unique_id,
-                is_edited: true,
-                edited_at: localMatch.edited_at || apiRep.updated_at || localMatch.client_updated_at,
+                is_edited: isEditedLocal || Boolean(apiRep.is_edited),
+                edited_at: isEditedLocal ? (localMatch.edited_at || null) : (apiRep.is_edited ? (apiRep.edited_at || null) : null),
                 sync_status: isLocalUnsynced ? "PENDING" : "SYNCED",
               };
             }
             return {
               ...apiRep,
-              is_edited: apiRep.is_edited || localMatch.is_edited,
-              edited_at: apiRep.edited_at || localMatch.edited_at || apiRep.updated_at,
+              is_edited: Boolean(apiRep.is_edited || localMatch.is_edited),
+              edited_at: (apiRep.is_edited ? apiRep.edited_at : localMatch.edited_at) || null,
             };
           }
           return apiRep;
@@ -949,9 +1001,21 @@ export default function ProgressReportsView({
         return false;
       }
 
+      // Teacher Filter
+      if (selectedTeacherFilter && selectedTeacherFilter !== "ALL") {
+        const repTeacherId = String(rep.teacher_id || (typeof rep.teacher === "object" ? rep.teacher?.id : rep.teacher) || "");
+        const repTeacherName = String(rep.teacher_name || (typeof rep.teacher === "object" ? rep.teacher?.name : "") || "").toLowerCase();
+        const target = String(selectedTeacherFilter).toLowerCase();
+        const matchesId = repTeacherId && repTeacherId === String(selectedTeacherFilter);
+        const matchesName = repTeacherName && (repTeacherName === target || repTeacherName.includes(target));
+        if (!matchesId && !matchesName) {
+          return false;
+        }
+      }
+
       return passesSearch && passesStudent && passesGroup && passesSession && passesDateRange;
     });
-  }, [reportsList, searchQuery, selectedStudentId, selectedGroupFilter, selectedSessionFilter, startDate, endDate, selectedDeptFilter, selectedClsFilter, selectedSecFilter]);
+  }, [reportsList, searchQuery, selectedStudentId, selectedGroupFilter, selectedSessionFilter, selectedTeacherFilter, startDate, endDate, selectedDeptFilter, selectedClsFilter, selectedSecFilter]);
 
   // Grouped by Student calculation for STUDENT_VIEW
   const studentGroupedData: StudentGroupedItem[] = useMemo(() => {
@@ -986,25 +1050,57 @@ export default function ProgressReportsView({
     }
   };
 
-  const toggleSelectReport = (id: number | string, explicitChecked?: boolean) => {
+  const toggleSelectReport = useCallback((id: number | string, explicitChecked?: boolean) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       const strId = String(id);
       const numId = !isNaN(Number(id)) ? Number(id) : null;
-      const isPresent = next.has(id) || next.has(strId) || (numId !== null && next.has(numId));
+
+      const rep = reportsList.find(
+        (r) =>
+          r.id === id ||
+          String(r.id) === strId ||
+          (numId !== null && r.id === numId) ||
+          r.report_unique_id === id ||
+          String(r.report_unique_id) === strId
+      );
+
+      const canonicalKey = String(rep ? (rep.id ?? rep.report_unique_id ?? id) : id);
+
+      const isPresent =
+        next.has(canonicalKey) ||
+        next.has(id) ||
+        next.has(strId) ||
+        (numId !== null && next.has(numId)) ||
+        (rep?.id !== undefined && (next.has(rep.id) || next.has(String(rep.id)))) ||
+        (rep?.report_unique_id && (next.has(rep.report_unique_id) || next.has(String(rep.report_unique_id))));
 
       const shouldUnselect = explicitChecked !== undefined ? !explicitChecked : isPresent;
 
-      if (shouldUnselect) {
-        next.delete(id);
-        next.delete(strId);
-        if (numId !== null) next.delete(numId);
-      } else {
-        next.add(id);
+      // Clean up all alternative representations first
+      next.delete(canonicalKey);
+      next.delete(id);
+      next.delete(strId);
+      if (numId !== null) next.delete(numId);
+      if (rep) {
+        if (rep.id !== undefined && rep.id !== null) {
+          next.delete(rep.id);
+          next.delete(String(rep.id));
+          if (!isNaN(Number(rep.id))) next.delete(Number(rep.id));
+        }
+        if (rep.report_unique_id) {
+          next.delete(rep.report_unique_id);
+          next.delete(String(rep.report_unique_id));
+        }
       }
+
+      if (!shouldUnselect) {
+        next.add(canonicalKey);
+      }
+
       return next;
     });
-  };
+  }, [reportsList]);
 
   const handleBatchSelect = (idsSet: Set<number | string>) => {
     setSelectedIds(idsSet);
@@ -1031,31 +1127,26 @@ export default function ProgressReportsView({
   };
 
   const handleRefresh = async () => {
-    setSearchQuery("");
-    setSelectedStudentId(null);
-    setSelectedGroupFilter("ALL");
-    setSelectedSessionFilter("ALL");
-    setStartDate("");
-    setEndDate("");
-    setInternalDeptId("");
-    setInternalClassId("");
-    setInternalSectionId("");
-    if (filterProps?.onClassChange) filterProps.onClassChange("");
-    if (filterProps?.onSectionChange) filterProps.onSectionChange("");
-    if (filterProps?.onDepartmentChange) filterProps.onDepartmentChange("");
-
-    setLoading(true);
+    setIsRefreshing(true);
     try {
-      // Force sync any pending / offline reports into PostgreSQL cloud database immediately
-      const syncResult = await triggerCloudSync({ force: true });
-      if (syncResult && syncResult.syncedCount && syncResult.syncedCount > 0) {
-        showToast(`Synced ${syncResult.syncedCount} report(s) directly to Database!`, "success");
+      if (isOnline()) {
+        try {
+          // Sync any pending / offline reports into PostgreSQL cloud database immediately
+          const syncResult = await triggerCloudSync({ force: true });
+          if (syncResult && syncResult.syncedCount && syncResult.syncedCount > 0) {
+            showToast(`Synced ${syncResult.syncedCount} report(s) directly to Database!`, "success");
+          }
+        } catch {
+          // Ignore background push errors during refresh
+        }
       }
-    } catch {
-      // Ignore background push errors during refresh
+      await loadReports(false);
+      showToast("Reports refreshed successfully!", "success");
+    } catch (err: any) {
+      showToast("Failed to refresh reports: " + (err?.message || "Network error"), "error");
+    } finally {
+      setIsRefreshing(false);
     }
-    await loadReports(false);
-    showToast("Reports refreshed and synced with Database", "info");
   };
 
   // Count unsynced offline reports
@@ -1155,9 +1246,26 @@ export default function ProgressReportsView({
 
   // Edit single report
   const handleEditReport = (rep: ReportItem) => {
+    const isBook = Boolean(
+      rep.mode === "BOOK" ||
+      rep.progress_mode === "BOOK" ||
+      rep.curriculum_book_name ||
+      rep.book_name ||
+      rep.book_title ||
+      rep.lesson_title ||
+      rep.lesson_covered ||
+      (Array.isArray(rep.bookPageData) && rep.bookPageData.length > 0)
+    );
+    const targetMode = isBook ? "book" : "quran";
+    const rawDate = rep.report_date || rep.isoDateOnly || rep.date || rep.record_date || rep.selectedDate;
+    const normalizedDate = normalizeToISODate(rawDate);
+    const query = normalizedDate ? `?date=${encodeURIComponent(normalizedDate)}` : "";
+
+    localStorage.setItem("spr_daily_progress_mode", isBook ? "BOOK" : "QURAN");
     localStorage.setItem("spr_editing_report", JSON.stringify(rep));
+    window.dispatchEvent(new CustomEvent("spr_daily_progress_mode_change", { detail: isBook ? "BOOK" : "QURAN" }));
     window.dispatchEvent(new CustomEvent("spr_edit_report", { detail: rep }));
-    navigate("/studies/daily-progress");
+    navigate(`/studies/daily-progress/${targetMode}${query}`);
     showToast(`Loaded report for "${rep.student_name}" for editing!`, "info");
   };
 
@@ -1383,12 +1491,15 @@ export default function ProgressReportsView({
         isEmbedded ? "py-1 px-0" : "py-4 px-3 sm:px-6"
       } ${className}`}
     >
-      {/* 1. Primary Comprehensive Filter Box (Academic Hierarchy + Search + Date Range + Session) */}
+      {/* 1. Primary Comprehensive Filter Box (Line 1: Date | Student | Session; Line 2: Dept | Class | Sec | Teacher) */}
       <DailyClassroomFilterControls
         showCardWrapper={true}
-        maxColumns={3}
+        collapsible={true}
         filterProps={effectiveFilterProps}
         showPeriodSwitcher={false}
+        hasTeachers={true}
+        selectedTeacherId={selectedTeacherFilter}
+        onTeacherChange={(tId: any) => setSelectedTeacherFilter(tId ? String(tId) : "ALL")}
         searchControl={
           <StudentSelector
             studentName={searchQuery}
@@ -1413,8 +1524,24 @@ export default function ProgressReportsView({
             }}
           />
         }
+        sessionControl={
+          <CustomSelect
+            label="Session"
+            placeholder="All Sessions"
+            options={sessionOptions}
+            value={selectedSessionFilter === "ALL" ? "" : selectedSessionFilter}
+            onChange={(val: any) => {
+              const selectedVal = typeof val === "object" ? (val?.value || val?.id) : val;
+              setSelectedSessionFilter(selectedVal || "ALL");
+            }}
+            size="md"
+          />
+        }
         customDateComponent={
           <DateRangePicker
+            label="Date Range"
+            showTimezone={true}
+            timezoneLink="/admin-tools?tab=classroom-config"
             startDate={startDate}
             endDate={endDate}
             onRangeSelect={(start: string, end: string) => {
@@ -1429,22 +1556,6 @@ export default function ProgressReportsView({
               setEndDate("");
             }}
           />
-        }
-        extraFields={
-          /* Session Filter */
-          <div className="col-span-1 space-y-1.5">
-            <CustomSelect
-              label="Session"
-              placeholder="All Sessions"
-              options={sessionOptions}
-              value={selectedSessionFilter === "ALL" ? "" : selectedSessionFilter}
-              onChange={(val: any) => {
-                const selectedVal = typeof val === "object" ? (val?.value || val?.id) : val;
-                setSelectedSessionFilter(selectedVal || "ALL");
-              }}
-              size="md"
-            />
-          </div>
         }
       >
         {/* Filter Box Bottom Footer Row */}
@@ -1504,7 +1615,7 @@ export default function ProgressReportsView({
               <div className="flex items-center justify-center">
                 <SegmentedSwitch<"RECORD_REPORTS" | "STUDENT_VIEW">
                   value={viewMode}
-                  onChange={setViewMode}
+                  onChange={handleViewModeChange}
                   options={[
                     {
                       value: "RECORD_REPORTS",
@@ -1520,7 +1631,7 @@ export default function ProgressReportsView({
                 />
               </div>
 
-              {/* Right: Actions / Pending Sync + Only-icon Refresh Button */}
+              {/* Right: Actions / Pending Sync + Single Layout Toggle + Only-icon Refresh Button */}
               <div className="flex items-center justify-center sm:justify-end gap-2 shrink-0">
                 {pendingSyncCount > 0 && !offline && (
                   <button
@@ -1541,11 +1652,31 @@ export default function ProgressReportsView({
                   </button>
                 )}
 
+                {/* Single Toggle Button for Cards / Table View (Reusing /academy/periods pattern) */}
+                <button
+                  type="button"
+                  onClick={() => handleLayoutModeChange(layoutMode === "card" ? "table" : "card")}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
+                  title={layoutMode === "card" ? "Switch to Table View" : "Switch to Cards View"}
+                >
+                  {layoutMode === "card" ? (
+                    <>
+                      <TableIcon className="w-3.5 h-3.5 theme-accent" />
+                      <span>Table</span>
+                    </>
+                  ) : (
+                    <>
+                      <Squares2X2Icon className="w-3.5 h-3.5 theme-accent" />
+                      <span>Cards</span>
+                    </>
+                  )}
+                </button>
+
                 <IconButton
                   icon={RefreshIcon}
                   onClick={handleRefresh}
-                  loading={loading}
-                  disabled={loading || isSyncing}
+                  loading={isRefreshing}
+                  disabled={isRefreshing || isSyncing}
                   variant="sub"
                   size="sm"
                   shape="rounded"
@@ -1588,38 +1719,74 @@ export default function ProgressReportsView({
       ) : (
         <>
           {viewMode === "RECORD_REPORTS" && (
-            <RecordReportsTable
-              reports={filteredReports}
-              selectedIds={selectedIds}
-              onToggleSelect={toggleSelectReport}
-              onBatchSelect={handleBatchSelect}
-              onDeselectAll={handleDeselectAll}
-              onContextMenu={handleContextMenu}
-              onEdit={handleEditReport}
-              onDelete={handleDeleteReport}
-              onSync={handleSyncSingleReport}
-              onCopyText={(rep) => handleCopyTextReport(rep)}
-              onResetFilters={handleResetAllFilters}
-              onRefresh={handleRefresh}
-            />
+            layoutMode === "table" ? (
+              <RecordReportsTable
+                reports={filteredReports}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelectReport}
+                onBatchSelect={handleBatchSelect}
+                onDeselectAll={handleDeselectAll}
+                onContextMenu={handleContextMenu}
+                onEdit={handleEditReport}
+                onDelete={handleDeleteReport}
+                onSync={handleSyncSingleReport}
+                onCopyText={(rep) => handleCopyTextReport(rep)}
+                onResetFilters={handleResetAllFilters}
+                onRefresh={handleRefresh}
+              />
+            ) : (
+              <RecordReportsCardGrid
+                reports={filteredReports}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelectReport}
+                onBatchSelect={handleBatchSelect}
+                onDeselectAll={handleDeselectAll}
+                onContextMenu={handleContextMenu}
+                onEdit={handleEditReport}
+                onDelete={handleDeleteReport}
+                onSync={handleSyncSingleReport}
+                onCopyText={(rep) => handleCopyTextReport(rep)}
+                onResetFilters={handleResetAllFilters}
+                onRefresh={handleRefresh}
+              />
+            )
           )}
 
           {viewMode === "STUDENT_VIEW" && (
-            <StudentGroupedTable
-              studentGroupedData={studentGroupedData}
-              selectedIds={selectedIds}
-              onToggleSelect={toggleSelectReport}
-              onBatchSelect={handleBatchSelect}
-              onDeselectAll={handleDeselectAll}
-              onContextMenu={handleContextMenu}
-              onStudentContextMenu={handleStudentContextMenu}
-              onEdit={handleEditReport}
-              onDelete={handleDeleteReport}
-              onSync={handleSyncSingleReport}
-              onCopyText={(rep) => handleCopyTextReport(rep)}
-              onResetFilters={handleResetAllFilters}
-              onRefresh={handleRefresh}
-            />
+            layoutMode === "table" ? (
+              <StudentGroupedTable
+                studentGroupedData={studentGroupedData}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelectReport}
+                onBatchSelect={handleBatchSelect}
+                onDeselectAll={handleDeselectAll}
+                onContextMenu={handleContextMenu}
+                onStudentContextMenu={handleStudentContextMenu}
+                onEdit={handleEditReport}
+                onDelete={handleDeleteReport}
+                onSync={handleSyncSingleReport}
+                onCopyText={(rep) => handleCopyTextReport(rep)}
+                onResetFilters={handleResetAllFilters}
+                onRefresh={handleRefresh}
+              />
+            ) : (
+              <StudentGroupedCardGrid
+                studentGroupedData={studentGroupedData}
+                reportsList={reportsList}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelectReport}
+                onBatchSelect={handleBatchSelect}
+                onDeselectAll={handleDeselectAll}
+                onContextMenu={handleContextMenu}
+                onStudentContextMenu={handleStudentContextMenu}
+                onEdit={handleEditReport}
+                onDelete={handleDeleteReport}
+                onSync={handleSyncSingleReport}
+                onCopyText={(rep) => handleCopyTextReport(rep)}
+                onResetFilters={handleResetAllFilters}
+                onRefresh={handleRefresh}
+              />
+            )
           )}
 
         </>

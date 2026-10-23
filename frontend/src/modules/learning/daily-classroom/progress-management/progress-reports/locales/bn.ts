@@ -14,6 +14,7 @@ export default {
   mistakeDetails: "ভুলের বিবরণ",
   stuckDetails: "আটকে যাওয়ার বিবরণ",
   commentsRemarks: "মন্তব্য",
+  commentsReporter: "কমেন্ট ও রিপোর্টার",
   actions: "অ্যাকশন",
   noReportsFound: "কোনো রিপোর্ট পাওয়া যায়নি",
   noReportsDesc: "বর্তমান ফিল্টার বা তারিখ অনুযায়ী কোনো প্রগ্রেস রিপোর্ট মেলেনি।",

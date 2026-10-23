@@ -95,15 +95,15 @@ export default function StudentGroupedTable({
       const shouldUnselect = explicitChecked !== undefined ? !explicitChecked : allSelected;
 
       const nextSet = new Set(selectedIds);
-      if (shouldUnselect) {
-        stuReportIds.forEach((id) => {
-          nextSet.delete(id);
-          nextSet.delete(String(id));
-          if (!isNaN(Number(id))) nextSet.delete(Number(id));
-        });
-      } else {
-        stuReportIds.forEach((id) => nextSet.add(id));
-      }
+      stuReportIds.forEach((id) => {
+        const strKey = String(id);
+        nextSet.delete(id);
+        nextSet.delete(strKey);
+        if (!isNaN(Number(id))) nextSet.delete(Number(id));
+        if (!shouldUnselect && strKey) {
+          nextSet.add(strKey);
+        }
+      });
       onBatchSelect(nextSet);
     },
     [onBatchSelect, selectedIds]

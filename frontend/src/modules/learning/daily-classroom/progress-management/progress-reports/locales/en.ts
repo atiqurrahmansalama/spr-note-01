@@ -14,6 +14,7 @@ export default {
   mistakeDetails: "Mistake Details",
   stuckDetails: "Stuck Details",
   commentsRemarks: "Comments",
+  commentsReporter: "Comments & Reporter",
   actions: "Actions",
   noReportsFound: "No Progress Reports Found",
   noReportsDesc: "No daily progress reports match the current filters or date criteria.",
