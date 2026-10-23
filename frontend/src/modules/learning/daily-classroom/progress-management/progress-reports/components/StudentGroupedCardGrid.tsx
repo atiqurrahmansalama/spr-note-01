@@ -239,7 +239,7 @@ export default function StudentGroupedCardGrid({
               }`}
             >
               <div className="space-y-3.5">
-                {/* 1. Header: Selection Checkbox + Student Avatar + Name + Meta + Total Reports */}
+                {/* 1. Header: Selection Checkbox + Name + Meta + Total Reports */}
                 <div className="flex items-start justify-between gap-2.5">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     {/* Reusable Enterprise Checkbox for Student */}
@@ -256,11 +256,6 @@ export default function StudentGroupedCardGrid({
                         />
                       </div>
                     )}
-
-                    {/* Student Avatar */}
-                    <div className="w-10 h-10 rounded-xl theme-bg-accent-soft text-sm font-bold theme-accent flex items-center justify-center border theme-border shrink-0 shadow-xs">
-                      {stu.student_name ? stu.student_name.charAt(0).toUpperCase() : "S"}
-                    </div>
 
                     {/* Student Name & Meta */}
                     <div className="min-w-0 flex-1 text-left">

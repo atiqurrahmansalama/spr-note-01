@@ -34,6 +34,8 @@ export const ROUTE_TITLE_MAP = {
   "/studies/progress-management": { title: "Progress Management", category: "Daily Classroom" },
   "/studies/daily-progress": { title: "Daily Progress", category: "Daily Classroom" },
   "/studies/progress-reports": { title: "Progress Reports", category: "Daily Classroom" },
+  "/studies/progress-reports/records": { title: "Progress Reports", category: "Daily Classroom" },
+  "/studies/progress-reports/by-student": { title: "Progress Reports", category: "Daily Classroom" },
   "/studies/progress-assessments": { title: "Progress Reports", category: "Daily Classroom" },
   "/studies/progress-analytics": { title: "Progress Analytics", category: "Daily Classroom" },
   "/progress-analytics": { title: "Progress Analytics", category: "Daily Classroom" },
@@ -595,7 +597,7 @@ export default function AppLayout() {
         else if (key === "s") { e.preventDefault(); navigate("/sessions-comments"); }
         else if (key === "b") { e.preventDefault(); navigate("/data-backup"); }
         else if (key === "k") { e.preventDefault(); navigate("/shortcuts"); }
-        else if (key === "r") { e.preventDefault(); navigate("/studies/progress-reports"); }
+        else if (key === "r") { e.preventDefault(); navigate("/studies/progress-reports/records"); }
       }
 
       if (e.key === "Escape") {

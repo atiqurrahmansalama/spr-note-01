@@ -33,4 +33,7 @@ export default {
   delete: "حذف",
   selectAllStudent: "تحديد جميع تقارير هذا الطالب",
   sessionTimelineFor: "الجدول الزمني لجلسات {{name}}",
+  analytics: "التحليلات",
+  hideAnalytics: "إخفاء التحليلات",
+  showAnalytics: "عرض التحليلات",
 };

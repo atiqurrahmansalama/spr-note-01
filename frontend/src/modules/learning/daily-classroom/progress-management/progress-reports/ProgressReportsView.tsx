@@ -17,6 +17,8 @@ import {
   CopyIcon,
   TableIcon,
   Squares2X2Icon,
+  TrendingUpIcon,
+  ChevronIcon,
 } from "@/components/ui/Icons";
 import { ConfirmModal } from "@/components/ui/Modal";
 import { useTranslation } from "@/i18n";
@@ -27,6 +29,7 @@ import { DateRangePicker } from "@/components/selectors";
 import SegmentedSwitch from "@/components/ui/SegmentedSwitch";
 import DailyClassroomFilterControls from "../../components/DailyClassroomFilterControls";
 import { StudentSelector } from "../../components";
+import { ProgressAnalyticsDashboard } from "../../components/progress-analytics";
 import { normalizeToISODate } from "../../utils/dailyClassroomUtils";
 import { useAcademicData } from "@/hooks/useAcademicData";
 import { useTenant } from "@/context/TenantContext";
@@ -121,6 +124,27 @@ export default function ProgressReportsView({
     try {
       localStorage.setItem("spr_progress_reports_layout", mode);
     } catch {}
+  };
+
+  // Collapsible Analytics State (persisted & synced with ?analytics=true)
+  const [showAnalytics, setShowAnalytics] = useState<boolean>(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("analytics") === "true") return true;
+      return localStorage.getItem("spr_progress_reports_show_analytics") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleAnalytics = () => {
+    setShowAnalytics((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("spr_progress_reports_show_analytics", String(next));
+      } catch {}
+      return next;
+    });
   };
 
   // Local academic fallback state when filterProps is not supplied
@@ -1672,6 +1696,22 @@ export default function ProgressReportsView({
                   )}
                 </button>
 
+                {/* Collapsible Analytics Toggle Button */}
+                <button
+                  type="button"
+                  onClick={handleToggleAnalytics}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none ${
+                    showAnalytics
+                      ? "theme-bg-accent theme-accent-text border-[var(--accent-main)]"
+                      : "theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary"
+                  }`}
+                  title={showAnalytics ? t("hideAnalytics", "Hide Analytics") : t("showAnalytics", "Show Analytics")}
+                >
+                  <TrendingUpIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>{showAnalytics ? t("hideAnalytics", "Hide Analytics") : t("analytics", "Analytics")}</span>
+                  <ChevronIcon isOpen={showAnalytics} className="w-3 h-3 shrink-0" />
+                </button>
+
                 <IconButton
                   icon={RefreshIcon}
                   onClick={handleRefresh}
@@ -1688,6 +1728,16 @@ export default function ProgressReportsView({
           )}
         </div>
       </DailyClassroomFilterControls>
+
+      {/* 2. Real-Time Analytics & Trends Dashboard (Filtered dynamically by all 7 filters via filteredReports) */}
+      {showAnalytics && (
+        <ProgressAnalyticsDashboard
+          reports={filteredReports}
+          variant="full"
+          collapsible={false}
+          className="w-full"
+        />
+      )}
 
       {/* 2a. Sync Errors Alert Banner */}
       {syncErrors && syncErrors.length > 0 && (

@@ -33,4 +33,7 @@ export default {
   delete: "মুছুন",
   selectAllStudent: "এই শিক্ষার্থীর সব রিপোর্ট নির্বাচন করুন",
   sessionTimelineFor: "{{name}} এর সেশন টাইমলাইন",
+  analytics: "অ্যানালিটিক্স",
+  hideAnalytics: "অ্যানালিটিক্স বন্ধ করুন",
+  showAnalytics: "অ্যানালিটিক্স দেখুন",
 };

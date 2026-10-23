@@ -44,9 +44,6 @@ const HifzReportBuilderModule = lazy(
 const StudentReportsView = lazy(
   () => import('./progress-management/progress-reports/ProgressReportsView')
 );
-const ProgressAnalyticsView = lazy(
-  () => import('./progress-management/analytics/ProgressAnalyticsView')
-);
 
 const LESSON_MANAGEMENT_TABS = [
   { id: 'LESSON', label: 'Daily Lessons', icon: BookOpenIcon, path: '/studies/daily-lessons', featureKey: 'lesson_tab_daily_lessons' },
@@ -56,8 +53,7 @@ const LESSON_MANAGEMENT_TABS = [
 
 const PROGRESS_MANAGEMENT_TABS = [
   { id: 'PROGRESS', label: 'Daily Progress', icon: TrendingUpIcon, path: '/studies/daily-progress/quran', featureKey: 'progress_tab_daily_progress' },
-  { id: 'PROGRESS_ASSESSMENT', label: 'Progress Reports', icon: ChecklistIcon, path: '/studies/progress-reports', featureKey: 'progress_tab_reports' },
-  { id: 'PROGRESS_ANALYTICS', label: 'Analytics', icon: TrendingUpIcon, path: '/studies/progress-analytics', featureKey: 'progress_tab_analytics' },
+  { id: 'PROGRESS_ASSESSMENT', label: 'Progress Reports', icon: ChecklistIcon, path: '/studies/progress-reports/records', featureKey: 'progress_tab_reports' },
 ];
 
 const normalizeTabId = (tab: string | null, isProgress: boolean) => {
@@ -70,10 +66,10 @@ const normalizeTabId = (tab: string | null, isProgress: boolean) => {
     return 'LESSON_ANALYTICS';
   }
   if (upper === 'PROGRESS_ANALYTICS') {
-    return 'PROGRESS_ANALYTICS';
+    return 'PROGRESS_ASSESSMENT';
   }
   if (upper === 'ANALYTICS') {
-    return isProgress ? 'PROGRESS_ANALYTICS' : 'LESSON_ANALYTICS';
+    return isProgress ? 'PROGRESS_ASSESSMENT' : 'LESSON_ANALYTICS';
   }
   if (
     upper === 'PROGRESS_ASSESSMENT' ||
@@ -154,8 +150,7 @@ export default function DailyClassroomHubView({
     if (defaultTab) return normalizeTabId(defaultTab, isProgressHub);
 
     if (isProgressHub) {
-      if (path.includes('/progress-analytics')) return 'PROGRESS_ANALYTICS';
-      if (path.includes('/progress-reports') || path.includes('/progress-assessments')) return 'PROGRESS_ASSESSMENT';
+      if (path.includes('/progress-analytics') || path.includes('/progress-reports') || path.includes('/progress-assessments')) return 'PROGRESS_ASSESSMENT';
       return 'PROGRESS';
     } else {
       if (path.includes('/lesson-analytics')) return 'LESSON_ANALYTICS';
@@ -185,9 +180,7 @@ export default function DailyClassroomHubView({
     }
 
     if (isProgressHub) {
-      if (path.includes('/progress-analytics')) {
-        setActiveTab((prev) => (prev !== 'PROGRESS_ANALYTICS' ? 'PROGRESS_ANALYTICS' : prev));
-      } else if (path.includes('/progress-reports') || path.includes('/progress-assessments')) {
+      if (path.includes('/progress-analytics') || path.includes('/progress-reports') || path.includes('/progress-assessments')) {
         setActiveTab((prev) => (prev !== 'PROGRESS_ASSESSMENT' ? 'PROGRESS_ASSESSMENT' : prev));
       } else if (path.includes('/daily-progress') || path.includes('/progress-management')) {
         setActiveTab((prev) => (prev !== 'PROGRESS' ? 'PROGRESS' : prev));
@@ -430,10 +423,8 @@ export default function DailyClassroomHubView({
     setActiveTab(tabId);
     let targetPath = '';
     if (isProgressHub) {
-      if (tabId === 'PROGRESS_ANALYTICS') {
-        targetPath = '/studies/progress-analytics';
-      } else if (tabId === 'PROGRESS_ASSESSMENT') {
-        targetPath = '/studies/progress-reports';
+      if (tabId === 'PROGRESS_ASSESSMENT') {
+        targetPath = '/studies/progress-reports/records';
       } else {
         const mode = progressMode === 'BOOK' ? 'book' : 'quran';
         targetPath = `/studies/daily-progress/${mode}`;
@@ -971,17 +962,6 @@ export default function DailyClassroomHubView({
               filterProps={sharedFilterProps}
               defaultReportView={defaultReportView}
             />
-          </Suspense>
-        </div>
-      )}
-
-      {isProgressHub && visitedTabs.has('PROGRESS_ANALYTICS') && (
-        <div
-          className={activeTab === 'PROGRESS_ANALYTICS' ? 'w-full pt-1' : 'hidden'}
-          aria-hidden={activeTab !== 'PROGRESS_ANALYTICS'}
-        >
-          <Suspense fallback={<HubTabSkeletonLoader isProgress={true} />}>
-            <ProgressAnalyticsView filterProps={sharedFilterProps} isEmbedded={true} />
           </Suspense>
         </div>
       )}

@@ -19,3 +19,7 @@ export { default as StudentSelector } from './StudentSelector';
 export { default as StudentInputSection } from './StudentSelector';
 export * from './StudentSelector';
 
+export { default as ProgressAnalyticsDashboard } from './progress-analytics';
+export * from './progress-analytics';
+
+

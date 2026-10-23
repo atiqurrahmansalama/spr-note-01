@@ -33,4 +33,7 @@ export default {
   delete: "حذف کریں",
   selectAllStudent: "اس طالب علم کی تمام رپورٹس منتخب کریں",
   sessionTimelineFor: "{{name}} کی نشستوں کی تفصیل",
+  analytics: "تجزیات",
+  hideAnalytics: "تجزیات چھپائیں",
+  showAnalytics: "تجزیات دیکھیں",
 };

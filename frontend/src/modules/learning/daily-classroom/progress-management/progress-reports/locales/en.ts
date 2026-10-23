@@ -33,4 +33,7 @@ export default {
   delete: "Delete",
   selectAllStudent: "Select all reports for this student",
   sessionTimelineFor: "Session Timeline for {{name}}",
+  analytics: "Analytics",
+  hideAnalytics: "Hide Analytics",
+  showAnalytics: "Show Analytics",
 };

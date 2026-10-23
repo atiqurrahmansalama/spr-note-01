@@ -230,7 +230,7 @@ export default function App() {
                 <Route path="/studies/progress-reports" element={<Navigate to="/studies/progress-reports/records" replace />} />
                 <Route path="/studies/progress-reports/records" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS_ASSESSMENT" defaultReportView="RECORD_REPORTS" />} />
                 <Route path="/studies/progress-reports/by-student" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS_ASSESSMENT" defaultReportView="STUDENT_VIEW" />} />
-                <Route path="/studies/progress-analytics" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS_ANALYTICS" />} />
+                <Route path="/studies/progress-analytics" element={<Navigate to="/studies/progress-reports/records?analytics=true" replace />} />
                 <Route path="/studies/progress-assessments" element={<Navigate to="/studies/progress-reports/records" replace />} />
                 <Route path="/studies/progress-management/daily-progress" element={<Navigate to="/studies/daily-progress/quran" replace />} />
                 <Route path="/studies/progress-management/daily-progress/quran" element={<Navigate to="/studies/daily-progress/quran" replace />} />
@@ -239,7 +239,7 @@ export default function App() {
                 <Route path="/studies/progress-management/progress-reports" element={<Navigate to="/studies/progress-reports/records" replace />} />
                 <Route path="/studies/progress-management/progress-reports/records" element={<Navigate to="/studies/progress-reports/records" replace />} />
                 <Route path="/studies/progress-management/progress-reports/by-student" element={<Navigate to="/studies/progress-reports/by-student" replace />} />
-                <Route path="/studies/progress-management/analytics" element={<Navigate to="/studies/progress-analytics" replace />} />
+                <Route path="/studies/progress-management/analytics" element={<Navigate to="/studies/progress-reports/records?analytics=true" replace />} />
                 <Route path="/progress-management" element={<Navigate to="/studies/progress-management" replace />} />
                 <Route path="/daily-progress" element={<Navigate to="/studies/daily-progress/quran" replace />} />
                 <Route path="/daily-progress/quran" element={<Navigate to="/studies/daily-progress/quran" replace />} />
@@ -248,7 +248,7 @@ export default function App() {
                 <Route path="/progress-reports/records" element={<Navigate to="/studies/progress-reports/records" replace />} />
                 <Route path="/progress-reports/by-student" element={<Navigate to="/studies/progress-reports/by-student" replace />} />
                 <Route path="/progress-assessments" element={<Navigate to="/studies/progress-reports/records" replace />} />
-                <Route path="/progress-analytics" element={<Navigate to="/studies/progress-analytics" replace />} />
+                <Route path="/progress-analytics" element={<Navigate to="/studies/progress-reports/records?analytics=true" replace />} />
 
                 {/* Examination & Result Management Hub Routes */}
                 <Route path="/examinations" element={<ExaminationsHubView />} />

@@ -210,7 +210,7 @@ export default function RecordReportsCardGrid({
               }`}
             >
               <div className="space-y-3">
-                {/* 1. Top Bar: Checkbox + Student Avatar + Name + Sync Status + 3-Dots ActionMenu */}
+                {/* 1. Top Bar: Checkbox + Student Name + Sync Status + 3-Dots ActionMenu */}
                 <div className="flex items-start justify-between gap-2.5">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     {/* Reusable Enterprise Checkbox */}
@@ -228,11 +228,6 @@ export default function RecordReportsCardGrid({
                         />
                       </div>
                     )}
-
-                    {/* Student Initial Avatar */}
-                    <div className="w-9 h-9 rounded-xl theme-bg-accent-soft text-xs font-bold theme-accent flex items-center justify-center border theme-border shrink-0 shadow-xs">
-                      {report.student_name ? report.student_name.charAt(0).toUpperCase() : "S"}
-                    </div>
 
                     {/* Student Name & Meta Details */}
                     <div className="min-w-0 flex-1 text-left">
