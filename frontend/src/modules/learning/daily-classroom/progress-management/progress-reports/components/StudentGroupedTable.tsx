@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import DataTable from "@/components/ui/DataTable";
 import Pagination from "@/components/ui/Pagination";
 import { StudentGroupedTableProps } from "../types";
@@ -69,14 +69,16 @@ export default function StudentGroupedTable({
     setCurrentPage(1);
   }, [enrichedStudentRows.length]);
 
-  // Accordion toggle: single student expansion
+  // Accordion toggle: at most 1 student expanded at a time (opening one collapses any other)
   const toggleStudentExpand = useCallback((studentKey: string) => {
     setExpandedStudents((prev) => (prev.has(studentKey) ? new Set() : new Set([studentKey])));
   }, []);
 
-  // Sync with external isAllExpanded if provided
+  // Sync with external isAllExpanded only when prop value actually transitions
+  const prevIsAllExpandedRef = useRef<boolean | undefined>(propIsAllExpanded);
   useEffect(() => {
-    if (propIsAllExpanded !== undefined) {
+    if (propIsAllExpanded !== undefined && prevIsAllExpandedRef.current !== propIsAllExpanded) {
+      prevIsAllExpandedRef.current = propIsAllExpanded;
       if (propIsAllExpanded) {
         setExpandedStudents(new Set(enrichedStudentRows.map((s) => s.student_key)));
       } else {
@@ -177,7 +179,7 @@ export default function StudentGroupedTable({
   }
 
   return (
-    <div className="w-full select-none animate-fade-in space-y-3">
+    <div className="w-full select-none space-y-3">
       {/* Top Quick Actions Bar (Hidden when Analytics is expanded) */}
       {!hideBatchToolbar && (
         <TableBatchToolbar
@@ -239,7 +241,7 @@ export default function StudentGroupedTable({
         selectionCellClassName="!w-12 !min-w-[48px] !max-w-[48px] !p-0 text-center"
         headerPaddingClass="py-2.5 px-3 sm:px-4 text-xs font-bold uppercase tracking-wider"
         cellPaddingClass="py-2.5 px-3 sm:px-4 text-xs"
-        tableClassName="w-full table-fixed"
+        tableClassName="w-full min-w-[880px] table-fixed"
         rowClassName={(stu: EnrichedStudentRow) =>
           expandedStudents.has(stu.student_key) ? "[&>td]:!border-b-0" : ""
         }

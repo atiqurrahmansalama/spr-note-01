@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import DataCardGrid from "@/components/ui/DataCardGrid";
 import Pagination from "@/components/ui/Pagination";
 import ActionMenu from "@/components/ui/ActionMenu";
@@ -85,22 +85,16 @@ export default function StudentGroupedCardGrid({
     return enrichedStudentRows.slice(startIndex, startIndex + pageSize);
   }, [enrichedStudentRows, safeCurrentPage, pageSize]);
 
-  // Toggle single student expand
+  // Accordion toggle: at most 1 student expanded at a time (opening one collapses any other)
   const handleToggleStudentExpand = useCallback((studentKey: string) => {
-    setExpandedStudents((prev) => {
-      const next = new Set(prev);
-      if (next.has(studentKey)) {
-        next.delete(studentKey);
-      } else {
-        next.add(studentKey);
-      }
-      return next;
-    });
+    setExpandedStudents((prev) => (prev.has(studentKey) ? new Set() : new Set([studentKey])));
   }, []);
 
-  // Sync with external isAllExpanded if provided
+  // Sync with external isAllExpanded only when prop value actually transitions
+  const prevIsAllExpandedRef = useRef<boolean | undefined>(propIsAllExpanded);
   useEffect(() => {
-    if (propIsAllExpanded !== undefined) {
+    if (propIsAllExpanded !== undefined && prevIsAllExpandedRef.current !== propIsAllExpanded) {
+      prevIsAllExpandedRef.current = propIsAllExpanded;
       if (propIsAllExpanded) {
         setExpandedStudents(new Set(enrichedStudentRows.map((s) => s.student_key)));
       } else {

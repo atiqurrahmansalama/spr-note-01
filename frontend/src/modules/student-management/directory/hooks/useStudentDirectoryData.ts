@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchWithAuth } from "../../../../utils/authService";
 import { useToast } from "../../../../context/ToastContext";
 import { useTenant } from "../../../../context/TenantContext";
@@ -216,6 +216,9 @@ export function useStudentDirectoryData(onTenantReset?: () => void) {
     }
   }, [activeTenantId, getCachedStudents]);
 
+  const studentsRef = useRef<StudentRecord[]>(students);
+  studentsRef.current = students;
+
   const loadMetrics = useCallback(async () => {
     try {
       const res = await fetchWithAuth("/api/v1/students/metrics/");
@@ -228,9 +231,9 @@ export function useStudentDirectoryData(onTenantReset?: () => void) {
       }
     } catch {}
 
-    // Dynamic metrics fallback computed from loaded student records
+    // Dynamic metrics fallback computed from current student records without causing render loops
     setMetrics((prev) => {
-      const currentList = students.length > 0 ? students : getCachedStudents();
+      const currentList = studentsRef.current.length > 0 ? studentsRef.current : getCachedStudents();
       return {
         total_students: currentList.length,
         active_students: currentList.filter(
@@ -240,7 +243,7 @@ export function useStudentDirectoryData(onTenantReset?: () => void) {
         avg_juz_completed: prev.avg_juz_completed || 0.0,
       };
     });
-  }, [students, getCachedStudents]);
+  }, [getCachedStudents]);
 
   const refreshData = useCallback(() => {
     loadStudents();
@@ -248,6 +251,7 @@ export function useStudentDirectoryData(onTenantReset?: () => void) {
     loadMetrics();
   }, [loadStudents, loadClassesAndGroups, loadMetrics]);
 
+  // Initial mount trigger & tenant changes: ONLY re-runs when activeTenantId actually changes
   useEffect(() => {
     refreshData();
 
@@ -277,7 +281,7 @@ export function useStudentDirectoryData(onTenantReset?: () => void) {
       window.removeEventListener("spr_student_updated", handleDataUpdated);
       window.removeEventListener("spr_tenant_changed", handleTenantChanged);
     };
-  }, [refreshData, onTenantReset, getCachedStudents]);
+  }, [activeTenantId]);
 
   const handleDeleteSingle = async (id: string | number, studentName?: string) => {
     try {

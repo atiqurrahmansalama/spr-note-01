@@ -80,11 +80,9 @@ export default function StudentSelector({
     if (Array.isArray(studentDatabase) && studentDatabase.length > 0) {
       sourceList.push(...studentDatabase);
     } else {
-      if (Array.isArray(academicStudents)) sourceList.push(...academicStudents);
-      try {
-        const local = studentStore.getAll?.() || [];
-        if (Array.isArray(local)) sourceList.push(...local);
-      } catch {}
+      if (Array.isArray(academicStudents) && academicStudents.length > 0) {
+        sourceList.push(...academicStudents);
+      }
       try {
         const tenantId = typeof localStorage !== "undefined"
           ? localStorage.getItem("spr_active_tenant_id") || "default"
@@ -92,8 +90,18 @@ export default function StudentSelector({
         const fromCache = JSON.parse(
           localStorage.getItem(`spr_students_cache_${tenantId}`) || "[]"
         );
-        if (Array.isArray(fromCache)) sourceList.push(...fromCache);
+        if (Array.isArray(fromCache) && fromCache.length > 0) {
+          sourceList.push(...fromCache);
+        }
       } catch {}
+
+      // Fallback to studentStore only if canonical sources are totally empty
+      if (sourceList.length === 0) {
+        try {
+          const local = studentStore.getAll?.() || [];
+          if (Array.isArray(local)) sourceList.push(...local);
+        } catch {}
+      }
     }
 
     const result: any[] = [];
@@ -121,17 +129,20 @@ export default function StudentSelector({
       const isDupId = Boolean(rawId != null && seenIds.has(String(rawId)));
       const isDupUniq = Boolean(uniq && seenUniqs.has(String(uniq)));
       const isDupCard = Boolean(cardNo && seenCards.has(String(cardNo)));
+
+      // Canonical resolution: exact key -> loose class key -> universal normalized name
       const existingIdx = seenNameMap.has(nameKey)
         ? seenNameMap.get(nameKey)
         : roll == null && seenNameMap.has(looseNameKey)
         ? seenNameMap.get(looseNameKey)
-        : roll == null && !clsId && seenNameMap.has(normName)
+        : seenNameMap.has(normName)
         ? seenNameMap.get(normName)
         : undefined;
 
       if (isDupId || isDupUniq || isDupCard || existingIdx !== undefined) {
         if (existingIdx !== undefined && result[existingIdx]) {
           const target = result[existingIdx];
+          // Preserve valid official fields over stale fallbacks
           if (!target.id && rawId) target.id = rawId;
           if (!target.roll_number && roll != null) target.roll_number = roll;
           if (!target.student_id_card_number && cardNo) target.student_id_card_number = cardNo;
@@ -148,8 +159,8 @@ export default function StudentSelector({
 
       const newIdx = result.length;
       seenNameMap.set(nameKey, newIdx);
-      if (roll == null) seenNameMap.set(looseNameKey, newIdx);
-      if (!clsId && roll == null) seenNameMap.set(normName, newIdx);
+      seenNameMap.set(looseNameKey, newIdx);
+      seenNameMap.set(normName, newIdx);
 
       result.push(s);
     };

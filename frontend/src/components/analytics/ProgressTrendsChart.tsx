@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import html2canvas from "html2canvas-pro";
 import { ProgressTrendPoint, MetricType, ChartViewMode } from "./types";
 import ActionMenu, { ActionMenuItem } from "@/components/ui/ActionMenu";
@@ -46,67 +46,84 @@ export interface ProgressTrendsChartProps {
 
 interface TrendBarProps {
   pct: number;
-  widthClass: string;
+  barWidth?: number;
+  widthClass?: string;
   colorClass: string;
   ringColorClass?: string;
   isHovered: boolean;
   circleColorClass?: string;
-  circleSizeClass: string;
-  zIndex?: string;
+  circleSize?: number;
+  circleSizeClass?: string;
   roundedClass?: string;
   showWhiteCap?: boolean;
 }
 
 /**
- * Reusable individual bar renderer with rounded corners, unoccupied background track, and hover circle indicator
+ * Reusable individual bar renderer with rounded corners, unoccupied softer empty bar with bottom radius, and hover-only circle indicator
  */
 const TrendBar: React.FC<TrendBarProps> = ({
   pct,
-  widthClass,
+  barWidth,
+  widthClass = "",
   colorClass,
   ringColorClass,
   isHovered,
   circleColorClass,
-  circleSizeClass,
-  zIndex = "z-20",
-  roundedClass = "rounded-full",
-  showWhiteCap = false,
-}) => (
-  <div className={`relative h-full ${widthClass} shrink-0`}>
-    {/* Unoccupied Upper Track (Empty Background Bar - Clearly Visible Capsule Track) */}
-    <div
-      className={`absolute inset-0 w-full ${roundedClass} ${
-        isHovered
-          ? "bg-slate-300 dark:bg-white/[0.18]"
-          : "bg-slate-200/90 dark:bg-white/[0.10]"
-      } pointer-events-none transition-colors duration-200`}
-    />
+  circleSize = 8,
+  circleSizeClass = "w-2.5 h-2.5",
+  roundedClass = "rounded-md",
+  showWhiteCap = true,
+}) => {
+  const emptyPct = Math.max(0, 100 - pct);
 
-    {/* Hover Indicator Circle */}
-    {isHovered && pct > 0 && circleColorClass && (
-      <div
-        className={`absolute ${zIndex} ${circleSizeClass} rounded-full theme-bg-surface border-2 ${circleColorClass} shadow-sm pointer-events-none transition-all duration-150`}
-        style={{
-          bottom: `${pct}%`,
-          left: "50%",
-          transform: "translate(-50%, 50%)",
-        }}
-      />
-    )}
-
-    {/* Active Data Filled Bar (Fills up from the baseline inside/over the capsule) */}
+  return (
     <div
-      className={`absolute bottom-0 inset-x-0 w-full ${roundedClass} transition-all duration-300 flex flex-col justify-end overflow-hidden ${
-        isHovered && ringColorClass
-          ? `opacity-100 ring-2 ${ringColorClass} scale-105 shadow-md`
-          : "opacity-95"
-      } ${colorClass}`}
-      style={{ height: `${pct}%` }}
+      data-trend-bar="true"
+      className={`relative h-full shrink-0 flex flex-col justify-end ${widthClass}`}
+      style={barWidth ? { width: `${barWidth}px`, maxWidth: "100%" } : undefined}
     >
-      {pct > 0 && showWhiteCap && <div className="w-full h-1 bg-white/20 shrink-0" />}
+      {/* 1. Unoccupied Upper Bar (Starts where the real bar ends and goes to the top, completely borderless, ultra-light soft shade, with bottom radius as well) */}
+      <div
+        className={`w-full ${roundedClass} transition-colors duration-200 pointer-events-none ${
+          isHovered
+            ? "bg-[color-mix(in_srgb,var(--text-primary)_5%,transparent)]"
+            : "bg-[color-mix(in_srgb,var(--text-primary)_2.2%,transparent)]"
+        }`}
+        style={{ height: `${emptyPct}%` }}
+      />
+
+      {/* 2. Active Data Filled Bar (Starts from baseline up to pct%, borderless, with rounded corners) */}
+      <div
+        className={`relative w-full ${roundedClass} transition-all duration-300 flex flex-col justify-end overflow-hidden ${
+          isHovered && ringColorClass
+            ? `ring-2 ${ringColorClass} scale-[1.03] shadow-md z-10`
+            : "hover:opacity-95"
+        } ${colorClass}`}
+        style={{ height: `${pct}%` }}
+      >
+        {pct > 0 && showWhiteCap && (
+          <div className="w-full h-0.5 sm:h-1 bg-white/20 shrink-0" />
+        )}
+      </div>
+
+      {/* 3. Small Indicator Circle: ONLY visible when hovered! */}
+      {isHovered && pct > 0 && circleColorClass && (
+        <div
+          className={`absolute z-30 rounded-full theme-bg-surface border-2 ${circleColorClass} shadow-md pointer-events-none transition-all duration-150 scale-110 ${
+            !circleSize ? circleSizeClass : ""
+          }`}
+          style={{
+            width: circleSize ? `${circleSize}px` : undefined,
+            height: circleSize ? `${circleSize}px` : undefined,
+            bottom: `${pct}%`,
+            left: "50%",
+            transform: "translate(-50%, 50%)",
+          }}
+        />
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
   trendPoints,
@@ -178,103 +195,40 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
 
   const { max: niceMax, ticks: yTicks } = useMemo(() => computeNiceYAxis(rawMax), [rawMax]);
 
-  // Responsive bar width classes
-  const {
-    tripleBarWidthClass,
-    tripleBarGapClass,
-    doubleBarWidthClass,
-    doubleBarGapClass,
-    singleBarWidthClass,
-    colPaddingClass,
-    circleSizeClass,
-  } = useMemo(() => {
-    const n = trendPoints.length;
-    if (n <= 7) {
-      return {
-        tripleBarWidthClass: "w-[9px] sm:w-[12px]",
-        tripleBarGapClass: "gap-0.5 sm:gap-1",
-        doubleBarWidthClass: "w-[12px] sm:w-[15px]",
-        doubleBarGapClass: "gap-1 sm:gap-1.5",
-        singleBarWidthClass: "w-[34px] sm:w-[44px]",
-        colPaddingClass: "px-1 sm:px-1.5",
-        circleSizeClass: "w-2.5 h-2.5 sm:w-3 sm:h-3",
-      };
-    }
-    if (n <= 12) {
-      return {
-        tripleBarWidthClass: "w-[6px] sm:w-[8px]",
-        tripleBarGapClass: "gap-[1px] sm:gap-0.5",
-        doubleBarWidthClass: "w-[8px] sm:w-[11px]",
-        doubleBarGapClass: "gap-0.5 sm:gap-1",
-        singleBarWidthClass: "w-[24px] sm:w-[32px]",
-        colPaddingClass: "px-0.5 sm:px-1",
-        circleSizeClass: "w-2.5 h-2.5",
-      };
-    }
-    if (n <= 18) {
-      return {
-        tripleBarWidthClass: "w-[4px] sm:w-[5.5px]",
-        tripleBarGapClass: "gap-[1px]",
-        doubleBarWidthClass: "w-[5.5px] sm:w-[7px]",
-        doubleBarGapClass: "gap-[1px] sm:gap-0.5",
-        singleBarWidthClass: "w-[16px] sm:w-[20px]",
-        colPaddingClass: "px-[0.5px]",
-        circleSizeClass: "w-2 h-2",
-      };
-    }
-    if (n <= 28) {
-      return {
-        tripleBarWidthClass: "w-[2.8px] sm:w-[3.8px]",
-        tripleBarGapClass: "gap-[0.5px]",
-        doubleBarWidthClass: "w-[4px] sm:w-[5px]",
-        doubleBarGapClass: "gap-[1px]",
-        singleBarWidthClass: "w-[11px] sm:w-[14px]",
-        colPaddingClass: "px-0",
-        circleSizeClass: "w-1.5 h-1.5",
-      };
-    }
-    if (n <= 45) {
-      return {
-        tripleBarWidthClass: "w-[1.8px] sm:w-[2.5px]",
-        tripleBarGapClass: "gap-[0.5px]",
-        doubleBarWidthClass: "w-[2.5px] sm:w-[3.5px]",
-        doubleBarGapClass: "gap-[0.5px]",
-        singleBarWidthClass: "w-[7px] sm:w-[9px]",
-        colPaddingClass: "px-0",
-        circleSizeClass: "w-1.5 h-1.5",
-      };
-    }
-    return {
-      tripleBarWidthClass: "w-[1.2px] sm:w-[1.6px]",
-      tripleBarGapClass: "gap-[0.5px]",
-      doubleBarWidthClass: "w-[1.5px] sm:w-[2px]",
-      doubleBarGapClass: "gap-[0.5px]",
-      singleBarWidthClass: "w-[4px] sm:w-[5px]",
-      colPaddingClass: "px-0",
-      circleSizeClass: "w-1 h-1",
-    };
-  }, [trendPoints.length]);
-
-  // Responsive canvas container size
-  const [canvasWidth, setCanvasWidth] = useState<number>(600);
+  // Responsive canvas container size (initialized to viewport estimate to prevent initial overflow)
+  const [canvasWidth, setCanvasWidth] = useState<number>(() =>
+    typeof window !== "undefined" ? Math.max(280, Math.min(window.innerWidth - 64, 900)) : 600
+  );
 
   useEffect(() => {
     const updateSize = () => {
       if (chartCanvasRef.current) {
-        const w = chartCanvasRef.current.clientWidth;
-        if (w > 0) setCanvasWidth(w);
+        const rect = chartCanvasRef.current.getBoundingClientRect();
+        const w = rect.width || chartCanvasRef.current.clientWidth;
+        if (w > 0) setCanvasWidth(Math.round(w));
       }
     };
     updateSize();
 
+    // Re-verify after layout stabilization / tab switch
+    const rafId = requestAnimationFrame(updateSize);
+    const timerId = setTimeout(updateSize, 120);
+
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== "undefined" && chartCanvasRef.current) {
-      ro = new ResizeObserver(() => updateSize());
+      ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const w = entry.contentRect.width;
+          if (w > 0) setCanvasWidth(Math.round(w));
+        }
+      });
       ro.observe(chartCanvasRef.current);
     }
 
     window.addEventListener("resize", updateSize);
     return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timerId);
       window.removeEventListener("resize", updateSize);
       if (ro) ro.disconnect();
     };
@@ -286,34 +240,112 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
   const plotHeight = chartHeight - topPadding - bottomPadding;
   const baselineY = chartHeight - bottomPadding;
 
-  // Single unified coordinate calculation for both Bar trend overlays and Line chart curves
-  const chartCoordinates = useMemo(() => {
-    if (trendPoints.length === 0 || canvasWidth <= 0) {
-      return { mistakes: [], stucks: [], pages: [] };
-    }
-    const n = trendPoints.length;
-    const colWidth = canvasWidth / n;
-    const mistakes: Array<{ x: number; y: number }> = [];
-    const stucks: Array<{ x: number; y: number }> = [];
-    const pages: Array<{ x: number; y: number }> = [];
+  // Dynamic, container-responsive bar sizing based on both canvasWidth and data points count
+  const {
+    singleBarWidth,
+    doubleBarWidth,
+    tripleBarWidth,
+    tripleBarGapClass,
+    doubleBarGapClass,
+    colPaddingClass,
+    barRoundedClass,
+    circleSize,
+  } = useMemo(() => {
+    const n = Math.max(trendPoints.length, 1);
+    const colWidth = Math.max(canvasWidth / n, 4);
 
-    trendPoints.forEach((p, i) => {
-      const x = i * colWidth + colWidth / 2;
-      const mVal = p.totalMistakes || 0;
-      const sVal = p.totalStucks || 0;
-      const pVal = p.totalPages || 0;
+    // Dynamic inter-date separation (clear spacing between adjacent dates/data points)
+    // Reserves ~34% - 38% of colWidth as distinct inter-group space
+    const interDateGap = Math.max(6, Math.min(28, Math.round(colWidth * 0.36)));
+    const clusterWidth = Math.max(colWidth - interDateGap, 4);
 
-      const mY = Math.min(baselineY, Math.max(topPadding, topPadding + plotHeight - (mVal / niceMax) * plotHeight));
-      const sY = Math.min(baselineY, Math.max(topPadding, topPadding + plotHeight - (sVal / niceMax) * plotHeight));
-      const pY = Math.min(baselineY, Math.max(topPadding, topPadding + plotHeight - (pVal / niceMax) * plotHeight));
+    // 1. Single bar (Pages only): strictly sized within cluster
+    const single = Math.max(3, Math.min(36, Math.round(clusterWidth * 0.45)));
 
-      mistakes.push({ x, y: mY });
-      stucks.push({ x, y: sY });
-      pages.push({ x, y: pY });
-    });
+    // 2. Double bar (Mistakes & Stucks - 2 bars): mathematically bounded within cluster
+    const doubleGapPx = clusterWidth > 32 ? 3 : clusterWidth > 18 ? 2 : 1;
+    const double = Math.max(2, Math.min(18, Math.floor((clusterWidth - doubleGapPx) / 2)));
 
-    return { mistakes, stucks, pages };
-  }, [trendPoints, canvasWidth, niceMax, plotHeight, topPadding, baselineY]);
+    // 3. Triple bar (Combined - 3 bars: Pages, Mistakes, Stucks): tightly grouped within cluster
+    const tripleGapPx = clusterWidth > 36 ? 2.5 : clusterWidth > 20 ? 1.5 : 1;
+    const triple = Math.max(2, Math.min(12, Math.floor((clusterWidth - tripleGapPx * 2) / 3)));
+
+    // Corner radius adapted to bar thickness
+    let rounded = "rounded-md";
+    if (single >= 14) rounded = "rounded-lg";
+    else if (single >= 7) rounded = "rounded-md";
+    else if (single >= 4) rounded = "rounded-sm";
+    else rounded = "rounded-xs";
+
+    // Circle size on hover adapted to bar thickness
+    const cSize = Math.max(5, Math.min(10, Math.round(single * 0.75)));
+
+    // Intra-bar gap (tight grouping within the same date)
+    const tripleGap = clusterWidth > 36 ? "gap-1" : clusterWidth > 20 ? "gap-0.5" : "gap-[1px]";
+    const doubleGap = clusterWidth > 32 ? "gap-1" : clusterWidth > 18 ? "gap-0.5" : "gap-[1px]";
+
+    // Inter-column padding: creates the prominent gap between different date points
+    const colPad =
+      interDateGap >= 20
+        ? "px-2 sm:px-3"
+        : interDateGap >= 12
+        ? "px-1.5 sm:px-2"
+        : interDateGap >= 8
+        ? "px-1"
+        : "px-0.5";
+
+    return {
+      singleBarWidth: single,
+      doubleBarWidth: double,
+      tripleBarWidth: triple,
+      singleBarWidthClass: "w-auto",
+      doubleBarWidthClass: "w-auto",
+      tripleBarWidthClass: "w-auto",
+      tripleBarGapClass: tripleGap,
+      doubleBarGapClass: doubleGap,
+      colPaddingClass: colPad,
+      barRoundedClass: rounded,
+      circleSize: cSize,
+      circleSizeClass: "w-2.5 h-2.5",
+    };
+  }, [canvasWidth, trendPoints.length]);
+
+  // Reusable unified coordinate calculation for any width (used for active viewport and desktop export)
+  const computeCoordinatesForWidth = useCallback(
+    (targetWidth: number) => {
+      if (trendPoints.length === 0 || targetWidth <= 0) {
+        return { mistakes: [], stucks: [], pages: [] };
+      }
+      const n = trendPoints.length;
+      const colWidth = targetWidth / n;
+      const mistakes: Array<{ x: number; y: number }> = [];
+      const stucks: Array<{ x: number; y: number }> = [];
+      const pages: Array<{ x: number; y: number }> = [];
+
+      trendPoints.forEach((p, i) => {
+        const x = i * colWidth + colWidth / 2;
+        const mVal = p.totalMistakes || 0;
+        const sVal = p.totalStucks || 0;
+        const pVal = p.totalPages || 0;
+
+        const mY = Math.min(baselineY, Math.max(topPadding, topPadding + plotHeight - (mVal / niceMax) * plotHeight));
+        const sY = Math.min(baselineY, Math.max(topPadding, topPadding + plotHeight - (sVal / niceMax) * plotHeight));
+        const pY = Math.min(baselineY, Math.max(topPadding, topPadding + plotHeight - (pVal / niceMax) * plotHeight));
+
+        mistakes.push({ x, y: mY });
+        stucks.push({ x, y: sY });
+        pages.push({ x, y: pY });
+      });
+
+      return { mistakes, stucks, pages };
+    },
+    [trendPoints, niceMax, plotHeight, topPadding, baselineY]
+  );
+
+  const chartCoordinates = useMemo(
+    () => computeCoordinatesForWidth(canvasWidth),
+    [computeCoordinatesForWidth, canvasWidth]
+  );
 
   // X-axis visible date indices
   const visibleDateIndices = useMemo(() => {
@@ -354,16 +386,149 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
 
   const isDateStacked = trendPoints.length > 5 || canvasWidth < 520;
 
-  // Unified, robust clipboard copy helper
-  const copyChartCanvasToClipboard = async (): Promise<boolean> => {
-    if (!chartContainerRef.current) return false;
+  // Desktop canvas capture for export - always captures full desktop layout (1200px) regardless of user screen size
+  const captureDesktopCanvas = async (): Promise<HTMLCanvasElement | null> => {
+    if (!chartContainerRef.current) return null;
+
+    const sourceNode = chartContainerRef.current;
+    const clone = sourceNode.cloneNode(true) as HTMLElement;
+
+    // 1. Clean up active tooltips or hover indicators in clone
+    clone.querySelectorAll("[role='tooltip'], .shadow-xl").forEach((el) => el.remove());
+
+    // 2. Hide the 3-dots action menu / export dropdown button in exported image
+    const actionMenu = clone.querySelector("[aria-label='Export Options']");
+    if (actionMenu) {
+      (actionMenu as HTMLElement).style.display = "none";
+    }
+
+    // 3. Desktop dimensions (1200px container width)
+    const desktopWidth = 1200;
+    const desktopPadding = 24;
+    const yAxisWidth = 40;
+    const gap = 8;
+    const desktopCanvasWidth = desktopWidth - desktopPadding * 2 - yAxisWidth - gap; // ~1104px
+
+    clone.style.position = "fixed";
+    clone.style.left = "-9999px";
+    clone.style.top = "0";
+    clone.style.width = `${desktopWidth}px`;
+    clone.style.minWidth = `${desktopWidth}px`;
+    clone.style.maxWidth = `${desktopWidth}px`;
+    clone.style.height = "auto";
+    clone.style.zIndex = "-9999";
+    clone.style.opacity = "1";
+    clone.style.pointerEvents = "none";
+    clone.style.transform = "none";
+    clone.style.padding = `${desktopPadding}px`;
+    clone.style.borderRadius = "16px";
+    clone.style.backgroundColor = "var(--bg-surface)";
+
+    // 4. Force desktop typography & layout
+    clone.querySelectorAll(".truncate").forEach((el) => {
+      (el as HTMLElement).style.overflow = "visible";
+      (el as HTMLElement).style.whiteSpace = "normal";
+    });
+
+    // 5. Update SVG paths for desktopCanvasWidth
+    const desktopCoords = computeCoordinatesForWidth(desktopCanvasWidth);
+    const svgs = clone.querySelectorAll("svg");
+    svgs.forEach((svg) => {
+      if (svg.getAttribute("viewBox")?.includes("220")) {
+        svg.setAttribute("viewBox", `0 0 ${desktopCanvasWidth} ${chartHeight}`);
+
+        const paths = svg.querySelectorAll("path");
+        paths.forEach((p) => {
+          const stroke = p.getAttribute("stroke");
+          const fill = p.getAttribute("fill");
+
+          if (stroke === "var(--accent-main)") {
+            p.setAttribute(
+              "d",
+              generateSmoothPath(extendCoordsToEdges(desktopCoords.pages, desktopCanvasWidth), topPadding, baselineY)
+            );
+          } else if (stroke === "var(--color-danger)") {
+            p.setAttribute(
+              "d",
+              generateSmoothPath(extendCoordsToEdges(desktopCoords.mistakes, desktopCanvasWidth), topPadding, baselineY)
+            );
+          } else if (stroke?.includes("#f59e0b") || stroke?.includes("warning")) {
+            p.setAttribute(
+              "d",
+              generateSmoothPath(extendCoordsToEdges(desktopCoords.stucks, desktopCanvasWidth), topPadding, baselineY)
+            );
+          } else if (fill?.includes("trendPagesGrad")) {
+            p.setAttribute(
+              "d",
+              generateAreaPath(desktopCoords.pages, baselineY, topPadding, desktopCanvasWidth)
+            );
+          } else if (fill?.includes("trendMistakesGrad")) {
+            p.setAttribute(
+              "d",
+              generateAreaPath(desktopCoords.mistakes, baselineY, topPadding, desktopCanvasWidth)
+            );
+          } else if (fill?.includes("trendStucksGrad")) {
+            p.setAttribute(
+              "d",
+              generateAreaPath(desktopCoords.stucks, baselineY, topPadding, desktopCanvasWidth)
+            );
+          }
+        });
+      }
+    });
+
+    // 6. Update bar widths in the clone to desktop proportions
+    const n = Math.max(trendPoints.length, 1);
+    const desktopColWidth = desktopCanvasWidth / n;
+    const desktopSingleBar = Math.max(8, Math.min(48, Math.round(desktopColWidth * 0.46)));
+    const desktopDoubleBar = Math.max(6, Math.min(24, Math.round((desktopColWidth - 4) * 0.38)));
+    const desktopTripleBar = Math.max(4, Math.min(18, Math.round((desktopColWidth - 6) * 0.28)));
+
+    const targetBarWidth =
+      currentMetric === "pages"
+        ? desktopSingleBar
+        : currentMetric === "mistakes"
+        ? desktopDoubleBar
+        : desktopTripleBar;
+
+    const barCols = clone.querySelectorAll("[data-trend-bar='true']");
+    barCols.forEach((bar) => {
+      (bar as HTMLElement).style.width = `${targetBarWidth}px`;
+    });
+
+    // 7. Reveal all X-axis timeline dates in the desktop export
+    const timelineLabels = clone.querySelectorAll("[data-timeline-label='true']");
+    timelineLabels.forEach((label) => {
+      (label as HTMLElement).style.opacity = "1";
+      (label as HTMLElement).style.visibility = "visible";
+    });
+
+    document.body.appendChild(clone);
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
     try {
-      const canvas = await html2canvas(chartContainerRef.current, {
+      const canvas = await html2canvas(clone, {
         scale: 2,
         useCORS: true,
         backgroundColor: null,
         logging: false,
+        width: desktopWidth,
+        windowWidth: desktopWidth,
       });
+      return canvas;
+    } finally {
+      if (clone.parentNode) {
+        clone.parentNode.removeChild(clone);
+      }
+    }
+  };
+
+  // Unified, robust clipboard copy helper
+  const copyChartCanvasToClipboard = async (): Promise<boolean> => {
+    try {
+      const canvas = await captureDesktopCanvas();
+      if (!canvas) return false;
 
       if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
         const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
@@ -380,16 +545,12 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
     return false;
   };
 
-  // Export handlers
+  // Export handlers (Always full desktop size)
   const handleExportPNG = async () => {
-    if (!chartContainerRef.current) return;
     try {
-      const canvas = await html2canvas(chartContainerRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: null,
-        logging: false,
-      });
+      const canvas = await captureDesktopCanvas();
+      if (!canvas) return;
+
       const link = document.createElement("a");
       link.download = `recitation_trends_${new Date().toISOString().split("T")[0]}.png`;
       link.href = canvas.toDataURL("image/png");
@@ -430,33 +591,24 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
 
   const handleShareChart = async () => {
     try {
-      if (typeof navigator !== "undefined" && navigator.share && chartContainerRef.current) {
+      const canvas = await captureDesktopCanvas();
+      if (typeof navigator !== "undefined" && navigator.share && canvas) {
         const fileName = `recitation_trends_${new Date().toISOString().split("T")[0]}.png`;
         const shareData: ShareData = {
           title: "Recitation Trends Analytics",
           text: `Daily Classroom recitation trends: ${formattedTotalPages}p recited, ${avgPagesVal.toFixed(1)}p daily average, ${totalMistakesVal} mistakes, ${totalStucksVal} stucks across ${trendPoints.length} data points.`,
         };
 
-        try {
-          const canvas = await html2canvas(chartContainerRef.current, {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: null,
-            logging: false,
-          });
-          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-          if (blob) {
-            const file = new File([blob], fileName, { type: "image/png" });
-            if (navigator.canShare && navigator.canShare({ ...shareData, files: [file] })) {
-              await navigator.share({ ...shareData, files: [file] });
-              return;
-            }
+        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+        if (blob) {
+          const file = new File([blob], fileName, { type: "image/png" });
+          if (navigator.canShare && navigator.canShare({ ...shareData, files: [file] })) {
+            await navigator.share({ ...shareData, files: [file] });
+            return;
           }
-        } catch {
-          // Fall back to text share if canvas screenshot fails
         }
         await navigator.share(shareData);
-      } else {
+      } else if (canvas) {
         await copyChartCanvasToClipboard();
       }
     } catch (err: any) {
@@ -596,10 +748,10 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
   return (
     <div
       ref={chartContainerRef}
-      className={`theme-bg-surface border theme-border rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4 select-none relative ${className}`}
+      className={`theme-bg-surface border theme-border rounded-2xl p-3.5 sm:p-5 shadow-2xs space-y-4 select-none relative w-full min-w-0 overflow-hidden ${className}`}
     >
       {/* 1. Header Toolbar: Left Title + Right Unified Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b theme-border pb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b theme-border pb-3 w-full min-w-0">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0">
             <TrendingUpIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -627,7 +779,7 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
         </div>
 
         {/* Right: Unified Controls using project's SegmentedSwitch */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-nowrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-wrap sm:flex-nowrap justify-start sm:justify-end">
           <SegmentedSwitch
             options={metricOptions}
             value={currentMetric}
@@ -773,9 +925,9 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
           })()}
 
           {/* Grid Layout: Left Fixed-Width Y-Axis Scale + Main Plot Area */}
-          <div className="flex items-stretch gap-2 w-full">
+          <div className="flex items-stretch gap-1 sm:gap-2 w-full min-w-0">
             <div
-              className="w-8 sm:w-10 flex flex-col justify-between items-end pr-1 text-[10px] sm:text-[11px] font-mono theme-text-secondary select-none shrink-0"
+              className="w-7 sm:w-9 flex flex-col justify-between items-end pr-1 text-[9px] sm:text-[11px] font-mono theme-text-secondary select-none shrink-0"
               style={{ height: `${chartHeight}px`, paddingTop: `${topPadding}px`, paddingBottom: `${bottomPadding}px` }}
             >
               {yTicks.map((tickVal) => (
@@ -787,7 +939,7 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
 
             <div
               ref={chartCanvasRef}
-              className="relative flex-1 overflow-hidden"
+              className="relative flex-1 min-w-0 w-full overflow-hidden"
               style={{ height: `${chartHeight}px` }}
             >
               {/* Background Horizontal Left-Right Gridlines */}
@@ -810,7 +962,7 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
               {/* View 1: Bar Chart */}
               {viewMode === "bars" && (
                 <div
-                  className="absolute inset-0 flex items-stretch justify-between px-0"
+                  className="absolute inset-0 flex items-stretch w-full min-w-0"
                   style={{ paddingTop: `${topPadding}px`, paddingBottom: `${bottomPadding}px` }}
                 >
                   {trendPoints.map((point, idx) => {
@@ -832,95 +984,89 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
                     return (
                       <div
                         key={`bar-col-${point.key}-${idx}`}
-                        className={`flex-1 flex flex-col items-stretch h-full cursor-pointer relative group ${colPaddingClass}`}
+                        className={`flex-1 min-w-0 flex flex-col items-stretch h-full cursor-pointer relative group ${colPaddingClass}`}
                         onMouseEnter={() => setHoveredIndex(idx)}
                         onMouseLeave={() => setHoveredIndex(null)}
                       >
                         {/* MODE 1: COMBINED (3 Bars side-by-side: Pages, Mistakes, Stucks) */}
                         {currentMetric === "combined" && (
-                          <div className={`w-full flex items-stretch justify-center ${tripleBarGapClass} h-full`}>
+                          <div className={`w-full min-w-0 flex items-stretch justify-center ${tripleBarGapClass} h-full`}>
                             {/* Bar 1: Pages Recited (Theme Accent) */}
                             <TrendBar
                               pct={pagesPct}
-                              widthClass={tripleBarWidthClass}
+                              barWidth={tripleBarWidth}
                               colorClass="theme-bg-accent"
                               ringColorClass="ring-[var(--accent-main)]"
                               circleColorClass="border-[var(--accent-main)]"
-                              circleSizeClass={circleSizeClass}
+                              circleSize={circleSize}
                               isHovered={isHovered}
-                              roundedClass="rounded-full"
-                              zIndex="z-20"
+                              roundedClass={barRoundedClass}
                             />
 
                             {/* Bar 2: Mistakes (Rose) */}
                             <TrendBar
                               pct={mistakesPct}
-                              widthClass={tripleBarWidthClass}
+                              barWidth={tripleBarWidth}
                               colorClass="bg-[var(--color-danger)]"
                               ringColorClass="ring-[var(--color-danger)]"
                               circleColorClass="border-[var(--color-danger)]"
-                              circleSizeClass={circleSizeClass}
+                              circleSize={circleSize}
                               isHovered={isHovered}
-                              roundedClass="rounded-full"
-                              zIndex="z-20"
+                              roundedClass={barRoundedClass}
                             />
 
                             {/* Bar 3: Stucks (Amber - Progress Reports color) */}
                             <TrendBar
                               pct={stucksPct}
-                              widthClass={tripleBarWidthClass}
+                              barWidth={tripleBarWidth}
                               colorClass="bg-amber-500"
                               ringColorClass="ring-amber-500"
                               circleColorClass="border-amber-500"
-                              circleSizeClass={circleSizeClass}
+                              circleSize={circleSize}
                               isHovered={isHovered}
-                              roundedClass="rounded-full"
-                              zIndex="z-20"
+                              roundedClass={barRoundedClass}
                             />
                           </div>
                         )}
 
                         {/* MODE 2: MISTAKES & STUCKS ONLY */}
                         {currentMetric === "mistakes" && (
-                          <div className={`w-full flex items-stretch justify-center ${doubleBarGapClass} h-full`}>
+                          <div className={`w-full min-w-0 flex items-stretch justify-center ${doubleBarGapClass} h-full`}>
                             <TrendBar
                               pct={mistakesPct}
-                              widthClass={doubleBarWidthClass}
+                              barWidth={doubleBarWidth}
                               colorClass="bg-[var(--color-danger)]"
                               ringColorClass="ring-[var(--color-danger)]"
                               circleColorClass="border-[var(--color-danger)]"
-                              circleSizeClass={circleSizeClass}
+                              circleSize={circleSize}
                               isHovered={isHovered}
-                              roundedClass="rounded-full"
-                              zIndex="z-20"
+                              roundedClass={barRoundedClass}
                             />
                             <TrendBar
                               pct={stucksPct}
-                              widthClass={doubleBarWidthClass}
+                              barWidth={doubleBarWidth}
                               colorClass="bg-amber-500"
                               ringColorClass="ring-amber-500"
                               circleColorClass="border-amber-500"
-                              circleSizeClass={circleSizeClass}
+                              circleSize={circleSize}
                               isHovered={isHovered}
-                              roundedClass="rounded-full"
-                              zIndex="z-20"
+                              roundedClass={barRoundedClass}
                             />
                           </div>
                         )}
 
                         {/* MODE 3: PAGES ONLY */}
                         {currentMetric === "pages" && (
-                          <div className="w-full flex items-stretch justify-center h-full">
+                          <div className="w-full min-w-0 flex items-stretch justify-center h-full">
                             <TrendBar
                               pct={pagesPct}
-                              widthClass={singleBarWidthClass}
+                              barWidth={singleBarWidth}
                               colorClass="theme-bg-accent"
                               ringColorClass="ring-[var(--accent-main)]"
                               circleColorClass="border-[var(--accent-main)]"
-                              circleSizeClass={circleSizeClass}
+                              circleSize={circleSize}
                               isHovered={isHovered}
-                              roundedClass="rounded-full"
-                              zIndex="z-20"
+                              roundedClass={barRoundedClass}
                             />
                           </div>
                         )}
@@ -930,10 +1076,10 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
                 </div>
               )}
 
-              {/* Trend Line Overlay in Bar mode ("ডাটার সাথে গ্রাফ লাইন" - Dual lines extending completely edge-to-edge) */}
+              {/* Trend Line Overlay across data points in Bar mode */}
               {viewMode === "bars" && (
                 <svg
-                  className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-hidden"
+                  className="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-hidden"
                   viewBox={`0 0 ${canvasWidth} ${chartHeight}`}
                   style={{ width: "100%", height: "100%" }}
                 >
@@ -942,9 +1088,9 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
                       d={generateSmoothPath(extendCoordsToEdges(chartCoordinates.pages, canvasWidth), topPadding, baselineY)}
                       fill="none"
                       stroke="var(--accent-main)"
-                      strokeWidth={currentMetric === "combined" ? "1.6" : "1.5"}
+                      strokeWidth={currentMetric === "combined" ? "1.6" : "1.8"}
                       strokeDasharray={currentMetric === "combined" ? undefined : "3 3"}
-                      opacity={currentMetric === "combined" ? "0.35" : "0.75"}
+                      opacity={currentMetric === "combined" ? "0.45" : "0.85"}
                     />
                   )}
                   {(currentMetric === "combined" || currentMetric === "mistakes") && chartCoordinates.mistakes.length > 1 && (
@@ -952,9 +1098,9 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
                       d={generateSmoothPath(extendCoordsToEdges(chartCoordinates.mistakes, canvasWidth), topPadding, baselineY)}
                       fill="none"
                       stroke="var(--color-danger)"
-                      strokeWidth={currentMetric === "combined" ? "1.4" : "1.5"}
+                      strokeWidth={currentMetric === "combined" ? "1.4" : "1.6"}
                       strokeDasharray="3 3"
-                      opacity={currentMetric === "combined" ? "0.75" : "0.8"}
+                      opacity={currentMetric === "combined" ? "0.75" : "0.85"}
                     />
                   )}
                   {(currentMetric === "combined" || currentMetric === "mistakes") && chartCoordinates.stucks.length > 1 && (
@@ -962,9 +1108,9 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
                       d={generateSmoothPath(extendCoordsToEdges(chartCoordinates.stucks, canvasWidth), topPadding, baselineY)}
                       fill="none"
                       stroke="var(--color-warning, #f59e0b)"
-                      strokeWidth={currentMetric === "combined" ? "1.4" : "1.5"}
+                      strokeWidth={currentMetric === "combined" ? "1.4" : "1.6"}
                       strokeDasharray="3 3"
-                      opacity={currentMetric === "combined" ? "0.75" : "0.8"}
+                      opacity={currentMetric === "combined" ? "0.75" : "0.85"}
                     />
                   )}
                 </svg>
@@ -1117,10 +1263,10 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
           </div>
 
           {/* 5. X-Axis Timeline Labels */}
-          <div className="flex items-center gap-2 w-full pt-1 select-none">
-            <div className="w-8 sm:w-10 shrink-0" />
+          <div className="flex items-center gap-1 sm:gap-2 w-full pt-1 select-none min-w-0">
+            <div className="w-7 sm:w-9 shrink-0" />
 
-            <div className="flex-1 flex items-center justify-between px-0 text-[10px] sm:text-[11px] font-mono theme-text-secondary tracking-wider">
+            <div className="flex-1 min-w-0 flex items-center justify-between px-0 text-[9px] sm:text-[11px] font-mono theme-text-secondary tracking-wider">
               {trendPoints.map((point, idx) => {
                 const isVisible = visibleDateIndices.has(idx);
                 const isHovered = hoveredIndex === idx;
@@ -1129,7 +1275,8 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
                 return (
                   <div
                     key={`label-${point.key}-${idx}`}
-                    className="flex-1 flex flex-col items-center justify-center text-center px-0 sm:px-0.5 overflow-visible"
+                    data-timeline-label="true"
+                    className="flex-1 min-w-0 flex flex-col items-center justify-center text-center px-0 overflow-hidden"
                     title={`${dateParts.month} ${dateParts.day}`}
                   >
                     {isVisible ? (

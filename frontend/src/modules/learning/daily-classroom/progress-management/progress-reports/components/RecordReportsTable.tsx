@@ -207,7 +207,7 @@ export default function RecordReportsTable({
         selectionCellClassName="!w-12 !min-w-[48px] !max-w-[48px] !p-0 text-center"
         headerPaddingClass="py-2.5 px-3 sm:px-4 text-xs font-bold uppercase tracking-wider"
         cellPaddingClass="py-2.5 px-3 sm:px-4 text-xs"
-        tableClassName="w-full table-fixed"
+        tableClassName="w-full min-w-[880px] table-fixed"
         rowClassName={(rep) => {
           const repKey = rep.id ?? rep.report_unique_id ?? "";
           return expandedIds.has(repKey) ? "[&>td]:!border-b-0" : "";

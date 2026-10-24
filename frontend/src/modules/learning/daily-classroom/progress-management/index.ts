@@ -7,5 +7,3 @@ export * from "./daily-progress";
 export { default as ProgressReportsView } from "./progress-reports/ProgressReportsView";
 export { default as StudentReportsView } from "./progress-reports/ProgressReportsView";
 export * from "./progress-reports";
-export { default as ProgressAnalyticsView } from "./analytics/ProgressAnalyticsView";
-export * from "./analytics/ProgressAnalyticsView";

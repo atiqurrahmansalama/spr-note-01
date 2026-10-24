@@ -277,7 +277,7 @@ export function useDailyProgressHierarchy({
         ? seenNameMap.get(nameKey)
         : roll == null && seenNameMap.has(looseNameKey)
         ? seenNameMap.get(looseNameKey)
-        : roll == null && !stClsId && seenNameMap.has(normName)
+        : seenNameMap.has(normName)
         ? seenNameMap.get(normName)
         : undefined;
 
@@ -302,8 +302,8 @@ export function useDailyProgressHierarchy({
 
       const newIdx = fullList.length;
       seenNameMap.set(nameKey, newIdx);
-      if (roll == null) seenNameMap.set(looseNameKey, newIdx);
-      if (!stClsId && roll == null) seenNameMap.set(normName, newIdx);
+      seenNameMap.set(looseNameKey, newIdx);
+      seenNameMap.set(normName, newIdx);
 
       const badge =
         typeof st === "object" && st.badge

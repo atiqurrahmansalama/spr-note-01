@@ -358,7 +358,7 @@ export function useProgressAnalyticsEngine(
       },
       {
         id: "active_students",
-        label: "Students Reciting",
+        label: "Students Recited",
         value: studentCount,
         subValue: `Covering ${trendPoints.length} day timeline`,
         sparkline: padSparkline(sparklineStudents, studentCount),
