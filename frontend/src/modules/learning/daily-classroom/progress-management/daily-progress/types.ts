@@ -38,7 +38,13 @@ export interface DailyProgressDraft {
   comment?: string;
   savedAtDate?: string;
   savedAtTime?: string;
-  timestamp?: number;
+  timestamp?: number | string;
+  departmentId?: string | number;
+  classId?: string | number;
+  sectionId?: string | number;
+  selectedDepartmentId?: string;
+  selectedClassId?: string;
+  selectedSectionId?: string;
   hasData?: boolean;
 }
 

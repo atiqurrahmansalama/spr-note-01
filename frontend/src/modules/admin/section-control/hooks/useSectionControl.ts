@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { fetchWithAuth } from '../../../../utils/authService';
 import { useToast } from '../../../../context/ToastContext';
 import { useFeatureControl } from '../../../../context/FeatureControlContext';
-import { getSectionConfig, saveSectionConfig } from '../../../../config/defaultSectionConfig';
 import { useSectionTranslation } from './useSectionTranslation';
 import {
   ScopeType,
@@ -387,21 +386,7 @@ export function useSectionControl() {
         const data = await res.json();
         showToast(data.message || t('toasts.saveSuccess', 'Section rules saved successfully!'), 'success');
 
-        if (activeScope === 'global') {
-          try {
-            const currentLocal = getSectionConfig();
-            const updatedLocal = { ...currentLocal };
-            keys.forEach((k) => {
-              updatedLocal[k] = { ...updatedLocal[k], enabled: modifiedFlags[k] };
-            });
-            saveSectionConfig(updatedLocal);
-            broadcastUpdate(updatedLocal);
-          } catch {
-            broadcastUpdate();
-          }
-        } else {
-          broadcastUpdate();
-        }
+        broadcastUpdate();
 
         setModifiedFlags({});
         refetchConfig();
@@ -504,17 +489,7 @@ export function useSectionControl() {
           t('toasts.saveSuccess', 'Applied globally! All conflicting overrides cleared.'),
           'success'
         );
-        try {
-          const currentLocal = getSectionConfig();
-          const updatedLocal = { ...currentLocal };
-          targetKeys.forEach((k) => {
-            updatedLocal[k] = { ...updatedLocal[k], enabled: modifiedFlags[k] };
-          });
-          saveSectionConfig(updatedLocal);
-          broadcastUpdate(updatedLocal);
-        } catch {
-          broadcastUpdate();
-        }
+        broadcastUpdate();
 
         setModifiedFlags({});
         refetchConfig();

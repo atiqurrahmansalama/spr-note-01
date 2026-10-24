@@ -45,6 +45,8 @@ export interface AutocompleteDropdownProps {
   variant?: 'default' | 'filled' | 'elevated' | 'sub';
   autoFocus?: boolean;
   inputRef?: React.RefObject<HTMLInputElement | null> | null;
+  id?: string;
+  inputId?: string;
   disableSaveButton?: boolean;
   showAllOptionsOnFocus?: boolean;
   readOnly?: boolean;
@@ -93,6 +95,8 @@ export default function AutocompleteDropdown({
   disabled = false,
   icon: Icon = null,
   error = null,
+  id = '',
+  inputId = '',
 }: AutocompleteDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const initialSearchTerm = typeof value === 'string' ? value : value?.label || value?.name || '';
@@ -379,6 +383,7 @@ export default function AutocompleteDropdown({
           )}
 
           <input
+            id={id || inputId || undefined}
             ref={refToUse}
             type="text"
             readOnly={readOnly}

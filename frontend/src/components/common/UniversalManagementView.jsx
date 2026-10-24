@@ -3,7 +3,7 @@ import PageHeader from '../ui/PageHeader';
 import MetricsGrid from '../ui/MetricsGrid';
 import TabSwitcher from '../ui/TabSwitcher';
 import DataViewToolbar from '../ui/DataViewToolbar';
-import FilterBar from '../ui/FilterBar';
+import { FilterBar } from '../ui';
 import DataTable from '../ui/DataTable';
 import DataCardGrid from '../ui/DataCardGrid';
 import DataViewFooter from '../ui/DataViewFooter';

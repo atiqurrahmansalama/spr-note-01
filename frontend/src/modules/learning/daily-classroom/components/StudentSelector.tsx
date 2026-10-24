@@ -44,6 +44,8 @@ export interface StudentSelectorProps {
   actionTitle?: string | null;
   disabled?: boolean;
   returnToUrl?: string;
+  id?: string;
+  inputRef?: React.RefObject<HTMLInputElement | null> | null;
 }
 
 /**
@@ -71,6 +73,8 @@ export default function StudentSelector({
   actionTitle = "Add new student (Quick Admission)",
   disabled = false,
   returnToUrl,
+  id,
+  inputRef,
 }: StudentSelectorProps) {
   const { students: academicStudents } = useAcademicData();
 
@@ -354,6 +358,8 @@ export default function StudentSelector({
   return (
     <div className={`w-full ${className}`}>
       <AutocompleteDropdown
+        id={id}
+        inputRef={inputRef}
         options={options}
         value={studentName}
         selectedId={studentId ? String(studentId) : undefined}

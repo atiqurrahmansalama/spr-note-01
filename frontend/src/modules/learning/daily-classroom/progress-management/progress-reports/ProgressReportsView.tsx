@@ -279,7 +279,9 @@ export default function ProgressReportsView({
     localStorage.setItem("spr_editing_report", JSON.stringify(rep));
     window.dispatchEvent(new CustomEvent("spr_daily_progress_mode_change", { detail: isBook ? "BOOK" : "QURAN" }));
     window.dispatchEvent(new CustomEvent("spr_edit_report", { detail: rep }));
-    navigate(`/studies/daily-progress/${targetMode}${query}`);
+    if (!isEmbedded) {
+      navigate(`/studies/daily-progress/${targetMode}${query}`);
+    }
     showToast(`Loaded report for "${rep.student_name}" for editing!`, "info");
   };
 
@@ -499,72 +501,75 @@ export default function ProgressReportsView({
           />
         }
       >
-        {/* Filter Box Bottom Footer Row */}
-        <div className="pt-2.5 border-t theme-border w-full">
-          {showAnalytics ? (
-            <div className="flex items-center justify-between gap-3 w-full">
-              <div className="flex items-center gap-2 text-xs font-semibold theme-text-secondary select-none">
-                <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse shrink-0" />
-                <span className="theme-text-primary font-bold">
-                  {filteredReports.length} / {reportsList.length}
-                </span>
-                <span>Reports Filtered</span>
+        {({ moreButton }: { moreButton: React.ReactNode }) => (
+          <div className="pt-2.5 border-t theme-border w-full">
+            {showAnalytics ? (
+              <div className="flex items-center justify-between gap-3 w-full">
+                <div className="flex items-center gap-2 text-xs font-semibold theme-text-secondary select-none">
+                  <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse shrink-0" />
+                  <span className="theme-text-primary font-bold">
+                    {filteredReports.length} / {reportsList.length}
+                  </span>
+                  <span>Reports Filtered</span>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {moreButton}
+                  <button
+                    type="button"
+                    onClick={handleToggleAnalytics}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none theme-bg-accent theme-accent-text border-[var(--accent-main)]"
+                    title={t("hideAnalytics", "Hide Analytics")}
+                  >
+                    <TrendingUpIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span>{t("hideAnalytics", "Hide Analytics")}</span>
+                    <ChevronIcon isOpen={true} className="w-3 h-3 shrink-0" />
+                  </button>
+
+                  <IconButton
+                    icon={RefreshIcon}
+                    onClick={handleRefresh}
+                    loading={isRefreshing}
+                    disabled={isRefreshing || isSyncing}
+                    variant="sub"
+                    size="sm"
+                    shape="rounded"
+                    title="Refresh Reports & Sync with Database"
+                    ariaLabel="Refresh Reports & Sync with Database"
+                  />
+                </div>
               </div>
+            ) : (
+              renderTableActionToolbar(
+                <>
+                  {moreButton}
+                  <button
+                    type="button"
+                    onClick={handleToggleAnalytics}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary"
+                    title={t("showAnalytics", "Show Analytics")}
+                  >
+                    <TrendingUpIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span>{t("analytics", "Analytics")}</span>
+                    <ChevronIcon isOpen={false} className="w-3 h-3 shrink-0" />
+                  </button>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleToggleAnalytics}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none theme-bg-accent theme-accent-text border-[var(--accent-main)]"
-                  title={t("hideAnalytics", "Hide Analytics")}
-                >
-                  <TrendingUpIcon className="w-3.5 h-3.5 shrink-0" />
-                  <span>{t("hideAnalytics", "Hide Analytics")}</span>
-                  <ChevronIcon isOpen={true} className="w-3 h-3 shrink-0" />
-                </button>
-
-                <IconButton
-                  icon={RefreshIcon}
-                  onClick={handleRefresh}
-                  loading={isRefreshing}
-                  disabled={isRefreshing || isSyncing}
-                  variant="sub"
-                  size="sm"
-                  shape="rounded"
-                  title="Refresh Reports & Sync with Database"
-                  ariaLabel="Refresh Reports & Sync with Database"
-                />
-              </div>
-            </div>
-          ) : (
-            renderTableActionToolbar(
-              <>
-                <button
-                  type="button"
-                  onClick={handleToggleAnalytics}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary"
-                  title={t("showAnalytics", "Show Analytics")}
-                >
-                  <TrendingUpIcon className="w-3.5 h-3.5 shrink-0" />
-                  <span>{t("analytics", "Analytics")}</span>
-                  <ChevronIcon isOpen={false} className="w-3 h-3 shrink-0" />
-                </button>
-
-                <IconButton
-                  icon={RefreshIcon}
-                  onClick={handleRefresh}
-                  loading={isRefreshing}
-                  disabled={isRefreshing || isSyncing}
-                  variant="sub"
-                  size="sm"
-                  shape="rounded"
-                  title="Refresh Reports & Sync with Database"
-                  ariaLabel="Refresh Reports & Sync with Database"
-                />
-              </>
-            )
-          )}
-        </div>
+                  <IconButton
+                    icon={RefreshIcon}
+                    onClick={handleRefresh}
+                    loading={isRefreshing}
+                    disabled={isRefreshing || isSyncing}
+                    variant="sub"
+                    size="sm"
+                    shape="rounded"
+                    title="Refresh Reports & Sync with Database"
+                    ariaLabel="Refresh Reports & Sync with Database"
+                  />
+                </>
+              )
+            )}
+          </div>
+        )}
       </DailyClassroomFilterControls>
 
       {/* 2. Real-Time Analytics & Trends Dashboard */}

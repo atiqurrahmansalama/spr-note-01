@@ -15,7 +15,7 @@ export { default as AutoSaveBadge } from './AutoSaveBadge';
 export { default as TabSwitcher } from './TabSwitcher';
 export { default as Stepper } from './Stepper';
 export { default as PageHeader } from './PageHeader';
-export { default as FilterBar } from './FilterBar';
+export { FilterBar } from './FilterBox';
 export { default as FullscreenButton } from './FullscreenButton';
 export { default as RightSidebarPanel } from './RightSidebarPanel';
 export { default as TemplateActionToolbar } from './TemplateActionToolbar';
@@ -62,5 +62,7 @@ export { default as SegmentedSwitch } from './SegmentedSwitch';
 export type { SegmentedSwitchProps, SegmentedSwitchOption } from './SegmentedSwitch';
 export { default as SelectionActionBar } from './SelectionActionBar';
 export type { SelectionActionBarProps, SelectionActionItem } from './SelectionActionBar';
+export { default as FilterBox } from './FilterBox';
+export type { FilterBoxProps, FilterBoxScopeItem, FilterBoxRenderProps } from './FilterBox';
 export * from './Icons';
 

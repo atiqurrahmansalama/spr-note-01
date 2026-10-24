@@ -71,37 +71,43 @@ export function useReportForm() {
   const [groupName, setGroupName] = useState<string>("");
   const [selectedSession, setSelectedSession] = useState<string>("");
 
-  // Current logged-in user as default teacher
+  // Current logged-in user as default teacher (guaranteed fallback to never be empty)
   const authContext = (useAuth() as any) || {};
   const user = authContext.user;
 
   const defaultTeacherId = useMemo(() => {
-    if (user?.id) return String(user.id);
-    if (user?.staff_id) return String(user.staff_id);
+    const u = user || authStore.getUser?.() || authStore.getUserProfile?.() || null;
+    if (u?.id) return String(u.id);
+    if (u?.user_id) return String(u.user_id);
+    if (u?.staff_id) return String(u.staff_id);
+    if (u?.pk) return String(u.pk);
     return "";
   }, [user]);
 
   const defaultTeacherName = useMemo(() => {
-    if (user?.full_name) return String(user.full_name);
-    if (user?.name) return String(user.name);
-    if (user?.first_name || user?.last_name) {
-      return [user.first_name, user.last_name].filter(Boolean).join(" ");
+    const u = user || authStore.getUser?.() || authStore.getUserProfile?.() || null;
+    if (u?.full_name) return String(u.full_name);
+    if (u?.name) return String(u.name);
+    if (u?.first_name || u?.last_name) {
+      return [u.first_name, u.last_name].filter(Boolean).join(" ");
     }
-    if (user?.username) return String(user.username);
-    return "";
+    if (u?.user_name) return String(u.user_name);
+    if (u?.username) return String(u.username);
+    return "Staff Teacher";
   }, [user]);
 
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string>(defaultTeacherId);
-  const [selectedTeacherName, setSelectedTeacherName] = useState<string>(defaultTeacherName);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>(() => defaultTeacherId);
+  const [selectedTeacherName, setSelectedTeacherName] = useState<string>(() => defaultTeacherName);
 
+  // Guarantee teacher is never empty or "ALL" in Daily Progress
   useEffect(() => {
-    if (defaultTeacherId && !selectedTeacherId) {
+    if (defaultTeacherId && (!selectedTeacherId || selectedTeacherId === "ALL" || selectedTeacherId === "")) {
       setSelectedTeacherId(defaultTeacherId);
     }
-    if (defaultTeacherName && !selectedTeacherName) {
+    if (defaultTeacherName && (!selectedTeacherName || selectedTeacherName === "All Teachers" || selectedTeacherName === "")) {
       setSelectedTeacherName(defaultTeacherName);
     }
-  }, [defaultTeacherId, defaultTeacherName]);
+  }, [defaultTeacherId, defaultTeacherName, selectedTeacherId, selectedTeacherName]);
 
   const [progressMode, setProgressModeState] = useState<"QURAN" | "BOOK">(() => {
     if (typeof window !== "undefined") {
@@ -664,55 +670,38 @@ export function useReportForm() {
         showToast("Report draft recovered successfully!", "success");
       }
     } else {
-      const recovered = draftReport.getById("active_report_draft");
-      if (recovered) {
-        if (recovered.studentName !== undefined) setStudentName(recovered.studentName);
-        if (recovered.selectedStudentId !== undefined) setSelectedStudentId(recovered.selectedStudentId);
-        if (recovered.groupName !== undefined) setGroupName(recovered.groupName);
-        if (recovered.selectedSession !== undefined) setSelectedSession(recovered.selectedSession);
-        if (recovered.selectedDate !== undefined) setSelectedDate(recovered.selectedDate);
-        if (recovered.progressMode) setProgressMode(recovered.progressMode);
-        if (recovered.bookTitle !== undefined) setBookTitle(recovered.bookTitle);
-        if (recovered.lessonTitle !== undefined) setLessonTitle(recovered.lessonTitle);
-        if (recovered.juzPageData?.length) setJuzPageData(recovered.juzPageData);
-        if (recovered.mistakeData?.length) setMistakeData(recovered.mistakeData);
-        if (recovered.stuckData?.length) setStuckData(recovered.stuckData);
-        if (recovered.bookPageData?.length) setBookPageData(recovered.bookPageData);
-        if (recovered.bookMistakeData?.length) setBookMistakeData(recovered.bookMistakeData);
-        if (recovered.bookStuckData?.length) setBookStuckData(recovered.bookStuckData);
-        if (recovered.comment !== undefined) setComment(recovered.comment);
+      // Check for unsaved drafts with substantive content across storage
+      const allDrafts = draftReport.getAll();
+      const unsavedDrafts = allDrafts.filter((d: any) => {
+        const hasContent = Boolean(
+          (d.studentName && String(d.studentName).trim()) ||
+          (d.comment && String(d.comment).trim()) ||
+          d.selectedSession ||
+          (d.bookTitle && String(d.bookTitle).trim()) ||
+          (d.lessonTitle && String(d.lessonTitle).trim()) ||
+          (Array.isArray(d.juzPageData) && d.juzPageData.some((j: any) => j.juz || (j.ranges || []).some((r: any) => r.start || r.end))) ||
+          (Array.isArray(d.mistakeData) && d.mistakeData.some((m: any) => m.page || (m.ayahs || []).some((a: any) => a.value))) ||
+          (Array.isArray(d.bookPageData) && d.bookPageData.some((b: any) => (b.ranges || []).some((r: any) => r.start || r.end))) ||
+          d.hasData
+        );
+        return hasContent;
+      });
+
+      if (unsavedDrafts.length > 0) {
+        setDraftInfo(unsavedDrafts);
       } else {
-        // Asynchronously check Central IndexedDB drafts
+        // Fallback: check Central IndexedDB draft if localStorage was cleared
         dailyProgressRepository.getDraft(currentDraftId).then((idbDraft) => {
           if (idbDraft && typeof idbDraft === "object") {
-            if (idbDraft.studentName !== undefined) setStudentName(idbDraft.studentName);
-            if (idbDraft.selectedStudentId !== undefined) setSelectedStudentId(idbDraft.selectedStudentId);
-            if (idbDraft.groupName !== undefined) setGroupName(idbDraft.groupName);
-            if (idbDraft.selectedSession !== undefined) setSelectedSession(idbDraft.selectedSession);
-            if (idbDraft.selectedDate !== undefined) setSelectedDate(idbDraft.selectedDate);
-            if (idbDraft.progressMode) setProgressMode(idbDraft.progressMode);
-            if (idbDraft.bookTitle !== undefined) setBookTitle(idbDraft.bookTitle);
-            if (idbDraft.lessonTitle !== undefined) setLessonTitle(idbDraft.lessonTitle);
-            if (idbDraft.juzPageData?.length) setJuzPageData(idbDraft.juzPageData);
-            if (idbDraft.mistakeData?.length) setMistakeData(idbDraft.mistakeData);
-            if (idbDraft.stuckData?.length) setStuckData(idbDraft.stuckData);
-            if (idbDraft.bookPageData?.length) setBookPageData(idbDraft.bookPageData);
-            if (idbDraft.bookMistakeData?.length) setBookMistakeData(idbDraft.bookMistakeData);
-            if (idbDraft.bookStuckData?.length) setBookStuckData(idbDraft.bookStuckData);
-            if (idbDraft.comment !== undefined) setComment(idbDraft.comment);
+            const hasIdbContent = Boolean(
+              idbDraft.studentName || idbDraft.comment || idbDraft.selectedSession || idbDraft.hasData
+            );
+            if (hasIdbContent) {
+              setDraftInfo([{ id: currentDraftId, ...idbDraft }]);
+            }
           }
         }).catch(() => {});
       }
-    }
-
-    const allDrafts = draftReport.getAll();
-    const unsavedDrafts = allDrafts.filter((d: any) => {
-      const hasContent = d.studentName || d.comment || d.selectedSession || d.hasData;
-      return hasContent && d.id !== currentDraftId && d.id !== "active_report_draft";
-    });
-
-    if (unsavedDrafts.length > 0) {
-      setDraftInfo(unsavedDrafts);
     }
 
     const pendingEditRaw = localStorage.getItem("spr_editing_report");
@@ -720,8 +709,12 @@ export function useReportForm() {
       try {
         const pendingEdit = JSON.parse(pendingEditRaw);
         if (pendingEdit && typeof pendingEdit === "object") {
-          localStorage.removeItem("spr_editing_report");
           applyReportToForm(pendingEdit);
+          setTimeout(() => {
+            try {
+              localStorage.removeItem("spr_editing_report");
+            } catch {}
+          }, 800);
         }
       } catch (err) {
         console.error("Failed to parse pending edit report:", err);
@@ -760,7 +753,14 @@ export function useReportForm() {
       bookStuckData.some((s) => s.page || (s.ayahs || []).some((a) => a.value))
     );
 
+    const activeStudentObj = (studentDatabase || []).find(
+      (s: any) =>
+        (selectedStudentId && String(s.id) === String(selectedStudentId)) ||
+        (studentName && (s.name === studentName || s.name_en === studentName))
+    );
+
     const draftPayload = {
+      id: currentDraftId,
       studentName,
       selectedStudentId,
       groupName,
@@ -776,6 +776,9 @@ export function useReportForm() {
       bookMistakeData,
       bookStuckData,
       comment,
+      departmentId: activeStudentObj?.department_id || activeStudentObj?.department,
+      classId: activeStudentObj?.academic_class_id || activeStudentObj?.class_id || activeStudentObj?.student_class,
+      sectionId: activeStudentObj?.section_id || activeStudentObj?.student_section,
       hasData: hasAnyContent,
     };
 
@@ -824,8 +827,31 @@ export function useReportForm() {
     if (draft.bookStuckData?.length) setBookStuckData(draft.bookStuckData);
     if (draft.comment !== undefined) setComment(draft.comment);
 
+    // Sync academic hierarchy if stored with draft
+    if (
+      draft.departmentId ||
+      draft.classId ||
+      draft.sectionId ||
+      draft.selectedDepartmentId ||
+      draft.selectedClassId ||
+      draft.selectedSectionId
+    ) {
+      window.dispatchEvent(
+        new CustomEvent("spr_edit_report", {
+          detail: {
+            departmentId: draft.departmentId || draft.selectedDepartmentId,
+            classId: draft.classId || draft.selectedClassId,
+            sectionId: draft.sectionId || draft.selectedSectionId,
+            student_name: draft.studentName,
+            selectedDate: draft.selectedDate,
+          },
+        })
+      );
+    }
+
     setDraftInfo((prev) => (prev ? prev.filter((d) => d.id !== draft.id) : null));
     draftReport.remove(draft.id);
+    dailyProgressRepository.clearDraft(draft.id).catch(() => {});
     showToast("Report draft recovered successfully!", "success");
     saveStatusStore.set("local", "Saved (Local)");
   };
@@ -837,7 +863,16 @@ export function useReportForm() {
       return updated && updated.length > 0 ? updated : null;
     });
     draftReport.remove(draft.id);
+    dailyProgressRepository.clearDraft(draft.id).catch(() => {});
     showToast("Report draft discarded", "info");
+  };
+
+  const dismissDraft = (draft: any) => {
+    if (!draft) return;
+    setDraftInfo((prev) => {
+      const updated = prev ? prev.filter((d) => d.id !== draft.id) : null;
+      return updated && updated.length > 0 ? updated : null;
+    });
   };
 
   const fetchData = async () => {
@@ -1201,7 +1236,7 @@ export function useReportForm() {
     setStudentName("");
     setSelectedStudentId(null);
     setGroupName("");
-    setSelectedSession("");
+    // Note: Retain selectedSession so the teacher doesn't have to re-select the session for consecutive student records
     setSelectedTeacherId(defaultTeacherId);
     setSelectedTeacherName(defaultTeacherName);
     setSelectedDate(getClassroomTodayDate());
@@ -1272,17 +1307,27 @@ export function useReportForm() {
 
       recordStudentUsage(selectedStudent);
 
+      const finalTeacherId =
+        selectedTeacherId && selectedTeacherId !== "ALL"
+          ? selectedTeacherId
+          : defaultTeacherId;
+
       const resolvedTeacherId =
-        selectedTeacherId && !isNaN(Number(selectedTeacherId))
-          ? Number(selectedTeacherId)
-          : selectedTeacherId || null;
+        finalTeacherId && !isNaN(Number(finalTeacherId))
+          ? Number(finalTeacherId)
+          : finalTeacherId || null;
+
+      const finalTeacherName =
+        selectedTeacherName && selectedTeacherName !== "All Teachers"
+          ? selectedTeacherName
+          : defaultTeacherName || "Staff Teacher";
 
       const payload = {
         student: studentNumericId || realStudentName,
         student_name: realStudentName,
         teacher: resolvedTeacherId,
         teacher_id: resolvedTeacherId,
-        teacher_name: selectedTeacherName || defaultTeacherName || "",
+        teacher_name: finalTeacherName,
         session: selectedSession.trim(),
         session_name: selectedSession.trim(),
         progress_mode: progressMode,
@@ -1537,6 +1582,12 @@ export function useReportForm() {
       }
 
       resetForm();
+      // Auto-focus student input so teacher can immediately type the next student's name
+      setTimeout(() => {
+        const el = document.getElementById("daily-progress-student-input") as HTMLInputElement;
+        el?.focus();
+        el?.select?.();
+      }, 60);
     } finally {
       setIsSaving(false);
     }
@@ -1594,6 +1645,8 @@ export function useReportForm() {
     setSelectedTeacherId,
     selectedTeacherName,
     setSelectedTeacherName,
+    defaultTeacherId,
+    defaultTeacherName,
     progressMode,
     setProgressMode,
     bookTitle,
@@ -1623,6 +1676,7 @@ export function useReportForm() {
     draftInfo,
     recoverDraft,
     discardDraft,
+    dismissDraft,
     editingReport,
     cancelEditMode,
     handleSaveRecord,

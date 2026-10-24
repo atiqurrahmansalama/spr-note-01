@@ -22,6 +22,8 @@ jobs:
     name: Generate 100% Full System Archive & Cloud Sync
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE20: true
 
     steps:
       - name: Checkout Repository
@@ -45,6 +47,39 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install psycopg2-binary dj-database-url
 
+      - name: Verify Database Secrets & Connectivity
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "::error::CRITICAL: GitHub Secret 'DATABASE_URL' is missing! Please configure DATABASE_URL in Repository Settings -> Secrets and variables -> Actions."
+            echo "::error::Hourly backup requires live connection to cloud PostgreSQL database to generate 100% full archive."
+            exit 1
+          fi
+          echo "DATABASE_URL secret is detected. Verifying PostgreSQL connectivity..."
+          python -c "
+          import os, dj_database_url, psycopg2, sys
+          url = os.environ.get('DATABASE_URL')
+          try:
+              cfg = dj_database_url.parse(url)
+              conn = psycopg2.connect(
+                  dbname=cfg['NAME'],
+                  user=cfg['USER'],
+                  password=cfg['PASSWORD'],
+                  host=cfg['HOST'],
+                  port=cfg['PORT'],
+                  sslmode='require',
+                  connect_timeout=15
+              )
+              conn.close()
+              print('Database connection successfully established and verified!')
+          except Exception as err:
+              print(f'::error::Database connection failed: {err}', file=sys.stderr)
+              print('::error::Please verify that DATABASE_URL secret in GitHub Settings has valid credentials and host accessibility.', file=sys.stderr)
+              sys.exit(1)
+          "
+
       - name: Execute 100% Full System Enterprise Backup
         working-directory: backend
         env:
@@ -60,13 +95,17 @@ jobs:
         id: archive_info
         working-directory: backend
         run: |
-          ARCHIVE_FILE=$(ls -t backups/enterprise_full_backup_*.tar.gz | head -n 1)
-          SHA256_FILE=$(ls -t backups/enterprise_full_backup_*.sha256 | head -n 1)
+          ARCHIVE_FILE=$(find backups -maxdepth 1 -name "enterprise_full_backup_*.tar.gz" | sort -r | head -n 1)
+          if [ -z "${ARCHIVE_FILE}" ]; then
+            echo "::error::No backup archive was created in backups/ directory."
+            exit 1
+          fi
+          SHA256_FILE="${ARCHIVE_FILE}.sha256"
           echo "archive_path=${ARCHIVE_FILE}" >> $GITHUB_OUTPUT
           echo "archive_name=$(basename ${ARCHIVE_FILE})" >> $GITHUB_OUTPUT
           echo "sha256_path=${SHA256_FILE}" >> $GITHUB_OUTPUT
           echo "Generated Archive: $(basename ${ARCHIVE_FILE})"
-          cat ${SHA256_FILE}
+          if [ -f "${SHA256_FILE}" ]; then cat "${SHA256_FILE}"; fi
 
       - name: Tier 1 - Store in GitHub Encrypted Artifact Vault
         uses: actions/upload-artifact@v4

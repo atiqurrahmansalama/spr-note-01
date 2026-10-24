@@ -6,22 +6,24 @@
  * defaults to empty string so requests are cleanly routed through the relative path.
  */
 
-export const getApiBaseUrl = () => {
+export const getApiBaseUrl = (): string => {
   const envUrl =
-    typeof import.meta !== 'undefined' && import.meta.env
-      ? import.meta.env.VITE_API_BASE_URL
-      : typeof process !== 'undefined' && process.env
-      ? process.env.VITE_API_BASE_URL
+    typeof import.meta !== 'undefined' && (import.meta as any).env
+      ? (import.meta as any).env.VITE_API_BASE_URL
+      : typeof process !== 'undefined' && (process as any).env
+      ? (process as any).env.VITE_API_BASE_URL
       : '';
+
   if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
     // Avoid dummy placeholder URLs
     if (!envUrl.includes('your-production-domain.com')) {
       return envUrl.trim().replace(/\/+$/, '');
     }
   }
+
   return '';
 };
 
-export const API_BASE_URL = getApiBaseUrl();
+export const API_BASE_URL: string = getApiBaseUrl();
 
 export default API_BASE_URL;

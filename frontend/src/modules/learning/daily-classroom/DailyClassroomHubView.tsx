@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, Suspense, lazy } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { CollapsiblePageHeader } from '@/components/ui';
 import CustomButton from '@/components/ui/CustomButton';
@@ -160,6 +160,7 @@ export default function DailyClassroomHubView({
   });
 
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => new Set([activeTab]));
+  const isNavigatingToEditRef = useRef(false);
 
   useEffect(() => {
     setVisitedTabs((prev) => {
@@ -180,6 +181,14 @@ export default function DailyClassroomHubView({
     }
 
     if (isProgressHub) {
+      if (isNavigatingToEditRef.current) {
+        if (path.includes('/daily-progress')) {
+          isNavigatingToEditRef.current = false;
+        } else {
+          return;
+        }
+      }
+
       if (path.includes('/progress-analytics') || path.includes('/progress-reports') || path.includes('/progress-assessments')) {
         setActiveTab((prev) => (prev !== 'PROGRESS_ASSESSMENT' ? 'PROGRESS_ASSESSMENT' : prev));
       } else if (path.includes('/daily-progress') || path.includes('/progress-management')) {
@@ -460,6 +469,7 @@ export default function DailyClassroomHubView({
           rep.lesson_covered ||
           (Array.isArray(rep.bookPageData) && rep.bookPageData.length > 0)
         );
+        isNavigatingToEditRef.current = true;
         const mode = isBook ? 'BOOK' : 'QURAN';
         setProgressMode(mode);
         setActiveTab('PROGRESS');
@@ -776,7 +786,17 @@ export default function DailyClassroomHubView({
         if (sectionId) params.set('section', sectionId);
         else params.delete('section');
       }
-      navigate(`?${params.toString()}`, { replace: true });
+      const targetBase = isProgressHub
+        ? (activeTab === 'PROGRESS'
+            ? `/studies/daily-progress/${progressMode === 'BOOK' ? 'book' : 'quran'}`
+            : '/studies/progress-reports/records')
+        : (activeTab === 'LESSON_ANALYTICS'
+            ? '/studies/lesson-analytics'
+            : activeTab === 'LESSON_ASSESSMENT'
+            ? '/studies/lesson-assessments'
+            : '/studies/daily-lessons');
+      const targetQuery = params.toString() ? `?${params.toString()}` : '';
+      navigate(`${targetBase}${targetQuery}`, { replace: true });
     },
     setAcademicFilters: ({ departmentId, classId, sectionId }: { departmentId?: string; classId?: string; sectionId?: string }) => {
       if (departmentId !== undefined) setSelectedDepartmentId(departmentId || '');
@@ -795,7 +815,17 @@ export default function DailyClassroomHubView({
         if (sectionId) params.set('section', sectionId);
         else params.delete('section');
       }
-      navigate(`?${params.toString()}`, { replace: true });
+      const targetBase = isProgressHub
+        ? (activeTab === 'PROGRESS'
+            ? `/studies/daily-progress/${progressMode === 'BOOK' ? 'book' : 'quran'}`
+            : '/studies/progress-reports/records')
+        : (activeTab === 'LESSON_ANALYTICS'
+            ? '/studies/lesson-analytics'
+            : activeTab === 'LESSON_ASSESSMENT'
+            ? '/studies/lesson-assessments'
+            : '/studies/daily-lessons');
+      const targetQuery = params.toString() ? `?${params.toString()}` : '';
+      navigate(`${targetBase}${targetQuery}`, { replace: true });
     },
     progressMode,
     onProgressModeChange: handleProgressModeChange,

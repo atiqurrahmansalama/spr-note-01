@@ -90,6 +90,8 @@ export default function DailyProgressView({
     setSelectedTeacherId,
     selectedTeacherName,
     setSelectedTeacherName,
+    defaultTeacherId,
+    defaultTeacherName,
     progressMode,
     setProgressMode,
     bookTitle,
@@ -118,6 +120,7 @@ export default function DailyProgressView({
     draftInfo,
     recoverDraft,
     discardDraft,
+    dismissDraft,
     editingReport,
     cancelEditMode,
     handleSaveRecord,
@@ -160,8 +163,10 @@ export default function DailyProgressView({
     setGroupName,
   });
 
-  const handleSaveRecordWithContext = useCallback(() => {
-    return handleSaveRecord({
+  const studentInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSaveRecordWithContext = useCallback(async () => {
+    const result = await handleSaveRecord({
       departmentId: selectedDepartmentId,
       classId: selectedClassId,
       sectionId: selectedSectionId,
@@ -170,6 +175,20 @@ export default function DailyProgressView({
       classes,
       sections,
     });
+
+    // Auto-focus the student input box after saving so teacher can seamlessly enter next student
+    setTimeout(() => {
+      if (studentInputRef.current) {
+        studentInputRef.current.focus();
+        studentInputRef.current.select?.();
+      } else {
+        const el = document.getElementById("daily-progress-student-input") as HTMLInputElement;
+        el?.focus();
+        el?.select?.();
+      }
+    }, 60);
+
+    return result;
   }, [
     handleSaveRecord,
     selectedDepartmentId,
@@ -406,6 +425,7 @@ export default function DailyProgressView({
         draftInfo={draftInfo}
         onRecover={recoverDraft}
         onDiscard={discardDraft}
+        onDismiss={dismissDraft}
       />
 
       {/* Classroom Filter Controls Box (Line 1: Date | Student | Session; Line 2: Dept | Class | Sec | Teacher) */}
@@ -438,17 +458,23 @@ export default function DailyProgressView({
         onSectionChange={handleSectionChange}
         sectionSelectOptions={sectionSelectOptions}
         hasTeachers={true}
-        selectedTeacherId={selectedTeacherId}
+        allowAllTeachers={false}
+        selectedTeacherId={selectedTeacherId || defaultTeacherId}
         onTeacherChange={(tId: any, tObj?: any) => {
-          setSelectedTeacherId(tId ? String(tId) : "");
+          const nextId = tId && tId !== 'ALL' ? String(tId) : defaultTeacherId;
+          setSelectedTeacherId(nextId);
           if (tObj) {
-            setSelectedTeacherName(tObj.name_en || tObj.name || tObj.user_name || "");
+            setSelectedTeacherName(tObj.name_en || tObj.name || tObj.user_name || defaultTeacherName || "");
+          } else if (!tId || tId === 'ALL') {
+            setSelectedTeacherName(defaultTeacherName || "");
           }
         }}
         showPeriodSwitcher={false}
         studentControl={
           sectionConfig.studentSelect?.enabled && (
             <StudentInputSection
+              id="daily-progress-student-input"
+              inputRef={studentInputRef}
               studentDatabase={allStudentDatabase}
               studentName={studentName}
               studentId={selectedStudentId}

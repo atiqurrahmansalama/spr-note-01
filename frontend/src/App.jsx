@@ -71,7 +71,7 @@ const ActivityAnalyticsView = lazy(() => import("./modules/admin/activity-analyt
 const TrashRestorationView = lazy(() => import("./modules/admin/TrashRestorationView"));
 
 // ─── Protected Settings & Personalization Views (Lazy Loaded) ───────────────
-const ProfileSettingsView = lazy(() => import("./modules/settings/ProfileSettingsView"));
+const ProfileSettingsView = lazy(() => import("./modules/profile/ProfileSettingsView"));
 const PersonalizeSettingsHubView = lazy(() => import("./modules/settings/PersonalizeSettingsHubView"));
 const SecuritySessionsView = lazy(() => import("./modules/settings/components/SecuritySessionsView"));
 const ClassroomConfigurationView = lazy(() => import("./modules/learning/daily-classroom/components/ClassroomConfigurationView"));

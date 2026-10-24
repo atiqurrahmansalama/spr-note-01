@@ -67,6 +67,8 @@ class Command(BaseCommand):
                 ))
             else:
                 self.stdout.write(self.style.ERROR(f"Backup failed: {result.get('error', 'Unknown error')}"))
+                import sys
+                sys.exit(1)
 
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"Critical error during backup: {str(e)}"))

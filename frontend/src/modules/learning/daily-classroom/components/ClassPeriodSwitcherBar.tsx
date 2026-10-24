@@ -9,6 +9,7 @@ export interface ClassPeriodSwitcherBarProps {
   onPeriodChange?: (val: string) => void;
   getSlotCount?: (val: string) => number;
   getPeriodSubtitle?: (val: string) => string;
+  headerRightAction?: React.ReactNode;
 }
 
 export default function ClassPeriodSwitcherBar({
@@ -18,6 +19,7 @@ export default function ClassPeriodSwitcherBar({
   onPeriodChange,
   getSlotCount,
   getPeriodSubtitle,
+  headerRightAction,
 }: ClassPeriodSwitcherBarProps) {
   const periodScrollRef = useHorizontalScroll();
   const totalSlotsCount = allPeriodFilterOptions.length;
@@ -31,6 +33,11 @@ export default function ClassPeriodSwitcherBar({
             {title} ({totalSlotsCount} {totalSlotsCount === 1 ? 'SLOT' : 'SLOTS'})
           </span>
         </div>
+        {headerRightAction && (
+          <div className="flex items-center gap-2 shrink-0">
+            {headerRightAction}
+          </div>
+        )}
       </div>
 
       <div
