@@ -179,7 +179,13 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         ${sizeConfig.button}
         ${shapeClass}
         ${variantClass}
-        ${active ? 'theme-bg-accent theme-accent-text ring-1 ring-[var(--accent-main)]/40 shadow-xs' : ''}
+        ${
+          active
+            ? variant === 'ghost' || variant === 'sub' || variant === 'surface' || variant === 'outline'
+              ? 'theme-bg-sub theme-text-primary'
+              : 'theme-bg-accent theme-accent-text ring-1 ring-[var(--accent-main)]/40 shadow-xs'
+            : ''
+        }
         ${
           isDisabled
             ? 'opacity-30 cursor-not-allowed pointer-events-none'

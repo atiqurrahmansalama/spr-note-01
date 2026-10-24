@@ -1436,6 +1436,27 @@ export function HardDriveIcon({ className = "w-4 h-4", ...props }: IconProps) {
   );
 }
 
+export function BarChartIcon({ className = "w-4 h-4", ...props }: IconProps) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  );
+}
+
+export function LineChartIcon({ className = "w-4 h-4", ...props }: IconProps) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M3 3v18h18" />
+      <path d="m19 9-5 5-4-4-3 3" />
+    </svg>
+  );
+}
+
+export const Share2Icon = ShareIcon;
+
 // ==========================================
 // Standardized Aliases (DRY / Deduplicated)
 // ==========================================

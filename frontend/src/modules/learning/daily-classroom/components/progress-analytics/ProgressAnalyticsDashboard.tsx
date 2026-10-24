@@ -1,25 +1,24 @@
 import React, { useState } from "react";
 import {
   MetricType,
-  TimeHorizon,
   ProgressAnalyticsDashboardProps,
 } from "./types";
 import { useProgressAnalyticsEngine } from "./useProgressAnalyticsEngine";
 import ProgressSparklineKPIs from "./ProgressSparklineKPIs";
-import ProgressTrendsChart from "./ProgressTrendsChart";
-import ProgressSessionBreakdown from "./ProgressSessionBreakdown";
+import { ProgressTrendsChart, ProgressSessionBreakdown } from "@/components/analytics";
 import { TrendingUpIcon, ChevronIcon } from "@/components/ui/Icons";
 
 export const ProgressAnalyticsDashboard: React.FC<ProgressAnalyticsDashboardProps> = ({
   reports = [],
+  startDate,
+  endDate,
   variant = "full",
   title = "Recitation Analytics & Performance",
   subtitle = "Dynamic visual metrics computed from current filter selection",
   collapsible = false,
   isExpanded: controlledExpanded,
   onToggleExpand,
-  defaultMetric = "pages",
-  defaultTimeHorizon = "daily",
+  defaultMetric = "combined",
   showKpis = true,
   showTrendsChart = true,
   showBreakdown = true,
@@ -37,9 +36,8 @@ export const ProgressAnalyticsDashboard: React.FC<ProgressAnalyticsDashboardProp
   };
 
   const [activeMetric, setActiveMetric] = useState<MetricType>(defaultMetric);
-  const [timeHorizon, setTimeHorizon] = useState<TimeHorizon>(defaultTimeHorizon);
 
-  const analytics = useProgressAnalyticsEngine(reports, activeMetric, timeHorizon);
+  const analytics = useProgressAnalyticsEngine(reports, activeMetric, startDate, endDate);
 
   return (
     <div className={`w-full space-y-4 animate-fade-in ${className}`}>
@@ -75,7 +73,7 @@ export const ProgressAnalyticsDashboard: React.FC<ProgressAnalyticsDashboardProp
 
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono font-bold theme-accent">
-              {analytics.totalReports} Evaluations · {analytics.totalPages} Pages
+              {analytics.totalPages} Pages · {analytics.totalReports} Sessions
             </span>
             <ChevronIcon isOpen={isExpanded} className="w-4 h-4 theme-text-secondary shrink-0" />
           </div>
@@ -92,13 +90,13 @@ export const ProgressAnalyticsDashboard: React.FC<ProgressAnalyticsDashboardProp
 
           {/* 2. Visual Trends & Breakdown Split */}
           {variant !== "kpi-only" && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
               {/* Left Column: Recitation Progress Trends Chart */}
               <div
                 className={
                   showBreakdown && variant !== "chart-only"
-                    ? "col-span-12 lg:col-span-8"
-                    : "col-span-12"
+                    ? "col-span-12 lg:col-span-8 flex flex-col"
+                    : "col-span-12 flex flex-col"
                 }
               >
                 {showTrendsChart && (
@@ -106,23 +104,27 @@ export const ProgressAnalyticsDashboard: React.FC<ProgressAnalyticsDashboardProp
                     trendPoints={analytics.trendPoints}
                     activeMetric={activeMetric}
                     onMetricChange={setActiveMetric}
-                    timeHorizon={timeHorizon}
-                    onHorizonChange={setTimeHorizon}
                     maxMetricValue={analytics.maxMetricValue}
                     totalPages={analytics.totalPages}
-                    totalReports={analytics.totalReports}
+                    totalMistakes={analytics.totalMistakes}
+                    totalStucks={analytics.totalStucks}
                     totalErrors={analytics.totalErrors}
-                    accuracyRate={analytics.accuracyRate}
+                    avgPagesPerDay={analytics.avgPagesPerDay}
+                    peakDayPages={analytics.peakDayPages}
+                    studentCount={analytics.studentCount}
+                    totalReports={analytics.totalReports}
+                    className="h-full flex flex-col justify-between"
                   />
                 )}
               </div>
 
               {/* Right Column: Session & Distribution Breakdown */}
               {showBreakdown && variant !== "chart-only" && (
-                <div className="col-span-12 lg:col-span-4">
+                <div className="col-span-12 lg:col-span-4 flex flex-col">
                   <ProgressSessionBreakdown
                     sessionBreakdown={analytics.sessionBreakdown}
                     aiInsight={analytics.aiInsight}
+                    className="h-full flex flex-col justify-between"
                   />
                 </div>
               )}

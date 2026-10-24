@@ -34,6 +34,9 @@ export default function RecordReportsTable({
   onPrintPDF,
   onResetFilters,
   onRefresh,
+  isAllExpanded: propIsAllExpanded,
+  onToggleExpandAll: propOnToggleExpandAll,
+  hideBatchToolbar = false,
 }: RecordReportsTableProps) {
   const { t } = useTranslation("progressReports");
   const activeReportsList = reports || reportsList || [];
@@ -60,15 +63,31 @@ export default function RecordReportsTable({
     setExpandedIds((prev) => (prev.has(id) ? new Set() : new Set([id])));
   }, []);
 
+  // Sync with external isAllExpanded if provided
+  useEffect(() => {
+    if (propIsAllExpanded !== undefined) {
+      if (propIsAllExpanded) {
+        const allIds = activeReportsList.map((r) => r.id ?? r.report_unique_id ?? "").filter(Boolean);
+        setExpandedIds(new Set(allIds));
+      } else {
+        setExpandedIds(new Set());
+      }
+    }
+  }, [propIsAllExpanded, activeReportsList]);
+
   // Expand / Collapse all
   const handleToggleExpandAll = useCallback(() => {
-    if (expandedIds.size === activeReportsList.length && activeReportsList.length > 0) {
-      setExpandedIds(new Set());
+    if (propOnToggleExpandAll) {
+      propOnToggleExpandAll();
     } else {
-      const allIds = activeReportsList.map((r) => r.id ?? r.report_unique_id ?? "").filter(Boolean);
-      setExpandedIds(new Set(allIds));
+      if (expandedIds.size === activeReportsList.length && activeReportsList.length > 0) {
+        setExpandedIds(new Set());
+      } else {
+        const allIds = activeReportsList.map((r) => r.id ?? r.report_unique_id ?? "").filter(Boolean);
+        setExpandedIds(new Set(allIds));
+      }
     }
-  }, [expandedIds.size, activeReportsList]);
+  }, [propOnToggleExpandAll, expandedIds.size, activeReportsList]);
 
   // Parent Table Columns Definition via custom hook
   const columns = useRecordReportsColumns({
@@ -114,16 +133,18 @@ export default function RecordReportsTable({
 
   return (
     <div className="space-y-3">
-      {/* Universal Batch Toolbar */}
-      <TableBatchToolbar
-        totalItems={totalItems}
-        selectedCount={selectedIds.size}
-        isAllExpanded={expandedIds.size === activeReportsList.length && activeReportsList.length > 0}
-        onToggleExpandAll={handleToggleExpandAll}
-        expandAllLabel={t("expandAll", "Expand All")}
-        collapseAllLabel={t("collapseAll", "Collapse All")}
-        showingLabel={`Showing ${paginatedReports.length} of ${totalItems} records`}
-      />
+      {/* Universal Batch Toolbar (Hidden when Analytics is expanded) */}
+      {!hideBatchToolbar && (
+        <TableBatchToolbar
+          totalItems={totalItems}
+          selectedCount={selectedIds.size}
+          isAllExpanded={expandedIds.size === activeReportsList.length && activeReportsList.length > 0}
+          onToggleExpandAll={handleToggleExpandAll}
+          expandAllLabel={t("expandAll", "Expand All")}
+          collapseAllLabel={t("collapseAll", "Collapse All")}
+          showingLabel={`Showing ${paginatedReports.length} of ${totalItems} records`}
+        />
+      )}
 
       {/* Main Single-Pass DataTable */}
       <DataTable

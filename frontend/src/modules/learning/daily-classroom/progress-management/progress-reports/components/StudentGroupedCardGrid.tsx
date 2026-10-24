@@ -53,6 +53,9 @@ export default function StudentGroupedCardGrid({
   onPrintPDF,
   onResetFilters,
   onRefresh,
+  isAllExpanded: propIsAllExpanded,
+  onToggleExpandAll: propOnToggleExpandAll,
+  hideBatchToolbar = false,
 }: StudentGroupedTableProps) {
   const { t } = useTranslation("progressReports");
   const { resolveStudentMeta } = useStudentMetaResolver();
@@ -95,14 +98,29 @@ export default function StudentGroupedCardGrid({
     });
   }, []);
 
+  // Sync with external isAllExpanded if provided
+  useEffect(() => {
+    if (propIsAllExpanded !== undefined) {
+      if (propIsAllExpanded) {
+        setExpandedStudents(new Set(enrichedStudentRows.map((s) => s.student_key)));
+      } else {
+        setExpandedStudents(new Set());
+      }
+    }
+  }, [propIsAllExpanded, enrichedStudentRows]);
+
   // Expand / collapse all visible students
   const handleToggleExpandAll = useCallback(() => {
-    if (expandedStudents.size === paginatedStudents.length && paginatedStudents.length > 0) {
-      setExpandedStudents(new Set());
+    if (propOnToggleExpandAll) {
+      propOnToggleExpandAll();
     } else {
-      setExpandedStudents(new Set(paginatedStudents.map((s) => s.student_key)));
+      if (expandedStudents.size === paginatedStudents.length && paginatedStudents.length > 0) {
+        setExpandedStudents(new Set());
+      } else {
+        setExpandedStudents(new Set(paginatedStudents.map((s) => s.student_key)));
+      }
     }
-  }, [expandedStudents.size, paginatedStudents]);
+  }, [propOnToggleExpandAll, expandedStudents.size, paginatedStudents]);
 
   // Robust selection checker across numeric IDs, string IDs, and unique report keys
   const isReportSelected = useCallback(
@@ -175,18 +193,20 @@ export default function StudentGroupedCardGrid({
 
   return (
     <div className="space-y-4 w-full">
-      {/* Batch Toolbar: Expand / Collapse All Students and Selection Badge */}
-      <TableBatchToolbar
-        totalItems={totalItems}
-        selectedCount={selectedIds.size}
-        isAllExpanded={isAllExpanded}
-        onToggleExpandAll={handleToggleExpandAll}
-        expandAllLabel={t("expandAll", "Expand All Students")}
-        collapseAllLabel={t("collapseAll", "Collapse All Students")}
-        showingLabel={`Showing ${paginatedStudents.length} of ${totalItems} students`}
-        showSelectedBadge={true}
-        selectedBadgeLabel="selected"
-      />
+      {/* Batch Toolbar: Expand / Collapse All Students and Selection Badge (Hidden when Analytics is expanded) */}
+      {!hideBatchToolbar && (
+        <TableBatchToolbar
+          totalItems={totalItems}
+          selectedCount={selectedIds.size}
+          isAllExpanded={isAllExpanded}
+          onToggleExpandAll={handleToggleExpandAll}
+          expandAllLabel={t("expandAll", "Expand All Students")}
+          collapseAllLabel={t("collapseAll", "Collapse All Students")}
+          showingLabel={`Showing ${paginatedStudents.length} of ${totalItems} students`}
+          showSelectedBadge={true}
+          selectedBadgeLabel="selected"
+        />
+      )}
 
       {/* Grid of Student Grouped Cards */}
       <DataCardGrid

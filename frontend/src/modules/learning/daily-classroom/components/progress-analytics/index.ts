@@ -1,7 +1,5 @@
+export * from "@/components/analytics";
 export * from "./types";
 export * from "./useProgressAnalyticsEngine";
-export * from "./ProgressSparklineKPIs";
-export * from "./ProgressTrendsChart";
-export * from "./ProgressSessionBreakdown";
-export * from "./ProgressAnalyticsDashboard";
-export { default } from "./ProgressAnalyticsDashboard";
+export { ProgressSparklineKPIs, default as ProgressSparklineKPIsDefault } from "./ProgressSparklineKPIs";
+export { ProgressAnalyticsDashboard, default } from "./ProgressAnalyticsDashboard";

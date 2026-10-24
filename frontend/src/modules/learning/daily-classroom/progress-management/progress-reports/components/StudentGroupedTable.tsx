@@ -39,6 +39,9 @@ export default function StudentGroupedTable({
   onPrintPDF,
   onResetFilters,
   onRefresh,
+  isAllExpanded: propIsAllExpanded,
+  onToggleExpandAll: propOnToggleExpandAll,
+  hideBatchToolbar = false,
 }: StudentGroupedTableProps) {
   const { t } = useTranslation("progressReports");
   const { resolveStudentMeta } = useStudentMetaResolver();
@@ -71,15 +74,30 @@ export default function StudentGroupedTable({
     setExpandedStudents((prev) => (prev.has(studentKey) ? new Set() : new Set([studentKey])));
   }, []);
 
+  // Sync with external isAllExpanded if provided
+  useEffect(() => {
+    if (propIsAllExpanded !== undefined) {
+      if (propIsAllExpanded) {
+        setExpandedStudents(new Set(enrichedStudentRows.map((s) => s.student_key)));
+      } else {
+        setExpandedStudents(new Set());
+      }
+    }
+  }, [propIsAllExpanded, enrichedStudentRows]);
+
   // Expand All / Collapse All
   const handleToggleExpandAll = useCallback(() => {
-    if (expandedStudents.size === enrichedStudentRows.length && enrichedStudentRows.length > 0) {
-      setExpandedStudents(new Set());
+    if (propOnToggleExpandAll) {
+      propOnToggleExpandAll();
     } else {
-      const allKeys = enrichedStudentRows.map((s) => s.student_key);
-      setExpandedStudents(new Set(allKeys));
+      if (expandedStudents.size === enrichedStudentRows.length && enrichedStudentRows.length > 0) {
+        setExpandedStudents(new Set());
+      } else {
+        const allKeys = enrichedStudentRows.map((s) => s.student_key);
+        setExpandedStudents(new Set(allKeys));
+      }
     }
-  }, [expandedStudents.size, enrichedStudentRows]);
+  }, [propOnToggleExpandAll, expandedStudents.size, enrichedStudentRows]);
 
   // Toggle selection for all reports of a specific student
   const handleStudentSelectToggle = useCallback(
@@ -160,16 +178,18 @@ export default function StudentGroupedTable({
 
   return (
     <div className="w-full select-none animate-fade-in space-y-3">
-      {/* Top Quick Actions Bar */}
-      <TableBatchToolbar
-        totalItems={totalItems}
-        selectedCount={selectedIds.size}
-        isAllExpanded={expandedStudents.size === enrichedStudentRows.length && enrichedStudentRows.length > 0}
-        onToggleExpandAll={handleToggleExpandAll}
-        expandAllLabel={t("expandAll", "Expand All")}
-        collapseAllLabel={t("collapseAll", "Collapse All")}
-        showingLabel={`Showing ${paginatedStudents.length} of ${totalItems} students`}
-      />
+      {/* Top Quick Actions Bar (Hidden when Analytics is expanded) */}
+      {!hideBatchToolbar && (
+        <TableBatchToolbar
+          totalItems={totalItems}
+          selectedCount={selectedIds.size}
+          isAllExpanded={expandedStudents.size === enrichedStudentRows.length && enrichedStudentRows.length > 0}
+          onToggleExpandAll={handleToggleExpandAll}
+          expandAllLabel={t("expandAll", "Expand All")}
+          collapseAllLabel={t("collapseAll", "Collapse All")}
+          showingLabel={`Showing ${paginatedStudents.length} of ${totalItems} students`}
+        />
+      )}
 
       {/* Main Hierarchical Parent Table */}
       <DataTable

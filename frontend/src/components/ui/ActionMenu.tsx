@@ -35,6 +35,7 @@ export interface ActionMenuProps {
   header?: React.ReactNode;
   title?: React.ReactNode;
   subtitle?: React.ReactNode;
+  showActiveRing?: boolean;
   // --- Coordinate / Controlled Context Menu Props ---
   isOpen?: boolean;
   onClose?: (() => void) | null;
@@ -71,6 +72,7 @@ export default function ActionMenu({
   header = null,
   title = null,
   subtitle = null,
+  showActiveRing = undefined,
   // --- Coordinate / Controlled Context Menu Props ---
   isOpen: controlledIsOpen = undefined,
   onClose = null,
@@ -270,7 +272,9 @@ export default function ActionMenu({
                   ? 'opacity-95 ring-2 ring-[var(--accent-main)]/40'
                   : variant === 'ghost'
                   ? 'opacity-85'
-                  : 'theme-bg-sub theme-text-primary ring-2 ring-[var(--accent-main)]/30'
+                  : (showActiveRing ?? (variant !== 'ghost' && variant !== 'sub'))
+                  ? 'theme-bg-sub theme-text-primary ring-2 ring-[var(--accent-main)]/30'
+                  : 'theme-bg-sub theme-text-primary'
                 : ''
             } ${buttonClassName}`}
           >
@@ -310,7 +314,11 @@ export default function ActionMenu({
             shape="rounded"
             active={isMenuOpen}
             className={`${
-              isMenuOpen ? 'ring-2 ring-[var(--accent-main)]/30 theme-bg-sub' : ''
+              isMenuOpen
+                ? (showActiveRing ?? (variant !== 'ghost' && variant !== 'sub' && variant !== 'surface'))
+                  ? 'ring-2 ring-[var(--accent-main)]/30 theme-bg-sub'
+                  : 'theme-bg-sub'
+                : ''
             } ${buttonClassName}`}
           />
         )

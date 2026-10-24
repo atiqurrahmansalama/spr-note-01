@@ -49,6 +49,7 @@ export default function RecordReportsCardGrid({
   onPrintPDF,
   onResetFilters,
   onRefresh,
+  hideBatchToolbar = false,
 }: RecordReportsTableProps) {
   const { t } = useTranslation("progressReports");
   const activeReportsList = reports || reportsList || [];
@@ -152,18 +153,20 @@ export default function RecordReportsCardGrid({
 
   return (
     <div className="space-y-4 w-full">
-      {/* Batch and Selection Header Toolbar */}
-      <TableBatchToolbar
-        totalItems={totalItems}
-        selectedCount={selectedIds.size}
-        isAllExpanded={isAllCurrentSelected}
-        onToggleExpandAll={handleToggleSelectAll}
-        expandAllLabel={t("selectAll", "Select All Visible")}
-        collapseAllLabel={t("deselectAll", "Deselect All Visible")}
-        showingLabel={`Showing ${paginatedReports.length} of ${totalItems} reports`}
-        showSelectedBadge={true}
-        selectedBadgeLabel="selected"
-      />
+      {/* Batch and Selection Header Toolbar (Hidden when Analytics is expanded) */}
+      {!hideBatchToolbar && (
+        <TableBatchToolbar
+          totalItems={totalItems}
+          selectedCount={selectedIds.size}
+          isAllExpanded={isAllCurrentSelected}
+          onToggleExpandAll={handleToggleSelectAll}
+          expandAllLabel={t("selectAll", "Select All Visible")}
+          collapseAllLabel={t("deselectAll", "Deselect All Visible")}
+          showingLabel={`Showing ${paginatedReports.length} of ${totalItems} reports`}
+          showSelectedBadge={true}
+          selectedBadgeLabel="selected"
+        />
+      )}
 
       {/* Grid of Report Cards */}
       <DataCardGrid

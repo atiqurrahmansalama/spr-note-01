@@ -146,6 +146,9 @@ export interface StudentGroupedTableProps {
   onPrintPDF?: (payload: any) => void;
   onResetFilters?: () => void;
   onRefresh?: () => void;
+  isAllExpanded?: boolean;
+  onToggleExpandAll?: () => void;
+  hideBatchToolbar?: boolean;
 }
 
 export interface RecordReportsTableProps {
@@ -165,6 +168,9 @@ export interface RecordReportsTableProps {
   onPrintPDF?: (payload: any) => void;
   onResetFilters?: () => void;
   onRefresh?: () => void;
+  isAllExpanded?: boolean;
+  onToggleExpandAll?: () => void;
+  hideBatchToolbar?: boolean;
 }
 
 // Backward-compatible aliases

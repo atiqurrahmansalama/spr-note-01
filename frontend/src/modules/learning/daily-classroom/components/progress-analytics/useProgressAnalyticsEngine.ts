@@ -2,11 +2,11 @@ import { useMemo } from "react";
 import { ReportItem } from "../../progress-management/progress-reports/types";
 import {
   MetricType,
-  TimeHorizon,
   ProgressTrendPoint,
   ProgressKPI,
   SessionBreakdownItem,
   ProgressAnalyticsEngineResult,
+  TimeHorizon,
 } from "./types";
 
 const getReportDate = (r: ReportItem): string => {
@@ -63,42 +63,49 @@ const formatDayLabel = (dateStr: string): string => {
   return dateStr;
 };
 
-const formatMonthLabel = (monthStr: string): string => {
-  try {
-    const parts = monthStr.split("-");
-    if (parts.length === 2) {
-      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
-      return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+const parseISODateParts = (str: string): { year: number; month: number; day: number } | null => {
+  const parts = str.split("-");
+  if (parts.length === 3) {
+    const year = Number(parts[0]);
+    const month = Number(parts[1]) - 1;
+    const day = Number(parts[2]);
+    if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+      return { year, month, day };
     }
-  } catch {}
-  return monthStr;
+  }
+  return null;
 };
 
-const getWeekKey = (dateStr: string): { key: string; label: string } => {
-  try {
-    const parts = dateStr.split("-");
-    if (parts.length === 3) {
-      const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      const startOfWeek = new Date(date);
-      const day = date.getDay();
-      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-      startOfWeek.setDate(diff);
+const generateDatesBetween = (startStr: string, endStr: string): string[] => {
+  const dates: string[] = [];
+  const sParts = parseISODateParts(startStr);
+  const eParts = parseISODateParts(endStr);
+  if (!sParts || !eParts) return [];
 
-      const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(startOfWeek.getDate() + 6);
+  const s = new Date(sParts.year, sParts.month, sParts.day);
+  const e = new Date(eParts.year, eParts.month, eParts.day);
+  if (s > e) return [];
 
-      const key = `${startOfWeek.getFullYear()}-W${Math.ceil(diff / 7)}`;
-      const label = `${startOfWeek.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${endOfWeek.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
-      return { key, label };
-    }
-  } catch {}
-  return { key: dateStr, label: dateStr };
+  const diffDays = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays > 90) return [];
+
+  const cur = new Date(s);
+  while (cur <= e) {
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, "0");
+    const d = String(cur.getDate()).padStart(2, "0");
+    dates.push(`${y}-${m}-${d}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
 };
 
 export function useProgressAnalyticsEngine(
   reports: ReportItem[] = [],
-  metric: MetricType = "pages",
-  horizon: TimeHorizon = "daily"
+  metric: MetricType = "combined",
+  startDate?: string,
+  endDate?: string,
+  _legacyHorizon?: TimeHorizon
 ): ProgressAnalyticsEngineResult {
   return useMemo(() => {
     // 1. Overall Aggregations
@@ -129,23 +136,19 @@ export function useProgressAnalyticsEngine(
       }
       const sessStat = sessionMap.get(sess)!;
       sessStat.totalReports += 1;
-      sessStat.totalPages += p;
+      sessStat.totalPages = Number((sessStat.totalPages + p).toFixed(1));
       sessStat.totalErrors += m + s;
     });
 
+    totalPages = Number(totalPages.toFixed(1));
     const totalErrors = totalMistakes + totalStucks;
     const studentCount = studentSet.size;
     const averagePagesPerReport = totalReports > 0 ? Number((totalPages / totalReports).toFixed(1)) : 0;
+    const accuracyRate = totalPages > 0
+      ? Math.max(0, Math.min(100, Math.round(100 - (totalErrors / Math.max(1, totalPages)) * 6)))
+      : totalReports > 0 ? 100 : 0;
 
-    // Quality/Clean Rate: Calculated realistically based on error frequency per page
-    const accuracyRate =
-      totalPages > 0
-        ? Math.max(0, Math.min(100, Math.round(100 - (totalErrors / Math.max(1, totalPages)) * 6)))
-        : totalReports > 0
-        ? 100
-        : 0;
-
-    // 2. Timeline Aggregation (Group by Daily, Weekly, or Monthly)
+    // 2. Timeline Aggregation (Driven strictly by the Date Picker / active dates)
     interface BucketData {
       key: string;
       label: string;
@@ -160,26 +163,38 @@ export function useProgressAnalyticsEngine(
 
     const bucketMap = new Map<string, BucketData>();
 
+    // Determine the date sequence
+    let dateSlots: string[] = [];
+    if (startDate && endDate) {
+      dateSlots = generateDatesBetween(startDate, endDate);
+    }
+
+    // Pre-populate date slots if generated
+    if (dateSlots.length > 0) {
+      dateSlots.forEach((d) => {
+        bucketMap.set(d, {
+          key: d,
+          label: formatDayLabel(d),
+          dateStr: d,
+          totalPages: 0,
+          totalReports: 0,
+          totalMistakes: 0,
+          totalStucks: 0,
+          studentSet: new Set<string>(),
+          sessionSet: new Set<string>(),
+        });
+      });
+    }
+
+    // Ingest reports into buckets
     reports.forEach((r) => {
       const dateStr = getReportDate(r);
       if (!dateStr) return;
 
-      let bKey = dateStr;
-      let bLabel = formatDayLabel(dateStr);
-
-      if (horizon === "weekly") {
-        const weekInfo = getWeekKey(dateStr);
-        bKey = weekInfo.key;
-        bLabel = weekInfo.label;
-      } else if (horizon === "monthly") {
-        bKey = dateStr.substring(0, 7);
-        bLabel = formatMonthLabel(bKey);
-      }
-
-      if (!bucketMap.has(bKey)) {
-        bucketMap.set(bKey, {
-          key: bKey,
-          label: bLabel,
+      if (!bucketMap.has(dateStr)) {
+        bucketMap.set(dateStr, {
+          key: dateStr,
+          label: formatDayLabel(dateStr),
           dateStr,
           totalPages: 0,
           totalReports: 0,
@@ -190,12 +205,12 @@ export function useProgressAnalyticsEngine(
         });
       }
 
-      const b = bucketMap.get(bKey)!;
+      const b = bucketMap.get(dateStr)!;
       const p = getReportPages(r);
       const m = getReportMistakes(r);
       const s = getReportStucks(r);
 
-      b.totalPages += p;
+      b.totalPages = Number((b.totalPages + p).toFixed(1));
       b.totalReports += 1;
       b.totalMistakes += m;
       b.totalStucks += s;
@@ -206,6 +221,31 @@ export function useProgressAnalyticsEngine(
       const sName = r.session_name || r.session;
       if (sName) b.sessionSet.add(sName);
     });
+
+    // If dateSlots was not pre-populated but reports have multiple dates spanning <= 31 days, fill intermediate days
+    if (dateSlots.length === 0 && bucketMap.size > 1) {
+      const allReportDates = Array.from(bucketMap.keys()).sort();
+      const minD = allReportDates[0];
+      const maxD = allReportDates[allReportDates.length - 1];
+      const filledDates = generateDatesBetween(minD, maxD);
+      if (filledDates.length > 0 && filledDates.length <= 31) {
+        filledDates.forEach((d) => {
+          if (!bucketMap.has(d)) {
+            bucketMap.set(d, {
+              key: d,
+              label: formatDayLabel(d),
+              dateStr: d,
+              totalPages: 0,
+              totalReports: 0,
+              totalMistakes: 0,
+              totalStucks: 0,
+              studentSet: new Set<string>(),
+              sessionSet: new Set<string>(),
+            });
+          }
+        });
+      }
+    }
 
     // Sort buckets chronologically
     const sortedBuckets = Array.from(bucketMap.values()).sort((a, b) =>
@@ -221,9 +261,11 @@ export function useProgressAnalyticsEngine(
           : 100;
 
       let activeValue = b.totalPages;
-      if (metric === "reports") activeValue = b.totalReports;
-      else if (metric === "mistakes") activeValue = bErrors;
-      else if (metric === "accuracy") activeValue = bAcc;
+      if (metric === "mistakes") {
+        activeValue = Math.max(b.totalMistakes, b.totalStucks);
+      } else if (metric === "combined") {
+        activeValue = Math.max(b.totalPages, b.totalMistakes, b.totalStucks);
+      }
 
       return {
         key: b.key,
@@ -241,69 +283,86 @@ export function useProgressAnalyticsEngine(
       };
     });
 
-    const maxMetricValue = Math.max(...trendPoints.map((p) => p.activeValue), 1);
+    const activeDaysCount = trendPoints.filter((p) => p.totalPages > 0 || p.totalReports > 0).length || 1;
+    const avgPagesPerDay = Number((totalPages / Math.max(1, activeDaysCount)).toFixed(1));
+    const peakDayPages = Math.max(...trendPoints.map((p) => p.totalPages), 0);
+
+    const maxMetricValue = Math.max(
+      ...trendPoints.map((p) => {
+        if (metric === "mistakes") {
+          return Math.max(p.totalMistakes, p.totalStucks);
+        }
+        if (metric === "combined") {
+          return Math.max(p.totalPages, p.totalMistakes, p.totalStucks);
+        }
+        return p.totalPages;
+      }),
+      1
+    );
 
     // 3. Sparklines for KPIs (Extracted from the last 7 to 10 points)
     const recentPoints = trendPoints.slice(-10);
     const sparklinePages = recentPoints.map((p) => p.totalPages);
-    const sparklineReports = recentPoints.map((p) => p.totalReports);
-    const sparklineErrors = recentPoints.map((p) => p.totalErrors);
-    const sparklineAccuracy = recentPoints.map((p) => p.accuracyRate);
+    const sparklineMistakes = recentPoints.map((p) => p.totalMistakes);
+    const sparklineStucks = recentPoints.map((p) => p.totalStucks);
+    const sparklineStudents = recentPoints.map((p) => p.studentCount);
 
-    // Ensure fallback sparkline array if points are sparse
     const padSparkline = (arr: number[], defVal: number) => {
       if (arr.length === 0) return [defVal, defVal];
       if (arr.length === 1) return [arr[0], arr[0]];
       return arr;
     };
 
-    // Calculate Trend Deltas (Comparing last point to previous)
-    const getDelta = (arr: number[]) => {
+    const getDelta = (arr: number[], inverse = false) => {
       if (arr.length < 2) return undefined;
       const last = arr[arr.length - 1];
       const prev = arr[arr.length - 2];
-      if (prev === 0) return { value: `${last > 0 ? "+" : ""}${last}`, isPositive: last >= 0 };
+      if (prev === 0) {
+        return {
+          value: `${last > 0 ? "+" : ""}${last}`,
+          isPositive: inverse ? last <= 0 : last >= 0,
+        };
+      }
       const pct = Math.round(((last - prev) / prev) * 100);
-      return { value: `${pct >= 0 ? "+" : ""}${pct}% vs prior`, isPositive: pct >= 0 };
+      return {
+        value: `${pct >= 0 ? "+" : ""}${pct}% vs prior`,
+        isPositive: inverse ? pct <= 0 : pct >= 0,
+      };
     };
 
+    // 4 High-Value KPI Cards (Zero hardcoded evaluations or quality rate)
     const kpis: ProgressKPI[] = [
       {
         id: "total_pages",
         label: "Total Pages Covered",
         value: `${totalPages} Pages`,
-        subValue: `Avg ${averagePagesPerReport}p per session`,
+        subValue: `Avg ${averagePagesPerReport}p per session · ${avgPagesPerDay}p daily`,
         sparkline: padSparkline(sparklinePages, totalPages),
         trend: getDelta(sparklinePages),
       },
       {
-        id: "total_evaluations",
-        label: "Evaluations Completed",
-        value: totalReports,
-        subValue: `Across ${studentCount} students`,
-        sparkline: padSparkline(sparklineReports, totalReports),
-        trend: getDelta(sparklineReports),
+        id: "total_mistakes",
+        label: "Mistakes (Errors)",
+        value: totalMistakes,
+        subValue: `Across ${totalReports} sessions`,
+        sparkline: padSparkline(sparklineMistakes, totalMistakes),
+        trend: getDelta(sparklineMistakes, true),
       },
       {
-        id: "total_errors",
-        label: "Mistakes & Stucks",
-        value: totalErrors,
-        subValue: `${totalMistakes} Mistakes · ${totalStucks} Stucks`,
-        sparkline: padSparkline(sparklineErrors, totalErrors),
-        trend: getDelta(sparklineErrors)
-          ? {
-              value: getDelta(sparklineErrors)!.value,
-              isPositive: !getDelta(sparklineErrors)!.isPositive, // For errors, less is positive
-            }
-          : undefined,
+        id: "total_stucks",
+        label: "Stucks (Hesitations)",
+        value: totalStucks,
+        subValue: `Total pauses noted`,
+        sparkline: padSparkline(sparklineStucks, totalStucks),
+        trend: getDelta(sparklineStucks, true),
       },
       {
-        id: "accuracy_rate",
-        label: "Average Quality Rate",
-        value: `${accuracyRate}%`,
-        subValue: accuracyRate >= 90 ? "Excellent retention" : "Moderate revisions needed",
-        sparkline: padSparkline(sparklineAccuracy, accuracyRate),
-        trend: getDelta(sparklineAccuracy),
+        id: "active_students",
+        label: "Students Reciting",
+        value: studentCount,
+        subValue: `Covering ${trendPoints.length} day timeline`,
+        sparkline: padSparkline(sparklineStudents, studentCount),
+        trend: getDelta(sparklineStudents),
       },
     ];
 
@@ -328,17 +387,21 @@ export function useProgressAnalyticsEngine(
       })
       .sort((a, b) => b.totalPages - a.totalPages);
 
-    // 5. Intelligent Data-Driven Summary Text
-    let aiInsight = "No progress records found matching the active filter criteria.";
+    // 5. Intelligent Summary Text
+    let aiInsight = "No progress records found matching the active date criteria.";
     if (totalReports > 0) {
       const topSession = sessionBreakdown[0];
       const errorRateText =
         totalErrors === 0
-          ? "with zero recorded mistakes"
-          : `with an average of ${(totalErrors / Math.max(1, totalPages)).toFixed(1)} mistakes per page`;
+          ? "with flawless zero recorded errors"
+          : `with ${totalMistakes} mistakes and ${totalStucks} stucks across ${totalPages} pages`;
 
-      aiInsight = `${studentCount} student${studentCount === 1 ? "" : "s"} evaluated across ${totalReports} session${totalReports === 1 ? "" : "s"}, covering ${totalPages} pages ${errorRateText}. ${
-        topSession ? `${topSession.sessionName} conducted the highest recitation volume (${topSession.totalPages} pages, ${topSession.cleanRate}% clean rate).` : ""
+      aiInsight = `${studentCount} student${studentCount === 1 ? "" : "s"} recited across ${totalReports} session${
+        totalReports === 1 ? "" : "s"
+      }, covering ${totalPages} pages (${errorRateText}). ${
+        topSession
+          ? `${topSession.sessionName} registered the highest recitation volume (${topSession.totalPages} pages, ${topSession.totalErrors} errors).`
+          : ""
       }`;
     }
 
@@ -351,11 +414,15 @@ export function useProgressAnalyticsEngine(
       accuracyRate,
       studentCount,
       averagePagesPerReport,
+      avgPagesPerDay,
+      peakDayPages,
       kpis,
       trendPoints,
       sessionBreakdown,
       maxMetricValue,
       aiInsight,
     };
-  }, [reports, metric, horizon]);
+  }, [reports, metric, startDate, endDate]);
 }
+
+export default useProgressAnalyticsEngine;

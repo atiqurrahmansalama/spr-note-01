@@ -1,4 +1,5 @@
 import React from 'react';
+import { InfoIcon } from '@/components/ui/Icons';
 
 const COLOR_MAP: Record<string, { icon: string; value: string }> = {
   accent: {
@@ -40,7 +41,7 @@ const COLOR_MAP: Record<string, { icon: string; value: string }> = {
 };
 
 export type MetricCardDensity = 'default' | 'compact' | 'minimal';
-export type MetricCardVariant = 'surface' | 'sub' | 'outline' | 'flat';
+export type MetricCardVariant = 'surface' | 'sub' | 'outline' | 'flat' | 'kpi';
 export type MetricIconPosition = 'right' | 'left' | 'top';
 
 export interface MetricItem {
@@ -49,6 +50,8 @@ export interface MetricItem {
   value: string | number | React.ReactNode;
   subLabel?: string;
   badge?: React.ReactNode | string;
+  sparkline?: number[];
+  footer?: React.ReactNode;
   icon?: React.ComponentType<{ className?: string }>;
   iconPosition?: MetricIconPosition;
   color?: 'accent' | 'default' | 'primary' | 'sky' | 'emerald' | 'purple' | 'amber' | 'rose' | 'indigo' | string;
@@ -70,6 +73,8 @@ export interface MetricCardProps {
   value: string | number | React.ReactNode;
   subLabel?: string;
   badge?: React.ReactNode | string;
+  sparkline?: number[];
+  footer?: React.ReactNode;
   icon?: React.ComponentType<{ className?: string }>;
   iconPosition?: MetricIconPosition;
   color?: string;
@@ -91,6 +96,8 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   value,
   subLabel,
   badge,
+  sparkline,
+  footer,
   icon: Icon,
   iconPosition = 'right',
   color = 'default',
@@ -106,6 +113,61 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   iconWrapperClassName = '',
   children,
 }) => {
+  // Enterprise KPI Card Variant (Header with Info Icon, Big Bold Mono Metric, and Border-t Trend Footer)
+  if (variant === 'kpi') {
+    return (
+      <div
+        onClick={onClick}
+        title={title}
+        className={`theme-bg-surface border theme-border rounded-2xl p-4 sm:p-4.5 shadow-2xs space-y-3 transition-all duration-200 hover:border-[var(--border-hover)] select-none min-w-0 ${
+          onClick ? 'cursor-pointer hover:theme-bg-sub/30 active:scale-[0.99]' : ''
+        } ${className}`}
+      >
+        {/* 1. Header: Label + Info Indicator / Icon */}
+        <div className="flex items-center justify-between text-[11px] font-bold tracking-wider uppercase theme-text-secondary">
+          <span className={`truncate ${labelClassName}`}>{label}</span>
+          {Icon ? (
+            <Icon className={`w-3.5 h-3.5 theme-text-secondary opacity-50 shrink-0 ml-1 ${iconClassName}`} />
+          ) : (
+            <InfoIcon className="w-3.5 h-3.5 theme-text-secondary opacity-50 shrink-0 ml-1" />
+          )}
+        </div>
+
+        {/* 2. Middle Row: Big Bold Metric + subLabel */}
+        <div className="flex items-end justify-between gap-3">
+          <div className="space-y-0.5 min-w-0 flex-1">
+            <span
+              className={`text-xl sm:text-2xl font-extrabold theme-text-primary tracking-tight font-mono block truncate ${valueClassName}`}
+            >
+              {value ?? 0}
+            </span>
+            {subLabel && (
+              <span
+                className={`text-[11px] theme-text-secondary block truncate ${subLabelClassName}`}
+                title={subLabel}
+              >
+                {subLabel}
+              </span>
+            )}
+          </div>
+          {children}
+        </div>
+
+        {/* 3. Footer: Trend Delta Indicator or Badge */}
+        {(badge || footer) && (
+          <div className="flex items-center gap-1.5 pt-2 text-[11px] font-mono border-t theme-border">
+            {footer || (
+              typeof badge === 'string' ? (
+                <span className="theme-accent font-bold">{badge}</span>
+              ) : (
+                badge
+              )
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
   const colorConfig = COLOR_MAP[color] || COLOR_MAP.default;
 
   // Density configurations
@@ -282,6 +344,8 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({
           value={item.value}
           subLabel={item.subLabel}
           badge={item.badge}
+          sparkline={item.sparkline}
+          footer={item.footer}
           icon={item.icon}
           iconPosition={item.iconPosition || iconPosition}
           color={item.color || 'default'}

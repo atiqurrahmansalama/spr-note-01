@@ -202,6 +202,10 @@ export default function ProgressReportsView({
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<number | string>>(new Set());
 
+  // Table rows expand/collapse all state
+  const [isAllExpanded, setIsAllExpanded] = useState<boolean>(false);
+  const handleToggleExpandAll = useCallback(() => setIsAllExpanded((prev) => !prev), []);
+
   // Context Menu state
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
@@ -1508,6 +1512,141 @@ export default function ProgressReportsView({
     }
   };
 
+  // Reusable Table Action Toolbar (Used in filter footer when analytics collapsed, or in dedicated box above table when analytics expanded)
+  const renderTableActionToolbar = (extraRightControls?: React.ReactNode) => {
+    if (selectedIds.size > 0) {
+      return (
+        <SelectionActionBar
+          fullWidth={true}
+          bordered={false}
+          selectedCount={selectedIds.size}
+          totalCount={filteredReports.length}
+          onToggleSelectAll={toggleSelectAll}
+          onClearSelection={handleDeselectAll}
+          actions={[
+            {
+              id: "sync",
+              label: `Sync to DB (${selectedIds.size})`,
+              shortLabel: `Sync to DB (${selectedIds.size})`,
+              icon: CloudIcon,
+              variant: "sub",
+              disabled: offline || isSyncing,
+              loading: isSyncing,
+              onClick: handleSyncSelectedReports,
+            },
+            {
+              id: "copy",
+              label: `Copy Summary (${selectedIds.size})`,
+              shortLabel: "Copy Summary",
+              icon: CopyIcon,
+              variant: "sub",
+              onClick: () => handleCopyTextReport(getActiveTargetReports()),
+            },
+            {
+              id: "delete",
+              label: `Delete (${selectedIds.size})`,
+              shortLabel: `Delete (${selectedIds.size})`,
+              icon: TrashIcon,
+              variant: "danger",
+              disabled: isDeleting,
+              onClick: handleBatchDeleteReports,
+            },
+          ]}
+        />
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-3 w-full">
+        {/* Left: Reports Count */}
+        <div className="flex items-center justify-center sm:justify-start gap-2 text-xs font-semibold theme-text-secondary select-none">
+          <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse shrink-0" />
+          <span className="theme-text-primary font-bold">
+            {filteredReports.length} / {reportsList.length}
+          </span>
+          <span>Reports</span>
+        </div>
+
+        {/* Center: Reusable Segmented Switch (Record Reports vs By Student) */}
+        <div className="flex items-center justify-center">
+          <SegmentedSwitch<"RECORD_REPORTS" | "STUDENT_VIEW">
+            value={viewMode}
+            onChange={handleViewModeChange}
+            options={[
+              {
+                value: "RECORD_REPORTS",
+                label: "Record Reports",
+                icon: CloudIcon,
+              },
+              {
+                value: "STUDENT_VIEW",
+                label: "By Student",
+                icon: UsersIcon,
+              },
+            ]}
+          />
+        </div>
+
+        {/* Right: Actions / Pending Sync + Cards/Table Toggle + Extra Controls */}
+        <div className="flex items-center justify-center sm:justify-end gap-2 shrink-0">
+          {pendingSyncCount > 0 && !offline && (
+            <button
+              type="button"
+              onClick={handleSyncOfflineReports}
+              disabled={loading || isSyncing}
+              className="py-1 px-2.5 rounded-xl text-xs font-semibold theme-bg-amber/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Sync offline reports to database"
+            >
+              {isSyncing ? (
+                <RefreshIcon className="w-3.5 h-3.5 shrink-0 animate-spin" />
+              ) : (
+                <CloudIcon className="w-3.5 h-3.5 shrink-0" />
+              )}
+              <span>
+                {isSyncing ? "Syncing..." : `Sync to DB (${pendingSyncCount})`}
+              </span>
+            </button>
+          )}
+
+          {/* Expand All / Collapse All Button when Analytics is Expanded */}
+          {showAnalytics && (
+            <button
+              type="button"
+              onClick={handleToggleExpandAll}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
+              title={isAllExpanded ? t("collapseAll", "Collapse All") : t("expandAll", "Expand All")}
+            >
+              <ChevronIcon isOpen={isAllExpanded} className="w-3.5 h-3.5 shrink-0" />
+              <span>{isAllExpanded ? t("collapseAll", "Collapse All") : t("expandAll", "Expand All")}</span>
+            </button>
+          )}
+
+          {/* Single Toggle Button for Cards / Table View */}
+          <button
+            type="button"
+            onClick={() => handleLayoutModeChange(layoutMode === "card" ? "table" : "card")}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
+            title={layoutMode === "card" ? "Switch to Table View" : "Switch to Cards View"}
+          >
+            {layoutMode === "card" ? (
+              <>
+                <TableIcon className="w-3.5 h-3.5 theme-accent" />
+                <span>Table</span>
+              </>
+            ) : (
+              <>
+                <Squares2X2Icon className="w-3.5 h-3.5 theme-accent" />
+                <span>Cards</span>
+              </>
+            )}
+          </button>
+
+          {extraRightControls}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div
       ref={containerRef}
@@ -1584,132 +1723,27 @@ export default function ProgressReportsView({
       >
         {/* Filter Box Bottom Footer Row */}
         <div className="pt-2.5 border-t theme-border w-full">
-          {selectedIds.size > 0 ? (
-            /* Google Drive style: Selection bar completely replaces standard footer controls */
-            <SelectionActionBar
-              fullWidth={true}
-              bordered={false}
-              selectedCount={selectedIds.size}
-              totalCount={filteredReports.length}
-              onToggleSelectAll={toggleSelectAll}
-              onClearSelection={handleDeselectAll}
-              actions={[
-                {
-                  id: "sync",
-                  label: `Sync to DB (${selectedIds.size})`,
-                  shortLabel: `Sync to DB (${selectedIds.size})`,
-                  icon: CloudIcon,
-                  variant: "sub",
-                  disabled: offline || isSyncing,
-                  loading: isSyncing,
-                  onClick: handleSyncSelectedReports,
-                },
-                {
-                  id: "copy",
-                  label: `Copy Summary (${selectedIds.size})`,
-                  shortLabel: "Copy Summary",
-                  icon: CopyIcon,
-                  variant: "sub",
-                  onClick: () => handleCopyTextReport(getActiveTargetReports()),
-                },
-                {
-                  id: "delete",
-                  label: `Delete (${selectedIds.size})`,
-                  shortLabel: `Delete (${selectedIds.size})`,
-                  icon: TrashIcon,
-                  variant: "danger",
-                  disabled: isDeleting,
-                  onClick: handleBatchDeleteReports,
-                },
-              ]}
-            />
-          ) : (
-            /* Standard Bottom Controls when no items are selected (Count, View Mode, Refresh) */
-            <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-3 w-full">
-              {/* Left: Showing count without background or border */}
-              <div className="flex items-center justify-center sm:justify-start gap-2 text-xs font-semibold theme-text-secondary select-none">
+          {showAnalytics ? (
+            /* When Analytics is expanded, table tools move down directly above the table */
+            <div className="flex items-center justify-between gap-3 w-full">
+              <div className="flex items-center gap-2 text-xs font-semibold theme-text-secondary select-none">
                 <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse shrink-0" />
                 <span className="theme-text-primary font-bold">
                   {filteredReports.length} / {reportsList.length}
                 </span>
-                <span>Reports</span>
+                <span>Reports Filtered</span>
               </div>
 
-              {/* Center: Reusable Segmented Switch */}
-              <div className="flex items-center justify-center">
-                <SegmentedSwitch<"RECORD_REPORTS" | "STUDENT_VIEW">
-                  value={viewMode}
-                  onChange={handleViewModeChange}
-                  options={[
-                    {
-                      value: "RECORD_REPORTS",
-                      label: "Record Reports",
-                      icon: CloudIcon,
-                    },
-                    {
-                      value: "STUDENT_VIEW",
-                      label: "By Student",
-                      icon: UsersIcon,
-                    },
-                  ]}
-                />
-              </div>
-
-              {/* Right: Actions / Pending Sync + Single Layout Toggle + Only-icon Refresh Button */}
-              <div className="flex items-center justify-center sm:justify-end gap-2 shrink-0">
-                {pendingSyncCount > 0 && !offline && (
-                  <button
-                    type="button"
-                    onClick={handleSyncOfflineReports}
-                    disabled={loading || isSyncing}
-                    className="py-1 px-2.5 rounded-xl text-xs font-semibold theme-bg-amber/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    title="Sync offline reports to database"
-                  >
-                    {isSyncing ? (
-                      <RefreshIcon className="w-3.5 h-3.5 shrink-0 animate-spin" />
-                    ) : (
-                      <CloudIcon className="w-3.5 h-3.5 shrink-0" />
-                    )}
-                    <span>
-                      {isSyncing ? "Syncing..." : `Sync to DB (${pendingSyncCount})`}
-                    </span>
-                  </button>
-                )}
-
-                {/* Single Toggle Button for Cards / Table View (Reusing /academy/periods pattern) */}
-                <button
-                  type="button"
-                  onClick={() => handleLayoutModeChange(layoutMode === "card" ? "table" : "card")}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
-                  title={layoutMode === "card" ? "Switch to Table View" : "Switch to Cards View"}
-                >
-                  {layoutMode === "card" ? (
-                    <>
-                      <TableIcon className="w-3.5 h-3.5 theme-accent" />
-                      <span>Table</span>
-                    </>
-                  ) : (
-                    <>
-                      <Squares2X2Icon className="w-3.5 h-3.5 theme-accent" />
-                      <span>Cards</span>
-                    </>
-                  )}
-                </button>
-
-                {/* Collapsible Analytics Toggle Button */}
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={handleToggleAnalytics}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none ${
-                    showAnalytics
-                      ? "theme-bg-accent theme-accent-text border-[var(--accent-main)]"
-                      : "theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary"
-                  }`}
-                  title={showAnalytics ? t("hideAnalytics", "Hide Analytics") : t("showAnalytics", "Show Analytics")}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none theme-bg-accent theme-accent-text border-[var(--accent-main)]"
+                  title={t("hideAnalytics", "Hide Analytics")}
                 >
                   <TrendingUpIcon className="w-3.5 h-3.5 shrink-0" />
-                  <span>{showAnalytics ? t("hideAnalytics", "Hide Analytics") : t("analytics", "Analytics")}</span>
-                  <ChevronIcon isOpen={showAnalytics} className="w-3 h-3 shrink-0" />
+                  <span>{t("hideAnalytics", "Hide Analytics")}</span>
+                  <ChevronIcon isOpen={true} className="w-3 h-3 shrink-0" />
                 </button>
 
                 <IconButton
@@ -1725,6 +1759,34 @@ export default function ProgressReportsView({
                 />
               </div>
             </div>
+          ) : (
+            /* When Analytics is collapsed, table tools remain here in the filter bottom row */
+            renderTableActionToolbar(
+              <>
+                <button
+                  type="button"
+                  onClick={handleToggleAnalytics}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary"
+                  title={t("showAnalytics", "Show Analytics")}
+                >
+                  <TrendingUpIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>{t("analytics", "Analytics")}</span>
+                  <ChevronIcon isOpen={false} className="w-3 h-3 shrink-0" />
+                </button>
+
+                <IconButton
+                  icon={RefreshIcon}
+                  onClick={handleRefresh}
+                  loading={isRefreshing}
+                  disabled={isRefreshing || isSyncing}
+                  variant="sub"
+                  size="sm"
+                  shape="rounded"
+                  title="Refresh Reports & Sync with Database"
+                  ariaLabel="Refresh Reports & Sync with Database"
+                />
+              </>
+            )
           )}
         </div>
       </DailyClassroomFilterControls>
@@ -1733,6 +1795,8 @@ export default function ProgressReportsView({
       {showAnalytics && (
         <ProgressAnalyticsDashboard
           reports={filteredReports}
+          startDate={startDate}
+          endDate={endDate}
           variant="full"
           collapsible={false}
           className="w-full"
@@ -1763,6 +1827,13 @@ export default function ProgressReportsView({
         </div>
       )}
 
+      {/* 2c. Dedicated Full-Width Single-Line Table Controls Box when Analytics is Expanded */}
+      {showAnalytics && (
+        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-2.5 sm:px-4 sm:py-2.5 shadow-2xs select-none animate-fade-in">
+          {renderTableActionToolbar()}
+        </div>
+      )}
+
       {/* VIEW MODES */}
       {loading ? (
         <ReportsTableSkeleton />
@@ -1783,6 +1854,9 @@ export default function ProgressReportsView({
                 onCopyText={(rep) => handleCopyTextReport(rep)}
                 onResetFilters={handleResetAllFilters}
                 onRefresh={handleRefresh}
+                isAllExpanded={isAllExpanded}
+                onToggleExpandAll={handleToggleExpandAll}
+                hideBatchToolbar={showAnalytics}
               />
             ) : (
               <RecordReportsCardGrid
@@ -1798,6 +1872,9 @@ export default function ProgressReportsView({
                 onCopyText={(rep) => handleCopyTextReport(rep)}
                 onResetFilters={handleResetAllFilters}
                 onRefresh={handleRefresh}
+                isAllExpanded={isAllExpanded}
+                onToggleExpandAll={handleToggleExpandAll}
+                hideBatchToolbar={showAnalytics}
               />
             )
           )}
@@ -1818,6 +1895,9 @@ export default function ProgressReportsView({
                 onCopyText={(rep) => handleCopyTextReport(rep)}
                 onResetFilters={handleResetAllFilters}
                 onRefresh={handleRefresh}
+                isAllExpanded={isAllExpanded}
+                onToggleExpandAll={handleToggleExpandAll}
+                hideBatchToolbar={showAnalytics}
               />
             ) : (
               <StudentGroupedCardGrid
@@ -1835,6 +1915,9 @@ export default function ProgressReportsView({
                 onCopyText={(rep) => handleCopyTextReport(rep)}
                 onResetFilters={handleResetAllFilters}
                 onRefresh={handleRefresh}
+                isAllExpanded={isAllExpanded}
+                onToggleExpandAll={handleToggleExpandAll}
+                hideBatchToolbar={showAnalytics}
               />
             )
           )}
