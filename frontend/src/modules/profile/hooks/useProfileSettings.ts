@@ -129,22 +129,35 @@ export function useProfileSettings() {
   }, [is2FAEnabled, passkeysCount, t]);
 
   const handleExportData = useCallback(() => {
-    const archiveData = {
-      export_date: new Date().toISOString(),
-      user: user || {},
-      settings_version: '1.0.0',
-    };
+    setConfirmDialog({
+      isOpen: true,
+      title: t('confirmExportTitle', 'Export Personal Account Data'),
+      description: t(
+        'confirmExportDesc',
+        'Download a complete JSON archive of your personal profile, security configuration, and account preferences.'
+      ),
+      confirmText: t('confirmExportAction', 'Download JSON Archive'),
+      confirmVariant: 'primary',
+      onConfirm: () => {
+        const archiveData = {
+          export_date: new Date().toISOString(),
+          user: user || {},
+          settings_version: '1.0.0',
+        };
 
-    const blob = new Blob([JSON.stringify(archiveData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `profile_data_${new Date().toISOString().split('T')[0]}.json`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+        const blob = new Blob([JSON.stringify(archiveData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `profile_data_${new Date().toISOString().split('T')[0]}.json`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
 
-    showToast(t('toastExportSuccess', 'Exported personal profile archive to JSON!'), 'success');
+        showToast(t('toastExportSuccess', 'Exported personal profile archive to JSON!'), 'success');
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
   }, [user, showToast, t]);
 
   const requestSignOut = useCallback(() => {
@@ -154,9 +167,9 @@ export function useProfileSettings() {
       description: t('confirmSignOutDesc', 'Are you sure you want to sign out of your account?'),
       confirmText: t('confirmSignOutAction', 'Sign Out'),
       confirmVariant: 'danger',
-      onConfirm: () => {
-        logoutUser();
-        window.location.reload();
+      onConfirm: async () => {
+        await logoutUser();
+        window.location.href = '/';
       },
     });
   }, [t]);

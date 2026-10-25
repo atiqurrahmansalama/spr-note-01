@@ -1215,9 +1215,12 @@ class PasskeyRegisterOptionsView(APIView):
         user_id_b64 = base64.b64encode(str(user.id if user else 1).encode()).decode()
 
         challenge = base64.b64encode(uuid.uuid4().bytes).decode()
+        raw_host = request.get_host().split(':')[0]
+        rp_id = 'localhost' if raw_host in ['127.0.0.1', 'localhost', '::1', 'testserver'] else raw_host
+
         options = {
             "challenge": challenge,
-            "rp": {"name": "SPR Note Suite", "id": request.get_host().split(':')[0]},
+            "rp": {"name": "SPR Note Suite", "id": rp_id},
             "user": {
                 "id": user_id_b64,
                 "name": username,
@@ -1246,9 +1249,13 @@ class PasskeyRegisterVerifyView(APIView):
     def post(self, request):
         user = request.user
 
-        cred_id = request.data.get('credential_id') or request.data.get('id') or f"cred_{uuid.uuid4().hex[:16]}"
+        credential = request.data.get('credential') or {}
+        cred_id = credential.get('id') or request.data.get('credential_id') or request.data.get('id')
+        if not cred_id or str(cred_id).startswith('passkey_') or cred_id == 'b64_fallback':
+            return Response({'error': 'A valid hardware/biometric passkey credential is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
         pub_key = request.data.get('public_key') or "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
-        device_name = request.data.get('device_name') or request.headers.get('User-Agent', 'Windows Hello / Touch ID')[:50]
+        device_name = request.data.get('name') or request.data.get('device_name') or request.headers.get('User-Agent', 'Passkey')[:50]
 
         passkey = UserPasskey.objects.create(
             user=user,
@@ -1384,7 +1391,7 @@ class Enable2FAView(APIView):
 
 class Disable2FAView(APIView):
     """
-    Disables 2FA after password or TOTP verification.
+    Disables 2FA after password, TOTP, or emergency backup code verification.
     """
     permission_classes = [IsAuthenticated]
 
@@ -1394,16 +1401,36 @@ class Disable2FAView(APIView):
         password = request.data.get('current_password') or request.data.get('password')
         code = request.data.get('code')
 
+        if not password and not code:
+            return Response({'error': 'Please provide either your account password or 6-digit verification code.'}, status=status.HTTP_400_BAD_REQUEST)
+
         verified = False
-        if password and user.check_password(password):
-            verified = True
-        elif code and user.totp_secret and pyotp.TOTP(user.totp_secret).verify(str(code).strip()):
-            verified = True
-        elif not password and not code:
-            verified = True # Admin or settings trigger
+
+        if password:
+            if not user.has_usable_password():
+                return Response({
+                    'error': 'This account does not have a usable password set. Please verify using your 6-digit authenticator code.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            if user.check_password(str(password)):
+                verified = True
+            else:
+                return Response({'error': 'Incorrect account password.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not verified and code:
+            clean_code = str(code).strip()
+            if user.totp_secret and pyotp.TOTP(user.totp_secret).verify(clean_code):
+                verified = True
+            elif user.backup_codes:
+                from django.contrib.auth.hashers import check_password
+                for hashed in user.backup_codes:
+                    if check_password(clean_code, hashed):
+                        verified = True
+                        break
+            if not verified:
+                return Response({'error': 'Invalid 6-digit authenticator or backup code.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not verified:
-            return Response({'error': 'Invalid password or verification code.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Verification failed. Please check your credentials.'}, status=status.HTTP_400_BAD_REQUEST)
 
         user.is_2fa_enabled = False
         user.totp_secret = None

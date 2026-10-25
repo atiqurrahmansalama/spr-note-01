@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useToast } from '../../../context/ToastContext';
 import { fetchWithAuth } from '../../../utils/authService';
-import { EyeIcon, EyeOffIcon, AlertCircleIcon, CheckIcon } from '../../../components/ui/Icons';
+import { AlertCircleIcon, CheckIcon, LockIcon } from '../../../components/ui/Icons';
 import CustomInput from '../../../components/ui/CustomInput';
-import { DrawerContainer, DrawerFooter } from '../../../components/layout';
+import { DrawerContainer, DrawerFooter, DrawerSection } from '../../../components/layout';
 import { useTranslation } from '../../../i18n';
 
 interface ChangePasswordDrawerProps {
@@ -20,9 +20,6 @@ export const ChangePasswordDrawer: React.FC<ChangePasswordDrawerProps> = ({ onCl
     confirm_password: '',
   });
 
-  const [showOldPass, setShowOldPass] = useState(false);
-  const [showNewPass, setShowNewPass] = useState(false);
-  const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -110,107 +107,88 @@ export const ChangePasswordDrawer: React.FC<ChangePasswordDrawerProps> = ({ onCl
   return (
     <DrawerContainer padding="none" spacing="normal">
       <form onSubmit={handleSubmit} className="@container space-y-5 pt-2 pb-6 px-1">
-        {errorMsg && (
-          <div className="p-3 rounded-xl theme-bg-danger-soft border border-rose-500/20 theme-danger text-xs flex items-center gap-2">
-            <AlertCircleIcon className="w-4 h-4 shrink-0" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
+        <DrawerSection
+          title={t('drawerPasswordTitle', 'Update Account Password')}
+          subtitle={t('drawerPasswordSubtitle', 'Choose a strong password to safeguard account access.')}
+          icon={LockIcon}
+          className="pt-0 first:pt-0"
+        >
+          {errorMsg && (
+            <div className="p-3 rounded-xl theme-bg-danger-soft border border-rose-500/20 theme-danger text-xs flex items-center gap-2">
+              <AlertCircleIcon className="w-4 h-4 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
 
-        {/* Current Password */}
-        <div className="relative">
+          {/* Current Password */}
           <CustomInput
-            type={showOldPass ? 'text' : 'password'}
+            type="password"
             label={t('currentPassword', 'Current Password')}
             value={form.old_password}
-            onChange={(e: any) =>
-              setForm((prev) => ({ ...prev, old_password: typeof e === 'string' ? e : e.target.value }))
+            onChange={(val: any) =>
+              setForm((prev) => ({ ...prev, old_password: typeof val === 'string' ? val : val?.target?.value || '' }))
             }
             placeholder={t('enterCurrentPassword', 'Enter current password')}
+            autoFocus
           />
-          <button
-            type="button"
-            onClick={() => setShowOldPass(!showOldPass)}
-            className="absolute right-3 top-8 text-xs theme-text-secondary hover:theme-text-primary p-1 cursor-pointer"
-          >
-            {showOldPass ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
-          </button>
-        </div>
 
-        {/* New Password */}
-        <div className="relative">
+          {/* New Password */}
           <CustomInput
-            type={showNewPass ? 'text' : 'password'}
+            type="password"
             label={t('newPassword', 'New Password')}
             value={form.new_password}
-            onChange={(e: any) =>
-              setForm((prev) => ({ ...prev, new_password: typeof e === 'string' ? e : e.target.value }))
+            onChange={(val: any) =>
+              setForm((prev) => ({ ...prev, new_password: typeof val === 'string' ? val : val?.target?.value || '' }))
             }
             placeholder={t('enterNewPassword', 'Minimum 6 characters')}
           />
-          <button
-            type="button"
-            onClick={() => setShowNewPass(!showNewPass)}
-            className="absolute right-3 top-8 text-xs theme-text-secondary hover:theme-text-primary p-1 cursor-pointer"
-          >
-            {showNewPass ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
-          </button>
-        </div>
 
-        {/* Strength Meter Bar */}
-        {form.new_password && (
-          <div className="space-y-1.5 p-3.5 rounded-xl theme-bg-sub/50 border theme-border">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="theme-text-secondary">{t('passwordStrength', 'Password Strength')}:</span>
-              <span className={`font-semibold ${strength.color}`}>{strength.text}</span>
+          {/* Strength Meter Bar */}
+          {form.new_password && (
+            <div className="space-y-1.5 p-3.5 rounded-xl theme-bg-sub/50 border theme-border">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="theme-text-secondary">{t('passwordStrength', 'Password Strength')}:</span>
+                <span className={`font-semibold ${strength.color}`}>{strength.text}</span>
+              </div>
+              <div className="h-1.5 w-full theme-bg-sub rounded-full overflow-hidden border theme-border">
+                <div
+                  className={`h-full transition-all duration-300 rounded-full ${
+                    score <= 1
+                      ? 'theme-bg-danger'
+                      : score === 2
+                      ? 'bg-amber-500'
+                      : 'theme-bg-accent'
+                  } ${strength.width}`}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-1 text-[11px] theme-text-secondary pt-1">
+                <span className={hasMinLength ? 'theme-accent flex items-center gap-1' : 'flex items-center gap-1'}>
+                  <CheckIcon className="w-3 h-3" /> {t('rule6Chars', '6+ characters')}
+                </span>
+                <span className={hasUpper ? 'theme-accent flex items-center gap-1' : 'flex items-center gap-1'}>
+                  <CheckIcon className="w-3 h-3" /> {t('ruleUppercase', 'Uppercase letter')}
+                </span>
+                <span className={hasNumber ? 'theme-accent flex items-center gap-1' : 'flex items-center gap-1'}>
+                  <CheckIcon className="w-3 h-3" /> {t('ruleNumber', 'Number (0-9)')}
+                </span>
+                <span className={hasSpecial ? 'theme-accent flex items-center gap-1' : 'flex items-center gap-1'}>
+                  <CheckIcon className="w-3 h-3" /> {t('ruleSymbol', 'Special symbol')}
+                </span>
+              </div>
             </div>
-            <div className="h-1.5 w-full theme-bg-sub rounded-full overflow-hidden border theme-border">
-              <div
-                className={`h-full transition-all duration-300 rounded-full ${
-                  score <= 1
-                    ? 'theme-bg-danger'
-                    : score === 2
-                    ? 'bg-amber-500'
-                    : 'theme-bg-accent'
-                } ${strength.width}`}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-1 text-[11px] theme-text-secondary pt-1">
-              <span className={hasMinLength ? 'theme-accent flex items-center gap-1' : 'flex items-center gap-1'}>
-                <CheckIcon className="w-3 h-3" /> {t('rule6Chars', '6+ characters')}
-              </span>
-              <span className={hasUpper ? 'theme-accent flex items-center gap-1' : 'flex items-center gap-1'}>
-                <CheckIcon className="w-3 h-3" /> {t('ruleUppercase', 'Uppercase letter')}
-              </span>
-              <span className={hasNumber ? 'theme-accent flex items-center gap-1' : 'flex items-center gap-1'}>
-                <CheckIcon className="w-3 h-3" /> {t('ruleNumber', 'Number (0-9)')}
-              </span>
-              <span className={hasSpecial ? 'theme-accent flex items-center gap-1' : 'flex items-center gap-1'}>
-                <CheckIcon className="w-3 h-3" /> {t('ruleSymbol', 'Special symbol')}
-              </span>
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* Confirm Password */}
-        <div className="relative">
+          {/* Confirm Password */}
           <CustomInput
-            type={showConfirmPass ? 'text' : 'password'}
+            type="password"
             label={t('confirmPassword', 'Confirm New Password')}
             value={form.confirm_password}
-            onChange={(e: any) =>
-              setForm((prev) => ({ ...prev, confirm_password: typeof e === 'string' ? e : e.target.value }))
+            onChange={(val: any) =>
+              setForm((prev) => ({ ...prev, confirm_password: typeof val === 'string' ? val : val?.target?.value || '' }))
             }
             placeholder={t('retypeNewPassword', 'Retype new password')}
           />
-          <button
-            type="button"
-            onClick={() => setShowConfirmPass(!showConfirmPass)}
-            className="absolute right-3 top-8 text-xs theme-text-secondary hover:theme-text-primary p-1 cursor-pointer"
-          >
-            {showConfirmPass ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
-          </button>
-        </div>
+        </DrawerSection>
       </form>
 
       <DrawerFooter

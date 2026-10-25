@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { useToast } from '../../../context/ToastContext';
 import { fetchWithAuth } from '../../../utils/authService';
+import { auth as authStore } from '../../../utils/localStore';
 import {
   LockIcon,
   CheckIcon,
@@ -9,11 +11,13 @@ import {
   ShieldCheckIcon,
   AlertCircleIcon,
   InfoIcon,
+  SpinnerIcon,
 } from '../../../components/ui/Icons';
 import CustomInput from '../../../components/ui/CustomInput';
 import CustomButton from '../../../components/ui/CustomButton';
 import CustomCheckbox from '../../../components/ui/CustomCheckbox';
-import { DrawerContainer, DrawerFooter } from '../../../components/layout';
+import Stepper from '../../../components/ui/Stepper';
+import { DrawerContainer, DrawerSection } from '../../../components/layout';
 import { useTranslation } from '../../../i18n';
 
 interface Setup2FADrawerProps {
@@ -33,6 +37,7 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [secret, setSecret] = useState('');
   const [qrCodeBase64, setQrCodeBase64] = useState('');
+  const [totpUri, setTotpUri] = useState('');
   const [pinCode, setPinCode] = useState('');
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [hasAcknowledgedBackup, setHasAcknowledgedBackup] = useState(false);
@@ -49,6 +54,7 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
         const data = await res.json();
         setSecret(data.secret || '');
         setQrCodeBase64(data.qr_code_base64 || '');
+        setTotpUri(data.totp_uri || '');
       } else {
         showToast(t('2faSetupFailed', 'Failed setting up 2FA.'), 'error');
       }
@@ -65,6 +71,7 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
     setBackupCodes([]);
     setHasAcknowledgedBackup(false);
     setDisableValue('');
+    setTotpUri('');
     if (!is2FAEnabled) {
       initiateSetup();
     }
@@ -119,7 +126,7 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
       const payload =
         disableMethod === 'code'
           ? { code: disableValue.trim() }
-          : { current_password: disableValue.trim() };
+          : { current_password: disableValue, password: disableValue };
 
       const res = await fetchWithAuth('/api/v1/auth/2fa/disable/', {
         method: 'POST',
@@ -129,6 +136,12 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
       if (res.ok) {
         showToast(t('2faDisabledSuccess', 'Two-Factor Authentication has been disabled.'), 'info');
         if (onStatusChanged) onStatusChanged(false);
+        const currentUser = authStore.getUser();
+        if (currentUser) {
+          currentUser.is_2fa_enabled = false;
+          authStore.saveUser(currentUser);
+        }
+        window.dispatchEvent(new CustomEvent('spr_auth_updated'));
         onClose();
       } else {
         const data = await res.json().catch(() => ({}));
@@ -182,13 +195,77 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
     showToast(t('toastBackupCodesDownloaded', 'Backup codes file downloaded!'), 'success');
   };
 
-  // Normalize QR base64 image string
+  // Fallback base64 image string if totpUri is unavailable
   const resolvedQrSrc = qrCodeBase64.startsWith('data:')
     ? qrCodeBase64
     : `data:image/png;base64,${qrCodeBase64}`;
 
+  // Unified Bottom Footer (Prevents any duplicate buttons)
+  const renderFooter = () => {
+    if (is2FAEnabled) {
+      return (
+        <div className="flex items-center justify-end w-full px-1">
+          <CustomButton variant="sub" onClick={onClose}>
+            {t('close', 'Close')}
+          </CustomButton>
+        </div>
+      );
+    }
+
+    if (step === 1) {
+      return (
+        <div className="flex items-center justify-between gap-3 w-full px-1">
+          <CustomButton variant="sub" onClick={onClose}>
+            {t('cancel', 'Cancel')}
+          </CustomButton>
+          <CustomButton
+            variant="primary"
+            onClick={() => setStep(2)}
+            disabled={loading || (!totpUri && !qrCodeBase64)}
+          >
+            {t('nextVerifyCode', 'Verify Code')}
+          </CustomButton>
+        </div>
+      );
+    }
+
+    if (step === 2) {
+      return (
+        <div className="flex items-center justify-between gap-3 w-full px-1">
+          <CustomButton variant="sub" onClick={() => setStep(1)} disabled={loading}>
+            {t('back', 'Back')}
+          </CustomButton>
+          <CustomButton
+            variant="primary"
+            onClick={() => handleVerifyCode()}
+            loading={loading}
+            disabled={loading || pinCode.replace(/\s+/g, '').length < 6}
+          >
+            {t('verifyAndEnable', 'Verify & Activate')}
+          </CustomButton>
+        </div>
+      );
+    }
+
+    if (step === 3) {
+      return (
+        <div className="flex items-center justify-end w-full px-1">
+          <CustomButton
+            variant="primary"
+            disabled={!hasAcknowledgedBackup}
+            onClick={onClose}
+          >
+            {t('done', 'Complete Setup')}
+          </CustomButton>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
-    <DrawerContainer padding="none" spacing="normal">
+    <DrawerContainer padding="none" spacing="normal" footer={renderFooter()}>
       <div className="@container space-y-6 pt-2 pb-6 px-1">
         {is2FAEnabled ? (
           /* ============================================================== */
@@ -221,7 +298,7 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
 
               <div className="pt-2 border-t theme-border flex items-center justify-between text-xs theme-text-secondary">
                 <span className="flex items-center gap-1.5">
-                  <InfoIcon className="w-3.5 h-3.5" />
+                  <InfoIcon className="w-3.5 h-3.5 theme-accent" />
                   {t('standardTOTP', 'RFC 6238 Standard (30-second rotation)')}
                 </span>
                 <span className="font-mono text-[11px] px-2 py-0.5 rounded-md theme-bg-sub border theme-border font-bold">
@@ -231,14 +308,10 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
             </div>
 
             {/* Emergency Recovery Codes Status */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 pb-2 border-b theme-border">
-                <LockIcon className="w-4 h-4 theme-accent" />
-                <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
-                  {t('backupCodesHeader', 'Emergency Backup Recovery Codes')}
-                </h4>
-              </div>
-
+            <DrawerSection
+              title={t('backupCodesHeader', 'Emergency Backup Recovery Codes')}
+              icon={LockIcon}
+            >
               <div className="p-3.5 rounded-xl theme-bg-sub/60 border theme-border text-xs theme-text-secondary space-y-2">
                 <p className="leading-relaxed">
                   {t(
@@ -252,17 +325,13 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
                   </span>
                 </div>
               </div>
-            </div>
+            </DrawerSection>
 
             {/* Disable 2FA Section (Enterprise Guarded) */}
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center gap-2 pb-2 border-b theme-border">
-                <AlertCircleIcon className="w-4 h-4 theme-danger" />
-                <h4 className="text-xs font-bold uppercase tracking-wider theme-danger">
-                  {t('disable2FA', 'Disable 2FA Protection')}
-                </h4>
-              </div>
-
+            <DrawerSection
+              title={t('disable2FA', 'Disable 2FA Protection')}
+              icon={AlertCircleIcon}
+            >
               <form onSubmit={handleDisable2FA} className="p-4 rounded-2xl theme-bg-surface border theme-border space-y-4">
                 <p className="text-xs theme-text-secondary leading-relaxed">
                   {t(
@@ -304,6 +373,7 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
                 </div>
 
                 <CustomInput
+                  key={`disable-2fa-input-${disableMethod}`}
                   type={disableMethod === 'password' ? 'password' : 'text'}
                   label={
                     disableMethod === 'code'
@@ -311,7 +381,9 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
                       : t('currentPassword', 'Account Password')
                   }
                   value={disableValue}
-                  onChange={(e: any) => setDisableValue(typeof e === 'string' ? e : e.target.value)}
+                  onChange={(val: any) =>
+                    setDisableValue(typeof val === 'string' ? val : val?.target?.value || '')
+                  }
                   placeholder={disableMethod === 'code' ? '000000' : '••••••••'}
                   maxLength={disableMethod === 'code' ? 6 : undefined}
                 />
@@ -325,33 +397,28 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
                   </CustomButton>
                 </div>
               </form>
-            </div>
+            </DrawerSection>
           </div>
         ) : (
           /* ============================================================== */
           /* INACTIVE 2FA ENROLLMENT WIZARD (3-STEP ENTERPRISE FLOW)         */
           /* ============================================================== */
           <div className="space-y-6">
-            {/* Step Stepper Header */}
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { s: 1, label: t('step1Short', '1. Scan') },
-                { s: 2, label: t('step2Short', '2. Verify') },
-                { s: 3, label: t('step3Short', '3. Backup') },
-              ].map((item) => (
-                <div
-                  key={item.s}
-                  className={`text-center py-2 px-1 rounded-xl border text-xs font-bold transition-all ${
-                    step === item.s
-                      ? 'theme-bg-accent-soft theme-accent border theme-border'
-                      : step > item.s
-                      ? 'theme-bg-success-soft theme-text-success border theme-border-success'
-                      : 'theme-bg-sub theme-text-secondary border theme-border opacity-60'
-                  }`}
-                >
-                  {item.label}
-                </div>
-              ))}
+            {/* Reusable Enterprise Stepper Component */}
+            <div className="w-full pb-1">
+              <Stepper
+                steps={[
+                  { id: 1, label: t('step1Short', '1. Scan') },
+                  { id: 2, label: t('step2Short', '2. Verify') },
+                  { id: 3, label: t('step3Short', '3. Backup') },
+                ]}
+                currentStep={step}
+                onStepClick={(stepNum: number) => {
+                  if (stepNum < step) setStep(stepNum as 1 | 2);
+                }}
+                clickable={step > 1}
+                size="sm"
+              />
             </div>
 
             {/* STEP 1: Scan QR Code */}
@@ -369,20 +436,33 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
                   </p>
                 </div>
 
-                {/* QR Code Container */}
-                {loading ? (
-                  <div className="w-52 h-52 mx-auto rounded-2xl theme-bg-surface border theme-border flex items-center justify-center animate-pulse">
-                    <span className="text-xs theme-text-secondary">{t('loading', 'Loading...')}</span>
+                {/* Centered QR Canvas matching QRSyncDrawer Design */}
+                <div className="flex flex-col items-center justify-center py-2 px-2">
+                  <div className="p-5 sm:p-6 my-2 bg-white rounded-2xl shadow-md border theme-border flex items-center justify-center mx-auto transition-transform hover:scale-[1.01]">
+                    {loading ? (
+                      <div className="w-48 h-48 flex items-center justify-center">
+                        <SpinnerIcon className="w-8 h-8 theme-accent animate-spin" />
+                      </div>
+                    ) : totpUri ? (
+                      <QRCodeCanvas
+                        value={totpUri}
+                        size={192}
+                        level="M"
+                        marginSize={1}
+                      />
+                    ) : qrCodeBase64 ? (
+                      <img
+                        src={resolvedQrSrc}
+                        alt="2FA QR Code"
+                        className="w-48 h-48 object-contain"
+                      />
+                    ) : (
+                      <div className="w-48 h-48 flex items-center justify-center">
+                        <SpinnerIcon className="w-8 h-8 theme-accent animate-spin" />
+                      </div>
+                    )}
                   </div>
-                ) : qrCodeBase64 ? (
-                  <div className="w-52 h-52 mx-auto p-3.5 bg-white rounded-2xl shadow-sm border theme-border flex items-center justify-center">
-                    <img
-                      src={resolvedQrSrc}
-                      alt="2FA QR Code"
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                ) : null}
+                </div>
 
                 {/* Manual Secret Key Card */}
                 {secret && (
@@ -394,26 +474,17 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
                       <button
                         type="button"
                         onClick={copySecret}
-                        className="inline-flex items-center gap-1 text-xs theme-accent hover:underline cursor-pointer"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold theme-accent hover:opacity-80 transition-opacity cursor-pointer"
                       >
                         <CopyIcon className="w-3.5 h-3.5" />
                         <span>{t('copyCodes', 'Copy Key')}</span>
                       </button>
                     </div>
-                    <div className="font-mono text-xs font-bold theme-text-primary tracking-widest break-all select-all p-2 rounded-lg theme-bg-sub border theme-border text-center">
+                    <div className="font-mono text-xs font-bold theme-text-primary tracking-widest break-all select-all p-2.5 rounded-lg theme-bg-sub border theme-border text-center">
                       {secret}
                     </div>
                   </div>
                 )}
-
-                <div className="flex items-center justify-between pt-2">
-                  <CustomButton variant="sub" onClick={onClose}>
-                    {t('cancel', 'Cancel')}
-                  </CustomButton>
-                  <CustomButton variant="primary" onClick={() => setStep(2)}>
-                    {t('nextVerifyCode', 'Next: Verify Code')}
-                  </CustomButton>
-                </div>
               </div>
             )}
 
@@ -442,18 +513,9 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
                     autoFocus
                   />
                   <p className="text-[11px] theme-text-secondary flex items-center gap-1.5">
-                    <InfoIcon className="w-3.5 h-3.5 shrink-0" />
+                    <InfoIcon className="w-3.5 h-3.5 shrink-0 theme-accent" />
                     <span>{t('codeRefreshes30s', 'Codes refresh every 30 seconds.')}</span>
                   </p>
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <CustomButton variant="sub" onClick={() => setStep(1)} disabled={loading}>
-                    {t('back', 'Back')}
-                  </CustomButton>
-                  <CustomButton variant="primary" type="submit" loading={loading}>
-                    {t('verifyAndEnable', 'Verify & Activate')}
-                  </CustomButton>
                 </div>
               </form>
             )}
@@ -463,7 +525,7 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
               <div className="space-y-5">
                 <div className="p-4 rounded-2xl theme-bg-success-soft border theme-border-success space-y-2">
                   <div className="flex items-center gap-2">
-                    <CheckIcon className="w-5 h-5 theme-text-success" />
+                    <CheckIcon className="w-5 h-5 theme-text-success shrink-0" />
                     <h3 className="text-sm font-bold theme-text-primary">
                       {t('step3Header', 'Step 3: Save Emergency Recovery Codes')}
                     </h3>
@@ -487,7 +549,7 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
                         <button
                           type="button"
                           onClick={copyBackupCodes}
-                          className="inline-flex items-center gap-1 text-xs theme-accent hover:underline cursor-pointer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold theme-accent hover:opacity-80 transition-opacity cursor-pointer"
                         >
                           <CopyIcon className="w-3.5 h-3.5" />
                           <span>{t('copyCodes', 'Copy')}</span>
@@ -496,7 +558,7 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
                         <button
                           type="button"
                           onClick={downloadBackupCodes}
-                          className="inline-flex items-center gap-1 text-xs theme-accent hover:underline cursor-pointer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold theme-accent hover:opacity-80 transition-opacity cursor-pointer"
                         >
                           <DownloadIcon className="w-3.5 h-3.5" />
                           <span>{t('downloadCodes', 'Download .txt')}</span>
@@ -528,25 +590,11 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
                     )}
                   />
                 </div>
-
-                <div className="flex items-center justify-end pt-2">
-                  <CustomButton
-                    variant="primary"
-                    disabled={!hasAcknowledgedBackup}
-                    onClick={onClose}
-                  >
-                    {t('done', 'Complete Setup')}
-                  </CustomButton>
-                </div>
               </div>
             )}
           </div>
         )}
       </div>
-
-      {!is2FAEnabled && step !== 3 && (
-        <DrawerFooter onCancel={onClose} cancelLabel={t('close', 'Close')} />
-      )}
     </DrawerContainer>
   );
 };

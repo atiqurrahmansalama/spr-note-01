@@ -3,7 +3,7 @@ import { useFeatureControl } from '../../context/FeatureControlContext';
 import { useTranslation } from '../../i18n';
 import { useRightSidebar, useDrawerRegistration } from '../../context/RightSidebarContext';
 import {
-  KeyRoundIcon,
+  PasskeyIcon,
   SmartphoneIcon,
   ShieldCheckIcon,
   DownloadIcon,
@@ -235,12 +235,6 @@ export const ProfileSettingsView: React.FC = () => {
               icon={<UserCheckIcon className="w-4 h-4 theme-accent" />}
               title={t('accountSwitcherTitle', 'Switch or Add Account')}
               subtitle={t('accountSwitcherSubtitle', 'Manage saved accounts and active session switches')}
-              badgeText={t(
-                savedAccountsCount > 1 ? 'badgeSavedAccounts_plural' : 'badgeSavedAccounts',
-                `${formatNumber(savedAccountsCount)} Saved`,
-                { count: formatNumber(savedAccountsCount) }
-              )}
-              badgeVariant="accent"
               onClick={() => openDrawer('profile-accounts')}
             />
 
@@ -248,8 +242,6 @@ export const ProfileSettingsView: React.FC = () => {
               icon={<SmartphoneIcon className="w-4 h-4 theme-accent" />}
               title={t('qrSyncTitle', 'Scan QR to Login Elsewhere')}
               subtitle={t('qrSyncSubtitle', 'Instantly authorize login on another workstation or mobile device')}
-              badgeText={t('badgeInstantSync', 'Instant Sync')}
-              badgeVariant="accent"
               onClick={() => openDrawer('profile-qr')}
             />
 
@@ -258,27 +250,15 @@ export const ProfileSettingsView: React.FC = () => {
                 icon={<LockIcon className="w-4 h-4 theme-accent" />}
                 title={t('twoFactorTitle', 'Two-Factor Authentication (2FA)')}
                 subtitle={t('twoFactorSubtitle', 'Safeguard sign-ins with TOTP Authenticator apps')}
-                badgeText={
-                  is2FAEnabled
-                    ? t('badgeEnabled', 'Enabled')
-                    : t('badgeDisabled', 'Disabled')
-                }
-                badgeVariant={is2FAEnabled ? 'success' : 'neutral'}
                 onClick={() => openDrawer('profile-2fa')}
               />
             )}
 
             {isSectionEnabled('settings_security') && (
               <ProfileOptionRow
-                icon={<KeyRoundIcon className="w-4 h-4 theme-accent" />}
+                icon={<PasskeyIcon className="w-4 h-4 theme-accent" />}
                 title={t('passkeysTitle', 'Passkeys & Biometrics')}
                 subtitle={t('passkeysSubtitle', 'Passwordless authentication using Touch ID, Face ID, or Windows Hello')}
-                badgeText={t(
-                  passkeysCount !== 1 ? 'badgePasskeys_plural' : 'badgePasskeys',
-                  `${formatNumber(passkeysCount)} Keys`,
-                  { count: formatNumber(passkeysCount) }
-                )}
-                badgeVariant={passkeysCount > 0 ? 'accent' : 'neutral'}
                 onClick={() => openDrawer('profile-passkeys')}
               />
             )}
@@ -288,7 +268,7 @@ export const ProfileSettingsView: React.FC = () => {
           {isSectionEnabled('settings_security') && (
             <ProfileOptionGroup title={t('groupSecurityManagement', 'Security & Device Management')}>
               <ProfileOptionRow
-                icon={<KeyRoundIcon className="w-4 h-4 theme-accent" />}
+                icon={<LockIcon className="w-4 h-4 theme-accent" />}
                 title={t('changePasswordTitle', 'Change Password')}
                 subtitle={t('changePasswordSubtitle', 'Update your account login password credentials')}
                 onClick={() => openDrawer('profile-password')}
@@ -298,8 +278,6 @@ export const ProfileSettingsView: React.FC = () => {
                 icon={<SmartphoneIcon className="w-4 h-4 theme-accent" />}
                 title={t('activeSessionsTitle', 'Active Devices & Sessions')}
                 subtitle={t('activeSessionsSubtitle', 'Review currently active sessions and revoke unauthorized devices')}
-                badgeText={t('badgeActiveNow', 'Active')}
-                badgeVariant="accent"
                 onClick={() => openDrawer('profile-sessions')}
               />
 
@@ -309,20 +287,20 @@ export const ProfileSettingsView: React.FC = () => {
                 subtitle={t('securityLogsSubtitle', 'Inspect recent authentication events and security activity audits')}
                 onClick={() => openDrawer('profile-logs')}
               />
+
+              {isSectionEnabled('settings_backup') && (
+                <ProfileOptionRow
+                  icon={<DownloadIcon className="w-4 h-4 theme-accent" />}
+                  title={t('exportDataTitle', 'Export Personal Account Data')}
+                  subtitle={t('exportDataSubtitle', 'Download a full JSON archive of your personal profile and preferences')}
+                  onClick={handleExportData}
+                />
+              )}
             </ProfileOptionGroup>
           )}
 
           {/* 4. Danger Zone & System Actions */}
           <ProfileOptionGroup title={t('groupDangerZone', 'Danger Zone & System Actions')}>
-            {isSectionEnabled('settings_backup') && (
-              <ProfileOptionRow
-                icon={<DownloadIcon className="w-4 h-4 theme-accent" />}
-                title={t('exportDataTitle', 'Export Personal Account Data')}
-                subtitle={t('exportDataSubtitle', 'Download a full JSON archive of your personal profile and preferences')}
-                onClick={handleExportData}
-              />
-            )}
-
             <ProfileOptionRow
               icon={<LogOutIcon className="w-4 h-4 theme-danger" />}
               title={t('signOutTitle', 'Sign Out of Account')}

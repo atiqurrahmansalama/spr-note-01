@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
 import { useToast } from '../../../context/ToastContext';
 import { fetchWithAuth } from '../../../utils/authService';
-import { KeyRoundIcon, PlusIcon, TrashIcon } from '../../../components/ui/Icons';
+import { PasskeyIcon, PlusIcon, TrashIcon } from '../../../components/ui/Icons';
 import CustomButton from '../../../components/ui/CustomButton';
-import { DrawerContainer, DrawerFooter } from '../../../components/layout';
+import EmptyState from '../../../components/ui/EmptyState';
+import { DrawerContainer, DrawerFooter, DrawerSection } from '../../../components/layout';
 import { useTranslation } from '../../../i18n';
 import type { PasskeyItem } from '../types';
 
@@ -53,21 +54,33 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
     try {
       const optionsRes = await fetchWithAuth('/api/v1/auth/passkeys/register-options/');
       if (!optionsRes.ok) {
-        throw new Error('Could not fetch passkey options.');
+        throw new Error(t('passkeyOptionsFailed', 'Could not fetch passkey options.'));
       }
       const options = await optionsRes.json();
 
-      let credential = null;
+      // WebAuthn W3C specification strictly requires rp.id to match the origin hostname and forbids raw IP addresses
+      if (options && options.rp) {
+        const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+        options.rp.id = (currentHost === '127.0.0.1' || currentHost === 'localhost' || !options.rp.id)
+          ? 'localhost'
+          : options.rp.id;
+      }
+
+      let credential: any = null;
       try {
         credential = await startRegistration(options);
       } catch (err: any) {
-        console.warn('[PasskeysDrawer] Browser WebAuthn prompt bypassed or unsupported:', err?.message);
-        credential = {
-          id: `passkey_${Date.now()}`,
-          rawId: `raw_${Date.now()}`,
-          type: 'public-key',
-          response: { clientDataJSON: 'b64_fallback', attestationObject: 'b64_fallback' },
-        };
+        if (err?.name === 'NotAllowedError') {
+          showToast(t('passkeyCancelled', 'Passkey creation was cancelled.'), 'info');
+        } else {
+          showToast(err?.message || t('passkeyFailed', 'Passkey registration cancelled or failed.'), 'error');
+        }
+        return;
+      }
+
+      if (!credential || !credential.id) {
+        showToast(t('passkeyFailed', 'No passkey credential received.'), 'error');
+        return;
       }
 
       const verifyRes = await fetchWithAuth('/api/v1/auth/passkeys/register-verify/', {
@@ -82,7 +95,8 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
         showToast(t('passkeyCreatedSuccess', 'Passkey registered successfully!'), 'success');
         fetchPasskeys();
       } else {
-        showToast(t('passkeyVerifyFailed', 'Failed validating passkey signature.'), 'error');
+        const data = await verifyRes.json().catch(() => ({}));
+        showToast(data.error || t('passkeyVerifyFailed', 'Failed validating passkey signature.'), 'error');
       }
     } catch (err: any) {
       showToast(err?.message || t('passkeyFailed', 'Passkey registration cancelled or failed.'), 'error');
@@ -115,77 +129,109 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
   return (
     <DrawerContainer padding="none" spacing="normal">
       <div className="@container space-y-4 pt-2 pb-6 px-1">
-        <div className="p-3.5 rounded-xl theme-bg-sub/50 border theme-border text-xs theme-text-secondary leading-relaxed">
-          {t(
+        <DrawerSection
+          title={t('drawerPasskeysTitle', 'Manage Passkeys & Biometrics')}
+          subtitle={t(
             'drawerPasskeysSubtitle',
             'Hardware-bound credentials using Touch ID, Face ID, or Windows Hello for instant, passwordless sign-in.'
           )}
-        </div>
-
-        {/* Add Passkey Quick Action */}
-        <CustomButton
-          variant="primary"
-          size="sm"
-          onClick={handleRegisterPasskey}
-          loading={registering}
-          icon={PlusIcon}
-          className="w-full justify-center"
+          icon={PasskeyIcon}
+          headerRight={
+            passkeys.length > 0 && (
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full theme-bg-sub theme-text-secondary border theme-border">
+                {passkeys.length} {passkeys.length === 1 ? t('passkey', 'Passkey') : t('passkeys', 'Passkeys')}
+              </span>
+            )
+          }
+          className="pt-0 first:pt-0"
         >
-          {t('createPasskey', 'Add New Passkey')}
-        </CustomButton>
-
-        {loading ? (
-          <div className="space-y-2 py-2">
-            <div className="h-14 theme-bg-sub/50 rounded-xl animate-pulse" />
-            <div className="h-14 theme-bg-sub/50 rounded-xl animate-pulse" />
-          </div>
-        ) : passkeys.length === 0 ? (
-          <div className="p-6 rounded-2xl theme-bg-sub/50 border theme-border text-center space-y-2">
-            <KeyRoundIcon className="w-8 h-8 theme-accent mx-auto" />
-            <h3 className="text-sm font-semibold theme-text-primary">
-              {t('noPasskeysFound', 'No Passkeys Registered')}
-            </h3>
-            <p className="text-xs theme-text-secondary max-w-xs mx-auto">
-              {t(
-                'noPasskeysDesc',
-                'Register this device biometric scanner to sign in instantly with a single touch.'
-              )}
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-theme-border border theme-border rounded-xl overflow-hidden theme-bg-surface">
-            {passkeys.map((pk) => (
-              <div
-                key={pk.id}
-                className="p-3.5 sm:p-4 flex items-center justify-between gap-3 hover:theme-bg-sub/40 transition-colors"
+          {loading ? (
+            <div className="py-8 flex items-center justify-center">
+              <EmptyState
+                variant="sub"
+                size="sm"
+                icon={PasskeyIcon}
+                iconVariant="accent"
+                title={t('loadingPasskeys', 'Loading passkeys...')}
+                description={t(
+                  'verifyingHardwareTokens',
+                  'Discovering registered biometric credentials...'
+                )}
+                animate
+              />
+            </div>
+          ) : passkeys.length === 0 ? (
+            <div className="py-2">
+              <EmptyState
+                variant="sub"
+                size="sm"
+                icon={PasskeyIcon}
+                iconVariant="accent"
+                title={t('noPasskeysFound', 'No Passkeys Registered')}
+                description={t(
+                  'noPasskeysDesc',
+                  'Register this device biometric scanner to sign in instantly with a single touch.'
+                )}
+                action={{
+                  label: t('createPasskey', 'Add New Passkey'),
+                  onClick: handleRegisterPasskey,
+                  icon: PlusIcon,
+                  variant: 'primary',
+                  size: 'sm',
+                  disabled: registering,
+                }}
+              />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Add Passkey Action Button */}
+              <CustomButton
+                variant="primary"
+                size="sm"
+                onClick={handleRegisterPasskey}
+                loading={registering}
+                icon={PlusIcon}
+                className="w-full justify-center"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-lg theme-bg-accent-soft theme-accent border theme-border flex items-center justify-center shrink-0">
-                    <KeyRoundIcon className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-sm font-semibold theme-text-primary truncate block">
-                      {pk.name || t('securityKey', 'Security Passkey')}
-                    </span>
-                    <span className="text-xs theme-text-secondary font-mono">
-                      {t('registeredOn', 'Added')}: {pk.created_at ? formatDate(pk.created_at) : 'Active'}
-                    </span>
-                  </div>
-                </div>
+                {t('createPasskey', 'Add New Passkey')}
+              </CustomButton>
 
-                <button
-                  type="button"
-                  onClick={() => handleDeletePasskey(pk.id)}
-                  disabled={deletingId === pk.id}
-                  className="p-1.5 rounded-lg theme-text-secondary hover:theme-danger hover:theme-bg-danger-soft transition-colors shrink-0 cursor-pointer"
-                  title={t('deletePasskey', 'Delete passkey')}
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </button>
+              {/* Passkeys List */}
+              <div className="divide-y divide-[var(--border-color)] border theme-border rounded-xl overflow-hidden theme-bg-surface">
+                {passkeys.map((pk) => (
+                  <div
+                    key={pk.id}
+                    className="p-3.5 sm:p-4 flex items-center justify-between gap-3 hover:theme-bg-sub/40 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-lg theme-bg-accent-soft theme-accent border theme-border flex items-center justify-center shrink-0">
+                        <PasskeyIcon className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-sm font-semibold theme-text-primary truncate block">
+                          {pk.name || t('securityKey', 'Security Passkey')}
+                        </span>
+                        <span className="text-xs theme-text-secondary font-mono">
+                          {t('registeredOn', 'Added')}: {pk.created_at ? formatDate(pk.created_at) : 'Active'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePasskey(pk.id)}
+                      disabled={deletingId === pk.id}
+                      className="p-1.5 rounded-lg theme-text-secondary hover:theme-danger hover:theme-bg-danger-soft transition-colors shrink-0 cursor-pointer"
+                      title={t('deletePasskey', 'Delete passkey')}
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          )}
+        </DrawerSection>
       </div>
 
       <DrawerFooter onCancel={onClose} cancelLabel={t('close', 'Close')} />

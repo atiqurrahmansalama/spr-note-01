@@ -9,7 +9,7 @@ export const ProfileOptionGroup: React.FC<ProfileOptionGroupProps> = ({ title, c
   return (
     <div className="space-y-2">
       {title && (
-        <h2 className="text-xs font-bold uppercase tracking-wider theme-accent px-1">
+        <h2 className="text-xs font-bold uppercase tracking-wider theme-text-secondary px-1">
           {title}
         </h2>
       )}

@@ -1321,6 +1321,7 @@ const CustomInput = forwardRef(function CustomInput(
                   onClick={() => setShowPassword((prev) => !prev)}
                   title={showPassword ? "Hide password" : "Show password"}
                   ariaLabel={showPassword ? "Hide password" : "Show password"}
+                  className="theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition-all rounded-lg p-1 active:scale-95 cursor-pointer"
                 />
               )}
 

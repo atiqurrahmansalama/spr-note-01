@@ -3,7 +3,7 @@ import { API_BASE_URL } from "../config/api";
 import { sendLoginLog, sendActivityLog } from "./activityTracker";
 
 // Helper to make fetch request with relative proxy & fast resolution + resilient retry
-const fetchApi = async (path, options = {}, isRetry = false) => {
+const fetchApi = async (path, options = {}, retryCount = 0) => {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   const targetUrl = API_BASE_URL ? `${API_BASE_URL}${cleanPath}` : cleanPath;
   
@@ -11,9 +11,12 @@ const fetchApi = async (path, options = {}, isRetry = false) => {
     const res = await fetch(targetUrl, options);
     return res;
   } catch (err) {
-    if (!isRetry) {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      return fetchApi(path, options, true);
+    if (err.name === 'AbortError' || options.signal?.aborted) {
+      throw err;
+    }
+    if (retryCount < 2) {
+      await new Promise((resolve) => setTimeout(resolve, (retryCount + 1) * 300));
+      return fetchApi(path, options, retryCount + 1);
     }
     console.warn(`[authService] Fetch to ${targetUrl} failed:`, err);
     throw new Error("Server is offline or unreachable.");
