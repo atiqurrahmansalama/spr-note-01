@@ -14,6 +14,16 @@ export const getApiBaseUrl = (): string => {
       ? (process as any).env.VITE_API_BASE_URL
       : '';
 
+  // In browser local development with Vite dev server (e.g. localhost / 127.0.0.1),
+  // routing requests through Vite's built-in proxy ('') prevents CORS preflight drops,
+  // origin mismatches (e.g. localhost:5174 vs 127.0.0.1:8000), and dynamic port binding issues.
+  if (typeof window !== 'undefined' && window.location) {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return '';
+    }
+  }
+
   if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
     // Avoid dummy placeholder URLs
     if (!envUrl.includes('your-production-domain.com')) {

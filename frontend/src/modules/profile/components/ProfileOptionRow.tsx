@@ -54,7 +54,7 @@ export const ProfileOptionRow: React.FC<ProfileOptionRowProps> = ({
           onClick?.();
         }
       }}
-      className={`px-5 py-4 flex items-center justify-between transition-colors cursor-pointer group select-none ${
+      className={`px-5 py-4 flex items-center justify-between transition-colors cursor-pointer group select-none border-b theme-border last:border-b-0 ${
         isDanger ? 'hover:theme-bg-danger-soft' : 'hover:theme-bg-sub/60'
       }`}
     >

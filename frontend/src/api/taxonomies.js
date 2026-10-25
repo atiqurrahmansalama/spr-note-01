@@ -8,10 +8,15 @@ export const taxonomiesApi = {
   fetchTaxonomies: async (tenantId) => {
     try {
       const url = tenantId && tenantId !== "default" 
-        ? `/tenant-taxonomies/?tenant_id=${tenantId}`
-        : `/tenant-taxonomies/`;
+        ? `/api/tenant-taxonomies/?tenant_id=${tenantId}`
+        : `/api/tenant-taxonomies/`;
       const res = await fetchWithAuth(url);
       if (!res.ok) return { success: false, taxonomies: {} };
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("text/html")) {
+        console.warn("[TaxonomiesApi] Unexpected HTML response from:", url);
+        return { success: false, taxonomies: {} };
+      }
       const data = await res.json();
       return { success: true, taxonomies: data.taxonomies || {} };
     } catch (err) {
@@ -23,13 +28,18 @@ export const taxonomiesApi = {
   bulkSyncTaxonomies: async (tenantId, taxonomiesPayload) => {
     try {
       const url = tenantId && tenantId !== "default" 
-        ? `/tenant-taxonomies/bulk-sync/?tenant_id=${tenantId}`
-        : `/tenant-taxonomies/bulk-sync/`;
+        ? `/api/tenant-taxonomies/bulk-sync/?tenant_id=${tenantId}`
+        : `/api/tenant-taxonomies/bulk-sync/`;
       const res = await fetchWithAuth(url, {
         method: "POST",
         body: JSON.stringify({ taxonomies: taxonomiesPayload }),
       });
       if (!res.ok) return { success: false };
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("text/html")) {
+        console.warn("[TaxonomiesApi] Unexpected HTML response from:", url);
+        return { success: false };
+      }
       const data = await res.json();
       return { success: true, data };
     } catch (err) {

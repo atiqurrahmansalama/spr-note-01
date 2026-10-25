@@ -1,6 +1,7 @@
 import React from "react";
 import ActionMenu, { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { CopyIcon, TrashIcon, EditIcon, PrinterIcon, CloudIcon } from "@/components/ui/Icons";
+import { isReportUnsynced } from "@/utils/syncEngine";
 import { ReportContextMenuProps, ReportItem } from "../types";
 
 export interface GetReportMenuItemsOptions {
@@ -40,7 +41,11 @@ export function getReportMenuItems({
     menuItems.push({ label: "divider", divider: true });
   }
 
-  if (onSync) {
+  const isTargetUnsynced = Array.isArray(targetPayload)
+    ? targetPayload.some(isReportUnsynced)
+    : isReportUnsynced(report);
+
+  if (onSync && isTargetUnsynced) {
     menuItems.push({
       label: "Sync to Database",
       icon: CloudIcon,

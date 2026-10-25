@@ -1,20 +1,18 @@
-import { useState, useEffect } from "react";
-import { quranTrackingSession } from "../quranRules";
+import { useSyncExternalStore } from "react";
+import { quranTrackingSession, type QuranSessionSnapshot } from "../quranRules";
+
+const subscribe = (callback: () => void) => quranTrackingSession.subscribe(callback);
+const getSnapshot = (): QuranSessionSnapshot => quranTrackingSession.getSnapshot();
 
 export function useQuranTrackingSession() {
-  const [, setTick] = useState(0);
-
-  useEffect(() => {
-    return quranTrackingSession.subscribe(() => {
-      setTick((t) => t + 1);
-    });
-  }, []);
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot);
 
   return {
-    lastPage: quranTrackingSession.getLastPage(),
-    lastAyah: quranTrackingSession.getLastAyah(),
+    lastPage: snapshot.lastPage,
+    lastAyah: snapshot.lastAyah,
     setLastPage: (val: string | number | null | undefined) => quranTrackingSession.setLastPage(val),
     setLastAyah: (val: string | number | null | undefined) => quranTrackingSession.setLastAyah(val),
     resetSession: () => quranTrackingSession.reset(),
   };
 }
+

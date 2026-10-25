@@ -1,6 +1,6 @@
 export default {
   title: "إعدادات الملف الشخصي والحساب",
-  subtitle: "إدارة ملفك الشخصي وبيانات الاعتماد والحسابات المتصلة وسياسات الأمان.",
+  subtitle: "",
   editProfile: "تعديل الملف الشخصي",
   changeAvatar: "تغيير الصورة الشخصية",
   userFallback: "الملف الشخصي للمستخدم",
@@ -79,6 +79,8 @@ export default {
   drawerAccountsSubtitle: "التبديل بين الحسابات المحفوظة بسهولة.",
   drawerQrTitle: "تسجيل الدخول عبر رمز QR",
   drawerQrSubtitle: "مسح الرمز ضوئياً بجهاز مسجل للدخول الفوري.",
+  generatingQR: "جارٍ إنشاء رمز جلسة آمن...",
+  qrGeneratingDesc: "جارٍ تأسيس مصافحة أمنية مشفرة للجلسة...",
   drawer2FaTitle: "المصادقة الثنائية (2FA)",
   drawer2FaSubtitle: "إضافة طبقة حماية إضافية عبر تطبيقات المصادقة TOTP.",
   drawerPasskeysTitle: "إدارة مفاتيح المرور والبيومتريا",

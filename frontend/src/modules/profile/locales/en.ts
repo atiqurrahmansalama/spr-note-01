@@ -1,6 +1,6 @@
 export default {
   title: "Profile & Account Settings",
-  subtitle: "Manage your personal profile, credentials, connected accounts, and enterprise security policies.",
+  subtitle: "",
   editProfile: "Edit Profile",
   changeAvatar: "Change Avatar Photo",
   userFallback: "User Profile",
@@ -79,6 +79,8 @@ export default {
   drawerAccountsSubtitle: "Switch between multiple saved institutional profiles.",
   drawerQrTitle: "Cross-Device QR Sign-In",
   drawerQrSubtitle: "Scan with a logged-in mobile device to sign in instantly.",
+  generatingQR: "Generating secure ticket...",
+  qrGeneratingDesc: "Establishing a cryptographic session handshake...",
   drawer2FaTitle: "Two-Factor Authentication (2FA)",
   drawer2FaSubtitle: "Add an extra layer of enterprise protection using TOTP authenticator apps.",
   drawerPasskeysTitle: "Manage Passkeys & Biometrics",

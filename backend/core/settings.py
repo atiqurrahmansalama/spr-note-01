@@ -296,6 +296,7 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     'x-device-id',
     'x-app-version',
     'x-csrftoken',
+    'x-idempotency-key',
 ]
 
 # Allow global flag override from environment (default False for strict production security)
@@ -304,8 +305,10 @@ CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", "False").lower() in
 # Explicit base origins
 _default_cors_origins = [
     "http://localhost:5173",
+    "http://localhost:5174",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
     "http://127.0.0.1:3000",
     "https://spr-note-01.pages.dev",
     "https://spr-note.vercel.app",
@@ -320,11 +323,12 @@ if _raw_cors_env:
 
 CORS_ALLOWED_ORIGINS = _default_cors_origins
 
-# Dynamic Regexes for preview deployments (Cloudflare Pages, Render, Vercel)
+# Dynamic Regexes for preview deployments and local dev servers (any port)
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https:\/\/.*\.pages\.dev$",
     r"^https:\/\/.*\.vercel\.app$",
     r"^https:\/\/.*\.onrender\.com$",
+    r"^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$",
 ]
 
 # CSRF Trusted Origins for HTTPS form submissions
@@ -333,8 +337,10 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.vercel.app",
     "https://*.onrender.com",
     "http://localhost:5173",
+    "http://localhost:5174",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
     "http://127.0.0.1:3000",
 ]
 

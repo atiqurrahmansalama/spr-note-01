@@ -112,25 +112,36 @@ export function getJuzPageBounds(
   };
 }
 
+export interface QuranSessionSnapshot {
+  lastPage: number | null;
+  lastAyah: number | null;
+}
+
 export class QuranTrackingSessionStore {
-  private lastPage: number | null = null;
-  private lastAyah: number | null = null;
+  private snapshot: QuranSessionSnapshot = {
+    lastPage: null,
+    lastAyah: null,
+  };
   private listeners: Set<() => void> = new Set();
 
+  getSnapshot(): QuranSessionSnapshot {
+    return this.snapshot;
+  }
+
   getLastPage(): number | null {
-    return this.lastPage;
+    return this.snapshot.lastPage;
   }
 
   getLastAyah(): number | null {
-    return this.lastAyah;
+    return this.snapshot.lastAyah;
   }
 
   setLastPage(val: string | number | null | undefined) {
     if (val === "" || val === null || val === undefined) return;
     const num = Number(val);
     if (!isNaN(num) && num > 0) {
-      if (this.lastPage !== num) {
-        this.lastPage = num;
+      if (this.snapshot.lastPage !== num) {
+        this.snapshot = { ...this.snapshot, lastPage: num };
         this.notify();
       }
     }
@@ -140,8 +151,8 @@ export class QuranTrackingSessionStore {
     if (val === "" || val === null || val === undefined) return;
     const num = Number(val);
     if (!isNaN(num) && num > 0) {
-      if (this.lastAyah !== num) {
-        this.lastAyah = num;
+      if (this.snapshot.lastAyah !== num) {
+        this.snapshot = { ...this.snapshot, lastAyah: num };
         this.notify();
       }
     }
@@ -155,9 +166,10 @@ export class QuranTrackingSessionStore {
   }
 
   reset() {
-    this.lastPage = null;
-    this.lastAyah = null;
-    this.notify();
+    if (this.snapshot.lastPage !== null || this.snapshot.lastAyah !== null) {
+      this.snapshot = { lastPage: null, lastAyah: null };
+      this.notify();
+    }
   }
 
   private notify() {
@@ -172,3 +184,4 @@ export class QuranTrackingSessionStore {
 }
 
 export const quranTrackingSession = new QuranTrackingSessionStore();
+

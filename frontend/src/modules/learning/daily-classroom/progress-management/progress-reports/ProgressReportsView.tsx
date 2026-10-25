@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/context/ToastContext";
 import { formatDate } from "@/utils/reportGenerator";
@@ -19,10 +19,11 @@ import CustomSelect from "@/components/ui/CustomSelect";
 import IconButton from "@/components/ui/IconButton";
 import SelectionActionBar from "@/components/ui/SelectionActionBar";
 import { DateRangePicker } from "@/components/selectors";
-import SegmentedSwitch from "@/components/ui/SegmentedSwitch";
+import SegmentedSwitch, { SegmentedSwitchOption } from "@/components/ui/SegmentedSwitch";
 import DailyClassroomFilterControls from "../../components/DailyClassroomFilterControls";
 import { StudentSelector } from "../../components";
 import { ProgressAnalyticsDashboard } from "../../components/progress-analytics";
+import { isReportUnsynced } from "@/utils/syncEngine";
 import { normalizeToISODate } from "../../utils/dailyClassroomUtils";
 import { useAcademicData } from "@/hooks/useAcademicData";
 import { useTenant } from "@/context/TenantContext";
@@ -147,8 +148,25 @@ export default function ProgressReportsView({
     return () => window.removeEventListener("popstate", handlePopState);
   }, [getResolvedViewMode]);
 
+  // Memoized stable options for the view mode switch to prevent reference re-creation
+  const reportViewOptions = useMemo<SegmentedSwitchOption<"RECORD_REPORTS" | "STUDENT_VIEW">[]>(
+    () => [
+      {
+        value: "RECORD_REPORTS",
+        label: "Record Reports",
+        icon: CloudIcon,
+      },
+      {
+        value: "STUDENT_VIEW",
+        label: "By Student",
+        icon: UsersIcon,
+      },
+    ],
+    []
+  );
+
   // Zero-flicker view mode switcher
-  const handleViewModeChange = (newMode: "RECORD_REPORTS" | "STUDENT_VIEW") => {
+  const handleViewModeChange = useCallback((newMode: "RECORD_REPORTS" | "STUDENT_VIEW") => {
     setViewMode(newMode);
     const targetSub = newMode === "STUDENT_VIEW" ? "by-student" : "records";
     const p = window.location.pathname.toLowerCase();
@@ -161,7 +179,7 @@ export default function ProgressReportsView({
     const finalUrl = `${targetPath}${window.location.search}`;
     // Using window.history.replaceState avoids router remounting that caused flicker
     window.history.replaceState(null, "", finalUrl);
-  };
+  }, []);
 
   // Layout mode: "table" | "card" (persisted across sessions)
   const [layoutMode, setLayoutMode] = useState<"table" | "card">(() => {
@@ -295,6 +313,44 @@ export default function ProgressReportsView({
   // Reusable Table Action Toolbar
   const renderTableActionToolbar = (extraRightControls?: React.ReactNode) => {
     if (selectedIds.size > 0) {
+      const activeTargets = getActiveTargetReports();
+      const unsyncedTargets = activeTargets.filter(isReportUnsynced);
+      const hasUnsynced = unsyncedTargets.length > 0;
+
+      const actions = [
+        ...(hasUnsynced
+          ? [
+              {
+                id: "sync",
+                label: `Sync to DB (${unsyncedTargets.length})`,
+                shortLabel: `Sync to DB (${unsyncedTargets.length})`,
+                icon: CloudIcon,
+                variant: "sub" as const,
+                disabled: offline || isSyncing,
+                loading: isSyncing,
+                onClick: () => handleSyncSelectedReports(unsyncedTargets),
+              },
+            ]
+          : []),
+        {
+          id: "copy",
+          label: `Copy Summary (${selectedIds.size})`,
+          shortLabel: "Copy Summary",
+          icon: CopyIcon,
+          variant: "sub" as const,
+          onClick: () => handleCopyTextReport(activeTargets),
+        },
+        {
+          id: "delete",
+          label: `Delete (${selectedIds.size})`,
+          shortLabel: `Delete (${selectedIds.size})`,
+          icon: TrashIcon,
+          variant: "danger" as const,
+          disabled: isDeleting,
+          onClick: handleBatchDeleteReports,
+        },
+      ];
+
       return (
         <SelectionActionBar
           fullWidth={true}
@@ -303,35 +359,7 @@ export default function ProgressReportsView({
           totalCount={filteredReports.length}
           onToggleSelectAll={toggleSelectAll}
           onClearSelection={handleDeselectAll}
-          actions={[
-            {
-              id: "sync",
-              label: `Sync to DB (${selectedIds.size})`,
-              shortLabel: `Sync to DB (${selectedIds.size})`,
-              icon: CloudIcon,
-              variant: "sub",
-              disabled: offline || isSyncing,
-              loading: isSyncing,
-              onClick: () => handleSyncSelectedReports(getActiveTargetReports()),
-            },
-            {
-              id: "copy",
-              label: `Copy Summary (${selectedIds.size})`,
-              shortLabel: "Copy Summary",
-              icon: CopyIcon,
-              variant: "sub",
-              onClick: () => handleCopyTextReport(getActiveTargetReports()),
-            },
-            {
-              id: "delete",
-              label: `Delete (${selectedIds.size})`,
-              shortLabel: `Delete (${selectedIds.size})`,
-              icon: TrashIcon,
-              variant: "danger",
-              disabled: isDeleting,
-              onClick: handleBatchDeleteReports,
-            },
-          ]}
+          actions={actions}
         />
       );
     }
@@ -352,18 +380,7 @@ export default function ProgressReportsView({
           <SegmentedSwitch<"RECORD_REPORTS" | "STUDENT_VIEW">
             value={viewMode}
             onChange={handleViewModeChange}
-            options={[
-              {
-                value: "RECORD_REPORTS",
-                label: "Record Reports",
-                icon: CloudIcon,
-              },
-              {
-                value: "STUDENT_VIEW",
-                label: "By Student",
-                icon: UsersIcon,
-              },
-            ]}
+            options={reportViewOptions}
           />
         </div>
 
@@ -451,7 +468,9 @@ export default function ProgressReportsView({
             classId={selectedClsFilter}
             sectionId={selectedSecFilter}
             size="md"
-            label="STUDENT"
+            label="Student"
+            actionLabel={null}
+            actionTo={null}
             placeholder="Search student, session, roll..."
             onStudentSelect={(selected) => {
               if (!selected) {
@@ -483,8 +502,8 @@ export default function ProgressReportsView({
         customDateComponent={
           <DateRangePicker
             label="Date Range"
-            showTimezone={true}
-            timezoneLink="/admin-tools?tab=classroom-config"
+            showTimezone={false}
+            actionLabel={null}
             startDate={startDate}
             endDate={endDate}
             onRangeSelect={(start: string, end: string) => {

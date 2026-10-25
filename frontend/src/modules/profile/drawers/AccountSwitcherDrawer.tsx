@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import { multiAccount, auth as authStore } from '../../../utils/localStore';
-import { CheckIcon, TrashIcon } from '../../../components/ui/Icons';
+import { CheckIcon, TrashIcon, PlusIcon, UserCheckIcon } from '../../../components/ui/Icons';
 import { DrawerContainer, DrawerFooter } from '../../../components/layout';
 import { useTranslation } from '../../../i18n';
 import type { UserProfile } from '../types';
@@ -13,6 +14,7 @@ interface AccountSwitcherDrawerProps {
 export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ onClose }) => {
   const { showToast } = useToast();
   const { t } = useTranslation('profile');
+  const navigate = useNavigate();
 
   const [accounts, setAccounts] = useState<any[]>([]);
   const [activeUser, setActiveUser] = useState<UserProfile | null>(null);
@@ -76,17 +78,30 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
     showToast(t('accountRemoved', 'Account removed from saved list.'), 'info');
   };
 
+  const handleAddAccount = () => {
+    onClose();
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
+    navigate(`/login?action=add_account&returnTo=${encodeURIComponent(currentPath)}`);
+  };
+
   return (
     <DrawerContainer padding="none" spacing="normal">
       <div className="@container space-y-4 pt-2 pb-6 px-1">
-        <div className="p-3.5 rounded-xl theme-bg-sub/50 border theme-border text-xs theme-text-secondary leading-relaxed">
-          {t(
-            'drawerAccountsSubtitle',
-            'Select any previously saved profile to instantly switch workspaces.'
-          )}
+        {/* Streamlined Section Header */}
+        <div className="flex items-center justify-between pb-2 border-b theme-border">
+          <div className="flex items-center gap-2">
+            <UserCheckIcon className="w-4 h-4 theme-accent" />
+            <h3 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
+              {t('savedAccounts', 'Saved Accounts')}
+            </h3>
+          </div>
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full theme-bg-sub theme-text-secondary border theme-border">
+            {accounts.length} {accounts.length === 1 ? t('account', 'Account') : t('accounts', 'Accounts')}
+          </span>
         </div>
 
-        <div className="divide-y divide-theme-border border theme-border rounded-xl overflow-hidden theme-bg-surface">
+        {/* Saved Accounts List */}
+        <div className="border theme-border rounded-xl overflow-hidden theme-bg-surface divide-y divide-[var(--border-color)]">
           {accounts.map((acc, idx) => {
             const accUser = acc.user || {};
             const activeId = activeUser?.phone_number || activeUser?.email || activeUser?.id;
@@ -106,7 +121,7 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
               <div
                 key={idx}
                 onClick={() => handleSwitch(acc)}
-                className={`p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer transition-colors ${
+                className={`p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer transition-colors border-b theme-border last:border-b-0 ${
                   isCurrent ? 'theme-bg-sub/60 font-semibold' : 'hover:theme-bg-sub/40'
                 }`}
               >
@@ -156,6 +171,18 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
             );
           })}
         </div>
+
+        {/* Add Another Account Action Box */}
+        <button
+          type="button"
+          onClick={handleAddAccount}
+          className="w-full p-3.5 rounded-xl border border-dashed theme-border hover:border-primary/50 theme-bg-sub/30 hover:theme-bg-sub/60 transition-all flex items-center justify-center gap-2.5 text-xs font-semibold theme-text-primary hover:theme-accent cursor-pointer group active:scale-[0.99] select-none"
+        >
+          <div className="w-7 h-7 rounded-lg theme-bg-accent-soft theme-accent flex items-center justify-center transition-transform group-hover:scale-110">
+            <PlusIcon className="w-4 h-4" />
+          </div>
+          <span>{t('addAnotherAccount', 'Add Another Account')}</span>
+        </button>
       </div>
 
       <DrawerFooter onCancel={onClose} cancelLabel={t('close', 'Close')} />

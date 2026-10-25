@@ -209,12 +209,6 @@ export const ProfileSettingsView: React.FC = () => {
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary">
           {t('title', 'Profile & Account Settings')}
         </h1>
-        <p className="text-xs sm:text-sm theme-text-secondary mt-1">
-          {t(
-            'subtitle',
-            'Manage your personal profile, credentials, connected accounts, and enterprise security policies.'
-          )}
-        </p>
       </div>
 
       {/* Main 2-Column Responsive Layout */}

@@ -496,18 +496,16 @@ export function DetailRow({
   };
 
   const stepJuz = useCallback((direction: number) => {
-    onChange((prev) => {
-      const nextJuz = stepValueCircular(
-        prev.juz,
-        direction,
-        validAvailableJuzNumbers.length > 0 ? validAvailableJuzNumbers : null,
-        minJuz,
-        maxJuz,
-        validAvailableJuzNumbers[0] || minJuz
-      );
-      return { ...prev, juz: nextJuz };
-    });
-  }, [validAvailableJuzNumbers, minJuz, maxJuz, onChange]);
+    const nextJuz = stepValueCircular(
+      rowData.juz,
+      direction,
+      validAvailableJuzNumbers.length > 0 ? validAvailableJuzNumbers : null,
+      minJuz,
+      maxJuz,
+      validAvailableJuzNumbers[0] || minJuz
+    );
+    onChange((prev) => ({ ...prev, juz: nextJuz }));
+  }, [rowData.juz, validAvailableJuzNumbers, minJuz, maxJuz, onChange]);
 
   const handleJuzWheel = (e: React.WheelEvent | WheelEvent) => {
     e?.preventDefault?.();
@@ -549,19 +547,17 @@ export function DetailRow({
   };
 
   const stepPage = useCallback((direction: number) => {
-    onChange((prev) => {
-      const nextVal = stepValueCircular(
-        prev.page,
-        direction,
-        allowedPages,
-        minPage,
-        maxPageVal,
-        lastPage
-      );
-      quranTrackingSession.setLastPage(nextVal);
-      return { ...prev, page: nextVal };
-    });
-  }, [allowedPages, minPage, maxPageVal, lastPage, onChange]);
+    const nextVal = stepValueCircular(
+      rowData.page,
+      direction,
+      allowedPages,
+      minPage,
+      maxPageVal,
+      lastPage
+    );
+    onChange((prev) => ({ ...prev, page: nextVal }));
+    quranTrackingSession.setLastPage(nextVal);
+  }, [rowData.page, allowedPages, minPage, maxPageVal, lastPage, onChange]);
 
   const handlePageWheel = (e: React.WheelEvent | WheelEvent) => {
     e?.preventDefault?.();

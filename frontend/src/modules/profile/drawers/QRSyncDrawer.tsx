@@ -3,8 +3,16 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { useToast } from '../../../context/ToastContext';
 import { fetchWithAuth } from '../../../utils/authService';
 import { auth as authStore } from '../../../utils/localStore';
-import { RefreshIcon, CheckIcon, AlertCircleIcon } from '../../../components/ui/Icons';
+import {
+  RefreshIcon,
+  CheckIcon,
+  AlertCircleIcon,
+  QrCodeIcon,
+  SmartphoneIcon,
+  ClockIcon,
+} from '../../../components/ui/Icons';
 import CustomButton from '../../../components/ui/CustomButton';
+import EmptyState from '../../../components/ui/EmptyState';
 import { DrawerContainer, DrawerFooter } from '../../../components/layout';
 import { useTranslation } from '../../../i18n';
 
@@ -117,31 +125,61 @@ export const QRSyncDrawer: React.FC<QRSyncDrawerProps> = ({ onClose }) => {
 
   return (
     <DrawerContainer padding="none" spacing="normal">
-      <div className="@container space-y-4 pt-2 pb-6 px-1 text-center">
-        <div className="p-3.5 rounded-xl theme-bg-sub/50 border theme-border text-xs theme-text-secondary leading-relaxed">
-          {t(
-            'drawerQrSubtitle',
-            'Scan this dynamic QR code with a logged-in mobile companion app to authenticate instantly without typing your password.'
-          )}
+      <div className="@container space-y-4 pt-2 pb-6 px-1">
+        {/* Streamlined Section Header */}
+        <div className="flex items-center gap-2.5 pb-2.5 border-b theme-border text-left">
+          <div className="p-2 rounded-xl theme-bg-accent-soft shrink-0 flex items-center justify-center">
+            <SmartphoneIcon className="w-4 h-4 theme-accent" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-xs font-semibold theme-text-primary tracking-wide">
+              {t('drawerQrTitle', 'Cross-Device QR Sign-In')}
+            </h3>
+            <p className="text-[11px] theme-text-secondary leading-normal">
+              {t('drawerQrSubtitle', 'Scan with a logged-in mobile device to sign in instantly.')}
+            </p>
+          </div>
         </div>
 
+        {/* Loading State using EmptyState */}
         {status === 'loading' && (
-          <div className="w-56 h-56 mx-auto rounded-2xl theme-bg-sub/50 border theme-border flex items-center justify-center animate-pulse">
-            <span className="text-xs theme-text-secondary">{t('generatingQR', 'Generating secure ticket...')}</span>
+          <div className="py-6 flex items-center justify-center">
+            <EmptyState
+              variant="sub"
+              size="sm"
+              icon={QrCodeIcon}
+              iconVariant="accent"
+              title={t('generatingQR', 'Generating secure ticket...')}
+              description={t(
+                'qrGeneratingDesc',
+                'Establishing a cryptographic session handshake...'
+              )}
+              animate
+            />
           </div>
         )}
 
+        {/* Pending Active QR Code */}
         {status === 'pending' && ticketId && (
-          <div className="space-y-4 py-2">
-            <div className="w-56 h-56 mx-auto p-3.5 bg-white rounded-2xl shadow-sm border theme-border flex items-center justify-center">
-              <QRCodeCanvas value={qrPayload} size={200} level="M" />
+          <div className="flex flex-col items-center justify-center py-3 px-2 space-y-4">
+            {/* Centered QR Canvas with comfortable 4-side padding & margin */}
+            <div className="p-5 sm:p-6 my-2 bg-white rounded-2xl shadow-md border theme-border flex items-center justify-center mx-auto transition-transform hover:scale-[1.01]">
+              <QRCodeCanvas
+                value={qrPayload}
+                size={192}
+                level="M"
+                marginSize={1}
+              />
             </div>
 
-            <div className="flex items-center justify-center gap-2 text-xs font-mono theme-text-secondary">
+            {/* Countdown Badge */}
+            <div className="inline-flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-full theme-bg-sub border theme-border text-xs font-mono theme-text-secondary shadow-xs">
+              <ClockIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
               <span>{t('expiresIn', 'Expires in')}:</span>
               <span className="font-bold theme-accent">{timeFormatted}</span>
             </div>
 
+            {/* Refresh Action */}
             <CustomButton
               variant="sub"
               size="sm"
@@ -154,40 +192,41 @@ export const QRSyncDrawer: React.FC<QRSyncDrawerProps> = ({ onClose }) => {
           </div>
         )}
 
+        {/* Authorized State using EmptyState */}
         {status === 'authorized' && (
-          <div className="p-6 rounded-2xl theme-bg-accent-soft border theme-border space-y-2">
-            <div className="w-12 h-12 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center mx-auto">
-              <CheckIcon className="w-6 h-6" />
-            </div>
-            <h3 className="text-sm font-bold theme-text-primary">
-              {t('sessionAuthorized', 'Authorized Successfully!')}
-            </h3>
-            <p className="text-xs theme-text-secondary">
-              {authorizedUser?.name || t('userAuthorized', 'New device connected.')}
-            </p>
+          <div className="py-6 flex items-center justify-center">
+            <EmptyState
+              variant="card"
+              size="sm"
+              icon={CheckIcon}
+              iconVariant="success"
+              title={t('sessionAuthorized', 'Authorized Successfully!')}
+              description={authorizedUser?.name || t('userAuthorized', 'New device connected.')}
+            />
           </div>
         )}
 
+        {/* Expired State using EmptyState */}
         {status === 'expired' && (
-          <div className="p-6 rounded-2xl theme-bg-sub/50 border theme-border space-y-3">
-            <AlertCircleIcon className="w-10 h-10 theme-danger mx-auto" />
-            <div className="space-y-1">
-              <h3 className="text-sm font-semibold theme-text-primary">
-                {t('qrExpired', 'Ticket Expired')}
-              </h3>
-              <p className="text-xs theme-text-secondary">
-                {t('qrExpiredDesc', 'This QR code has timed out. Click refresh below to generate a new session.')}
-              </p>
-            </div>
-            <CustomButton
-              variant="primary"
+          <div className="py-6 flex items-center justify-center">
+            <EmptyState
+              variant="sub"
               size="sm"
-              onClick={generateTicket}
-              icon={RefreshIcon}
-              className="mx-auto"
-            >
-              {t('regenerateQR', 'Refresh Code')}
-            </CustomButton>
+              icon={AlertCircleIcon}
+              iconVariant="danger"
+              title={t('qrExpired', 'Ticket Expired')}
+              description={t(
+                'qrExpiredDesc',
+                'This QR code has timed out. Click refresh below to generate a new session.'
+              )}
+              action={{
+                label: t('regenerateQR', 'Refresh Code'),
+                onClick: generateTicket,
+                icon: RefreshIcon,
+                variant: 'primary',
+                size: 'sm',
+              }}
+            />
           </div>
         )}
       </div>

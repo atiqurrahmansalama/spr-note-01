@@ -215,11 +215,17 @@ export function useProgressAnalyticsEngine(
       b.totalMistakes += m;
       b.totalStucks += s;
 
-      const sid = r.student_name || r.studentId || r.student_id;
+      const sid =
+        r.student_name ||
+        (r as any).studentName ||
+        (r as any).student?.name ||
+        (r as any).student?.full_name ||
+        r.studentId ||
+        r.student_id;
       if (sid) b.studentSet.add(String(sid));
 
-      const sName = r.session_name || r.session;
-      if (sName) b.sessionSet.add(sName);
+      const sName = r.session_name || r.session || (r as any).sessionName;
+      if (sName) b.sessionSet.add(String(sName));
     });
 
     // If dateSlots was not pre-populated but reports have multiple dates spanning <= 31 days, fill intermediate days
@@ -278,6 +284,7 @@ export function useProgressAnalyticsEngine(
         totalErrors: bErrors,
         accuracyRate: bAcc,
         studentCount: b.studentSet.size,
+        studentNames: Array.from(b.studentSet),
         sessionNames: Array.from(b.sessionSet),
         activeValue,
       };

@@ -78,27 +78,27 @@ export default function SegmentedSwitch<T extends string = string>({
             type="button"
             title={opt.title || opt.label}
             onClick={() => !isDisabled && !isActive && onChange(opt.value)}
-            className={`font-bold transition-all duration-200 cursor-pointer flex items-center justify-center outline-none focus:outline-none shrink-0 ${
+            className={`font-bold transition-colors duration-150 cursor-pointer flex items-center justify-center outline-none focus:outline-none shrink-0 group ${
               sizeClasses.button
             } ${fullWidth ? 'flex-1' : ''} ${
               isDisabled
                 ? 'opacity-40 cursor-not-allowed theme-text-secondary'
                 : isActive
-                ? 'theme-bg-accent theme-accent-text shadow-xs scale-[1.01]'
-                : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/50'
+                ? 'theme-bg-accent theme-accent-text shadow-xs'
+                : 'theme-text-secondary hover:theme-text-primary hover:bg-[color-mix(in_srgb,var(--text-primary)_6%,transparent)]'
             }`}
           >
             {IconComponent && (
               <IconComponent
-                className={`${sizeClasses.icon} shrink-0 transition-transform duration-200 ${
-                  isActive ? 'scale-105' : 'opacity-70 group-hover:opacity-100'
+                className={`${sizeClasses.icon} shrink-0 transition-opacity duration-150 ${
+                  isActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
                 }`}
               />
             )}
             <span className="whitespace-nowrap">{opt.label}</span>
             {opt.count !== undefined && opt.count !== null && (
               <span
-                className={`font-mono font-bold rounded-full transition-colors ${sizeClasses.badge} ${
+                className={`font-mono font-bold rounded-full transition-colors duration-150 ${sizeClasses.badge} ${
                   isActive
                     ? 'theme-bg-surface/20 theme-accent-text'
                     : 'theme-bg-surface border theme-border theme-text-secondary'

@@ -1048,7 +1048,7 @@ class QRGenerateView(APIView):
 
     def post(self, request):
         ticket = QRSessionTicket.objects.create(
-            expires_at=timezone.now() + datetime.timedelta(minutes=3)
+            expires_at=timezone.now() + timedelta(minutes=3)
         )
         return Response({
             'status': 'success',

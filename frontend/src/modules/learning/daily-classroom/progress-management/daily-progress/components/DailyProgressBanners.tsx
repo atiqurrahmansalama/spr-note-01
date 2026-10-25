@@ -148,25 +148,38 @@ export function DraftRecoveryBanner({
           return (
             <div
               key={draft.id}
-              className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-2.5 rounded-xl theme-bg-sub border theme-border gap-2.5 hover:border-primary/30 transition-colors"
+              className="p-2.5 rounded-xl theme-bg-sub border theme-border hover:border-primary/40 transition-colors space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-2.5"
             >
-              <div className="min-w-0 text-xs">
-                <div className="flex items-center gap-1.5 font-bold theme-text-primary truncate">
-                  <span className="truncate">{infoText}</span>
-                  <span className="shrink-0 text-[10px] px-1.5 py-0.2 rounded font-semibold theme-bg-elevated border theme-border text-xs uppercase tracking-wider">
-                    {modeBadge}
-                  </span>
+              <div className="flex items-start justify-between gap-2 min-w-0 sm:flex-1">
+                <div className="min-w-0 text-xs">
+                  <div className="flex items-center gap-1.5 font-bold theme-text-primary truncate">
+                    <span className="truncate">{infoText}</span>
+                    <span className="shrink-0 text-[10px] px-1.5 py-0.2 rounded font-semibold theme-bg-elevated border theme-border text-xs uppercase tracking-wider">
+                      {modeBadge}
+                    </span>
+                  </div>
+                  <div className="text-[10px] theme-text-secondary mt-0.5">
+                    {timeStr}
+                    {sessionText && <span className="font-medium">{sessionText}</span>}
+                  </div>
                 </div>
-                <div className="text-[10px] theme-text-secondary mt-0.5">
-                  {timeStr}
-                  {sessionText && <span className="font-medium">{sessionText}</span>}
+                <div className="sm:hidden shrink-0">
+                  <IconButton
+                    icon={CloseIcon}
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => onDiscard(draft)}
+                    title="Discard Draft"
+                    ariaLabel="Discard Draft"
+                  />
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+
+              <div className="flex items-center justify-between sm:justify-end gap-2 pt-1.5 sm:pt-0 border-t sm:border-t-0 theme-border/30 shrink-0">
                 <button
                   type="button"
                   onClick={() => onRecover(draft)}
-                  className="theme-bg-accent hover:opacity-90 theme-accent-text text-[10px] px-2.5 py-1 rounded-lg font-semibold transition shadow cursor-pointer active:scale-95"
+                  className="theme-bg-accent hover:opacity-90 theme-accent-text text-[11px] sm:text-[10px] px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-lg font-semibold transition cursor-pointer active:scale-95 shadow"
                   title="Load this draft into the current form"
                 >
                   Recover
@@ -174,19 +187,21 @@ export function DraftRecoveryBanner({
                 <button
                   type="button"
                   onClick={() => handleOpenInNewTab(draft)}
-                  className="theme-bg-elevated hover:theme-bg-accent-soft hover:theme-accent theme-text-primary text-[10px] px-2.5 py-1 rounded-lg font-semibold transition border theme-border cursor-pointer active:scale-95"
+                  className="theme-bg-elevated hover:theme-bg-accent-soft hover:theme-accent theme-text-primary text-[11px] sm:text-[10px] px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-lg font-semibold transition border theme-border cursor-pointer active:scale-95"
                   title="Open this draft in a new tab"
                 >
                   Open in New Tab
                 </button>
-                <IconButton
-                  icon={CloseIcon}
-                  size="xs"
-                  variant="ghost"
-                  onClick={() => onDiscard(draft)}
-                  title="Discard Draft"
-                  ariaLabel="Discard Draft"
-                />
+                <div className="hidden sm:block">
+                  <IconButton
+                    icon={CloseIcon}
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => onDiscard(draft)}
+                    title="Discard Draft"
+                    ariaLabel="Discard Draft"
+                  />
+                </div>
               </div>
             </div>
           );

@@ -13,7 +13,7 @@ export const ProfileOptionGroup: React.FC<ProfileOptionGroupProps> = ({ title, c
           {title}
         </h2>
       )}
-      <div className="theme-bg-surface border theme-border rounded-2xl overflow-hidden divide-y divide-theme-border shadow-xs">
+      <div className="theme-bg-surface border theme-border rounded-2xl overflow-hidden shadow-xs divide-y divide-[var(--border-color)]">
         {children}
       </div>
     </div>

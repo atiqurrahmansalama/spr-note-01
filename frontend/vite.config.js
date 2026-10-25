@@ -98,7 +98,7 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      '^/(students|reports|sessions|groups|messages|users|roles|activity|auth|control-panel|institutions)($|/)': {
+      '^/(students|reports|sessions|groups|messages|users|roles|activity|auth|control-panel|institutions|tenant-taxonomies)($|/)': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,

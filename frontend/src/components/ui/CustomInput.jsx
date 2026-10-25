@@ -159,6 +159,7 @@ const CustomInput = forwardRef(function CustomInput(
     manageTitle = null,
     onActionClick = null,
     actionLabel = null,
+    actionTitle = null,
     actionTo = null,
     headerAction = null,
     multiLanguage = false,

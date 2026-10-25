@@ -4,18 +4,49 @@ import { useToast } from "../../context/ToastContext";
 import { fetchWithAuth } from "../../utils/authService";
 import { auth as authStore } from "../../utils/localStore";
 import { API_BASE_URL } from "../../config/api";
+import { AlertTriangleIcon, SpinnerIcon } from "../../components/ui/Icons";
+import { InviteDetails } from "./types";
 
-export default function JoinWithInviteView() {
+export default function JoinWithInviteView(): React.JSX.Element {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [token, setToken] = useState("");
-  const [inviteDetails, setInviteDetails] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [claiming, setClaiming] = useState(false);
+  const [token, setToken] = useState<string>("");
+  const [inviteDetails, setInviteDetails] = useState<InviteDetails | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [errorMsg, setErrorMsg] = useState<string>("");
+  const [claiming, setClaiming] = useState<boolean>(false);
 
   const isLoggedIn = authStore.isLoggedIn();
+
+  const verifyToken = async (t: string): Promise<void> => {
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      const targetUrl = API_BASE_URL ? `${API_BASE_URL}/api/v1/invites/verify/?token=${t}` : `/api/v1/invites/verify/?token=${t}`;
+      const res = await fetch(targetUrl);
+      if (res.ok) {
+        const data: InviteDetails = await res.json();
+        setInviteDetails(data);
+      } else {
+        let reason = "This invitation is invalid, expired, or has been revoked.";
+        try {
+          const errData = await res.json();
+          if (errData && errData.error) {
+            reason = errData.error;
+          }
+        } catch {
+          // JSON parsing failed
+        }
+        setErrorMsg(reason);
+        sessionStorage.removeItem("pending_invite_token");
+      }
+    } catch {
+      setErrorMsg("Failed to connect to the verification server.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     // 1. Resolve token from URL or sessionStorage
@@ -36,36 +67,7 @@ export default function JoinWithInviteView() {
     verifyToken(resolvedToken);
   }, [searchParams]);
 
-  const verifyToken = async (t) => {
-    setLoading(true);
-    setErrorMsg("");
-    try {
-      const targetUrl = API_BASE_URL ? `${API_BASE_URL}/api/v1/invites/verify/?token=${t}` : `/api/v1/invites/verify/?token=${t}`;
-      const res = await fetch(targetUrl);
-      if (res.ok) {
-        const data = await res.json();
-        setInviteDetails(data);
-      } else {
-        let reason = "This invitation is invalid, expired, or has been revoked.";
-        try {
-          const errData = await res.json();
-          if (errData && errData.error) {
-            reason = errData.error;
-          }
-        } catch (e) {
-          // JSON parsing failed (e.g. HTML response)
-        }
-        setErrorMsg(reason);
-        sessionStorage.removeItem("pending_invite_token");
-      }
-    } catch (err) {
-      setErrorMsg("Failed to connect to the verification server.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleClaimDirectly = async () => {
+  const handleClaimDirectly = async (): Promise<void> => {
     setClaiming(true);
     try {
       const res = await fetchWithAuth("/api/v1/invites/claim/", {
@@ -97,7 +99,7 @@ export default function JoinWithInviteView() {
     }
   };
 
-  const handleGoToLogin = () => {
+  const handleGoToLogin = (): void => {
     navigate("/login");
   };
 
@@ -105,8 +107,8 @@ export default function JoinWithInviteView() {
     <div className="min-h-screen flex items-center justify-center bg-zinc-950 px-4 py-12 font-sans select-none text-zinc-100">
       <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl p-8 space-y-6 text-center">
         <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-3xl">
-            Suffah Notes
+          <div className="w-16 h-16 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sm font-bold tracking-tight text-sky-400">
+            Suffah LMS
           </div>
         </div>
 
@@ -118,7 +120,9 @@ export default function JoinWithInviteView() {
           </div>
         ) : errorMsg ? (
           <div className="space-y-6">
-            <div className="text-rose-500 text-5xl">⚠️</div>
+            <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500 mx-auto flex items-center justify-center">
+              <AlertTriangleIcon className="w-8 h-8" />
+            </div>
             <h2 className="text-xl font-bold">Invitation Invalid</h2>
             <p className="text-sm text-zinc-400">{errorMsg}</p>
             <button
@@ -133,16 +137,16 @@ export default function JoinWithInviteView() {
             <div className="space-y-2">
               <h2 className="text-2xl font-bold tracking-tight">You are Invited!</h2>
               <p className="text-sm text-zinc-400">
-                You have been invited by <span className="font-semibold text-zinc-200">{inviteDetails.inviter_name}</span> to join the platform.
+                You have been invited by <span className="font-semibold text-zinc-200">{inviteDetails?.inviter_name}</span> to join the platform.
               </p>
             </div>
 
             <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-2xl space-y-3">
               <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Target Assignment</div>
               <div className="text-lg font-bold text-sky-400 uppercase tracking-wide">
-                {inviteDetails.target_role_name}
+                {inviteDetails?.target_role_name}
               </div>
-              <div className="text-xs text-zinc-500">{inviteDetails.title}</div>
+              <div className="text-xs text-zinc-500">{inviteDetails?.title}</div>
             </div>
 
             {isLoggedIn ? (
@@ -150,9 +154,10 @@ export default function JoinWithInviteView() {
                 <button
                   onClick={handleClaimDirectly}
                   disabled={claiming}
-                  className="w-full py-3 rounded-xl font-bold text-sm bg-sky-600 hover:bg-sky-500 text-white transition-all cursor-pointer shadow-md disabled:opacity-50"
+                  className="w-full py-3 rounded-xl font-bold text-sm bg-sky-600 hover:bg-sky-500 text-white transition-all cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {claiming ? "Processing Onboarding..." : `Claim ${inviteDetails.target_role_name} Assignment`}
+                  {claiming && <SpinnerIcon className="w-4 h-4 text-white" />}
+                  <span>{claiming ? "Processing Onboarding..." : `Claim ${inviteDetails?.target_role_name} Assignment`}</span>
                 </button>
                 <p className="text-xs text-zinc-500">
                   Logged in as <span className="text-zinc-400">{authStore.getUser()?.phone_number}</span>
@@ -167,7 +172,7 @@ export default function JoinWithInviteView() {
                   onClick={handleGoToLogin}
                   className="w-full py-3 rounded-xl font-bold text-sm bg-sky-600 hover:bg-sky-500 text-white transition-all cursor-pointer shadow-md"
                 >
-                  ⚡ Sign In to Accept Invitation
+                  Sign In to Accept Invitation
                 </button>
               </div>
             )}

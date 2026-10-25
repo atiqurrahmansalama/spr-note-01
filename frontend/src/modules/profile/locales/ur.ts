@@ -1,6 +1,6 @@
 export default {
   title: "پروفائل اور اکاؤنٹ کی ترتیبات",
-  subtitle: "اپنا ذاتی پروفائل، اسناد، منسلک اکاؤنٹس اور سیکیورٹی پالیسیوں کا نظم کریں۔",
+  subtitle: "",
   editProfile: "پروفائل میں ترمیم کریں",
   changeAvatar: "تصویر تبدیل کریں",
   userFallback: "صارف کا پروفائل",
@@ -79,6 +79,8 @@ export default {
   drawerAccountsSubtitle: "محفوظ کردہ اکاؤنٹس کے درمیان آسانی سے سوئچ کریں۔",
   drawerQrTitle: "کیو آر سائن ان",
   drawerQrSubtitle: "فوری لاگ ان کے لیے کیمرے سے اسکین کریں۔",
+  generatingQR: "محفوظ سیشن ٹکٹ تیار کیا جا رہا ہے...",
+  qrGeneratingDesc: "محفوظ کرپٹوگرافک مصافحہ قائم کیا جا رہا ہے...",
   drawer2FaTitle: "دو فیکٹر تصدیق (2FA)",
   drawer2FaSubtitle: "TOTP ایپس کے ذریعے اکاؤنٹ کو مزید محفوظ بنائیں۔",
   drawerPasskeysTitle: "پاس کیز اور بائیو میٹرکس کا انتظام",
