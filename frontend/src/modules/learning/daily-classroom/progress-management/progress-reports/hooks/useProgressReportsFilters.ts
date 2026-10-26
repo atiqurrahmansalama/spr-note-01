@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { ReportItem, StudentGroupedItem } from "../types";
+import { calendarSettings } from "@/utils/localStore";
+import { getTodayInTimezone } from "@/constants/calendarConstants";
 
 export interface UseProgressReportsFiltersOptions {
   reportsList: ReportItem[];
@@ -72,9 +74,9 @@ export function useProgressReportsFilters({
   const [isAllExpanded, setIsAllExpanded] = useState<boolean>(false);
   const handleToggleExpandAll = useCallback(() => setIsAllExpanded((prev) => !prev), []);
 
-  // Date Boundaries Calculation
+  // Date Boundaries Calculation (Timezone-Aware standard)
   const { minEarliestDate, todayMaxDate } = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodayInTimezone(calendarSettings.getTimezone());
     if (reportsList.length === 0) {
       return { minEarliestDate: today, todayMaxDate: today };
     }
@@ -84,7 +86,8 @@ export function useProgressReportsFilters({
       .sort();
 
     const earliest = validDates.length > 0 ? validDates[0] : today;
-    return { minEarliestDate: earliest, todayMaxDate: today };
+    const latest = validDates.length > 0 && validDates[validDates.length - 1] > today ? validDates[validDates.length - 1] : today;
+    return { minEarliestDate: earliest, todayMaxDate: latest };
   }, [reportsList]);
 
   // Extract unique groups & sessions for dropdown filters

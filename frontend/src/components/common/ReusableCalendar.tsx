@@ -11,6 +11,7 @@ import {
 import IconButton from '../ui/IconButton';
 import CustomInput from '../ui/CustomInput';
 import { getHijriDetails } from '../../utils/hijriUtils';
+import { calendarSettings } from '../../utils/localStore';
 import { useTranslation } from '../../i18n';
 import { Link } from 'react-router-dom';
 import { getTodayInTimezone, getEnrichedTimezoneList, getTimezoneOffsetString } from '../../constants/calendarConstants';
@@ -165,12 +166,14 @@ export default function ReusableCalendar({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
 
+  const effectiveTz = timeZone || (calendarSettings?.getTimezone?.() ?? "");
+
   const todayStr = useMemo(() => {
-    return timeZone ? getTodayInTimezone(timeZone) : (() => {
+    return effectiveTz ? getTodayInTimezone(effectiveTz) : (() => {
       const d = new Date();
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     })();
-  }, [timeZone]);
+  }, [effectiveTz]);
 
   // Built-in Reusable TimeZone Action Resolution
   const resolvedHeaderAction = useMemo(() => {

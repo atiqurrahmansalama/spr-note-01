@@ -25,6 +25,7 @@ import { classroomSessionsSectionConfig } from "../../student-management/session
 import { classroomConfigSectionConfig } from "../../learning/daily-classroom/components/ClassroomConfigurationView";
 import { trashRestorationSectionConfig } from "../../admin/TrashRestorationView";
 import { systemEnvironmentSectionConfig } from "./SystemEnvironmentPanel";
+import { emailTemplatesSectionConfig } from "./EmailTemplatesPreviewPanel";
 
 /**
  * Metadata and catalog definitions for all Admin & Developer Tools sections.
@@ -56,6 +57,7 @@ export const DEVELOPER_TOOLS_SECTIONS: DeveloperToolsSectionItem[] = [
   classroomConfigSectionConfig,
 
   // Group 5: System & Platform Environment
+  emailTemplatesSectionConfig,
   trashRestorationSectionConfig,
   systemEnvironmentSectionConfig,
 ];

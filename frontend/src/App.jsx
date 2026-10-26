@@ -15,6 +15,7 @@ const LoginView = lazy(() => import("./modules/auth/LoginView"));
 const RegisterView = lazy(() => import("./modules/auth/RegisterView"));
 const VerifyEmailView = lazy(() => import("./modules/auth/VerifyEmailView"));
 const ResetPasswordView = lazy(() => import("./modules/auth/ResetPasswordView"));
+const ForgotPasswordView = lazy(() => import("./modules/auth/ForgotPasswordView"));
 const PublicVerifyReportView = lazy(() => import("./modules/verification/PublicVerifyReportView"));
 const JoinWithInviteView = lazy(() => import("./modules/auth/JoinWithInviteView"));
 const PublicOnlineAdmissionView = lazy(() => import("./modules/student-management/admission/PublicOnlineAdmissionView"));
@@ -134,6 +135,8 @@ export default function App() {
               <Route path="/register" element={<RegisterView />} />
               <Route path="/verify-email/:token" element={<VerifyEmailView />} />
               <Route path="/reset-password/:token" element={<ResetPasswordView />} />
+              <Route path="/forgot-password" element={<ForgotPasswordView />} />
+              <Route path="/secure-account" element={<ForgotPasswordView />} />
               <Route path="/verify-report/:report_id" element={<PublicVerifyReportView />} />
               <Route path="/api/v1/hifz/verify-report/:report_id" element={<PublicVerifyReportView />} />
               <Route path="/verify-receipt/:receiptNumber" element={<PublicVerifyReceiptView />} />

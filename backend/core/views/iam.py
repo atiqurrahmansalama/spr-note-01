@@ -246,14 +246,16 @@ class RegisterView(generics.CreateAPIView):
         verify_token = EmailVerificationToken.objects.create(user=user)
         verification_url = f"{settings.FRONTEND_URL}/verify-email/{verify_token.token}"
 
+        inst_name = getattr(user, 'institution', None) and user.institution.name or 'SPR Note Suite'
         context = {
             'user_name': f"{user.first_name} {user.last_name}".strip() or user.email,
-            'verification_url': verification_url
+            'verification_url': verification_url,
+            'institution_name': inst_name,
         }
         send_smtp_email(
             'emails/email_verification.html',
             context,
-            'Verify Your Email - Suffah Hifz LMS',
+            f'Verify Your Email - {inst_name}',
             [user.email]
         )
 
@@ -306,14 +308,16 @@ class ResendVerificationView(APIView):
             verify_token = EmailVerificationToken.objects.create(user=user)
             verification_url = f"{settings.FRONTEND_URL}/verify-email/{verify_token.token}"
 
+            inst_name = getattr(user, 'institution', None) and user.institution.name or 'SPR Note Suite'
             context = {
                 'user_name': f"{user.first_name} {user.last_name}".strip() or user.email,
-                'verification_url': verification_url
+                'verification_url': verification_url,
+                'institution_name': inst_name,
             }
             send_smtp_email(
                 'emails/email_verification.html',
                 context,
-                'Verify Your Email - Suffah Hifz LMS',
+                f'Verify Your Email - {inst_name}',
                 [user.email]
             )
 
@@ -335,14 +339,16 @@ class PasswordResetRequestView(APIView):
             reset_token = PasswordResetToken.objects.create(user=user)
             reset_url = f"{settings.FRONTEND_URL}/reset-password/{reset_token.token}"
 
+            inst_name = getattr(user, 'institution', None) and user.institution.name or 'SPR Note Suite'
             context = {
                 'user_name': f"{user.first_name} {user.last_name}".strip() or user.email,
-                'reset_url': reset_url
+                'reset_url': reset_url,
+                'institution_name': inst_name,
             }
             send_smtp_email(
                 'emails/password_reset.html',
                 context,
-                'Reset Your Password - Suffah Hifz LMS',
+                f'Reset Your Password - {inst_name}',
                 [user.email]
             )
 

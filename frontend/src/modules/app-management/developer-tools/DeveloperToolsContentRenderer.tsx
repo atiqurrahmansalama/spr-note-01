@@ -22,6 +22,7 @@ import SessionManager from "../../student-management/sessions/SessionManager";
 import ClassroomConfigurationView from "../../learning/daily-classroom/components/ClassroomConfigurationView";
 import TrashRestorationView from "../../admin/TrashRestorationView";
 import { SystemEnvironmentPanel } from "./SystemEnvironmentPanel";
+import { EmailTemplatesPreviewPanel } from "./EmailTemplatesPreviewPanel";
 
 
 export interface DeveloperToolsContentRendererProps {
@@ -187,6 +188,13 @@ export const DeveloperToolsContentRenderer: React.FC<DeveloperToolsContentRender
       {currentRenderSection === "trash" && (
         <div className="w-full animate-fade-in">
           <TrashRestorationView />
+        </div>
+      )}
+
+      {/* Section 5.5: Email Templates & Mailer Console */}
+      {currentRenderSection === "email-templates" && (
+        <div className="w-full animate-fade-in">
+          <EmailTemplatesPreviewPanel />
         </div>
       )}
 

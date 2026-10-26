@@ -112,6 +112,9 @@ from .views import (
     RoleInviteTokenViewSet,
     PublicInviteVerificationView,
     PublicInviteClaimView,
+    EmailTemplateCatalogView,
+    EmailTemplateRenderView,
+    EmailTemplateTestSendView,
     StaffProfileViewSet,
     SystemHealthDiagnosticsView,
     EnterpriseComplianceDataExportView,
@@ -415,6 +418,11 @@ urlpatterns = [
     path('api/v1/system/backup/tenant-restore/', TenantBackupRestoreView.as_view(), name='backup_tenant_restore'),
     path('api/v1/system/replication/status/', ReplicationStatusView.as_view(), name='replication_status'),
     path('api/v1/system/replication/sync-now/', ReplicationSyncNowView.as_view(), name='replication_sync_now'),
+
+    # Developer Tools Email Template Catalog, Preview & Test Mailer Endpoints
+    path('api/v1/system/email-templates/', EmailTemplateCatalogView.as_view(), name='email_templates_catalog'),
+    path('api/v1/system/email-templates/render/', EmailTemplateRenderView.as_view(), name='email_templates_render'),
+    path('api/v1/system/email-templates/send-test/', EmailTemplateTestSendView.as_view(), name='email_templates_send_test'),
 
     path('api/v1/', include(router.urls)),
     path('api/', include(router.urls)),

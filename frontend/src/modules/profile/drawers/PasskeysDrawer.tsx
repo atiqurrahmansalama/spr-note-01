@@ -2,7 +2,17 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
 import { useToast } from '../../../context/ToastContext';
 import { fetchWithAuth } from '../../../utils/authService';
-import { PasskeyIcon, PlusIcon, TrashIcon, ChevronIcon, CheckCircleIcon } from '../../../components/ui/Icons';
+import {
+  PasskeyIcon,
+  PlusIcon,
+  TrashIcon,
+  ChevronIcon,
+  CheckCircleIcon,
+  SmartphoneIcon,
+  LaptopIcon,
+  DesktopIcon,
+  TabletIcon,
+} from '../../../components/ui/Icons';
 import CustomButton from '../../../components/ui/CustomButton';
 import CollapsibleCard from '../../../components/ui/CollapsibleCard';
 import EmptyState from '../../../components/ui/EmptyState';
@@ -46,6 +56,16 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
       return str.includes(currentDeviceKeyword.toLowerCase());
     });
   }, [passkeys, currentDeviceKeyword]);
+
+  // Dynamic device icon detection based on registered device characteristics
+  const getDeviceIcon = useCallback((pk: PasskeyItem) => {
+    const str = `${pk.device_name || ''} ${pk.name || ''}`.toLowerCase();
+    if (/phone|iphone|android|mobile/i.test(str)) return SmartphoneIcon;
+    if (/ipad|tablet/i.test(str)) return TabletIcon;
+    if (/macbook|laptop|notebook/i.test(str)) return LaptopIcon;
+    if (/win|pc|desktop|computer|linux|workstation/i.test(str)) return DesktopIcon;
+    return PasskeyIcon;
+  }, []);
 
   // Localized date and time formatting (culturally and timezone accurate)
   const formatDateTime = (isoDate?: string, fallbackDisplay?: string) => {
@@ -255,7 +275,7 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
 
               {/* Current Device Status & Action Handling */}
               {isCurrentDeviceRegistered ? (
-                <div className="p-3.5 rounded-xl theme-bg-sub/60 border theme-border flex items-center justify-between gap-3 shadow-2xs">
+                <div className="p-3 sm:p-3.5 rounded-xl theme-bg-sub/60 border theme-border flex flex-col @[340px]:flex-row @[340px]:items-center justify-between gap-2.5 @[340px]:gap-3 shadow-2xs">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <CheckCircleIcon className="w-4 h-4 theme-accent shrink-0" />
                     <span className="text-xs font-semibold theme-text-primary truncate">
@@ -266,7 +286,7 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
                     type="button"
                     onClick={handleRegisterPasskey}
                     disabled={registering}
-                    className="text-xs font-semibold theme-accent hover:underline shrink-0 cursor-pointer transition-colors"
+                    className="text-xs font-semibold theme-accent hover:underline shrink-0 cursor-pointer transition-colors text-left @[340px]:text-right"
                   >
                     {t('reRegisterDevice', 'Re-register Device')}
                   </button>
@@ -292,35 +312,33 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
                     .toLowerCase()
                     .includes(currentDeviceKeyword.toLowerCase());
                   const formattedDateTime = formatDateTime(pk.created_at, pk.created_at_display);
+                  const DeviceIcon = getDeviceIcon(pk);
 
                   return (
                     <CollapsibleCard
                       key={pk.id}
-                      icon={PasskeyIcon}
+                      icon={DeviceIcon}
                       className="border theme-border theme-bg-surface rounded-xl overflow-hidden shadow-2xs"
                       headerClassName="p-3 sm:p-3.5"
                       title={
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs sm:text-sm font-semibold theme-text-primary truncate">
+                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                          <span className="text-xs @[360px]:text-sm font-semibold theme-text-primary truncate max-w-[170px] @[360px]:max-w-[220px] @[440px]:max-w-none">
                             {displayName}
                           </span>
                           {isThisDevice && (
-                            <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
+                            <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 shrink-0">
                               {t('currentDeviceBadge', 'This Device')}
                             </span>
                           )}
-                          <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full theme-bg-success-soft text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                            Active
-                          </span>
                         </div>
                       }
                       subtitle={
-                        <div className="flex items-center gap-2 text-[11px] theme-text-secondary">
+                        <div className="flex items-center gap-1.5 flex-wrap text-[11px] theme-text-secondary mt-0.5">
                           <span>
                             {t('registeredOn', 'Added')}: {formattedDateTime}
                           </span>
-                          <span>&bull;</span>
-                          <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                          <span className="opacity-50">&bull;</span>
+                          <span className="font-medium text-emerald-600 dark:text-emerald-400">
                             {t('biometricProtected', 'Biometric Protected')}
                           </span>
                         </div>
@@ -333,7 +351,7 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
                             handleDeletePasskey(pk.id);
                           }}
                           disabled={deletingId === pk.id}
-                          className="p-1.5 rounded-lg theme-text-secondary hover:theme-danger hover:theme-bg-danger-soft transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg theme-text-secondary hover:theme-danger hover:theme-bg-danger-soft transition-colors cursor-pointer shrink-0"
                           title={t('deletePasskey', 'Delete passkey')}
                         >
                           <TrashIcon className="w-4 h-4" />
@@ -356,7 +374,7 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
                           Copy ID
                         </button>
                       </div>
-                      <p className="theme-text-primary break-all select-all font-mono text-[10px] theme-bg-surface p-2 rounded-lg border theme-border leading-relaxed">
+                      <p className="theme-text-primary break-all select-all font-mono text-[10px] theme-bg-surface p-2.5 rounded-lg border theme-border leading-relaxed">
                         {pk.full_credential_id || pk.credential_id}
                       </p>
                     </CollapsibleCard>

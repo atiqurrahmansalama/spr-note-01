@@ -410,7 +410,7 @@ LOGGING = {
     },
 }
 
-# SMTP Email & IAM System Configuration
+# SMTP Email & IAM System Configuration (Gmail SMTP Active)
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend" if DEBUG else "django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))

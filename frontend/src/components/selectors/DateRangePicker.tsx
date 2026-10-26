@@ -5,7 +5,12 @@ import { ChevronIcon, CalendarIcon, CheckIcon } from "../ui/Icons";
 import ReusableCalendar from "../common/ReusableCalendar";
 import { calendarSettings } from "../../utils/localStore";
 import { getCurrentHijriMonthRange } from "../../utils/hijriUtils";
-import { getEnrichedTimezoneList, getTimezoneOffsetString } from "@/constants/calendarConstants";
+import { 
+  getEnrichedTimezoneList, 
+  getTimezoneOffsetString, 
+  getTodayInTimezone, 
+  getSystemTimezone 
+} from "@/constants/calendarConstants";
 
 const formatLocalDate = (d: Date | null | undefined): string => {
   if (!d) return "";
@@ -205,9 +210,18 @@ export default function DateRangePicker({
     };
   }, [isDropdownOpen, showCustomCalendar]);
 
+  const getEffectiveTimezone = () => {
+    return timeZone || (calendarSettings?.getTimezone?.() ?? getSystemTimezone());
+  };
+
   const getPresetDates = (presetKey: string) => {
-    const today = new Date();
-    const todayStr = formatLocalDate(today);
+    const effectiveTz = getEffectiveTimezone();
+    const todayStr = getTodayInTimezone(effectiveTz);
+    const [yStr, mStr, dStr] = todayStr.split("-");
+    const baseYear = parseInt(yStr, 10);
+    const baseMonth = parseInt(mStr, 10) - 1;
+    const baseDay = parseInt(dStr, 10);
+    const todayDate = new Date(baseYear, baseMonth, baseDay, 12, 0, 0);
 
     let start = "";
     let end = "";
@@ -216,36 +230,36 @@ export default function DateRangePicker({
       start = todayStr;
       end = todayStr;
     } else if (presetKey === "yesterday") {
-      const yest = new Date(today);
+      const yest = new Date(todayDate);
       yest.setDate(yest.getDate() - 1);
       const yestStr = formatLocalDate(yest);
       start = yestStr;
       end = yestStr;
     } else if (presetKey === "past_week") {
-      const weekAgo = new Date(today);
+      const weekAgo = new Date(todayDate);
       weekAgo.setDate(weekAgo.getDate() - 6);
       start = formatLocalDate(weekAgo);
       end = todayStr;
     } else if (presetKey === "past_2weeks") {
-      const twoWeeksAgo = new Date(today);
+      const twoWeeksAgo = new Date(todayDate);
       twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 13);
       start = formatLocalDate(twoWeeksAgo);
       end = todayStr;
     } else if (presetKey === "this_month") {
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      start = formatLocalDate(startOfMonth);
+      const startOfMonth = formatLocalDate(new Date(baseYear, baseMonth, 1, 12, 0, 0));
+      start = startOfMonth;
       end = todayStr;
     } else if (presetKey === "full_hijri_month") {
-      const hijriRange = getCurrentHijriMonthRange(today);
+      const hijriRange = getCurrentHijriMonthRange(todayDate);
       start = hijriRange.start;
       end = hijriRange.end;
     } else if (presetKey === "past_month") {
-      const monthAgo = new Date(today);
+      const monthAgo = new Date(todayDate);
       monthAgo.setDate(monthAgo.getDate() - 29);
       start = formatLocalDate(monthAgo);
       end = todayStr;
     } else if (presetKey === "past_3months") {
-      const ago = new Date(today);
+      const ago = new Date(todayDate);
       ago.setDate(ago.getDate() - 89);
       start = formatLocalDate(ago);
       end = todayStr;
@@ -291,30 +305,35 @@ export default function DateRangePicker({
     if (isCustomPicking) return "custom";
     if (!startDate && !endDate) return "all_time";
 
-    const today = new Date();
-    const todayStr = formatLocalDate(today);
+    const effectiveTz = getEffectiveTimezone();
+    const todayStr = getTodayInTimezone(effectiveTz);
+    const [yStr, mStr, dStr] = todayStr.split("-");
+    const baseYear = parseInt(yStr, 10);
+    const baseMonth = parseInt(mStr, 10) - 1;
+    const baseDay = parseInt(dStr, 10);
+    const todayDate = new Date(baseYear, baseMonth, baseDay, 12, 0, 0);
 
-    const yest = new Date(today);
+    const yest = new Date(todayDate);
     yest.setDate(yest.getDate() - 1);
     const yestStr = formatLocalDate(yest);
 
-    const weekAgo = new Date(today);
+    const weekAgo = new Date(todayDate);
     weekAgo.setDate(weekAgo.getDate() - 6);
     const weekStr = formatLocalDate(weekAgo);
 
-    const twoWeeksAgo = new Date(today);
+    const twoWeeksAgo = new Date(todayDate);
     twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 13);
     const twoWeeksStr = formatLocalDate(twoWeeksAgo);
 
-    const monthAgo = new Date(today);
+    const monthAgo = new Date(todayDate);
     monthAgo.setDate(monthAgo.getDate() - 29);
     const monthStr = formatLocalDate(monthAgo);
 
-    const threeMonthsAgo = new Date(today);
+    const threeMonthsAgo = new Date(todayDate);
     threeMonthsAgo.setDate(threeMonthsAgo.getDate() - 89);
     const threeMonthStr = formatLocalDate(threeMonthsAgo);
 
-    const startOfMonth = formatLocalDate(new Date(today.getFullYear(), today.getMonth(), 1));
+    const startOfMonth = formatLocalDate(new Date(baseYear, baseMonth, 1, 12, 0, 0));
 
     if (startDate === todayStr && endDate === todayStr) return "today";
     if (startDate === yestStr && endDate === yestStr) return "yesterday";
@@ -322,7 +341,7 @@ export default function DateRangePicker({
     if (startDate === twoWeeksStr && endDate === todayStr) return "past_2weeks";
     if (startDate === startOfMonth && endDate === todayStr) return "this_month";
 
-    const hijriRange = getCurrentHijriMonthRange(today);
+    const hijriRange = getCurrentHijriMonthRange(todayDate);
     if (startDate === hijriRange.start && endDate === hijriRange.end) return "full_hijri_month";
 
     if (startDate === monthStr && endDate === todayStr) return "past_month";
@@ -440,6 +459,7 @@ export default function DateRangePicker({
               isRange={true}
               startDate={startDate}
               endDate={endDate}
+              timeZone={getEffectiveTimezone()}
               onRangeSelect={(start: string, end: string) => {
                 if (onRangeSelect) onRangeSelect(start, end);
                 setIsDropdownOpen(false);

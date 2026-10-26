@@ -240,7 +240,7 @@ export function useDailyProgressHierarchy({
     const seenIds = new Set<string>();
     const seenUniqs = new Set<string>();
     const seenCards = new Set<string>();
-    const seenNameMap = new Map<string, number>();
+    const idToIdxMap = new Map<string, number>();
 
     const appendStudent = (st: any) => {
       const stName = (typeof st === "object" ? st.name_en || st.name || st.label : String(st || "")).trim();
@@ -266,22 +266,22 @@ export function useDailyProgressHierarchy({
       const stSecId = typeof st === "object" ? getSectionId(st) || (st.student_section || st.section_id) : undefined;
       const stDeptId = typeof st === "object" ? getDepartmentId(st) || (st.department || st.department_id) : undefined;
 
-      const normName = stName.toLowerCase();
-      const nameKey = `${normName}_cls_${stClsId || ""}_sec_${stSecId || ""}_roll_${roll != null ? roll : ""}`;
-      const looseNameKey = `${normName}_cls_${stClsId || ""}`;
+      const hasId = rawId != null && String(rawId).trim() !== "";
+      const hasUniq = Boolean(uniq && String(uniq).trim() !== "");
+      const hasCard = Boolean(cardNo && String(cardNo).trim() !== "");
 
-      const isDuplicateId = Boolean(rawId && seenIds.has(String(rawId)));
-      const isDuplicateUniq = Boolean(uniq && seenUniqs.has(String(uniq)));
-      const isDuplicateCard = Boolean(cardNo && seenCards.has(String(cardNo)));
-      const existingIdx = seenNameMap.has(nameKey)
-        ? seenNameMap.get(nameKey)
-        : roll == null && seenNameMap.has(looseNameKey)
-        ? seenNameMap.get(looseNameKey)
-        : seenNameMap.has(normName)
-        ? seenNameMap.get(normName)
-        : undefined;
+      // Deduplicate strictly by unique identifiers to allow multiple students with the exact same name
+      const isDuplicateId = hasId && seenIds.has(String(rawId));
+      const isDuplicateUniq = hasUniq && seenUniqs.has(String(uniq));
+      const isDuplicateCard = hasCard && seenCards.has(String(cardNo));
 
-      if (isDuplicateId || isDuplicateUniq || isDuplicateCard || existingIdx !== undefined) {
+      if (isDuplicateId || isDuplicateUniq || isDuplicateCard) {
+        const existingIdx = hasId
+          ? idToIdxMap.get(`id_${rawId}`)
+          : hasUniq
+          ? idToIdxMap.get(`uniq_${uniq}`)
+          : idToIdxMap.get(`card_${cardNo}`);
+
         if (existingIdx !== undefined && fullList[existingIdx]) {
           const target = fullList[existingIdx];
           if (!target.id && rawId) target.id = rawId;
@@ -296,27 +296,53 @@ export function useDailyProgressHierarchy({
         return;
       }
 
-      if (rawId) seenIds.add(String(rawId));
-      if (uniq) seenUniqs.add(String(uniq));
-      if (cardNo) seenCards.add(String(cardNo));
+      // If record completely lacks unique identifiers, fallback to composite key
+      if (!hasId && !hasUniq && !hasCard) {
+        const normName = stName.toLowerCase();
+        const fallbackKey = `noid_${normName}_cls_${stClsId || ""}_sec_${stSecId || ""}_roll_${roll != null ? roll : ""}`;
+        if (idToIdxMap.has(fallbackKey)) return;
+        idToIdxMap.set(fallbackKey, fullList.length);
+        fullList.push({
+          id: undefined,
+          label: stName,
+          name: stName,
+          name_en: typeof st === "object" ? st.name_en || stName : stName,
+          sub: secSub,
+          section_name: (typeof st === "object" ? st.section_name || st.student_section_name : null) || secSub || undefined,
+          roll_number: roll,
+          student_id_card_number: cardNo,
+          uniq_id: uniq,
+          badge: undefined,
+          student_class: stClsId,
+          student_class_name: typeof st === "object" ? st.student_class_name || st.class_name : undefined,
+          student_section: stSecId,
+          department: stDeptId,
+          department_name: typeof st === "object" ? st.department_name : undefined,
+          originalData: st,
+        });
+        return;
+      }
 
       const newIdx = fullList.length;
-      seenNameMap.set(nameKey, newIdx);
-      seenNameMap.set(looseNameKey, newIdx);
-      seenNameMap.set(normName, newIdx);
+      if (hasId) {
+        seenIds.add(String(rawId));
+        idToIdxMap.set(`id_${rawId}`, newIdx);
+      }
+      if (hasUniq) {
+        seenUniqs.add(String(uniq));
+        idToIdxMap.set(`uniq_${uniq}`, newIdx);
+      }
+      if (hasCard) {
+        seenCards.add(String(cardNo));
+        idToIdxMap.set(`card_${cardNo}`, newIdx);
+      }
 
       const badge =
-        typeof st === "object" && st.badge
-          ? st.badge
-          : roll != null
-          ? `Roll: ${roll}`
-          : cardNo
-          ? `ID: ${cardNo}`
-          : uniq
-          ? `ID: ${uniq}`
-          : rawId != null
-          ? `ID: ${rawId}`
-          : undefined;
+        (typeof st === "object" && st.badge ? st.badge : null) ||
+        (typeof uniq === "string" && uniq.trim() ? uniq.trim() : null) ||
+        (typeof cardNo === "string" && cardNo.trim() ? cardNo.trim() : null) ||
+        (roll != null ? `Roll: ${roll}` : undefined) ||
+        (rawId != null ? `ID: ${rawId}` : undefined);
 
       fullList.push({
         id: rawId || undefined,
