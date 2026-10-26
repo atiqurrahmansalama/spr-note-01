@@ -15,6 +15,7 @@ import DocumentFilePicker from '../../../../components/ui/DocumentFilePicker';
 import AddressPickerInput from '../../../../components/ui/AddressPickerInput';
 import { registerInstitution, getInstitutionCategories } from '../../../../api/institutions';
 import { useToast } from '../../../../context/ToastContext';
+import { useTenant } from '../../../../context/TenantContext';
 import { DrawerContainer } from '../../../../components/layout';
 
 export const CAMPUS_STRUCTURE_QUOTA_FIELDS = [
@@ -213,6 +214,7 @@ const FALLBACK_INSTITUTION_TYPES = [
 
 export default function InstitutionOnboardingForm({ onSuccess, onCancel, showStructureQuotas = false }) {
   const { showToast } = useToast();
+  const { switchInstitution } = useTenant();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
@@ -338,6 +340,9 @@ export default function InstitutionOnboardingForm({ onSuccess, onCancel, showStr
 
       const response = await registerInstitution(payload);
       showToast('Academy onboarded successfully!', 'success');
+      if (response?.institution?.id && switchInstitution) {
+        switchInstitution(String(response.institution.id));
+      }
       if (onSuccess) onSuccess(response);
     } catch (err) {
       console.error('[Onboarding Error]:', err);

@@ -85,6 +85,18 @@ export default {
   drawer2FaSubtitle: "Add an extra layer of enterprise protection using TOTP authenticator apps.",
   drawerPasskeysTitle: "Manage Passkeys & Biometrics",
   drawerPasskeysSubtitle: "Hardware-bound credentials using Touch ID, Face ID, or Windows Hello.",
+  passkeyHelpTitle: "One Passkey Per Device",
+  passkeyHelpDesc: "Each device (your phone, laptop, or work PC) holds its own hardware security key. Once registered on this device, you can sign in with a single touch without typing a password.",
+  currentDeviceBadge: "This Device",
+  hardwareProtected: "Hardware Protected",
+  deviceAlreadySecured: "This Device is Secured",
+  deviceAlreadySecuredDesc: "A hardware biometric key is already active for this device. Only one passkey per device is required.",
+  reRegisterDevice: "Re-register Device",
+  showKeyDetails: "Show Key ID",
+  hideKeyDetails: "Hide Key ID",
+  credentialHash: "Credential ID Hash",
+  biometricProtected: "Biometric Hardware Key",
+  currentDeviceSecured: "Active on this device",
 
   // Enterprise 2FA Strings
   twoFactorActiveHeader: "Two-Factor Authentication is Active",
@@ -109,6 +121,8 @@ export default {
   toastExportSuccess: "Personal profile data exported successfully!",
   toastProfileUpdatedSuccess: "Profile updated and synchronized successfully!",
   toastSignOutSuccess: "Signed out successfully.",
+  pwdUpdatedSuccess: "Password changed successfully!",
+  pwdUpdatedWithEmailAlert: "Password updated! A security alert was dispatched to your email.",
 
   // Common Controls
   saveChanges: "Save Changes",

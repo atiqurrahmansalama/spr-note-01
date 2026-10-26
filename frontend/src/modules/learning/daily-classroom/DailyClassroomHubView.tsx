@@ -890,9 +890,10 @@ export default function DailyClassroomHubView({
             <SegmentedSwitch<'QURAN' | 'BOOK'>
               value={progressMode}
               onChange={handleProgressModeChange}
+              hideIconsOnMobile={true}
               options={[
-                { value: 'QURAN', label: 'Quran', icon: BookOpenIcon },
-                { value: 'BOOK', label: 'Book', icon: LayersIcon },
+                { value: 'QURAN', label: 'Quran', icon: BookOpenIcon, hideIconOnMobile: true },
+                { value: 'BOOK', label: 'Book', icon: LayersIcon, hideIconOnMobile: true },
               ]}
               size="sm"
             />

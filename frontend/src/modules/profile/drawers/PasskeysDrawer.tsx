@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
 import { useToast } from '../../../context/ToastContext';
 import { fetchWithAuth } from '../../../utils/authService';
-import { PasskeyIcon, PlusIcon, TrashIcon } from '../../../components/ui/Icons';
+import { PasskeyIcon, PlusIcon, TrashIcon, ChevronIcon, CheckCircleIcon } from '../../../components/ui/Icons';
 import CustomButton from '../../../components/ui/CustomButton';
+import CollapsibleCard from '../../../components/ui/CollapsibleCard';
 import EmptyState from '../../../components/ui/EmptyState';
 import { DrawerContainer, DrawerFooter, DrawerSection } from '../../../components/layout';
 import { useTranslation } from '../../../i18n';
@@ -25,6 +26,45 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const [deletingId, setDeletingId] = useState<number | string | null>(null);
+  const [expandedKeyId, setExpandedKeyId] = useState<number | string | null>(null);
+
+  // Intelligent local platform detection
+  const currentDeviceKeyword = useMemo(() => {
+    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const platform = typeof navigator !== 'undefined' ? (navigator as any).userAgentData?.platform || navigator.platform || '' : '';
+    if (/Win/i.test(platform) || /Windows/i.test(userAgent)) return 'Windows';
+    if (/Mac/i.test(platform) || /Macintosh/i.test(userAgent)) return 'Mac';
+    if (/iPhone|iPad|iPod/i.test(userAgent)) return 'iPhone';
+    if (/Android/i.test(userAgent)) return 'Android';
+    if (/Linux/i.test(platform)) return 'Linux';
+    return 'PC';
+  }, []);
+
+  const isCurrentDeviceRegistered = useMemo(() => {
+    return passkeys.some((p) => {
+      const str = `${p.device_name || ''} ${p.name || ''}`.toLowerCase();
+      return str.includes(currentDeviceKeyword.toLowerCase());
+    });
+  }, [passkeys, currentDeviceKeyword]);
+
+  // Localized date and time formatting (culturally and timezone accurate)
+  const formatDateTime = (isoDate?: string, fallbackDisplay?: string) => {
+    if (!isoDate) return fallbackDisplay || 'Active';
+    try {
+      const d = new Date(isoDate);
+      if (isNaN(d.getTime())) return fallbackDisplay || isoDate;
+      return d.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch {
+      return fallbackDisplay || isoDate;
+    }
+  };
 
   const fetchPasskeys = useCallback(async () => {
     setLoading(true);
@@ -83,11 +123,26 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
         return;
       }
 
+      // Detect intelligent OS and browser name
+      const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+      const platform = typeof navigator !== 'undefined' ? (navigator as any).userAgentData?.platform || navigator.platform || '' : '';
+      const isWin = /Win/i.test(platform) || /Windows/i.test(userAgent);
+      const isMac = /Mac/i.test(platform) || /Macintosh/i.test(userAgent);
+      const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
+      const isAndroid = /Android/i.test(userAgent);
+      const isLinux = /Linux/i.test(platform) && !isAndroid;
+
+      let detectedDevice = isWin ? 'Windows PC' : isMac ? 'MacBook' : isIOS ? 'iPhone' : isAndroid ? 'Android Device' : isLinux ? 'Linux' : 'Personal Computer';
+      if (/Edg/i.test(userAgent)) detectedDevice += ' (Edge)';
+      else if (/Chrome/i.test(userAgent)) detectedDevice += ' (Chrome)';
+      else if (/Safari/i.test(userAgent)) detectedDevice += ' (Safari)';
+      else if (/Firefox/i.test(userAgent)) detectedDevice += ' (Firefox)';
+
       const verifyRes = await fetchWithAuth('/api/v1/auth/passkeys/register-verify/', {
         method: 'POST',
         body: JSON.stringify({
           credential,
-          name: `${navigator.platform || 'Workstation'} Passkey`,
+          name: `${detectedDevice} Biometrics`,
         }),
       });
 
@@ -131,10 +186,6 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
       <div className="@container space-y-4 pt-2 pb-6 px-1">
         <DrawerSection
           title={t('drawerPasskeysTitle', 'Manage Passkeys & Biometrics')}
-          subtitle={t(
-            'drawerPasskeysSubtitle',
-            'Hardware-bound credentials using Touch ID, Face ID, or Windows Hello for instant, passwordless sign-in.'
-          )}
           icon={PasskeyIcon}
           headerRight={
             passkeys.length > 0 && (
@@ -184,50 +235,133 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Add Passkey Action Button */}
-              <CustomButton
-                variant="primary"
-                size="sm"
-                onClick={handleRegisterPasskey}
-                loading={registering}
-                icon={PlusIcon}
-                className="w-full justify-center"
-              >
-                {t('createPasskey', 'Add New Passkey')}
-              </CustomButton>
+              {/* Context Banner: Explaining One Passkey Per Physical Device */}
+              <div className="p-3.5 rounded-xl theme-bg-sub/50 border theme-border flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0 mt-0.5">
+                  <PasskeyIcon className="w-4 h-4" />
+                </div>
+                <div className="text-xs space-y-1">
+                  <p className="font-semibold theme-text-primary">
+                    {t('passkeyHelpTitle', 'One Passkey Per Device')}
+                  </p>
+                  <p className="theme-text-secondary leading-relaxed">
+                    {t(
+                      'passkeyHelpDesc',
+                      'Each device (your phone, laptop, or work PC) holds its own hardware security key. Once registered on this device, you can sign in with a single touch without typing a password.'
+                    )}
+                  </p>
+                </div>
+              </div>
 
-              {/* Passkeys List */}
-              <div className="divide-y divide-[var(--border-color)] border theme-border rounded-xl overflow-hidden theme-bg-surface">
-                {passkeys.map((pk) => (
-                  <div
-                    key={pk.id}
-                    className="p-3.5 sm:p-4 flex items-center justify-between gap-3 hover:theme-bg-sub/40 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-lg theme-bg-accent-soft theme-accent border theme-border flex items-center justify-center shrink-0">
-                        <PasskeyIcon className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-sm font-semibold theme-text-primary truncate block">
-                          {pk.name || t('securityKey', 'Security Passkey')}
-                        </span>
-                        <span className="text-xs theme-text-secondary font-mono">
-                          {t('registeredOn', 'Added')}: {pk.created_at ? formatDate(pk.created_at) : 'Active'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleDeletePasskey(pk.id)}
-                      disabled={deletingId === pk.id}
-                      className="p-1.5 rounded-lg theme-text-secondary hover:theme-danger hover:theme-bg-danger-soft transition-colors shrink-0 cursor-pointer"
-                      title={t('deletePasskey', 'Delete passkey')}
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
+              {/* Current Device Status & Action Handling */}
+              {isCurrentDeviceRegistered ? (
+                <div className="p-3.5 rounded-xl theme-bg-sub/60 border theme-border flex items-center justify-between gap-3 shadow-2xs">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <CheckCircleIcon className="w-4 h-4 theme-accent shrink-0" />
+                    <span className="text-xs font-semibold theme-text-primary truncate">
+                      {t('deviceAlreadySecured', 'This Device is Secured')}
+                    </span>
                   </div>
-                ))}
+                  <button
+                    type="button"
+                    onClick={handleRegisterPasskey}
+                    disabled={registering}
+                    className="text-xs font-semibold theme-accent hover:underline shrink-0 cursor-pointer transition-colors"
+                  >
+                    {t('reRegisterDevice', 'Re-register Device')}
+                  </button>
+                </div>
+              ) : (
+                <CustomButton
+                  variant="primary"
+                  size="sm"
+                  onClick={handleRegisterPasskey}
+                  loading={registering}
+                  icon={PlusIcon}
+                  className="w-full justify-center"
+                >
+                  {t('createPasskey', 'Add New Passkey')}
+                </CustomButton>
+              )}
+
+              {/* Enriched Passkeys List using Reusable CollapsibleCard */}
+              <div className="space-y-3">
+                {passkeys.map((pk) => {
+                  const displayName = pk.device_name || pk.name || t('securityKey', 'Security Passkey');
+                  const isThisDevice = `${pk.device_name || ''} ${pk.name || ''}`
+                    .toLowerCase()
+                    .includes(currentDeviceKeyword.toLowerCase());
+                  const formattedDateTime = formatDateTime(pk.created_at, pk.created_at_display);
+
+                  return (
+                    <CollapsibleCard
+                      key={pk.id}
+                      icon={PasskeyIcon}
+                      className="border theme-border theme-bg-surface rounded-xl overflow-hidden shadow-2xs"
+                      headerClassName="p-3 sm:p-3.5"
+                      title={
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs sm:text-sm font-semibold theme-text-primary truncate">
+                            {displayName}
+                          </span>
+                          {isThisDevice && (
+                            <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
+                              {t('currentDeviceBadge', 'This Device')}
+                            </span>
+                          )}
+                          <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full theme-bg-success-soft text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            Active
+                          </span>
+                        </div>
+                      }
+                      subtitle={
+                        <div className="flex items-center gap-2 text-[11px] theme-text-secondary">
+                          <span>
+                            {t('registeredOn', 'Added')}: {formattedDateTime}
+                          </span>
+                          <span>&bull;</span>
+                          <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                            {t('biometricProtected', 'Biometric Protected')}
+                          </span>
+                        </div>
+                      }
+                      headerRight={
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeletePasskey(pk.id);
+                          }}
+                          disabled={deletingId === pk.id}
+                          className="p-1.5 rounded-lg theme-text-secondary hover:theme-danger hover:theme-bg-danger-soft transition-colors cursor-pointer"
+                          title={t('deletePasskey', 'Delete passkey')}
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
+                      }
+                      bodyClassName="p-3 pt-3 theme-bg-sub/30 space-y-2 text-xs"
+                    >
+                      <div className="flex items-center justify-between text-[11px] font-semibold theme-text-secondary">
+                        <span>{t('credentialHash', 'Credential ID Hash')}:</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const keyText = pk.full_credential_id || pk.credential_id || '';
+                            navigator.clipboard.writeText(keyText);
+                            showToast('Credential ID copied to clipboard', 'info');
+                          }}
+                          className="theme-accent hover:underline cursor-pointer text-[11px] font-medium"
+                        >
+                          Copy ID
+                        </button>
+                      </div>
+                      <p className="theme-text-primary break-all select-all font-mono text-[10px] theme-bg-surface p-2 rounded-lg border theme-border leading-relaxed">
+                        {pk.full_credential_id || pk.credential_id}
+                      </p>
+                    </CollapsibleCard>
+                  );
+                })}
               </div>
             </div>
           )}

@@ -115,6 +115,10 @@ export function useProgressAnalyticsEngine(
     let totalStucks = 0;
     const studentSet = new Set<string>();
     const sessionMap = new Map<string, { totalReports: number; totalPages: number; totalErrors: number }>();
+    const departmentSet = new Set<string>();
+    const classSet = new Set<string>();
+    const sectionSet = new Set<string>();
+    const teacherSet = new Set<string>();
 
     reports.forEach((r) => {
       const p = getReportPages(r);
@@ -138,6 +142,56 @@ export function useProgressAnalyticsEngine(
       sessStat.totalReports += 1;
       sessStat.totalPages = Number((sessStat.totalPages + p).toFixed(1));
       sessStat.totalErrors += m + s;
+
+      // Extract metadata dimensions
+      const dept =
+        r.department_name ||
+        r.departmentName ||
+        r.department_code ||
+        r.departmentCode ||
+        r.deptCode ||
+        r.student_details?.department_name ||
+        r.student_details?.department?.name ||
+        r.student_details?.department ||
+        r.department;
+      if (dept && typeof dept === "string" && dept.trim()) {
+        departmentSet.add(dept.trim());
+      }
+
+      const cls =
+        r.class_name ||
+        r.className ||
+        r.academic_class_name ||
+        r.student_details?.class_name ||
+        r.student_details?.class?.name ||
+        r.student_group ||
+        r.academic_class;
+      if (cls && typeof cls === "string" && cls.trim()) {
+        classSet.add(cls.trim());
+      }
+
+      const sec =
+        r.section_name ||
+        r.sectionName ||
+        r.student_section_name ||
+        r.student_details?.section_name ||
+        r.student_details?.section?.name ||
+        r.section;
+      if (sec && typeof sec === "string" && sec.trim()) {
+        sectionSet.add(sec.trim());
+      }
+
+      const tch =
+        r.teacher_name ||
+        r.teacherName ||
+        (typeof r.teacher === "object"
+          ? r.teacher?.name || r.teacher?.name_en
+          : typeof r.teacher === "string" && isNaN(Number(r.teacher))
+          ? r.teacher
+          : "");
+      if (tch && typeof tch === "string" && tch.trim()) {
+        teacherSet.add(tch.trim());
+      }
     });
 
     totalPages = Number(totalPages.toFixed(1));
@@ -159,7 +213,27 @@ export function useProgressAnalyticsEngine(
       totalStucks: number;
       studentSet: Set<string>;
       sessionSet: Set<string>;
+      departmentSet: Set<string>;
+      classSet: Set<string>;
+      sectionSet: Set<string>;
+      teacherSet: Set<string>;
     }
+
+    const createEmptyBucket = (d: string): BucketData => ({
+      key: d,
+      label: formatDayLabel(d),
+      dateStr: d,
+      totalPages: 0,
+      totalReports: 0,
+      totalMistakes: 0,
+      totalStucks: 0,
+      studentSet: new Set<string>(),
+      sessionSet: new Set<string>(),
+      departmentSet: new Set<string>(),
+      classSet: new Set<string>(),
+      sectionSet: new Set<string>(),
+      teacherSet: new Set<string>(),
+    });
 
     const bucketMap = new Map<string, BucketData>();
 
@@ -172,17 +246,7 @@ export function useProgressAnalyticsEngine(
     // Pre-populate date slots if generated
     if (dateSlots.length > 0) {
       dateSlots.forEach((d) => {
-        bucketMap.set(d, {
-          key: d,
-          label: formatDayLabel(d),
-          dateStr: d,
-          totalPages: 0,
-          totalReports: 0,
-          totalMistakes: 0,
-          totalStucks: 0,
-          studentSet: new Set<string>(),
-          sessionSet: new Set<string>(),
-        });
+        bucketMap.set(d, createEmptyBucket(d));
       });
     }
 
@@ -192,17 +256,7 @@ export function useProgressAnalyticsEngine(
       if (!dateStr) return;
 
       if (!bucketMap.has(dateStr)) {
-        bucketMap.set(dateStr, {
-          key: dateStr,
-          label: formatDayLabel(dateStr),
-          dateStr,
-          totalPages: 0,
-          totalReports: 0,
-          totalMistakes: 0,
-          totalStucks: 0,
-          studentSet: new Set<string>(),
-          sessionSet: new Set<string>(),
-        });
+        bucketMap.set(dateStr, createEmptyBucket(dateStr));
       }
 
       const b = bucketMap.get(dateStr)!;
@@ -226,6 +280,55 @@ export function useProgressAnalyticsEngine(
 
       const sName = r.session_name || r.session || (r as any).sessionName;
       if (sName) b.sessionSet.add(String(sName));
+
+      const dept =
+        r.department_name ||
+        r.departmentName ||
+        r.department_code ||
+        r.departmentCode ||
+        r.deptCode ||
+        r.student_details?.department_name ||
+        r.student_details?.department?.name ||
+        r.student_details?.department ||
+        r.department;
+      if (dept && typeof dept === "string" && dept.trim()) {
+        b.departmentSet.add(dept.trim());
+      }
+
+      const cls =
+        r.class_name ||
+        r.className ||
+        r.academic_class_name ||
+        r.student_details?.class_name ||
+        r.student_details?.class?.name ||
+        r.student_group ||
+        r.academic_class;
+      if (cls && typeof cls === "string" && cls.trim()) {
+        b.classSet.add(cls.trim());
+      }
+
+      const sec =
+        r.section_name ||
+        r.sectionName ||
+        r.student_section_name ||
+        r.student_details?.section_name ||
+        r.student_details?.section?.name ||
+        r.section;
+      if (sec && typeof sec === "string" && sec.trim()) {
+        b.sectionSet.add(sec.trim());
+      }
+
+      const tch =
+        r.teacher_name ||
+        r.teacherName ||
+        (typeof r.teacher === "object"
+          ? r.teacher?.name || r.teacher?.name_en
+          : typeof r.teacher === "string" && isNaN(Number(r.teacher))
+          ? r.teacher
+          : "");
+      if (tch && typeof tch === "string" && tch.trim()) {
+        b.teacherSet.add(tch.trim());
+      }
     });
 
     // If dateSlots was not pre-populated but reports have multiple dates spanning <= 31 days, fill intermediate days
@@ -237,17 +340,7 @@ export function useProgressAnalyticsEngine(
       if (filledDates.length > 0 && filledDates.length <= 31) {
         filledDates.forEach((d) => {
           if (!bucketMap.has(d)) {
-            bucketMap.set(d, {
-              key: d,
-              label: formatDayLabel(d),
-              dateStr: d,
-              totalPages: 0,
-              totalReports: 0,
-              totalMistakes: 0,
-              totalStucks: 0,
-              studentSet: new Set<string>(),
-              sessionSet: new Set<string>(),
-            });
+            bucketMap.set(d, createEmptyBucket(d));
           }
         });
       }
@@ -286,6 +379,10 @@ export function useProgressAnalyticsEngine(
         studentCount: b.studentSet.size,
         studentNames: Array.from(b.studentSet),
         sessionNames: Array.from(b.sessionSet),
+        departmentNames: Array.from(b.departmentSet),
+        classNames: Array.from(b.classSet),
+        sectionNames: Array.from(b.sectionSet),
+        teacherNames: Array.from(b.teacherSet),
         activeValue,
       };
     });
@@ -428,6 +525,10 @@ export function useProgressAnalyticsEngine(
       sessionBreakdown,
       maxMetricValue,
       aiInsight,
+      overallDepartments: Array.from(departmentSet),
+      overallClasses: Array.from(classSet),
+      overallSections: Array.from(sectionSet),
+      overallTeachers: Array.from(teacherSet),
     };
   }, [reports, metric, startDate, endDate]);
 }

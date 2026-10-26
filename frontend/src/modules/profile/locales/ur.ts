@@ -85,6 +85,18 @@ export default {
   drawer2FaSubtitle: "TOTP ایپس کے ذریعے اکاؤنٹ کو مزید محفوظ بنائیں۔",
   drawerPasskeysTitle: "پاس کیز اور بائیو میٹرکس کا انتظام",
   drawerPasskeysSubtitle: "Touch ID یا Windows Hello جیسی ہارڈ ویئر سے منسلک اسناد۔",
+  passkeyHelpTitle: "ہر ڈیوائس کے لیے الگ پاس کی",
+  passkeyHelpDesc: "ہر ڈیوائس میں اس کی اپنی ہارڈویئر سیکیورٹی کی محفوظ ہوتی ہے۔ اس ڈیوائس پر شامل کرنے کے بعد آپ بغیر پاس ورڈ درج کیے بائیو میٹرک سے لاگ ان کر سکتے ہیں۔",
+  currentDeviceBadge: "موجودہ ڈیوائس",
+  hardwareProtected: "ہارڈویئر پروٹیکٹڈ",
+  deviceAlreadySecured: "یہ ڈیوائس محفوظ ہے",
+  deviceAlreadySecuredDesc: "اس ڈیوائس اور براؤزر کے لیے پہلے سے ہی بائیو میٹرک پاس کی فعال ہے۔ فی فزیکل ڈیوائس صرف ایک پاس کی درکار ہوتی ہے۔",
+  reRegisterDevice: "ڈیوائس دوبارہ رجسٹر کریں",
+  showKeyDetails: "تکنیکی کی ID دیکھیں",
+  hideKeyDetails: "تکنیکی کی ID چھپائیں",
+  credentialHash: "کریڈینشل ID ہیش",
+  biometricProtected: "بائیو میٹرک ہارڈ ویئر کی",
+  currentDeviceSecured: "اس ڈیوائس پر فعال",
 
   // Enterprise 2FA Strings
   twoFactorActiveHeader: "دو فیکٹر تصدیق فعال ہے",
@@ -109,6 +121,8 @@ export default {
   toastExportSuccess: "ذاتی پروفائل ڈیٹا کامیابی سے ایکسپورٹ ہو گیا!",
   toastProfileUpdatedSuccess: "پروفائل کامیابی سے اپ ڈیٹ ہو گئی!",
   toastSignOutSuccess: "کامیابی سے سائن آؤٹ ہو گیا۔",
+  pwdUpdatedSuccess: "پاس ورڈ کامیابی سے تبدیل ہو گیا!",
+  pwdUpdatedWithEmailAlert: "پاس ورڈ کامیابی سے اپ ڈیٹ ہو گیا! آپ کے ای میل پر سیکیورٹی الرٹ بھیج دیا گیا ہے۔",
 
   // Common Controls
   saveChanges: "تبدیلیاں محفوظ کریں",

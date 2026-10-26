@@ -16,6 +16,10 @@ import {
   ShareIcon,
   SessionsIcon,
   StudentIcon,
+  TeacherIcon,
+  AcademicCapIcon,
+  BuildingOfficeIcon,
+  SectionIcon,
 } from "@/components/ui/Icons";
 import {
   computeNiceYAxis,
@@ -44,6 +48,10 @@ export interface ProgressTrendsChartProps {
   timeHorizon?: any;
   onHorizonChange?: (horizon: any) => void;
   accuracyRate?: number;
+  departmentNames?: string[];
+  classNames?: string[];
+  sectionNames?: string[];
+  teacherNames?: string[];
 }
 
 interface TrendBarProps {
@@ -138,6 +146,10 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
   avgPagesPerDay: propAvgPages,
   peakDayPages: propPeakPages,
   studentCount: propStudentCount,
+  departmentNames: propDepartmentNames,
+  classNames: propClassNames,
+  sectionNames: propSectionNames,
+  teacherNames: propTeacherNames,
   className = "",
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -744,7 +756,35 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
     return items;
   }, [currentMetric]);
 
-  // Comprehensive Sessions & Students extraction across timeline
+  // Comprehensive metadata extraction across timeline
+  const overallDepartments = useMemo(() => {
+    if (propDepartmentNames && propDepartmentNames.length > 0) return propDepartmentNames;
+    const set = new Set<string>();
+    trendPoints.forEach((p) => (p.departmentNames || []).forEach((d) => d && set.add(d)));
+    return Array.from(set);
+  }, [propDepartmentNames, trendPoints]);
+
+  const overallClasses = useMemo(() => {
+    if (propClassNames && propClassNames.length > 0) return propClassNames;
+    const set = new Set<string>();
+    trendPoints.forEach((p) => (p.classNames || []).forEach((c) => c && set.add(c)));
+    return Array.from(set);
+  }, [propClassNames, trendPoints]);
+
+  const overallSections = useMemo(() => {
+    if (propSectionNames && propSectionNames.length > 0) return propSectionNames;
+    const set = new Set<string>();
+    trendPoints.forEach((p) => (p.sectionNames || []).forEach((s) => s && set.add(s)));
+    return Array.from(set);
+  }, [propSectionNames, trendPoints]);
+
+  const overallTeachers = useMemo(() => {
+    if (propTeacherNames && propTeacherNames.length > 0) return propTeacherNames;
+    const set = new Set<string>();
+    trendPoints.forEach((p) => (p.teacherNames || []).forEach((t) => t && set.add(t)));
+    return Array.from(set);
+  }, [propTeacherNames, trendPoints]);
+
   const overallSessions = useMemo(() => {
     const set = new Set<string>();
     trendPoints.forEach((p) => (p.sessionNames || []).forEach((s) => s && set.add(s)));
@@ -757,9 +797,25 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
     return Array.from(set);
   }, [trendPoints]);
 
-  // Context-aware Footer Sessions & Students (dynamically reflects hovered date if hovered, else overall scope)
+  // Context-aware Footer Metadata (dynamically reflects hovered date if hovered, else overall scope)
   const isPointHovered = hoveredIndex !== null && trendPoints[hoveredIndex] !== undefined;
   const activeHoverPoint = isPointHovered ? trendPoints[hoveredIndex] : null;
+
+  const footerDepartments = activeHoverPoint?.departmentNames && activeHoverPoint.departmentNames.length > 0
+    ? activeHoverPoint.departmentNames
+    : overallDepartments;
+
+  const footerClasses = activeHoverPoint?.classNames && activeHoverPoint.classNames.length > 0
+    ? activeHoverPoint.classNames
+    : overallClasses;
+
+  const footerSections = activeHoverPoint?.sectionNames && activeHoverPoint.sectionNames.length > 0
+    ? activeHoverPoint.sectionNames
+    : overallSections;
+
+  const footerTeachers = activeHoverPoint?.teacherNames && activeHoverPoint.teacherNames.length > 0
+    ? activeHoverPoint.teacherNames
+    : overallTeachers;
 
   const footerSessions = activeHoverPoint?.sessionNames && activeHoverPoint.sessionNames.length > 0
     ? activeHoverPoint.sessionNames
@@ -904,7 +960,7 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
             </div>
 
             {/* Right Main Chart & Timeline (No Scrollbars, 100% Fit) */}
-            <div className="relative flex-1 min-w-0 overflow-hidden">
+            <div className="relative flex-1 min-w-0">
               {/* Main Plot Canvas */}
               <div
                 ref={chartCanvasRef}
@@ -1290,8 +1346,8 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
                 );
               })()}
 
-              {/* 5. X-Axis Timeline Labels - Pure Clean Date Header (Spacious & Zero Clutter) */}
-              <div className="relative w-full h-8 pt-1.5 select-none min-w-0">
+              {/* 5. X-Axis Timeline Labels - Aligned Exactly with Bars */}
+              <div className="relative w-full h-8 pt-1.5 select-none min-w-0 overflow-visible">
                 {Array.from(visibleDateIndices).map((idx) => {
                   const point = trendPoints[idx];
                   if (!point) return null;
@@ -1299,21 +1355,12 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
                   const dateParts = parseDateParts(point.dateStr, point.label);
                   const leftPct = ((idx + 0.5) / trendPoints.length) * 100;
 
-                  // Edge tick clamping so text never overhangs container borders
-                  const isFirst = idx === 0;
-                  const isLast = idx === trendPoints.length - 1;
-                  const transformClass = isFirst
-                    ? "translate-x-0"
-                    : isLast
-                    ? "-translate-x-full"
-                    : "-translate-x-1/2";
-                  const leftStyle = isFirst ? "2px" : isLast ? "calc(100% - 2px)" : `${leftPct}%`;
-
                   return (
                     <div
                       key={`anchor-label-${point.key}-${idx}`}
-                      className={`absolute top-1.5 flex flex-col items-center pointer-events-none text-center transition-colors max-w-[70px] ${transformClass}`}
-                      style={{ left: leftStyle }}
+                      data-timeline-label="true"
+                      className="absolute top-1.5 -translate-x-1/2 flex flex-col items-center pointer-events-none text-center transition-colors max-w-[70px]"
+                      style={{ left: `${leftPct}%` }}
                     >
                       {/* Date Header: Month + Day */}
                       <div className="flex flex-col items-center leading-none">
@@ -1343,12 +1390,12 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
         </div>
       )}
 
-      {/* 5. Dedicated Chart Card Footer: Sessions & Students Overview */}
+      {/* 5. Dedicated Chart Card Footer: Metadata Overview (2 Columns) */}
       {trendPoints.length > 0 && (
-        <div className="pt-3 border-t theme-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs theme-text-secondary select-none">
-          {/* Students Overview / Active Focus (Left) */}
-          <div className="flex items-center gap-2 min-w-0 flex-wrap">
-            <div className="flex items-center gap-1.5 font-semibold theme-text-primary shrink-0">
+        <div className="pt-3 border-t theme-border grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-xs theme-text-secondary select-none">
+          {/* Students */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
               <StudentIcon className="w-3.5 h-3.5 theme-accent" />
               <span>Students:</span>
             </div>
@@ -1356,39 +1403,95 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
               <span className="text-xs theme-text-secondary opacity-70">
                 {propStudentCount ? `${propStudentCount} Students` : "No student details"}
               </span>
-            ) : footerStudents.length <= 4 ? (
-              <span className="text-xs font-semibold theme-text-primary">
+            ) : footerStudents.length <= 3 ? (
+              <span className="text-xs font-medium theme-text-secondary truncate" title={footerStudents.join(", ")}>
                 {footerStudents.join(", ")}
               </span>
             ) : (
-              <span className="text-xs font-semibold theme-text-primary">
+              <span className="text-xs font-medium theme-text-secondary">
                 {footerStudents.length} Total Students
               </span>
             )}
             {activeHoverPoint && (
-              <span className="text-[10px] theme-accent font-mono ml-1 font-semibold">
+              <span className="text-[10px] theme-accent font-mono ml-0.5 font-semibold shrink-0">
                 ({activeHoverPoint.label})
               </span>
             )}
           </div>
 
-          {/* Sessions Overview / Active Focus (Right) */}
-          <div className="flex items-center gap-2 min-w-0 flex-wrap">
-            <div className="flex items-center gap-1.5 font-semibold theme-text-primary shrink-0">
+          {/* Sessions */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
               <SessionsIcon className="w-3.5 h-3.5 theme-accent" />
               <span>Sessions:</span>
             </div>
             {footerSessions.length === 0 ? (
               <span className="text-xs theme-text-secondary opacity-70">No session details</span>
-            ) : footerSessions.length <= 4 ? (
-              <span className="text-xs font-semibold theme-text-primary">
+            ) : footerSessions.length <= 3 ? (
+              <span className="text-xs font-medium theme-text-secondary truncate" title={footerSessions.join(", ")}>
                 {footerSessions.join(", ")}
               </span>
             ) : (
-              <span className="text-xs font-semibold theme-text-primary">
+              <span className="text-xs font-medium theme-text-secondary">
                 {footerSessions.length} Total Sessions
               </span>
             )}
+          </div>
+
+          {/* Department */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
+              <BuildingOfficeIcon className="w-3.5 h-3.5 theme-accent" />
+              <span>Department:</span>
+            </div>
+            <span
+              className="text-xs font-medium theme-text-secondary truncate max-w-[160px] sm:max-w-none"
+              title={footerDepartments.join(", ") || "General"}
+            >
+              {footerDepartments.length > 0 ? footerDepartments.join(", ") : "General"}
+            </span>
+          </div>
+
+          {/* Class */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
+              <AcademicCapIcon className="w-3.5 h-3.5 theme-accent" />
+              <span>Class:</span>
+            </div>
+            <span
+              className="text-xs font-medium theme-text-secondary truncate max-w-[160px] sm:max-w-none"
+              title={footerClasses.join(", ") || "All Classes"}
+            >
+              {footerClasses.length > 0 ? footerClasses.join(", ") : "All Classes"}
+            </span>
+          </div>
+
+          {/* Section */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
+              <SectionIcon className="w-3.5 h-3.5 theme-accent" />
+              <span>Section:</span>
+            </div>
+            <span
+              className="text-xs font-medium theme-text-secondary truncate max-w-[160px] sm:max-w-none"
+              title={footerSections.join(", ") || "All Sections"}
+            >
+              {footerSections.length > 0 ? footerSections.join(", ") : "All Sections"}
+            </span>
+          </div>
+
+          {/* Teacher */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
+              <TeacherIcon className="w-3.5 h-3.5 theme-accent" />
+              <span>Teacher:</span>
+            </div>
+            <span
+              className="text-xs font-medium theme-text-secondary truncate max-w-[160px] sm:max-w-none"
+              title={footerTeachers.join(", ") || "Staff Teacher"}
+            >
+              {footerTeachers.length > 0 ? footerTeachers.join(", ") : "Staff Teacher"}
+            </span>
           </div>
         </div>
       )}

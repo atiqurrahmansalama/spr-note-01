@@ -204,6 +204,7 @@ export const QRSyncDrawer: React.FC<QRSyncDrawerProps> = ({ onClose }) => {
         {/* Reused Enterprise Drawer Section without Subtitle */}
         <DrawerSection
           title={t('drawerQrTitle', 'Cross-Device QR Sign-In')}
+          subtitle={t('drawerQrSubtitle', 'Scan with a logged-in mobile device to sign in instantly.')}
           icon={SmartphoneIcon}
           className="pt-0 first:pt-0"
         >

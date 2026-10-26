@@ -24,6 +24,10 @@ export interface ProgressAnalyticsEngineResult {
   sessionBreakdown: SessionBreakdownItem[];
   maxMetricValue: number;
   aiInsight: string;
+  overallDepartments?: string[];
+  overallClasses?: string[];
+  overallSections?: string[];
+  overallTeachers?: string[];
 }
 
 export interface ProgressAnalyticsDashboardProps {

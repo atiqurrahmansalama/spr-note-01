@@ -7,6 +7,7 @@ export interface SegmentedSwitchOption<T extends string = string> {
   count?: number | string;
   disabled?: boolean;
   title?: string;
+  hideIconOnMobile?: boolean;
 }
 
 export interface SegmentedSwitchProps<T extends string = string> {
@@ -18,6 +19,7 @@ export interface SegmentedSwitchProps<T extends string = string> {
   fullWidth?: boolean;
   disabled?: boolean;
   ariaLabel?: string;
+  hideIconsOnMobile?: boolean;
 }
 
 /**
@@ -34,6 +36,7 @@ export default function SegmentedSwitch<T extends string = string>({
   fullWidth = false,
   disabled = false,
   ariaLabel = 'View switcher',
+  hideIconsOnMobile = false,
 }: SegmentedSwitchProps<T>) {
   const sizeClasses = {
     xs: {
@@ -91,6 +94,8 @@ export default function SegmentedSwitch<T extends string = string>({
             {IconComponent && (
               <IconComponent
                 className={`${sizeClasses.icon} shrink-0 transition-opacity duration-150 ${
+                  opt.hideIconOnMobile || hideIconsOnMobile ? 'hidden sm:inline-block' : ''
+                } ${
                   isActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
                 }`}
               />

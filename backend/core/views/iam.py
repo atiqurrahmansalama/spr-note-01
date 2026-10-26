@@ -704,20 +704,61 @@ class ChangePasswordView(APIView):
         user.set_password(new_password)
         user.save()
 
-        # Log password change security event
+        # Extract client IP and device info
+        ip = get_client_ip(request) or request.META.get('REMOTE_ADDR', '127.0.0.1')
+        user_agent = request.headers.get('User-Agent', '')
+        device_info = detect_device_info(request) if 'detect_device_info' in globals() else (
+            "Windows PC" if "Windows" in user_agent else
+            "Mac / Apple Device" if "Mac" in user_agent else
+            "Android Device" if "Android" in user_agent else
+            "iOS Device" if "iPhone" in user_agent or "iPad" in user_agent else
+            "Linux Workstation" if "Linux" in user_agent else "Web Browser"
+        )
+
+        # 1. Log password change security event
         try:
             from core.models import UserLoginLog
-            ip = request.META.get('REMOTE_ADDR')
             UserLoginLog.objects.create(
                 user=user,
                 status="LOGIN",
                 ip_address=ip,
-                country="Password Updated"
+                country="Password Updated",
+                device_info=str(device_info)[:100]
             )
         except Exception:
             pass
 
-        return Response({"status": "success", "message": "Password updated successfully!"}, status=status.HTTP_200_OK)
+        # 2. Industry Standard: Dispatch Automated Security Notification Email
+        email_dispatched = False
+        if user.email:
+            try:
+                change_time = timezone.now().strftime("%B %d, %Y at %I:%M %p UTC")
+                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+                security_url = f"{frontend_url}/forgot-password"
+                user_display_name = user.name or f"{getattr(user, 'first_name', '')} {getattr(user, 'last_name', '')}".strip() or user.email
+
+                context = {
+                    'user_name': user_display_name,
+                    'change_time': change_time,
+                    'ip_address': ip,
+                    'device_info': f"{device_info} ({user_agent[:45]}...)" if user_agent else device_info,
+                    'security_url': security_url,
+                }
+                send_smtp_email(
+                    'emails/password_changed_notification.html',
+                    context,
+                    'Security Alert: Your SPR Note Password Was Changed',
+                    [user.email]
+                )
+                email_dispatched = True
+            except Exception as e:
+                logger.warning(f"Could not send password change security notification email: {e}")
+
+        return Response({
+            "status": "success",
+            "message": "Password updated successfully!",
+            "email_notification_sent": email_dispatched,
+        }, status=status.HTTP_200_OK)
 
 
 class UserSessionView(APIView):
@@ -1173,13 +1214,23 @@ class PasskeysListView(APIView):
         if not user:
             return Response([], status=status.HTTP_200_OK)
 
-        passkeys = UserPasskey.objects.filter(user=user)
-        data = [{
-            'id': p.id,
-            'device_name': p.device_name,
-            'credential_id': p.credential_id[:20] + '...',
-            'created_at': p.created_at.strftime("%b %d, %Y - %I:%M %p")
-        } for p in passkeys]
+        passkeys = UserPasskey.objects.filter(user=user).order_by('-created_at')
+        data = []
+        for p in passkeys:
+            try:
+                local_dt = timezone.localtime(p.created_at)
+            except Exception:
+                local_dt = p.created_at
+
+            data.append({
+                'id': p.id,
+                'name': p.device_name,
+                'device_name': p.device_name,
+                'credential_id': p.credential_id[:20] + '...',
+                'full_credential_id': p.credential_id,
+                'created_at': p.created_at.isoformat() if p.created_at else '',
+                'created_at_display': local_dt.strftime("%b %d, %Y - %I:%M %p") if local_dt else 'Active',
+            })
         return Response(data, status=status.HTTP_200_OK)
 
 
@@ -1254,8 +1305,20 @@ class PasskeyRegisterVerifyView(APIView):
         if not cred_id or str(cred_id).startswith('passkey_') or cred_id == 'b64_fallback':
             return Response({'error': 'A valid hardware/biometric passkey credential is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Prevent duplicate passkey registrations for the same device credential
+        if UserPasskey.objects.filter(user=user, credential_id=str(cred_id)).exists():
+            return Response({'error': 'This biometric passkey is already registered on your account.'}, status=status.HTTP_400_BAD_REQUEST)
+
         pub_key = request.data.get('public_key') or "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
-        device_name = request.data.get('name') or request.data.get('device_name') or request.headers.get('User-Agent', 'Passkey')[:50]
+        
+        user_agent = request.headers.get('User-Agent', '')
+        client_name = request.data.get('name') or request.data.get('device_name')
+        if not client_name or client_name in ['Workstation Passkey', 'Win32 Passkey', 'Security Passkey']:
+            os_name = "Windows PC" if "Windows" in user_agent else "macOS" if "Mac" in user_agent else "Android" if "Android" in user_agent else "iPhone / iPad" if "iPhone" in user_agent or "iPad" in user_agent else "Linux" if "Linux" in user_agent else "Workstation"
+            browser_name = "Chrome" if "Chrome" in user_agent and "Edg" not in user_agent else "Edge" if "Edg" in user_agent else "Safari" if "Safari" in user_agent and "Chrome" not in user_agent else "Firefox" if "Firefox" in user_agent else "Browser"
+            device_name = f"{os_name} ({browser_name})"
+        else:
+            device_name = str(client_name)
 
         passkey = UserPasskey.objects.create(
             user=user,
@@ -1269,8 +1332,10 @@ class PasskeyRegisterVerifyView(APIView):
             'message': 'Passkey registered successfully!',
             'passkey': {
                 'id': passkey.id,
+                'name': passkey.device_name,
                 'device_name': passkey.device_name,
-                'created_at': passkey.created_at.strftime("%b %d, %Y")
+                'created_at': passkey.created_at.isoformat(),
+                'created_at_display': passkey.created_at.strftime("%b %d, %Y - %I:%M %p"),
             }
         }, status=status.HTTP_201_CREATED)
 

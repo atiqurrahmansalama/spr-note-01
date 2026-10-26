@@ -89,6 +89,7 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
       <div className="@container space-y-4 pt-2 pb-6 px-1">
         <DrawerSection
           title={t('savedAccounts', 'Saved Accounts')}
+          subtitle={t('drawerAccountsSubtitle', 'Switch between multiple saved institutional profiles.')}
           icon={UserCheckIcon}
           headerRight={
             <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full theme-bg-sub theme-text-secondary border theme-border">

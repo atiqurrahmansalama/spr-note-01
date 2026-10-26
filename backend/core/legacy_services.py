@@ -1019,9 +1019,14 @@ class StaffOnboardingService:
     @staticmethod
     def generate_employee_id(institution, staff_type='TEACHING'):
         from core.models import StaffProfile
-        import random
         from datetime import datetime
-        prefix = 'TEA' if staff_type == 'TEACHING' else 'STF'
+        import random
+        if staff_type == 'TEACHING':
+            prefix = 'TEA'
+        elif staff_type == 'ADMIN':
+            prefix = 'ADM'
+        else:
+            prefix = 'STF'
         year = datetime.now().year
         for _ in range(20):
             rand_suffix = random.randint(1000, 9999)

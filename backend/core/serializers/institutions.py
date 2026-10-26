@@ -268,6 +268,39 @@ class InstitutionOnboardingSerializer(serializers.Serializer):
                 is_active=True,
             )
 
+            # 2b. Auto-recruit Admin as Staff member of the newly onboarded Academy
+            from core.models.staff import StaffProfile, GeneralStaffDetail
+            from core.services import StaffOnboardingService
+
+            admin_emp_id = StaffOnboardingService.generate_employee_id(institution, staff_type='ADMIN')
+
+            admin_staff = StaffProfile.objects.create(
+                institution=institution,
+                user=admin_user,
+                employee_id=admin_emp_id,
+                staff_type='ADMIN',
+                designation='Academy Administrator',
+                rank_order=1,
+                employment_status='PERMANENT',
+                emergency_contact=admin_phone,
+                address=address,
+                division=division,
+                district=district,
+                upazila_thana=upazila_thana,
+                postal_code=postal_code,
+                latitude=latitude,
+                longitude=longitude,
+                map_place_id=map_place_id,
+                is_active=True,
+            )
+
+            GeneralStaffDetail.objects.create(
+                staff=admin_staff,
+                assigned_zone='Administration Block',
+                duty_scope='Institutional leadership, administrative management, and academy operations.',
+                shift_type='MORNING',
+            )
+
             # 3. Seed Preset Departments
             if preset_type == 'HIFZ':
                 AcademicDepartment.objects.create(
@@ -333,6 +366,8 @@ class InstitutionOnboardingSerializer(serializers.Serializer):
                     'phone_number': admin_user.phone_number,
                     'email': admin_user.email,
                     'user_type': admin_user.user_type,
+                    'staff_id': str(admin_staff.id),
+                    'employee_id': admin_staff.employee_id,
                 }
             }
 

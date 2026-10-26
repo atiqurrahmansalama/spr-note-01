@@ -44,12 +44,12 @@ export default function TabSwitcher({
 
   return (
     <div
-      className={`flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 border-b theme-border w-full min-w-0 ${className}`}
+      className={`flex flex-row items-center justify-between gap-2 border-b theme-border w-full min-w-0 ${className}`}
     >
       {/* Tabs List with Wheel & Drag Scrolling */}
       <div
         ref={tabsContainerRef}
-        className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 max-w-full cursor-grab active:cursor-grabbing pt-1.5"
+        className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 max-w-full cursor-grab active:cursor-grabbing pt-1 sm:pt-1.5"
       >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -61,7 +61,7 @@ export default function TabSwitcher({
               data-active={isActive}
               type="button"
               onClick={() => (handleTabSelect && handleTabSelect(tab.id))}
-              className={`group h-9 sm:h-10 px-3 sm:px-4 text-xs font-semibold rounded-t-xl transition-colors duration-150 cursor-pointer whitespace-nowrap border-t-2 border-x flex items-center gap-1.5 sm:gap-2 relative -mb-[1px] outline-none focus:outline-none focus:ring-0 select-none shrink-0 ${
+              className={`group h-8.5 sm:h-10 px-2.5 sm:px-4 text-xs font-semibold rounded-t-xl transition-colors duration-150 cursor-pointer whitespace-nowrap border-t-2 border-x flex items-center gap-1.5 sm:gap-2 relative -mb-[1px] outline-none focus:outline-none focus:ring-0 select-none shrink-0 ${
                 isActive
                   ? 'theme-bg-surface theme-text-primary border-t-[var(--accent-main)] theme-border shadow-xs border-b-[var(--bg-surface,theme-bg-surface)]'
                   : 'border-t-transparent border-x-transparent theme-bg-sub/50 theme-text-secondary hover:theme-text-primary hover:theme-bg-sub border-b-theme-border'
@@ -93,7 +93,7 @@ export default function TabSwitcher({
 
       {/* Right-aligned Slot (Action button, search box, filters, etc.) */}
       {rightContent && (
-        <div className="flex items-center justify-start sm:justify-end gap-2 shrink-0 pb-1 sm:pb-0 w-full sm:w-auto">
+        <div className="flex items-center justify-end gap-2 shrink-0 pb-1 sm:pb-0 w-auto">
           {rightContent}
         </div>
       )}

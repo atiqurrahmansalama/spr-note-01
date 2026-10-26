@@ -56,9 +56,13 @@ export interface SecurityAuditLog {
 export interface PasskeyItem {
   id: number | string;
   name?: string;
+  device_name?: string;
   created_at?: string;
+  created_at_display?: string;
   last_used_at?: string;
   credential_id?: string;
+  full_credential_id?: string;
+  is_current_device?: boolean;
 }
 
 export interface MultiAccountItem {

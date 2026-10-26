@@ -119,11 +119,11 @@ export const TeacherStaffRosterView: React.FC = () => {
           employment_status: statusFilter !== 'ALL' ? statusFilter : undefined,
         };
 
-        if (roleFilter === 'TEACHING') {
+        if (roleFilter === 'TEACHING' || roleFilter === 'TEACHER') {
           params.staff_type = 'TEACHING';
         } else if (roleFilter === 'SUPPORT') {
           params.staff_type = 'SUPPORT';
-        } else if (roleFilter === 'ADMIN') {
+        } else if (roleFilter === 'ADMIN' || roleFilter === 'SUPER_ADMIN') {
           params.staff_type = 'ADMIN';
         } else if (roleFilter === 'MANAGEMENT') {
           params.staff_type = 'MANAGEMENT';
@@ -284,7 +284,13 @@ export const TeacherStaffRosterView: React.FC = () => {
 
       let matchesRole = true;
       if (roleFilter !== 'ALL') {
-        matchesRole = s.staff_type === roleFilter;
+        if (roleFilter === 'TEACHER' || roleFilter === 'TEACHING') {
+          matchesRole = s.staff_type === 'TEACHING';
+        } else if (roleFilter === 'ADMIN' || roleFilter === 'SUPER_ADMIN') {
+          matchesRole = s.staff_type === 'ADMIN';
+        } else {
+          matchesRole = s.staff_type === roleFilter;
+        }
       }
 
       let matchesRank = true;

@@ -85,6 +85,18 @@ export default {
   drawer2FaSubtitle: "TOTP অথেন্টিকেটর অ্যাপের মাধ্যমে অ্যাকাউন্টে অতিরিক্ত প্রাতিষ্ঠানিক নিরাপত্তা নিশ্চিত করুন।",
   drawerPasskeysTitle: "পাসকি ও বায়োমেট্রিক্স পরিচালনা",
   drawerPasskeysSubtitle: "টাচ আইডি, ফেস আইডি বা উইন্ডোজ হ্যালোর মতো বায়োমেট্রিক সিকিউরিটি কি যুক্ত করুন।",
+  passkeyHelpTitle: "ডিভাইস ভিত্তিক সিকিউরিটি পাস কি",
+  passkeyHelpDesc: "প্রতিটি ডিভাইসে (ফোন, ল্যাপটপ বা অফিসের পিসি) নিজস্ব হার্ডওয়্যার কি তৈরি হয়। এই ডিভাইসে একবার যুক্ত করলে প্রতিবার পাসওয়ার্ড না লিখে শুধু ফিঙ্গারপ্রিন্ট বা ফেস দিয়ে লগইন করা যায়।",
+  currentDeviceBadge: "বর্তমান ডিভাইস",
+  hardwareProtected: "হার্ডওয়্যার সুরক্ষিত",
+  deviceAlreadySecured: "এই ডিভাইসটি সুরক্ষিত রয়েছে",
+  deviceAlreadySecuredDesc: "এই ডিভাইস এবং ব্রাউজারে ইতিমধ্যে একটি বায়োমেট্রিক পাস-কী সক্রিয় রয়েছে। প্রতি ডিভাইসে একটির বেশি কি প্রয়োজন নেই।",
+  reRegisterDevice: "ডিভাইস পুনরায় নিবন্ধন",
+  showKeyDetails: "কি আইডি দেখুন",
+  hideKeyDetails: "কি আইডি লুকান",
+  credentialHash: "ক্রেডেনশিয়াল কি হ্যাশ",
+  biometricProtected: "বায়োমেট্রিক হার্ডওয়্যার কি",
+  currentDeviceSecured: "এই ডিভাইসে সক্রিয়",
 
   // Enterprise 2FA Strings
   twoFactorActiveHeader: "টু-ফ্যাক্টর অথেন্টিকেশন সক্রিয় রয়েছে",
@@ -109,6 +121,8 @@ export default {
   toastExportSuccess: "ব্যক্তিগত প্রোফাইল ডাটা সফলভাবে এক্সপোর্ট হয়েছে!",
   toastProfileUpdatedSuccess: "প্রোফাইল তথ্য সফলভাবে আপডেট হয়েছে!",
   toastSignOutSuccess: "সফলভাবে সাইন আউট সম্পন্ন হয়েছে।",
+  pwdUpdatedSuccess: "পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে!",
+  pwdUpdatedWithEmailAlert: "পাসওয়ার্ড সফলভাবে আপডেট হয়েছে এবং আপনার ইমেইলে একটি সিকিউরিটি অ্যালার্ট পাঠানো হয়েছে।",
 
   // Common Controls
   saveChanges: "পরিবর্তন সংরক্ষণ করুন",

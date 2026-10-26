@@ -71,7 +71,7 @@ export const ChangePasswordDrawer: React.FC<ChangePasswordDrawerProps> = ({ onCl
 
     setSaving(true);
     try {
-      let res = await fetchWithAuth('/api/v1/auth/change-password/', {
+      const res = await fetchWithAuth('/api/v1/auth/change-password/', {
         method: 'POST',
         body: JSON.stringify({
           old_password: form.old_password,
@@ -79,22 +79,17 @@ export const ChangePasswordDrawer: React.FC<ChangePasswordDrawerProps> = ({ onCl
         }),
       });
 
-      if (!res.ok) {
-        res = await fetchWithAuth('/change-password/', {
-          method: 'POST',
-          body: JSON.stringify({
-            old_password: form.old_password,
-            new_password: form.new_password,
-          }),
-        });
-      }
+      const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
-        showToast(t('pwdUpdatedSuccess', 'Password changed successfully!'), 'success');
+        if (data.email_notification_sent) {
+          showToast(t('pwdUpdatedWithEmailAlert', 'Password updated! A security alert was dispatched to your email.'), 'success');
+        } else {
+          showToast(t('pwdUpdatedSuccess', 'Password changed successfully!'), 'success');
+        }
         setForm({ old_password: '', new_password: '', confirm_password: '' });
         onClose();
       } else {
-        const data = await res.json().catch(() => ({}));
         setErrorMsg(extractErrorMessage(data));
       }
     } catch {

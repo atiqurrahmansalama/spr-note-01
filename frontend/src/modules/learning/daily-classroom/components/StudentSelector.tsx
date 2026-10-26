@@ -112,7 +112,7 @@ export default function StudentSelector({
     const seenIds = new Set<string>();
     const seenUniqs = new Set<string>();
     const seenCards = new Set<string>();
-    const seenNameMap = new Map<string, number>();
+    const idToIdxMap = new Map<string, number>();
 
     const append = (s: any) => {
       if (!s) return;
@@ -126,27 +126,25 @@ export default function StudentSelector({
       const clsId = typeof s === "object" ? (s.student_class || s.class_id || s.class) : undefined;
       const secId = typeof s === "object" ? (s.student_section || s.section_id || s.section) : undefined;
 
-      const normName = sName.toLowerCase();
-      const nameKey = `${normName}_cls_${clsId || ""}_sec_${secId || ""}_roll_${roll != null ? roll : ""}`;
-      const looseNameKey = `${normName}_cls_${clsId || ""}`;
+      const hasId = rawId != null && String(rawId).trim() !== "";
+      const hasUniq = Boolean(uniq && String(uniq).trim() !== "");
+      const hasCard = Boolean(cardNo && String(cardNo).trim() !== "");
 
-      const isDupId = Boolean(rawId != null && seenIds.has(String(rawId)));
-      const isDupUniq = Boolean(uniq && seenUniqs.has(String(uniq)));
-      const isDupCard = Boolean(cardNo && seenCards.has(String(cardNo)));
+      // Check if this EXACT student record was already processed via unique identifiers
+      const isDupId = hasId && seenIds.has(String(rawId));
+      const isDupUniq = hasUniq && seenUniqs.has(String(uniq));
+      const isDupCard = hasCard && seenCards.has(String(cardNo));
 
-      // Canonical resolution: exact key -> loose class key -> universal normalized name
-      const existingIdx = seenNameMap.has(nameKey)
-        ? seenNameMap.get(nameKey)
-        : roll == null && seenNameMap.has(looseNameKey)
-        ? seenNameMap.get(looseNameKey)
-        : seenNameMap.has(normName)
-        ? seenNameMap.get(normName)
-        : undefined;
+      if (isDupId || isDupUniq || isDupCard) {
+        // Enrich already existing student record with any missing metadata
+        const existingIdx = hasId
+          ? idToIdxMap.get(`id_${rawId}`)
+          : hasUniq
+          ? idToIdxMap.get(`uniq_${uniq}`)
+          : idToIdxMap.get(`card_${cardNo}`);
 
-      if (isDupId || isDupUniq || isDupCard || existingIdx !== undefined) {
         if (existingIdx !== undefined && result[existingIdx]) {
           const target = result[existingIdx];
-          // Preserve valid official fields over stale fallbacks
           if (!target.id && rawId) target.id = rawId;
           if (!target.roll_number && roll != null) target.roll_number = roll;
           if (!target.student_id_card_number && cardNo) target.student_id_card_number = cardNo;
@@ -157,14 +155,30 @@ export default function StudentSelector({
         return;
       }
 
-      if (rawId != null) seenIds.add(String(rawId));
-      if (uniq) seenUniqs.add(String(uniq));
-      if (cardNo) seenCards.add(String(cardNo));
+      // If no unique identifier exists at all on this raw record, fallback to exact composite key
+      if (!hasId && !hasUniq && !hasCard) {
+        const normName = sName.toLowerCase();
+        const fallbackKey = `noid_${normName}_cls_${clsId || ""}_sec_${secId || ""}_roll_${roll != null ? roll : ""}`;
+        if (idToIdxMap.has(fallbackKey)) return;
+        idToIdxMap.set(fallbackKey, result.length);
+        result.push(s);
+        return;
+      }
 
+      // Register unique identifiers for this student
       const newIdx = result.length;
-      seenNameMap.set(nameKey, newIdx);
-      seenNameMap.set(looseNameKey, newIdx);
-      seenNameMap.set(normName, newIdx);
+      if (hasId) {
+        seenIds.add(String(rawId));
+        idToIdxMap.set(`id_${rawId}`, newIdx);
+      }
+      if (hasUniq) {
+        seenUniqs.add(String(uniq));
+        idToIdxMap.set(`uniq_${uniq}`, newIdx);
+      }
+      if (hasCard) {
+        seenCards.add(String(cardNo));
+        idToIdxMap.set(`card_${cardNo}`, newIdx);
+      }
 
       result.push(s);
     };
@@ -191,32 +205,6 @@ export default function StudentSelector({
             ""
           : "";
 
-      let subVal = "";
-      if (clsName && secName) {
-        subVal = `${clsName} • ${secName}`;
-      } else if (secName) {
-        subVal = secName;
-      } else if (clsName) {
-        subVal = clsName;
-      } else if (typeof s === "object" && s?.sub) {
-        subVal = String(s.sub);
-      } else if (typeof s === "object" && (s?.group_name || s?.group)) {
-        subVal = String(s.group_name || s.group);
-      }
-
-      const deptVal =
-        typeof s === "object" && (s.department || s.department_id)
-          ? String(s.department || s.department_id)
-          : undefined;
-      const classVal =
-        typeof s === "object" && (s.student_class || s.class_id || s.class)
-          ? String(s.student_class || s.class_id || s.class)
-          : undefined;
-      const secVal =
-        typeof s === "object" && (s.student_section || s.section_id || s.section)
-          ? String(s.student_section || s.section_id || s.section)
-          : undefined;
-
       const roll =
         typeof s === "object"
           ? s.roll_number ?? s.originalData?.roll_number
@@ -232,6 +220,36 @@ export default function StudentSelector({
       const rawId =
         typeof s === "object"
           ? s.id ?? s.student_id ?? s.originalData?.id
+          : undefined;
+
+      let subVal = "";
+      if (clsName && secName) {
+        subVal = `${clsName} • ${secName}`;
+      } else if (secName) {
+        subVal = secName;
+      } else if (clsName) {
+        subVal = clsName;
+      } else if (typeof s === "object" && s?.sub) {
+        subVal = String(s.sub);
+      } else if (typeof s === "object" && (s?.group_name || s?.group)) {
+        subVal = String(s.group_name || s.group);
+      }
+
+      if (roll != null && String(roll).trim() !== "" && !subVal.includes(`Roll ${roll}`)) {
+        subVal = subVal ? `${subVal} • Roll ${roll}` : `Roll ${roll}`;
+      }
+
+      const deptVal =
+        typeof s === "object" && (s.department || s.department_id)
+          ? String(s.department || s.department_id)
+          : undefined;
+      const classVal =
+        typeof s === "object" && (s.student_class || s.class_id || s.class)
+          ? String(s.student_class || s.class_id || s.class)
+          : undefined;
+      const secVal =
+        typeof s === "object" && (s.student_section || s.section_id || s.section)
+          ? String(s.student_section || s.section_id || s.section)
           : undefined;
 
       // Find matching student in Student Directory (academicStudents)
@@ -278,16 +296,29 @@ export default function StudentSelector({
       };
     });
 
-    // Zero-duplicate guarantee: deduplicate options by id and normalized label + sub
+    // Zero-duplicate guarantee: deduplicate options strictly by unique student identifier (id, uniq_id, cardNo)
     const deduplicated: AutocompleteOption[] = [];
     const seenOptionKeys = new Set<string>();
 
     rawOptions.forEach((opt) => {
-      const optKey = `${(opt.label || "").trim().toLowerCase()}_${(opt.sub || "").trim().toLowerCase()}_${opt.roll_number != null ? opt.roll_number : ""}`;
-      const idKey = opt.id ? `id_${opt.id}` : null;
-      if (seenOptionKeys.has(optKey) || (idKey && seenOptionKeys.has(idKey))) return;
-      seenOptionKeys.add(optKey);
-      if (idKey) seenOptionKeys.add(idKey);
+      // Primary deduplication: unique database or student identifier
+      const idKey = opt.id
+        ? `id_${opt.id}`
+        : opt.uniq_id
+        ? `uniq_${opt.uniq_id}`
+        : opt.student_id_card_number
+        ? `card_${opt.student_id_card_number}`
+        : null;
+
+      if (idKey) {
+        if (seenOptionKeys.has(idKey)) return;
+        seenOptionKeys.add(idKey);
+      } else {
+        // Fallback ONLY when no ID exists anywhere on the record
+        const fallbackKey = `fallback_${(opt.label || "").trim().toLowerCase()}_${(opt.sub || "").trim().toLowerCase()}_${opt.roll_number != null ? opt.roll_number : ""}`;
+        if (seenOptionKeys.has(fallbackKey)) return;
+        seenOptionKeys.add(fallbackKey);
+      }
       deduplicated.push(opt);
     });
 

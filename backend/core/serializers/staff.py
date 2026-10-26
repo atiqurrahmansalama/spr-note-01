@@ -288,6 +288,20 @@ class StaffProfileSerializer(serializers.ModelSerializer):
 
             return instance
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if instance.user:
+            ret['name'] = instance.user.name or ''
+            ret['name_en'] = instance.user.name or ''
+            ret['user_name'] = instance.user.name or ''
+            ret['bangla_name'] = instance.user.name_bn or ''
+            ret['phone_number'] = instance.user.phone_number or ''
+            ret['user_phone'] = instance.user.phone_number or ''
+            ret['email'] = instance.user.email or ''
+            ret['user_email'] = instance.user.email or ''
+        return ret
+
+
 
 class TeacherAssignmentSerializer(serializers.ModelSerializer):
     teacher_name = serializers.CharField(source='teacher.user.name', read_only=True, default='')

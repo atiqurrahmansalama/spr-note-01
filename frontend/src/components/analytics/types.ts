@@ -44,6 +44,10 @@ export interface TrendDataPoint {
   studentCount?: number;
   studentNames?: string[];
   sessionNames?: string[];
+  departmentNames?: string[];
+  classNames?: string[];
+  sectionNames?: string[];
+  teacherNames?: string[];
 }
 
 export type ProgressTrendPoint = TrendDataPoint;
@@ -118,6 +122,10 @@ export interface TrendChartProps {
   studentCount?: number;
   totalReports?: number;
   accuracyRate?: number;
+  departmentNames?: string[];
+  classNames?: string[];
+  sectionNames?: string[];
+  teacherNames?: string[];
 }
 
 export type ProgressTrendsChartProps = TrendChartProps;

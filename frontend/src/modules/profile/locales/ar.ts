@@ -85,6 +85,18 @@ export default {
   drawer2FaSubtitle: "إضافة طبقة حماية إضافية عبر تطبيقات المصادقة TOTP.",
   drawerPasskeysTitle: "إدارة مفاتيح المرور والبيومتريا",
   drawerPasskeysSubtitle: "بيانات اعتماد مرتبطة بالأجهزة مثل Touch ID أو Windows Hello.",
+  passkeyHelpTitle: "مفتاح مرور مخصص لكل جهاز",
+  passkeyHelpDesc: "يحتفظ كل جهاز بمفتاح أمان خاص به. بمجرد تسجيله على هذا الجهاز، يمكنك تسجيل الدخول بلمسة واحدة دون إدخال كلمة المرور.",
+  currentDeviceBadge: "هذا الجهاز",
+  hardwareProtected: "محمي بالعتاد",
+  deviceAlreadySecured: "هذا الجهاز محمي ومؤمّن",
+  deviceAlreadySecuredDesc: "يوجد مفتاح مرور بيومتري نشط بالفعل لهذا الجهاز والمتصفح. لا يتطلب كل جهاز فعلي سوى مفتاح واحد فقط.",
+  reRegisterDevice: "إعادة تسجيل الجهاز",
+  showKeyDetails: "إظهار المعرّف التقني",
+  hideKeyDetails: "إخفاء المعرّف التقني",
+  credentialHash: "تجزئة معرف الاعتماد",
+  biometricProtected: "مفتاح أمان بيومتري",
+  currentDeviceSecured: "نشط على هذا الجهاز",
 
   // Enterprise 2FA Strings
   twoFactorActiveHeader: "المصادقة الثنائية مفعلة بنجاح",
@@ -109,6 +121,8 @@ export default {
   toastExportSuccess: "تم تصدير بيانات الملف الشخصي بنجاح!",
   toastProfileUpdatedSuccess: "تم تحديث الملف الشخصي ومزامنته بنجاح!",
   toastSignOutSuccess: "تم تسجيل الخروج بنجاح.",
+  pwdUpdatedSuccess: "تم تغيير كلمة المرور بنجاح!",
+  pwdUpdatedWithEmailAlert: "تم تحديث كلمة المرور! تم إرسال تنبيه أمني إلى بريدك الإلكتروني.",
 
   // Common Controls
   saveChanges: "حفظ التغييرات",

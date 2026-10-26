@@ -113,6 +113,10 @@ export const ProgressAnalyticsDashboard: React.FC<ProgressAnalyticsDashboardProp
                     peakDayPages={analytics.peakDayPages}
                     studentCount={analytics.studentCount}
                     totalReports={analytics.totalReports}
+                    departmentNames={analytics.overallDepartments}
+                    classNames={analytics.overallClasses}
+                    sectionNames={analytics.overallSections}
+                    teacherNames={analytics.overallTeachers}
                     className="h-full flex flex-col justify-between"
                   />
                 )}

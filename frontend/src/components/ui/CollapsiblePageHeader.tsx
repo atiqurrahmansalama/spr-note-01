@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ChevronUpIcon, ChevronDownIcon } from "./Icons";
+import { IconButton } from "./IconButton";
 import TabSwitcher from "./TabSwitcher";
 
 export interface TabItem {
@@ -49,6 +50,10 @@ export interface CollapsiblePageHeaderProps {
   collapsible?: boolean;
   /** If true, completely hides the header */
   hideHeader?: boolean;
+  /** Label for collapse action on large screens */
+  collapseLabel?: string;
+  /** Label for expand action on large screens */
+  expandLabel?: string;
   /** Additional wrapper CSS classes */
   className?: string;
   /** Additional header section CSS classes */
@@ -87,6 +92,8 @@ export default function CollapsiblePageHeader({
   onToggle,
   collapsible = true,
   hideHeader = false,
+  collapseLabel = "Collapse",
+  expandLabel = "Expand",
   className = "",
   headerClassName = "",
   children,
@@ -165,8 +172,18 @@ export default function CollapsiblePageHeader({
           title="Click to expand header and tabs"
           className="w-full py-2 px-3 sm:px-4 rounded-xl border theme-border theme-bg-surface hover:theme-bg-sub/30 transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 shadow-2xs group select-none"
         >
-          {/* Left: Icon & Title */}
-          <div className="flex items-center gap-2.5 min-w-0 flex-1 text-left">
+          {/* Left: Icon & Title (On small screens, expand button is at the far left) */}
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 text-left">
+            <div className="block @md:hidden shrink-0">
+              <IconButton
+                icon={ChevronDownIcon}
+                ariaLabel="Expand page header"
+                title="Expand header and tabs"
+                size="sm"
+                variant="sub"
+                className="pointer-events-none"
+              />
+            </div>
             {Icon && (
               <div className="w-6 h-6 rounded-lg theme-bg-accent-soft border border-[var(--accent-main)]/20 flex items-center justify-center theme-accent shrink-0">
                 <Icon className="w-3.5 h-3.5" />
@@ -177,11 +194,10 @@ export default function CollapsiblePageHeader({
             </span>
           </div>
 
-          {/* Right: Only Expand Toggle Button */}
-          <div className="flex items-center gap-1 shrink-0">
-            <div className="p-1 sm:p-1.5 rounded-lg theme-bg-sub/40 group-hover:theme-bg-accent-soft group-hover:theme-accent transition-colors flex items-center justify-center">
-              <ChevronDownIcon className="w-4 h-4 theme-text-secondary group-hover:theme-accent transition-transform group-hover:translate-y-0.5" />
-            </div>
+          {/* Right: Expand Toggle Button (visible on @md and up) */}
+          <div className="hidden @md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border theme-border theme-bg-sub/50 group-hover:theme-bg-sub text-xs font-semibold theme-text-secondary group-hover:theme-text-primary transition-all duration-150 shrink-0 pointer-events-none">
+            <span>{expandLabel}</span>
+            <ChevronDownIcon className="w-3.5 h-3.5" />
           </div>
         </div>
       </div>
@@ -195,8 +211,20 @@ export default function CollapsiblePageHeader({
       <div
         className={`flex flex-col @md:flex-row @md:items-center justify-between gap-3 @md:gap-4 pb-1.5 sm:pb-2.5 w-full min-w-0 ${headerClassName}`}
       >
-        {/* Left: Icon, Title, Badge, Subtitle */}
-        <div className="flex items-center gap-3 @sm:gap-3.5 min-w-0 flex-1">
+        {/* Left: On small screens, collapse button is at the VERY LEFT! */}
+        <div className="flex items-center gap-2.5 @sm:gap-3.5 min-w-0 flex-1">
+          {collapsible && (
+            <div className="block @md:hidden shrink-0">
+              <IconButton
+                icon={ChevronUpIcon}
+                onClick={handleToggle}
+                ariaLabel="Collapse page header"
+                title="Collapse header and tabs"
+                size="sm"
+                variant="sub"
+              />
+            </div>
+          )}
           {Icon && (
             <div className="w-9 h-9 @sm:w-10 @sm:h-10 rounded-2xl theme-bg-accent-soft border border-[var(--accent-main)]/20 flex items-center justify-center theme-accent shrink-0 shadow-xs">
               <Icon className="w-4.5 h-4.5 @sm:w-5 @sm:h-5" />
@@ -212,20 +240,22 @@ export default function CollapsiblePageHeader({
           </div>
         </div>
 
-        {/* Right: Actions + Collapse Toggle Button */}
+        {/* Right: Actions + Collapse Toggle Button (with text on desktop) */}
         <div className="flex flex-wrap items-center gap-2 @sm:gap-2.5 w-full @md:w-auto shrink-0 justify-start @md:justify-end">
           {headerActions}
           {collapsible && (
-            <button
-              type="button"
-              onClick={handleToggle}
-              aria-expanded={true}
-              aria-label="Collapse page header"
-              title="Collapse header and tabs"
-              className="p-2 sm:p-2.5 rounded-xl theme-bg-surface border theme-border hover:theme-bg-sub/40 hover:border-[var(--accent-main)]/40 transition-colors shadow-2xs flex items-center justify-center text-xs theme-text-secondary hover:theme-text-primary cursor-pointer shrink-0"
-            >
-              <ChevronUpIcon className="w-4 h-4 theme-accent shrink-0" />
-            </button>
+            <div className="hidden @md:block shrink-0">
+              <button
+                type="button"
+                onClick={handleToggle}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border theme-border theme-bg-sub/50 hover:theme-bg-sub text-xs font-semibold theme-text-secondary hover:theme-text-primary transition-all duration-150 cursor-pointer shadow-2xs"
+                title="Collapse header and tabs"
+                aria-label="Collapse page header"
+              >
+                <span>{collapseLabel}</span>
+                <ChevronUpIcon className="w-3.5 h-3.5" />
+              </button>
+            </div>
           )}
         </div>
       </div>
