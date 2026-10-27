@@ -132,23 +132,25 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
   const handleRegisterPasskey = async () => {
     setRegistering(true);
     try {
-      const optionsRes = await fetchWithAuth('/api/v1/auth/passkeys/register-options/');
+      const clientHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+      const cleanHost = (clientHost === '127.0.0.1' || clientHost === 'localhost' || clientHost === '::1')
+        ? 'localhost'
+        : clientHost;
+
+      const optionsRes = await fetchWithAuth(`/api/v1/auth/passkeys/register-options/?rp_id=${encodeURIComponent(cleanHost)}`);
       if (!optionsRes.ok) {
         throw new Error(t('passkeyOptionsFailed', 'Could not fetch passkey options.'));
       }
       const options = await optionsRes.json();
 
-      // WebAuthn W3C specification strictly requires rp.id to match the origin hostname and forbids raw IP addresses
+      // WebAuthn W3C specification strictly requires rp.id to match the current browser origin hostname
       if (options && options.rp) {
-        const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-        options.rp.id = (currentHost === '127.0.0.1' || currentHost === 'localhost' || !options.rp.id)
-          ? 'localhost'
-          : options.rp.id;
+        options.rp.id = cleanHost;
       }
 
       let credential: any = null;
       try {
-        credential = await startRegistration(options);
+        credential = await startRegistration({ optionsJSON: options });
       } catch (err: any) {
         if (err?.name === 'NotAllowedError') {
           showToast(t('passkeyCancelled', 'Passkey creation was cancelled.'), 'info');

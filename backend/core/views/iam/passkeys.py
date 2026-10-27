@@ -80,7 +80,20 @@ class PasskeyRegisterOptionsView(APIView):
         user_id_b64 = base64.b64encode(str(user.id if user else 1).encode()).decode()
 
         challenge = base64.b64encode(uuid.uuid4().bytes).decode()
-        raw_host = request.get_host().split(':')[0]
+        
+        from urllib.parse import urlparse
+        requested_rp_id = request.query_params.get('rp_id') or request.headers.get('X-Client-Hostname')
+        if not requested_rp_id:
+            origin = request.headers.get('Origin') or request.META.get('HTTP_ORIGIN') or request.headers.get('Referer')
+            if origin:
+                try:
+                    parsed = urlparse(origin)
+                    if parsed.hostname:
+                        requested_rp_id = parsed.hostname
+                except Exception:
+                    pass
+
+        raw_host = requested_rp_id or request.get_host().split(':')[0]
         rp_id = 'localhost' if raw_host in ['127.0.0.1', 'localhost', '::1', 'testserver'] else raw_host
 
         options = {

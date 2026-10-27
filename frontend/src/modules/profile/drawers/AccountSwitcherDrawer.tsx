@@ -211,12 +211,12 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
                 <div
                   key={idx}
                   onClick={() => handleSwitch(acc)}
-                  className={`p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer transition-colors border-b theme-border last:border-b-0 ${
+                  className={`p-3.5 sm:p-4 flex items-start justify-between gap-3 cursor-pointer transition-colors border-b theme-border last:border-b-0 ${
                     isCurrent ? 'theme-bg-sub/60 font-semibold' : 'hover:theme-bg-sub/40'
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-full border theme-border theme-bg-sub flex items-center justify-center shrink-0 overflow-hidden">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <div className="w-10 h-10 rounded-full border theme-border theme-bg-sub flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
                       {accUser.avatar_url ? (
                         <img src={accUser.avatar_url} alt={name} className="w-full h-full object-cover" />
                       ) : (
@@ -226,15 +226,15 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
                       )}
                     </div>
 
-                    <div className="min-w-0">
-                      <span className="text-sm font-semibold theme-text-primary truncate block">{name}</span>
-                      <p className="text-xs theme-text-secondary truncate mt-0.5">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-sm font-semibold theme-text-primary block leading-snug break-words">{name}</span>
+                      <p className="text-xs theme-text-secondary mt-0.5 leading-relaxed break-words">
                         {accUser.email || accUser.phone_number || rawRole}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-start pt-1 shrink-0">
                     {isCurrent ? (
                       <div className="w-4.5 h-4.5 rounded-full theme-bg-accent flex items-center justify-center theme-accent-text shrink-0">
                         <CheckIcon className="w-2.5 h-2.5" />
@@ -279,14 +279,14 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
         >
           <div className="space-y-3">
             {/* Google Workspace Account Card */}
-            <div className="p-3.5 sm:p-4 rounded-xl border theme-border theme-bg-surface shadow-2xs flex items-center justify-between gap-3 transition-colors hover:border-[var(--accent-main)]/30">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="w-10 h-10 rounded-xl border theme-border theme-bg-sub flex items-center justify-center shrink-0 shadow-2xs">
+            <div className="p-3.5 sm:p-4 rounded-xl border theme-border theme-bg-surface shadow-2xs flex items-start justify-between gap-3 transition-colors hover:border-[var(--accent-main)]/30">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <div className="w-10 h-10 rounded-xl border theme-border theme-bg-sub flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
                   <GoogleIcon className="w-5 h-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold theme-text-primary truncate">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold theme-text-primary leading-snug break-words">
                       {t('googleAccountTitle', 'Google Workspace / Gmail')}
                     </span>
                     {isGoogleLinked && (
@@ -299,7 +299,7 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
                       </span>
                     )}
                   </div>
-                  <p className="text-xs theme-text-secondary mt-0.5 leading-relaxed truncate">
+                  <p className="text-xs theme-text-secondary mt-0.5 leading-relaxed break-words">
                     {isGoogleLinked
                       ? activeUser?.email ||
                         t(
@@ -314,7 +314,7 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
                 </div>
               </div>
 
-              <div className="shrink-0 flex items-center">
+              <div className="shrink-0 flex items-start pt-0.5">
                 {isGoogleLinked ? (
                   <ActionMenu
                     items={[
@@ -342,28 +342,25 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
             </div>
 
             {/* Institutional SSO / SAML Provider Card */}
-            <div className="p-3.5 sm:p-4 rounded-xl border theme-border theme-bg-sub/30 shadow-2xs flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="w-10 h-10 rounded-xl border theme-border theme-bg-surface flex items-center justify-center shrink-0 shadow-2xs">
-                  <ShieldCheckIcon className="w-5 h-5 theme-accent" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <span className="text-sm font-semibold theme-text-primary truncate block">
+            <div className="p-3.5 sm:p-4 rounded-xl border theme-border theme-bg-sub/30 shadow-2xs flex items-start gap-3 transition-colors">
+              <div className="w-10 h-10 rounded-xl border theme-border theme-bg-surface flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                <ShieldCheckIcon className="w-5 h-5 theme-accent" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold theme-text-primary leading-snug break-words">
                     {t('institutionalSsoTitle', 'Institutional Identity Provider (SAML / OIDC)')}
                   </span>
-                  <p className="text-xs theme-text-secondary mt-0.5 leading-relaxed truncate">
-                    {t(
-                      'institutionalSsoDesc',
-                      'Campus domain SSO is enabled for enterprise single sign-on.'
-                    )}
-                  </p>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 shrink-0 whitespace-nowrap shadow-2xs">
+                    {t('badgeReady', 'Enterprise Ready')}
+                  </span>
                 </div>
-              </div>
-
-              <div className="shrink-0 flex items-center">
-                <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 shrink-0 whitespace-nowrap shadow-2xs">
-                  {t('badgeReady', 'Enterprise Ready')}
-                </span>
+                <p className="text-xs theme-text-secondary mt-0.5 leading-relaxed break-words">
+                  {t(
+                    'institutionalSsoDesc',
+                    'Campus domain SSO is enabled for enterprise single sign-on.'
+                  )}
+                </p>
               </div>
             </div>
           </div>

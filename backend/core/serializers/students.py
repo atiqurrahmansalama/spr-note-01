@@ -475,6 +475,18 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
 
         # Auto sync section / group / class
         section = validated_data.get('section')
+        if not section and validated_data.get('group_name'):
+            from core.models import ClassSection
+            grp_name = str(validated_data['group_name']).strip()
+            inst_id = validated_data.get('institution_id') or scoped_inst_id
+            sec_qs = ClassSection.objects.filter(section_name__iexact=grp_name, is_deleted=False)
+            if inst_id:
+                sec_qs = sec_qs.filter(student_class__institution_id=inst_id)
+            sec_obj = sec_qs.first()
+            if sec_obj:
+                validated_data['section'] = sec_obj
+                section = sec_obj
+
         if section:
             if not validated_data.get('group_name'):
                 validated_data['group_name'] = getattr(section, 'section_name', None) or getattr(section, 'name', '') or ''

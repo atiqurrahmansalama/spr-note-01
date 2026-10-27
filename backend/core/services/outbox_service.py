@@ -81,8 +81,17 @@ def serialize_model_instance(instance: models.Model) -> Dict[str, Any]:
             data[field.name] = val.hex()
         elif isinstance(val, (set, tuple)):
             data[field.name] = list(val)
+        elif hasattr(val, 'storage') or hasattr(val, 'field'):
+            # Django FieldFile / FileField without raising ValueError on .url
+            data[field.name] = str(val.name) if getattr(val, 'name', None) else ''
         else:
-            data[field.name] = val
+            try:
+                # Test basic JSON serializability fallback
+                import json
+                json.dumps(val)
+                data[field.name] = val
+            except (TypeError, ValueError):
+                data[field.name] = str(val) if val is not None else None
     return data
 
 

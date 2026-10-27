@@ -22,6 +22,11 @@ import {
   useDrawerResizing,
   useAppSyncAndAuth,
 } from "./hooks";
+import {
+  useVersionControl,
+  ReleaseNotesDrawer,
+  ForceUpdateModal,
+} from "../../modules/version-control";
 
 // Re-export ROUTE_TITLE_MAP and RouteMeta for complete backward compatibility
 export { ROUTE_TITLE_MAP, resolveRouteMeta, type RouteMeta };
@@ -44,9 +49,37 @@ export default function AppLayout() {
     rightSidebarConfig,
     closeRightSidebar,
     closeDrawer,
+    openDrawer,
     drawerWidth,
     setDrawerWidth,
   } = useRightSidebar();
+
+  // Version Control Handshake & State
+  const {
+    hasUpdate,
+    isForceUpdate,
+    latestRelease,
+    currentVersion,
+    loading: checkingVersion,
+    triggerWebReload,
+  } = useVersionControl({ autoCheck: true });
+
+  // Global Drawer Registration: Release Notes
+  useDrawerRegistration('release_notes', () => {
+    return {
+      title: 'Release Notes',
+      category: 'System Release',
+      size: 'md',
+      content: (
+        <ReleaseNotesDrawer
+          release={latestRelease}
+          currentVersion={currentVersion}
+          onClose={closeDrawer || closeRightSidebar}
+          onReloadAndUpdate={triggerWebReload}
+        />
+      ),
+    };
+  });
 
   // Global Drawer Registration: Notification Center (Master List)
   useDrawerRegistration('notifications', (params) => {
@@ -272,6 +305,12 @@ export default function AppLayout() {
         currentInstitution={currentInstitution}
         activeBranch={activeBranch}
         activeYear={activeYear}
+        versionControl={{
+          currentVersion,
+          hasUpdate,
+          isChecking: checkingVersion,
+          onClick: () => openDrawer('release_notes'),
+        }}
       />
 
       {/* Main Content Body */}
@@ -413,6 +452,14 @@ export default function AppLayout() {
 
       {/* Global Institution Workspace Switch Alert Modal */}
       <InstitutionSwitchModal />
+
+      {/* High-Priority Security Gating Modal for Outdated Client Versions */}
+      <ForceUpdateModal
+        isOpen={isForceUpdate}
+        currentVersion={currentVersion}
+        latestRelease={latestRelease}
+        onReloadAndUpdate={triggerWebReload}
+      />
 
       {/* Draggable Floating Undo / Redo Action Dock */}
       <FloatingUndoRedoDock />

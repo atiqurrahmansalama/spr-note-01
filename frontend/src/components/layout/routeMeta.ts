@@ -143,6 +143,8 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
 
   "/about": { title: "About", category: "About" },
   "/trash-restoration": { title: "Trash & Restoration", category: "Admin Tools" },
+  "/version-control": { title: "Version Control & Releases", category: "Admin Tools" },
+  "/releases": { title: "Version Control & Releases", category: "Admin Tools" },
 };
 
 /**

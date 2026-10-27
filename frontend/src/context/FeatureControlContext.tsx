@@ -115,6 +115,7 @@ export const HARD_DEFAULTS: Record<string, boolean> = {
   personalize_tab_language: true,
   settings_backup: true,
   admin_tools: true,
+  version_control: true,
 
   // 11. System & Standalone
   nav_shortcuts: true,

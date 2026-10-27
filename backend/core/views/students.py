@@ -315,26 +315,42 @@ class StudentViewSet(viewsets.ModelViewSet):
                         return Response({"error": "Class ID is required"}, status=status.HTTP_400_BAD_REQUEST)
                     from core.models import StudentClass
                     target_cls = StudentClass.objects.get(id=target_class_id, is_deleted=False)
-                    queryset.update(student_class=target_cls)
-                elif action_type == 'assign_group':
-                    group_id = request.data.get('target_group_id') or request.data.get('group_id')
-                    group_name = request.data.get('group_name')
-                    from core.models import StudentGroup
-                    if group_id:
-                        grp = StudentGroup.objects.get(id=group_id, is_deleted=False)
-                        queryset.update(group_name=grp.name, student_group=grp)
-                    elif group_name:
-                        grp, _ = StudentGroup.objects.get_or_create(name=group_name.strip())
-                        queryset.update(group_name=group_name.strip(), student_group=grp)
-                    else:
-                        return Response({"error": "Group is required"}, status=status.HTTP_400_BAD_REQUEST)
+                    for st in queryset:
+                        st.student_class = target_cls
+                        if st.section and st.section.student_class_id != target_cls.id:
+                            st.section = None
+                        st.save()
+                elif action_type in ('assign_section', 'assign_group'):
+                    target_section_id = request.data.get('target_section_id') or request.data.get('section_id') or request.data.get('target_group_id') or request.data.get('group_id')
+                    target_section_name = request.data.get('section_name') or request.data.get('group_name')
+                    from core.models import ClassSection
+                    sec_obj = None
+                    if target_section_id:
+                        sec_obj = ClassSection.objects.filter(id=target_section_id, is_deleted=False).first()
+                    elif target_section_name:
+                        sec_obj = ClassSection.objects.filter(section_name__iexact=str(target_section_name).strip(), is_deleted=False).first()
+
+                    if not sec_obj:
+                        return Response({"error": "Valid section could not be resolved"}, status=status.HTTP_400_BAD_REQUEST)
+
+                    for st in queryset:
+                        st.section = sec_obj
+                        st.group_name = sec_obj.section_name
+                        if sec_obj.student_class_id and not st.student_class_id:
+                            st.student_class = sec_obj.student_class
+                        st.save()
                 elif action_type == 'change_status':
                     status_val = request.data.get('status')
                     if not status_val:
                         return Response({"error": "Status is required"}, status=status.HTTP_400_BAD_REQUEST)
-                    queryset.update(status=status_val.strip().title())
+                    for st in queryset:
+                        st.status = status_val.strip().title()
+                        st.save()
                 elif action_type == 'bulk_delete':
-                    queryset.update(is_deleted=True, status='INACTIVE')
+                    for st in queryset:
+                        st.is_deleted = True
+                        st.status = 'INACTIVE'
+                        st.save()
                 else:
                     return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
 

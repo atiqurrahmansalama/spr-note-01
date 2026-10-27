@@ -81,15 +81,15 @@ export function DrawerBanner({
     <div
       className={`p-3.5 sm:p-4 rounded-2xl theme-bg-sub border theme-border flex items-center justify-between gap-3 shadow-2xs ${className}`}
     >
-      <div className="flex items-center gap-3 min-w-0 flex-1">
+      <div className="flex items-start gap-3 min-w-0 flex-1">
         {Icon && (
-          <div className="w-10 h-10 rounded-xl theme-bg-accent-soft theme-accent flex items-center justify-center border theme-border shrink-0 shadow-2xs">
+          <div className="w-10 h-10 rounded-xl theme-bg-accent-soft theme-accent flex items-center justify-center border theme-border shrink-0 shadow-2xs mt-0.5">
             <Icon className="w-5 h-5" />
           </div>
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="text-xs sm:text-sm font-bold theme-text-primary truncate">
+            <h4 className="text-xs sm:text-sm font-bold theme-text-primary leading-snug break-words">
               {title}
             </h4>
             {badge && (
@@ -99,7 +99,7 @@ export function DrawerBanner({
             )}
           </div>
           {subtitle && (
-            <p className="text-[11px] sm:text-xs theme-text-secondary truncate mt-0.5 font-normal">
+            <p className="text-[11px] sm:text-xs theme-text-secondary mt-0.5 font-normal leading-relaxed break-words">
               {subtitle}
             </p>
           )}

@@ -60,6 +60,7 @@ export const navigation = {
   dataBackup: 'ڈیٹا بیک اپ',
   appGuide: 'رہنمائے استعمال',
   shortcuts: 'کی بورڈ شارٹ کٹس',
+  versionControl: 'ورژن اور ریلیزز',
   developerTools: 'ایڈمن اور ڈویلپر ٹولز',
   userManagement: 'صارفین کا انتظام',
   roleManagement: 'کردار کا انتظام',

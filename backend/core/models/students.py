@@ -111,6 +111,17 @@ class Student(models.Model):
                 self.institution = self.created_by.institution
 
         # ── Section, Group & Class Auto-Sync ──
+        if not self.section and self.group_name and str(self.group_name).strip():
+            from core.models import ClassSection
+            sec_qs = ClassSection.objects.filter(section_name__iexact=self.group_name.strip(), is_deleted=False)
+            if self.institution_id:
+                sec_qs = sec_qs.filter(student_class__institution_id=self.institution_id)
+            sec = sec_qs.first()
+            if sec:
+                self.section = sec
+                if not self.student_class_id and sec.student_class_id:
+                    self.student_class = sec.student_class
+
         if not self.student_group and self.group_name and str(self.group_name).strip():
             from core.models import StudentGroup
             grp = StudentGroup.objects.filter(name__iexact=self.group_name.strip(), is_deleted=False).first()

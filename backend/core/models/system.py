@@ -274,4 +274,68 @@ class DataMutationOutbox(models.Model):
         return f"[{self.status}] {self.operation} on {self.table_name}#{self.record_pk} (Mutation: {self.mutation_id})"
 
 
+class AppRelease(models.Model):
+    """
+    Enterprise Application Version & Release Management.
+    Governs multi-platform releases, SemVer handshake, mandatory force-update gating,
+    and structured changelogs for Web, Android, iOS, and Desktop wrappers.
+    """
+    RELEASE_CHANNEL_CHOICES = (
+        ('STABLE', 'Stable Production'),
+        ('BETA', 'Beta Preview'),
+        ('ALPHA', 'Internal Alpha'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    version = models.CharField(max_length=32, unique=True, db_index=True)
+    build_number = models.PositiveIntegerField(default=1, db_index=True)
+    channel = models.CharField(max_length=20, choices=RELEASE_CHANNEL_CHOICES, default='STABLE')
+    is_critical_update = models.BooleanField(
+        default=False,
+        help_text="Triggers hard blocking update gate if client is below min_supported_version"
+    )
+    min_supported_version = models.CharField(max_length=32, default="1.0.0")
+    min_supported_build = models.PositiveIntegerField(default=1)
+
+    # Platform Targets & Distribution Links
+    web_active = models.BooleanField(default=True)
+    android_apk_url = models.URLField(blank=True, default='')
+    desktop_installer_url = models.URLField(blank=True, default='')
+    ios_testflight_url = models.URLField(blank=True, default='')
+
+    # Release Notes & Structured Changelog
+    title = models.CharField(max_length=255)
+    summary = models.TextField(blank=True, default='')
+    changelog_features = models.JSONField(default=list, blank=True)
+    changelog_improvements = models.JSONField(default=list, blank=True)
+    changelog_fixes = models.JSONField(default=list, blank=True)
+    changelog_security = models.JSONField(default=list, blank=True)
+
+    # Publishing Metadata
+    published_by = models.ForeignKey(
+        'core.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='published_releases'
+    )
+    is_published = models.BooleanField(default=False, db_index=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-build_number', '-created_at']
+        verbose_name = "App Release"
+        verbose_name_plural = "App Releases"
+        indexes = [
+            models.Index(fields=['is_published', 'channel', '-build_number'], name='idx_rel_pub_chan_bld'),
+            models.Index(fields=['version'], name='idx_rel_ver'),
+        ]
+
+    def __str__(self):
+        status = "Published" if self.is_published else "Draft"
+        return f"v{self.version} ({self.build_number}) [{self.channel}] - {status}"
+
+
 

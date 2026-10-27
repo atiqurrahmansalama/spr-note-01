@@ -23,6 +23,7 @@ import ClassroomConfigurationView from "../../learning/daily-classroom/component
 import TrashRestorationView from "../../admin/TrashRestorationView";
 import { SystemEnvironmentPanel } from "./SystemEnvironmentPanel";
 import { EmailTemplatesPreviewPanel } from "./EmailTemplatesPreviewPanel";
+import { ReleaseManagementView } from "../../version-control";
 
 
 export interface DeveloperToolsContentRendererProps {
@@ -195,6 +196,13 @@ export const DeveloperToolsContentRenderer: React.FC<DeveloperToolsContentRender
       {currentRenderSection === "email-templates" && (
         <div className="w-full animate-fade-in">
           <EmailTemplatesPreviewPanel />
+        </div>
+      )}
+
+      {/* Section 5.8: Version Control & Releases Console */}
+      {(currentRenderSection === "version-control" || currentRenderSection === "releases") && (
+        <div className="w-full animate-fade-in">
+          <ReleaseManagementView />
         </div>
       )}
 

@@ -7,6 +7,7 @@ import { LanguageSelector } from "../../i18n";
 import NotificationBellDropdown from "./NotificationBellDropdown";
 import { useTheme } from "../../context/useTheme";
 import { getBranchDisplayName } from "../../utils/localStore";
+import { UpdateBadge } from "../../modules/version-control/components/UpdateBadge";
 
 export interface AppHeaderProps {
   onToggleMenu: () => void;
@@ -15,6 +16,12 @@ export interface AppHeaderProps {
   currentInstitution: any;
   activeBranch: any;
   activeYear: any;
+  versionControl?: {
+    currentVersion: string;
+    hasUpdate: boolean;
+    isChecking?: boolean;
+    onClick?: () => void;
+  };
 }
 
 /**
@@ -29,6 +36,7 @@ export default function AppHeader({
   currentInstitution,
   activeBranch,
   activeYear,
+  versionControl,
 }: AppHeaderProps) {
   const navigate = useNavigate();
   const themeContext = useTheme();
@@ -127,6 +135,16 @@ export default function AppHeader({
 
         {/* Multi-Language & RTL Switcher */}
         <LanguageSelector />
+
+        {/* Client Version & Update Status Badge */}
+        {versionControl && (
+          <UpdateBadge
+            currentVersion={versionControl.currentVersion}
+            hasUpdate={versionControl.hasUpdate}
+            isChecking={versionControl.isChecking}
+            onClick={versionControl.onClick}
+          />
+        )}
 
         {/* Real-time In-App Notification Bell */}
         <NotificationBellDropdown />

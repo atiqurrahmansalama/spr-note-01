@@ -90,6 +90,7 @@ const DeveloperToolsHubView = lazy(() => import("./modules/app-management/develo
 const DashboardHubView = lazy(() => import("./modules/dashboard/DashboardHubView"));
 const FinanceHubView = lazy(() => import("./modules/finance/FinanceHubView"));
 const PublicVerifyReceiptView = lazy(() => import("./modules/finance/components/public-verification/PublicVerifyReceiptView"));
+const ReleaseManagementView = lazy(() => import("./modules/version-control/views/ReleaseManagementView"));
 
 function ProtectedRoute({ children }) {
   const urlParams = new URLSearchParams(window.location.search);
@@ -320,6 +321,8 @@ export default function App() {
                 <Route path="/app-management/role-invites" element={<Navigate to="/user-management?tab=invites" replace />} />
                 <Route path="/app-management/notifications" element={<NotificationManagementView />} />
                 <Route path="/notifications" element={<NotificationManagementView />} />
+                <Route path="/version-control" element={<ReleaseManagementView />} />
+                <Route path="/releases" element={<ReleaseManagementView />} />
                 {/* Enterprise Finance, Accounts, Billing & Payroll Hub Routes */}
                 <Route path="/finance" element={<FeatureGuard sectionKey="nav_finance" fallback={<Navigate to="/dashboard" replace />}><FinanceHubView /></FeatureGuard>} />
                 <Route path="/finance/:tab" element={<FeatureGuard sectionKey="nav_finance" fallback={<Navigate to="/dashboard" replace />}><FinanceHubView /></FeatureGuard>} />

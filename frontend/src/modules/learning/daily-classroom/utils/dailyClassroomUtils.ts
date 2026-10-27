@@ -440,46 +440,6 @@ export function doesLessonMatchClass(item: any, targetClassId: string | number, 
     return true;
   }
 
-  // 3. Precise Tier Fallback for Curriculum Syllabus & Legacy Items
-  const itemClassIdStr = String(item.classId || item.class_id || '').toLowerCase();
-
-  if ((tName.includes('senior') || tName.includes('khatm') || tCode.includes('HIFZ-SR') || targetIdStr === 'cls_1') &&
-      (itemClassIdStr === 'cls_1' || itemClassIdStr === 'cls_hifz_sr' || candidateNames.some((n) => n.includes('senior') || n.includes('khatm')))) {
-    return true;
-  }
-  if ((tName.includes('intermediate') || tCode.includes('HIFZ-INT') || targetIdStr === 'cls_hifz_int') &&
-      (itemClassIdStr === 'cls_hifz_int' || candidateNames.some((n) => n.includes('intermediate')))) {
-    return true;
-  }
-  if ((tName.includes('junior') || tCode.includes('HIFZ-JUN') || targetIdStr === 'cls_hifz_jun') &&
-      (itemClassIdStr === 'cls_hifz_jun' || candidateNames.some((n) => n.includes('junior')))) {
-    return true;
-  }
-  if ((tName.includes('noorani') || tCode.includes('NOOR') || targetIdStr === 'cls_3' || targetIdStr === 'cls_noorani') &&
-      (itemClassIdStr === 'cls_3' || itemClassIdStr === 'cls_noorani' || candidateNames.some((n) => n.includes('noorani')))) {
-    return true;
-  }
-  if ((tName.includes('nazera') || tName.includes('nazira') || tCode.includes('NAZ') || targetIdStr === 'cls_4') &&
-      (itemClassIdStr === 'cls_4' || candidateNames.some((n) => n.includes('nazera') || n.includes('nazira')))) {
-    return true;
-  }
-  if ((tName.includes('kitab') || tName.includes('mizan') || tName.includes('fazilat') || tCode.includes('KITAB') || targetIdStr === 'cls_2') &&
-      (itemClassIdStr === 'cls_2' || itemClassIdStr === 'cls_kitab' || candidateNames.some((n) => n.includes('kitab') || n.includes('mizan') || n.includes('fazilat')))) {
-    return true;
-  }
-  if ((tName.includes('class 6') || tCode.includes('CLS-06') || targetIdStr === 'cls_6') &&
-      (itemClassIdStr === 'cls_6' || candidateNames.some((n) => n.includes('class 6')))) {
-    return true;
-  }
-  if ((tName.includes('class 7') || tCode.includes('CLS-07') || targetIdStr === 'cls_7') &&
-      (itemClassIdStr === 'cls_7' || candidateNames.some((n) => n.includes('class 7')))) {
-    return true;
-  }
-  if ((tName.includes('class 8') || tCode.includes('CLS-08') || targetIdStr === 'cls_8') &&
-      (itemClassIdStr === 'cls_8' || candidateNames.some((n) => n.includes('class 8')))) {
-    return true;
-  }
-
   return false;
 }
 
@@ -577,17 +537,6 @@ export function doesStudentMatchClass(student: any, targetClassId: string | numb
   if (tCode && (student.class_code || candidateNames.some((n) => n === tCode))) {
     return true;
   }
-
-  // Specific tier matching
-  if (tName.includes('senior') && candidateNames.some((n) => n.includes('senior') || n.includes('khatm'))) return true;
-  if (tName.includes('intermediate') && candidateNames.some((n) => n.includes('intermediate'))) return true;
-  if (tName.includes('junior') && candidateNames.some((n) => n.includes('junior'))) return true;
-  if (tName.includes('noorani') && candidateNames.some((n) => n.includes('noorani'))) return true;
-  if (tName.includes('nazera') && candidateNames.some((n) => n.includes('nazera') || n.includes('nazira'))) return true;
-  if (tName.includes('kitab') && candidateNames.some((n) => n.includes('kitab') || n.includes('mizan') || n.includes('fazilat'))) return true;
-  if (tName.includes('class 6') && candidateNames.some((n) => n.includes('class 6'))) return true;
-  if (tName.includes('class 7') && candidateNames.some((n) => n.includes('class 7'))) return true;
-  if (tName.includes('class 8') && candidateNames.some((n) => n.includes('class 8'))) return true;
 
   return false;
 }

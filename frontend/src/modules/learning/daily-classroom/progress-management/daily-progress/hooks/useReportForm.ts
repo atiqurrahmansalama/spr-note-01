@@ -1046,12 +1046,15 @@ export function useReportForm() {
     const currentSections = context?.sections || defaultSections;
 
     const matchedStudent = resolveStudentFromInputs(context);
+    const queryName = studentName.trim();
 
     // Strict Check 1: Student Existence in Admissions DB
     if (!matchedStudent) {
-      showToast("No student found with this name in the selected Dept · Class · Sec.", "error");
+      showToast(`No student found with name "${queryName}" in Admissions Directory`, "error");
       return false;
     }
+
+    const displayName = matchedStudent.name_en || matchedStudent.name || matchedStudent.label || queryName;
 
     // Strict Check 2: Academic Hierarchy Matching
     const activeDeptId = context?.departmentId && String(context.departmentId) !== "ALL" ? String(context.departmentId) : null;
@@ -1059,17 +1062,38 @@ export function useReportForm() {
     const activeSecId = context?.sectionId && String(context.sectionId) !== "ALL" ? String(context.sectionId) : null;
 
     if (activeDeptId && !doesStudentMatchDepartment(matchedStudent, activeDeptId, currentDepts, currentClasses)) {
-      showToast("No student found with this name in the selected Dept · Class · Sec.", "error");
+      const activeDeptObj = currentDepts.find((d: any) => String(d.id) === activeDeptId);
+      const activeDeptName = activeDeptObj?.name || activeDeptObj?.department_name || activeDeptId;
+      const stuDeptName = matchedStudent.department_name || (typeof matchedStudent.department === 'string' ? matchedStudent.department : null);
+      if (!stuDeptName) {
+        showToast(`Student "${displayName}" has no department assigned. Selected: "${activeDeptName}".`, "error");
+      } else {
+        showToast(`Student "${displayName}" belongs to "${stuDeptName}", not "${activeDeptName}".`, "error");
+      }
       return false;
     }
 
     if (activeClassId && !doesStudentMatchClass(matchedStudent, activeClassId, currentClasses)) {
-      showToast("No student found with this name in the selected Dept · Class · Sec.", "error");
+      const activeClassObj = currentClasses.find((c: any) => String(c.id) === activeClassId);
+      const activeClassName = activeClassObj?.name || activeClassObj?.class_name || activeClassId;
+      const stuClassName = matchedStudent.student_class_name || matchedStudent.class_name || (typeof matchedStudent.student_class === 'string' ? matchedStudent.student_class : null);
+      if (!stuClassName) {
+        showToast(`Student "${displayName}" has no class assigned. Selected: "${activeClassName}".`, "error");
+      } else {
+        showToast(`Student "${displayName}" belongs to class "${stuClassName}", not "${activeClassName}".`, "error");
+      }
       return false;
     }
 
     if (activeSecId && !doesStudentMatchSection(matchedStudent, activeSecId, currentSections)) {
-      showToast("No student found with this name in the selected Dept · Class · Sec.", "error");
+      const activeSecObj = currentSections.find((s: any) => String(s.id) === activeSecId);
+      const activeSecName = activeSecObj?.section_name || activeSecObj?.name || activeSecId;
+      const stuSecName = matchedStudent.section_name || matchedStudent.student_section_name || (typeof matchedStudent.section === 'string' ? matchedStudent.section : null) || matchedStudent.sub || matchedStudent.group_name;
+      if (!stuSecName) {
+        showToast(`Student "${displayName}" has no section assigned. Selected: "${activeSecName}".`, "error");
+      } else {
+        showToast(`Student "${displayName}" belongs to section "${stuSecName}", not "${activeSecName}".`, "error");
+      }
       return false;
     }
 
@@ -1272,7 +1296,7 @@ export function useReportForm() {
       const selectedStudent = resolveStudentFromInputs(context);
       if (!selectedStudent) {
         setIsSaving(false);
-        showToast("No student found with this name in the selected Dept · Class · Sec.", "error");
+        showToast(`No student found with name "${studentName.trim()}" in Admissions Directory.`, "error");
         return;
       }
 
@@ -1502,12 +1526,30 @@ export function useReportForm() {
           roll_number: studentRollNumber,
           uniqId: studentUniqId,
           uniq_id: studentUniqId,
-          className: selectedStudent?.student_class_name || selectedStudent?.class_name,
-          student_class_name: selectedStudent?.student_class_name || selectedStudent?.class_name,
-          sectionName: selectedStudent?.student_section_name || selectedStudent?.section_name,
-          student_section_name: selectedStudent?.student_section_name || selectedStudent?.section_name,
+          className:
+            selectedStudent?.student_class_name ||
+            selectedStudent?.class_name ||
+            (context?.classes?.find((c: any) => String(c.id) === String(context.classId))?.name) ||
+            undefined,
+          student_class_name:
+            selectedStudent?.student_class_name ||
+            selectedStudent?.class_name ||
+            (context?.classes?.find((c: any) => String(c.id) === String(context.classId))?.name) ||
+            undefined,
+          sectionName:
+            selectedStudent?.student_section_name ||
+            selectedStudent?.section_name ||
+            (context?.sections?.find((s: any) => String(s.id) === String(context.sectionId))?.section_name) ||
+            groupName ||
+            undefined,
+          student_section_name:
+            selectedStudent?.student_section_name ||
+            selectedStudent?.section_name ||
+            (context?.sections?.find((s: any) => String(s.id) === String(context.sectionId))?.section_name) ||
+            groupName ||
+            undefined,
           departmentCode: selectedStudent?.department_code || selectedStudent?.dept_code,
-          groupName: groupName || "",
+          groupName: groupName || (context?.sections?.find((s: any) => String(s.id) === String(context.sectionId))?.section_name) || "",
           progress_mode: progressMode,
           mode: progressMode,
           book_title: (bookTitle || "").trim(),

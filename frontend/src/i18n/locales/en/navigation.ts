@@ -60,6 +60,7 @@ export const navigation = {
   dataBackup: 'Data Backup',
   appGuide: 'App Guide',
   shortcuts: 'Keyboard Shortcuts',
+  versionControl: 'Version & Releases',
   developerTools: 'Developer & Admin Tools',
   userManagement: 'User Management',
   roleManagement: 'Role Management',

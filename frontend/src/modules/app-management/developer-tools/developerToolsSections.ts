@@ -26,6 +26,15 @@ import { classroomConfigSectionConfig } from "../../learning/daily-classroom/com
 import { trashRestorationSectionConfig } from "../../admin/TrashRestorationView";
 import { systemEnvironmentSectionConfig } from "./SystemEnvironmentPanel";
 import { emailTemplatesSectionConfig } from "./EmailTemplatesPreviewPanel";
+import { RefreshIcon } from "../../../components/ui/Icons";
+
+export const versionControlSectionConfig: DeveloperToolsSectionItem = {
+  id: "version-control",
+  group: "System & Runtime",
+  title: "Version Control & Releases",
+  description: "Manage client deployment versions, force-updates, and structured changelogs",
+  icon: RefreshIcon,
+};
 
 /**
  * Metadata and catalog definitions for all Admin & Developer Tools sections.
@@ -57,6 +66,7 @@ export const DEVELOPER_TOOLS_SECTIONS: DeveloperToolsSectionItem[] = [
   classroomConfigSectionConfig,
 
   // Group 5: System & Platform Environment
+  versionControlSectionConfig,
   emailTemplatesSectionConfig,
   trashRestorationSectionConfig,
   systemEnvironmentSectionConfig,

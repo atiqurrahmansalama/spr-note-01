@@ -38,6 +38,7 @@ import {
   ScaleIcon,
   CalculatorIcon,
   InvoiceIcon,
+  RefreshIcon,
 } from "../ui/Icons";
 
 
@@ -298,6 +299,7 @@ export default function SidebarContainer({
         { id: "Security & Sessions", name: "Security & Sessions", i18nKey: "securitySessions", path: "/security-sessions", matchPaths: ["/security-sessions"], Icon: SettingsIcon, key: "settings_security" },
         { id: "Personalize", name: "Personalize", i18nKey: "appearanceTheme", path: "/personalize", matchPaths: ["/personalize", "/appearance", "/date-time", "/language"], Icon: AppearanceIcon, key: "settings_personalize" },
         { id: "Data & Backup", name: "Data & Backup", i18nKey: "dataBackup", path: "/data-backup", matchPaths: ["/data-backup"], Icon: CloudIcon, key: "settings_backup" },
+        { id: "Version & Releases", name: "Version & Releases", i18nKey: "versionControl", path: "/version-control", matchPaths: ["/version-control", "/releases"], Icon: RefreshIcon, key: "version_control" },
         { id: "Admin Tools", name: "Admin Tools", i18nKey: "developerTools", path: "/admin-tools", matchPaths: ["/admin-tools", "/developer-tools", "/sp-management"], Icon: SparklesIcon, key: "admin_tools", superAdminOnly: true },
       ]
     },

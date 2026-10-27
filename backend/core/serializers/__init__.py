@@ -11,3 +11,4 @@ from .attendance import *
 from .notifications import *
 from .templates import *
 from .finance import *
+from .system import *

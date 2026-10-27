@@ -120,6 +120,8 @@ from .views import (
     EmailTemplateCatalogView,
     EmailTemplateRenderView,
     EmailTemplateTestSendView,
+    AppVersionCheckView,
+    AppReleaseViewSet,
     StaffProfileViewSet,
     SystemHealthDiagnosticsView,
     EnterpriseComplianceDataExportView,
@@ -198,6 +200,7 @@ router.register(r'document-templates', DocumentTemplateViewSet, basename='docume
 router.register(r'tenant-taxonomies', TenantTaxonomySettingViewSet, basename='tenant-taxonomies')
 router.register(r'admin/invites', RoleInviteTokenViewSet, basename='admin-invites')
 router.register(r'admissions/tokens', AdmissionInviteTokenViewSet, basename='admission-tokens')
+router.register(r'system/releases', AppReleaseViewSet, basename='system-releases')
 
 # Enterprise Residential & Dormitory Management Routers
 router.register(r'academy/residential-buildings', ResidentialBuildingViewSet, basename='residential-buildings')
@@ -436,6 +439,10 @@ urlpatterns = [
     path('api/v1/system/email-templates/', EmailTemplateCatalogView.as_view(), name='email_templates_catalog'),
     path('api/v1/system/email-templates/render/', EmailTemplateRenderView.as_view(), name='email_templates_render'),
     path('api/v1/system/email-templates/send-test/', EmailTemplateTestSendView.as_view(), name='email_templates_send_test'),
+
+    # Enterprise Version Handshake & Release Gating Endpoints
+    path('api/v1/system/version/', AppVersionCheckView.as_view(), name='system_version_check'),
+    path('api/system/version/', AppVersionCheckView.as_view(), name='system_version_check_alias'),
 
     path('api/v1/', include(router.urls)),
     path('api/', include(router.urls)),
