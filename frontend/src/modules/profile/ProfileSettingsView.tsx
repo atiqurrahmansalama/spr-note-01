@@ -10,6 +10,7 @@ import {
   LogOutIcon,
   LockIcon,
   UserCheckIcon,
+  MailIcon,
 } from '../../components/ui/Icons';
 import { ConfirmModal } from '../../components/ui/Modal';
 
@@ -30,6 +31,7 @@ import {
   QRSyncDrawer,
   Setup2FADrawer,
   PasskeysDrawer,
+  ChangeEmailDrawer,
 } from './drawers';
 
 import './locales';
@@ -37,7 +39,8 @@ import './locales';
 export const ProfileSettingsView: React.FC = () => {
   const { t, formatNumber } = useTranslation('profile');
   const { isSectionEnabled } = useFeatureControl();
-  const { openDrawer, closeDrawer } = useRightSidebar();
+  const { openDrawer, closeDrawer, isRightSidebarOpen, rightSidebarConfig } = useRightSidebar();
+  const activeDrawerKey = isRightSidebarOpen ? rightSidebarConfig?.drawerKey : null;
 
   const {
     user,
@@ -96,10 +99,11 @@ export const ProfileSettingsView: React.FC = () => {
     () => ({
       title: t('drawerSessionsTitle', 'Active Sessions & Devices'),
       category: t('title', 'Profile & Account Settings'),
-      size: 'md',
+      size: 'lg',
       content: (
         <ActiveSessionsDrawer
           key="drawer-profile-sessions"
+          initialTab="sessions"
           onClose={closeDrawer}
         />
       ),
@@ -110,12 +114,13 @@ export const ProfileSettingsView: React.FC = () => {
   useDrawerRegistration(
     'profile-logs',
     () => ({
-      title: t('drawerLogsTitle', 'Security & Authentication Logs'),
+      title: t('securityDevicesHubTitle', 'Security Activity & Devices'),
       category: t('title', 'Profile & Account Settings'),
       size: 'lg',
       content: (
-        <SecurityLogsDrawer
+        <ActiveSessionsDrawer
           key="drawer-profile-logs"
+          initialTab="logs"
           onClose={closeDrawer}
         />
       ),
@@ -190,51 +195,74 @@ export const ProfileSettingsView: React.FC = () => {
     [setPasskeysCount, closeDrawer, t]
   );
 
+  useDrawerRegistration(
+    'profile-change-email',
+    () => ({
+      title: user?.email && !user?.is_email_verified
+        ? t('verifyEmailTitle', 'Verify Email Address')
+        : t('changeEmailTitle', 'Change Email Address'),
+      category: t('title', 'Profile & Account Settings'),
+      size: 'md',
+      content: (
+        <ChangeEmailDrawer
+          key={`drawer-profile-email-${user?.email}-${user?.is_email_verified}`}
+          initialMode={user?.email && !user?.is_email_verified ? 'verify' : 'change'}
+          onClose={closeDrawer}
+        />
+      ),
+    }),
+    [user?.email, user?.is_email_verified, closeDrawer, t]
+  );
+
   if (loading) {
     return (
-      <div className="w-full max-w-6xl mx-auto py-8 px-4 sm:px-6 space-y-6 font-sans animate-pulse select-none">
-        <div className="h-44 theme-bg-surface border theme-border rounded-2xl" />
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-4 h-64 theme-bg-surface border theme-border rounded-2xl" />
-          <div className="lg:col-span-8 h-96 theme-bg-surface border theme-border rounded-2xl" />
+      <div className="@container w-full max-w-6xl mx-auto py-8 px-4 sm:px-6 space-y-6 font-sans animate-pulse select-none">
+        <div className="h-10 w-64 theme-bg-surface border theme-border rounded-xl" />
+        <div className="grid grid-cols-1 @[960px]:grid-cols-12 gap-6">
+          <div className="@[960px]:col-span-5 @[1140px]:col-span-4 h-64 theme-bg-surface border theme-border rounded-2xl" />
+          <div className="@[960px]:col-span-7 @[1140px]:col-span-8 h-96 theme-bg-surface border theme-border rounded-2xl" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto py-6 sm:py-8 px-4 sm:px-6 font-sans theme-text-primary animate-fade-in select-none">
+    <div className="@container w-full max-w-6xl mx-auto px-4 sm:px-6 font-sans theme-text-primary animate-fade-in select-none h-full flex flex-col min-h-0 overflow-hidden">
       {/* Page Header */}
-      <div className="mb-6 sm:mb-8">
+      <div className="pt-2 sm:pt-4 pb-3 sm:pb-4 shrink-0">
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary">
           {t('title', 'Profile & Account Settings')}
         </h1>
       </div>
 
-      {/* Main 2-Column Responsive Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-        {/* Left Column: Hero Card & Security Scorecard */}
-        <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6">
-          <ProfileHeroCard
-            user={user}
-            onEditProfile={() => openDrawer('profile-edit')}
-            onChangeAvatar={() => openDrawer('profile-edit')}
-          />
+      {/* Main Responsive Layout: Automatically stacks to 1 column with side-by-side hero/scorecard when drawer is open (< 960px) */}
+      <div className="grid grid-cols-1 @[960px]:grid-cols-12 gap-6 @[960px]:gap-8 items-stretch flex-1 min-h-0 overflow-y-auto @[960px]:overflow-hidden no-scrollbar">
+        {/* Left Column: Hero Card & Security Scorecard (Independent Scroll on Desktop @[960px]) */}
+        <div className="@[960px]:col-span-5 @[1140px]:col-span-4 space-y-6 @[960px]:h-full @[960px]:overflow-y-auto no-scrollbar pb-6 shrink-0">
+          <div className="grid grid-cols-1 @[540px]:grid-cols-2 @[960px]:grid-cols-1 gap-4 @[960px]:gap-6">
+            <ProfileHeroCard
+              user={user}
+              onEditProfile={() => openDrawer('profile-edit')}
+              onChangeAvatar={() => openDrawer('profile-edit')}
+              onVerifyEmail={() => openDrawer('profile-change-email')}
+            />
 
-          <ProfileSecurityScoreCard
-            metric={securityMetric}
-            onOpenCheckDrawer={(drawerKey) => openDrawer(drawerKey)}
-          />
+            <ProfileSecurityScoreCard
+              metric={securityMetric}
+              onOpenCheckDrawer={(drawerKey) => openDrawer(drawerKey)}
+            />
+          </div>
         </div>
 
-        {/* Right Column: Settings Groups with Standard Theme Dividers */}
-        <div className="lg:col-span-8 space-y-6">
+        {/* Right Column: Settings Groups (Independent Scroll on Desktop @[960px]) */}
+        <div className="@[960px]:col-span-7 @[1140px]:col-span-8 space-y-6 @[960px]:h-full @[960px]:overflow-y-auto no-scrollbar pb-12 flex-1">
           {/* 1. Account Access & Security (Unified Section) */}
           <ProfileOptionGroup title={t('groupAccessSecurity', 'Account Access & Security')}>
             <ProfileOptionRow
               icon={<UserCheckIcon className="w-4 h-4 theme-accent" />}
               title={t('accountSwitcherTitle', 'Switch or Add Account')}
               subtitle={t('accountSwitcherSubtitle', 'Manage saved accounts and active session switches')}
+              isActive={activeDrawerKey === 'profile-accounts'}
               onClick={() => openDrawer('profile-accounts')}
             />
 
@@ -242,50 +270,58 @@ export const ProfileSettingsView: React.FC = () => {
               icon={<SmartphoneIcon className="w-4 h-4 theme-accent" />}
               title={t('qrSyncTitle', 'Scan QR to Login Elsewhere')}
               subtitle={t('qrSyncSubtitle', 'Instantly authorize login on another workstation or mobile device')}
+              isActive={activeDrawerKey === 'profile-qr'}
               onClick={() => openDrawer('profile-qr')}
             />
 
-            {isSectionEnabled('settings_security') && (
-              <ProfileOptionRow
-                icon={<LockIcon className="w-4 h-4 theme-accent" />}
-                title={t('twoFactorTitle', 'Two-Factor Authentication (2FA)')}
-                subtitle={t('twoFactorSubtitle', 'Safeguard sign-ins with TOTP Authenticator apps')}
-                onClick={() => openDrawer('profile-2fa')}
-              />
-            )}
-
-            {isSectionEnabled('settings_security') && (
-              <ProfileOptionRow
-                icon={<PasskeyIcon className="w-4 h-4 theme-accent" />}
-                title={t('passkeysTitle', 'Passkeys & Biometrics')}
-                subtitle={t('passkeysSubtitle', 'Passwordless authentication using Touch ID, Face ID, or Windows Hello')}
-                onClick={() => openDrawer('profile-passkeys')}
-              />
-            )}
+            <ProfileOptionRow
+              icon={<MailIcon className="w-4 h-4 theme-accent" />}
+              title={t('changeEmailTitle', 'Change Email Address')}
+              subtitle={
+                user?.email
+                  ? `${user.email} • ${user.is_email_verified ? t('statusVerified', 'Verified') : t('statusUnverified', 'Unverified')}`
+                  : t('changeEmailSubtitle', 'Update and securely verify your account email address')
+              }
+              badgeText={user?.email && !user?.is_email_verified ? t('statusUnverified', 'Unverified') : undefined}
+              badgeVariant={user?.email && !user?.is_email_verified ? 'warning' : undefined}
+              isActive={activeDrawerKey === 'profile-change-email'}
+              onClick={() => openDrawer('profile-change-email')}
+            />
           </ProfileOptionGroup>
 
-          {/* 3. Security & Device Management */}
+          {/* 2. Security & Device Management */}
           {isSectionEnabled('settings_security') && (
             <ProfileOptionGroup title={t('groupSecurityManagement', 'Security & Device Management')}>
               <ProfileOptionRow
                 icon={<LockIcon className="w-4 h-4 theme-accent" />}
                 title={t('changePasswordTitle', 'Change Password')}
                 subtitle={t('changePasswordSubtitle', 'Update your account login password credentials')}
+                isActive={activeDrawerKey === 'profile-password'}
                 onClick={() => openDrawer('profile-password')}
               />
 
               <ProfileOptionRow
-                icon={<SmartphoneIcon className="w-4 h-4 theme-accent" />}
-                title={t('activeSessionsTitle', 'Active Devices & Sessions')}
-                subtitle={t('activeSessionsSubtitle', 'Review currently active sessions and revoke unauthorized devices')}
-                onClick={() => openDrawer('profile-sessions')}
+                icon={<LockIcon className="w-4 h-4 theme-accent" />}
+                title={t('twoFactorTitle', 'Two-Factor Authentication (2FA)')}
+                subtitle={t('twoFactorSubtitle', 'Safeguard sign-ins with TOTP Authenticator apps')}
+                isActive={activeDrawerKey === 'profile-2fa'}
+                onClick={() => openDrawer('profile-2fa')}
               />
 
               <ProfileOptionRow
-                icon={<ShieldCheckIcon className="w-4 h-4 theme-accent" />}
-                title={t('securityLogsTitle', 'Security & Activity Logs')}
-                subtitle={t('securityLogsSubtitle', 'Inspect recent authentication events and security activity audits')}
-                onClick={() => openDrawer('profile-logs')}
+                icon={<PasskeyIcon className="w-4 h-4 theme-accent" />}
+                title={t('passkeysTitle', 'Passkeys & Biometrics')}
+                subtitle={t('passkeysSubtitle', 'Passwordless authentication using Touch ID, Face ID, or Windows Hello')}
+                isActive={activeDrawerKey === 'profile-passkeys'}
+                onClick={() => openDrawer('profile-passkeys')}
+              />
+
+              <ProfileOptionRow
+                icon={<SmartphoneIcon className="w-4 h-4 theme-accent" />}
+                title={t('activeDevicesAndLogsTitle', 'Active Devices & Security Logs')}
+                subtitle={t('activeDevicesAndLogsSubtitle', 'Review connected sessions, authorized devices, and security audit logs')}
+                isActive={activeDrawerKey === 'profile-sessions' || activeDrawerKey === 'profile-logs'}
+                onClick={() => openDrawer('profile-sessions')}
               />
 
               {isSectionEnabled('settings_backup') && (

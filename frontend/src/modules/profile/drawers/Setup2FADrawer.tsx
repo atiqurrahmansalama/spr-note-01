@@ -12,6 +12,7 @@ import {
   AlertCircleIcon,
   InfoIcon,
   SpinnerIcon,
+  RefreshIcon,
 } from '../../../components/ui/Icons';
 import CustomInput from '../../../components/ui/CustomInput';
 import CustomButton from '../../../components/ui/CustomButton';
@@ -46,6 +47,16 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
   const [disableMethod, setDisableMethod] = useState<'code' | 'password'>('code');
   const [disableValue, setDisableValue] = useState('');
 
+  // Backup codes regeneration & status states
+  const [remainingCodesCount, setRemainingCodesCount] = useState<number>(8);
+  const [showRegenerateForm, setShowRegenerateForm] = useState(false);
+  const [regeneratingMethod, setRegeneratingMethod] = useState<'code' | 'password'>('code');
+  const [regeneratingValue, setRegeneratingValue] = useState('');
+  const [regenerating, setRegenerating] = useState(false);
+  const [newlyRegeneratedCodes, setNewlyRegeneratedCodes] = useState<string[]>([]);
+  const [hasAcknowledgedRegen, setHasAcknowledgedRegen] = useState(false);
+
+
   const initiateSetup = useCallback(async () => {
     setLoading(true);
     try {
@@ -72,10 +83,107 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
     setHasAcknowledgedBackup(false);
     setDisableValue('');
     setTotpUri('');
+    setShowRegenerateForm(false);
+    setNewlyRegeneratedCodes([]);
+    setHasAcknowledgedRegen(false);
     if (!is2FAEnabled) {
       initiateSetup();
     }
   }, [is2FAEnabled, initiateSetup]);
+
+  const fetchBackupCodesStatus = useCallback(async () => {
+    try {
+      const res = await fetchWithAuth('/api/v1/auth/2fa/backup-codes-status/');
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.remaining_codes_count === 'number') {
+          setRemainingCodesCount(data.remaining_codes_count);
+        }
+      }
+    } catch {
+      // Retain default count
+    }
+  }, []);
+
+  useEffect(() => {
+    if (is2FAEnabled) {
+      fetchBackupCodesStatus();
+    }
+  }, [is2FAEnabled, fetchBackupCodesStatus]);
+
+  const handleRegenerateCodes = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setRegenerating(true);
+    try {
+      const payload: any = {};
+      if (regeneratingValue.trim()) {
+        if (regeneratingMethod === 'code') {
+          payload.code = regeneratingValue.trim();
+        } else {
+          payload.password = regeneratingValue.trim();
+        }
+      }
+
+      const res = await fetchWithAuth('/api/v1/auth/2fa/regenerate-backup-codes/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.backup_codes) {
+        setNewlyRegeneratedCodes(data.backup_codes);
+        setRemainingCodesCount(data.backup_codes.length);
+        setShowRegenerateForm(false);
+        setRegeneratingValue('');
+        setHasAcknowledgedRegen(false);
+        showToast(t('backupCodesRegeneratedSuccess', '8 fresh backup recovery codes generated!'), 'success');
+      } else {
+        showToast(data.error || t('backupCodesRegenerateFailed', 'Failed to generate backup codes.'), 'error');
+      }
+    } catch {
+      showToast(t('serverOffline', 'Server connection error.'), 'error');
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
+  const copyNewBackupCodes = () => {
+    navigator.clipboard.writeText(newlyRegeneratedCodes.join('\n'));
+    setHasAcknowledgedRegen(true);
+    showToast(t('backupCodesCopied', 'Backup recovery codes copied!'), 'info');
+  };
+
+  const downloadNewBackupCodes = () => {
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const content = [
+      '==================================================',
+      'SPR Note Suite — Emergency Backup Recovery Codes',
+      `Generated: ${timestamp}`,
+      '==================================================',
+      '',
+      'Keep these single-use recovery codes in a secure offline location.',
+      'Each code can be used exactly once to regain account access.',
+      '',
+      ...newlyRegeneratedCodes.map((c, i) => `[${i + 1}]  ${c}`),
+      '',
+      '==================================================',
+    ].join('\n');
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `spr-note-backup-codes-${timestamp}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setHasAcknowledgedRegen(true);
+    showToast(t('toastBackupCodesDownloaded', 'Backup codes file downloaded!'), 'success');
+  };
+
 
   const handleVerifyCode = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -89,7 +197,8 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
     try {
       const res = await fetchWithAuth('/api/v1/auth/2fa/enable/', {
         method: 'POST',
-        body: JSON.stringify({ code: cleanPin }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: cleanPin, secret: secret || undefined }),
       });
 
       if (res.ok) {
@@ -98,6 +207,12 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
         setBackupCodes(data.backup_codes || []);
         setStep(3);
         if (onStatusChanged) onStatusChanged(true);
+        const currentUser = authStore.getUser();
+        if (currentUser) {
+          currentUser.is_2fa_enabled = true;
+          authStore.saveUser(currentUser);
+        }
+        window.dispatchEvent(new CustomEvent('spr_auth_updated'));
       } else {
         const data = await res.json().catch(() => ({}));
         showToast(data.error || t('invalid2faCode', 'Invalid verification code.'), 'error');
@@ -253,7 +368,10 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
           <CustomButton
             variant="primary"
             disabled={!hasAcknowledgedBackup}
-            onClick={onClose}
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('spr_auth_updated'));
+              onClose();
+            }}
           >
             {t('done', 'Complete Setup')}
           </CustomButton>
@@ -307,24 +425,199 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
               </div>
             </div>
 
-            {/* Emergency Recovery Codes Status */}
+            {/* Emergency Recovery Codes Status & Regeneration */}
             <DrawerSection
               title={t('backupCodesHeader', 'Emergency Backup Recovery Codes')}
               icon={LockIcon}
+              headerRight={
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full theme-bg-sub border theme-border font-semibold theme-text-primary">
+                  {t('backupCodesAvailable', '{{count}} Codes Available', { count: remainingCodesCount })}
+                </span>
+              }
             >
-              <div className="p-3.5 rounded-xl theme-bg-sub/60 border theme-border text-xs theme-text-secondary space-y-2">
-                <p className="leading-relaxed">
-                  {t(
-                    'backupCodesDesc',
-                    'Store these 8 emergency recovery codes safely. Each code can be used once if you lose your authenticator device.'
-                  )}
-                </p>
-                <div className="flex items-center gap-2 pt-1">
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded theme-bg-surface border theme-border theme-text-primary font-bold">
-                    8 {t('codesIssued', 'Codes Generated')}
-                  </span>
+              {newlyRegeneratedCodes.length > 0 ? (
+                /* 1. Newly Regenerated Codes Display */
+                <div className="space-y-4 p-4 rounded-xl border theme-border theme-bg-surface animate-fade-in">
+                  <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2.5">
+                    <AlertCircleIcon className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span className="leading-relaxed font-medium">
+                      {t('newCodesNotice', 'New emergency backup recovery codes have been generated. Previous codes are now invalid.')}
+                    </span>
+                  </div>
+
+                  {/* 2-Column Code Grid */}
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono font-bold select-all">
+                    {newlyRegeneratedCodes.map((code, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-lg theme-bg-sub/80 border theme-border flex items-center justify-between text-center"
+                      >
+                        <span className="text-muted-foreground text-[10px] select-none">
+                          {idx + 1}.
+                        </span>
+                        <span className="theme-text-primary tracking-wider">{code}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Copy & Download Actions */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <CustomButton
+                      type="button"
+                      variant="sub"
+                      size="sm"
+                      onClick={copyNewBackupCodes}
+                      icon={CopyIcon}
+                      className="flex-1"
+                    >
+                      {t('copyCodes', 'Copy Codes')}
+                    </CustomButton>
+                    <CustomButton
+                      type="button"
+                      variant="sub"
+                      size="sm"
+                      onClick={downloadNewBackupCodes}
+                      icon={DownloadIcon}
+                      className="flex-1"
+                    >
+                      {t('downloadCodes', 'Download TXT')}
+                    </CustomButton>
+                  </div>
+
+                  <div className="pt-2 border-t theme-border">
+                    <CustomCheckbox
+                      id="ackRegen"
+                      checked={hasAcknowledgedRegen}
+                      onChange={setHasAcknowledgedRegen}
+                      label={t('ackBackupSaved', 'I have securely copied or downloaded my emergency recovery codes.')}
+                    />
+                  </div>
+
+                  <div className="pt-1 flex justify-end">
+                    <CustomButton
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      disabled={!hasAcknowledgedRegen}
+                      onClick={() => setNewlyRegeneratedCodes([])}
+                    >
+                      {t('hideCodesAction', 'I have saved these codes • Done')}
+                    </CustomButton>
+                  </div>
                 </div>
-              </div>
+              ) : showRegenerateForm ? (
+                /* 2. Step-up Credential Form for Regeneration */
+                <form
+                  onSubmit={handleRegenerateCodes}
+                  className="p-4 rounded-xl border theme-border theme-bg-surface space-y-3.5 animate-fade-in"
+                >
+                  <p className="text-xs theme-text-secondary leading-relaxed">
+                    {t(
+                      'optionalAuthPrompt',
+                      'Enter your account password or 6-digit authenticator code to confirm:'
+                    )}
+                  </p>
+
+                  <div className="flex items-center gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRegeneratingMethod('code');
+                        setRegeneratingValue('');
+                      }}
+                      className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
+                        regeneratingMethod === 'code'
+                          ? 'theme-bg-accent theme-accent-text'
+                          : 'theme-bg-sub theme-text-secondary hover:theme-text-primary'
+                      }`}
+                    >
+                      {t('totpCode', '6-Digit TOTP')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRegeneratingMethod('password');
+                        setRegeneratingValue('');
+                      }}
+                      className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
+                        regeneratingMethod === 'password'
+                          ? 'theme-bg-accent theme-accent-text'
+                          : 'theme-bg-sub theme-text-secondary hover:theme-text-primary'
+                      }`}
+                    >
+                      {t('password', 'Account Password')}
+                    </button>
+                  </div>
+
+                  <CustomInput
+                    type={regeneratingMethod === 'password' ? 'password' : 'text'}
+                    label={
+                      regeneratingMethod === 'code'
+                        ? t('verificationCodeLabel', '6-Digit Verification Code')
+                        : t('currentPassword', 'Account Password')
+                    }
+                    value={regeneratingValue}
+                    onChange={(val: any) =>
+                      setRegeneratingValue(typeof val === 'string' ? val : val?.target?.value || '')
+                    }
+                    placeholder={
+                      regeneratingMethod === 'code' ? '123456' : t('enterCurrentPassword', 'Enter password')
+                    }
+                    autoFocus
+                  />
+
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <CustomButton
+                      type="button"
+                      variant="sub"
+                      size="sm"
+                      onClick={() => {
+                        setShowRegenerateForm(false);
+                        setRegeneratingValue('');
+                      }}
+                      disabled={regenerating}
+                    >
+                      {t('cancel', 'Cancel')}
+                    </CustomButton>
+                    <CustomButton
+                      type="submit"
+                      variant="primary"
+                      size="sm"
+                      loading={regenerating}
+                    >
+                      {t('regenerateCodesAction', 'Generate New Codes')}
+                    </CustomButton>
+                  </div>
+                </form>
+              ) : (
+                /* 3. Default Status View with Action */
+                <div className="p-3.5 rounded-xl theme-bg-sub/60 border theme-border text-xs theme-text-secondary space-y-3">
+                  <p className="leading-relaxed">
+                    {t(
+                      'backupCodesDesc',
+                      'Store these 8 emergency recovery codes safely. Each code can be used once if you lose your authenticator device.'
+                    )}
+                  </p>
+
+                  <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded theme-bg-surface border theme-border theme-text-primary font-bold">
+                        {remainingCodesCount} {t('codesIssued', 'Codes Remaining')}
+                      </span>
+                    </div>
+
+                    <CustomButton
+                      type="button"
+                      variant="sub"
+                      size="sm"
+                      onClick={() => setShowRegenerateForm(true)}
+                      icon={RefreshIcon}
+                    >
+                      {t('regenerateBackupCodes', 'Regenerate Backup Codes')}
+                    </CustomButton>
+                  </div>
+                </div>
+              )}
             </DrawerSection>
 
             {/* Disable 2FA Section (Enterprise Guarded) */}

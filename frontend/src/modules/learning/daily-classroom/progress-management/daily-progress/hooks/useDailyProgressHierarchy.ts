@@ -366,7 +366,37 @@ export function useDailyProgressHierarchy({
 
     (academicStudents || []).forEach(appendStudent);
     (studentDatabase || []).forEach(appendStudent);
-    (studentStore.getAll() || []).forEach(appendStudent);
+
+    // Fallback or reconcile with studentStore
+    if (fullList.length === 0) {
+      (studentStore.getAll() || []).forEach(appendStudent);
+    } else {
+      const canonicalKeys = new Set(
+        fullList.map((s: any) => `${(s.name_en || s.name || s.label || '').trim().toLowerCase()}___${(s.section_name || s.sub || '').trim().toLowerCase()}`)
+      );
+      const staleLocalIdsToClean: string[] = [];
+
+      (studentStore.getAll() || []).forEach((ls: any) => {
+        if (!ls) return;
+        const lsName = (ls.name_en || ls.name || ls.label || '').trim().toLowerCase();
+        const lsGroup = (ls.section_name || ls.sub || '').trim().toLowerCase();
+        const key = `${lsName}___${lsGroup}`;
+
+        if (canonicalKeys.has(key)) {
+          // If this was an uncleaned temporary local draft, queue it for eviction
+          if (ls._local || (typeof ls.id === 'string' && ls.id.startsWith('stu_'))) {
+            staleLocalIdsToClean.push(ls.id);
+          }
+        } else {
+          // Genuinely distinct offline student
+          appendStudent(ls);
+        }
+      });
+
+      if (staleLocalIdsToClean.length > 0 && typeof studentStore.remove === 'function') {
+        staleLocalIdsToClean.forEach((id) => studentStore.remove(id));
+      }
+    }
 
     return sortStudentsByUsage(fullList);
   }, [studentDatabase, academicStudents]);

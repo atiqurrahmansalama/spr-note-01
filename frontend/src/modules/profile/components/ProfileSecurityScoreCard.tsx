@@ -31,23 +31,23 @@ export const ProfileSecurityScoreCard: React.FC<ProfileSecurityScoreCardProps> =
   return (
     <div className="theme-bg-surface border theme-border rounded-2xl p-5 shadow-xs space-y-4 select-none">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <div className="w-8 h-8 rounded-lg theme-bg-sub border theme-border flex items-center justify-center shrink-0">
             <ShieldCheckIcon className="w-4 h-4 theme-accent" />
           </div>
-          <div>
-            <h2 className="text-[11px] font-bold uppercase tracking-wider theme-text-secondary">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[11px] font-bold uppercase tracking-wider theme-text-secondary truncate">
               {t('securityHealth', 'Security & Account Health')}
             </h2>
-            <p className="text-sm font-semibold theme-text-primary mt-0.5">
+            <p className="text-sm font-semibold theme-text-primary mt-0.5 truncate">
               {metric.label}
             </p>
           </div>
         </div>
 
         <span
-          className={`text-xs px-2.5 py-1 rounded-full font-bold border inline-flex items-center gap-1 ${getLevelBadgeClass()}`}
+          className={`text-xs px-2.5 py-1 rounded-full font-bold border inline-flex items-center gap-1 shrink-0 ${getLevelBadgeClass()}`}
         >
           {formatNumber(metric.score)}%
         </span>
@@ -89,12 +89,20 @@ export const ProfileSecurityScoreCard: React.FC<ProfileSecurityScoreCardProps> =
                 {chk.passed ? (
                   <span className="inline-flex items-center gap-1 theme-accent font-medium text-[11px]">
                     <CheckIcon className="w-3.5 h-3.5" />
-                    <span>{t('badgeEnabled', 'Enabled')}</span>
+                    <span>
+                      {chk.statusType === 'verification' || chk.id === 'email'
+                        ? t('badgeVerified', 'Verified')
+                        : t('badgeEnabled', 'Enabled')}
+                    </span>
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 theme-danger font-medium text-[11px]">
                     <AlertCircleIcon className="w-3.5 h-3.5" />
-                    <span>{t('badgeDisabled', 'Disabled')}</span>
+                    <span>
+                      {chk.statusType === 'verification' || chk.id === 'email'
+                        ? t('badgeUnverified', 'Unverified')
+                        : t('badgeDisabled', 'Disabled')}
+                    </span>
                   </span>
                 )}
 

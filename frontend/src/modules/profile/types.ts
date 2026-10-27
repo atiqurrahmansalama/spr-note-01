@@ -17,6 +17,7 @@ export interface UserProfile {
   role?: string | UserRoleInfo;
   role_info?: UserRoleInfo;
   user_type?: string;
+  is_email_verified?: boolean;
   is_2fa_enabled?: boolean;
   has_google_linked?: boolean;
   google_sub_id?: string;
@@ -81,6 +82,7 @@ export interface SecurityScoreMetric {
     id: string;
     label: string;
     passed: boolean;
+    statusType?: 'enabled' | 'verification';
     recommendation?: string;
     drawerKey?: string;
   }>;
@@ -94,4 +96,6 @@ export type ProfileDrawerKey =
   | 'profile-accounts'
   | 'profile-qr'
   | 'profile-2fa'
-  | 'profile-passkeys';
+  | 'profile-passkeys'
+  | 'profile-change-email';
+

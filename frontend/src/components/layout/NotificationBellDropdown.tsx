@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BellIcon } from '../ui/Icons';
+import IconButton from '../ui/IconButton';
 import { useRightSidebar } from '@/context/RightSidebarContext';
 import {
   getUnreadNotificationSummary,
@@ -83,21 +84,20 @@ export default function NotificationBellDropdown() {
   };
 
   return (
-    <div className="relative select-none">
-      <button
-        type="button"
+    <div className="relative select-none inline-flex items-center">
+      <IconButton
+        icon={BellIcon}
+        size="sm"
+        variant="ghost"
         onClick={handleOpenNotifications}
-        className="relative p-2 rounded-xl theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition border-0 bg-transparent flex items-center justify-center cursor-pointer active:scale-95"
         title="Notifications (Click to open sidebar)"
-        aria-label="Notifications"
-      >
-        <BellIcon className="w-4 h-4" />
-        {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full theme-bg-accent theme-accent-text text-[10px] font-extrabold shadow-sm ring-2 ring-[var(--bg-surface)] animate-pulse">
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
-        )}
-      </button>
+        ariaLabel="Notifications"
+      />
+      {unreadCount > 0 && (
+        <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full theme-bg-accent theme-accent-text text-[10px] font-extrabold shadow-sm ring-2 ring-[var(--bg-surface)] animate-pulse pointer-events-none">
+          {unreadCount > 9 ? '9+' : unreadCount}
+        </span>
+      )}
     </div>
   );
 }

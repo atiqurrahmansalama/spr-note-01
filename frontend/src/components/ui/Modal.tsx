@@ -116,7 +116,9 @@ export const Modal: React.FC<ModalProps> = ({
         {/* Header */}
         {(title || Icon || showCloseButton || headerActions) && (
           <div
-            className={`flex items-center justify-between px-5 sm:px-6 py-4 border-b theme-border theme-bg-sub shrink-0 ${headerClassName}`}
+            className={`flex items-center justify-between px-5 sm:px-6 py-4 ${
+              children ? 'border-b' : ''
+            } theme-border theme-bg-sub shrink-0 ${headerClassName}`}
           >
             <div className="flex items-center gap-3 min-w-0 pr-2">
               {Icon && (
@@ -159,10 +161,12 @@ export const Modal: React.FC<ModalProps> = ({
           </div>
         )}
 
-        {/* Body */}
-        <div className={`flex-1 overflow-y-auto ${currentPaddingClass} ${bodyClassName}`}>
-          {children}
-        </div>
+        {/* Body (Only rendered when content exists to eliminate empty gap) */}
+        {children ? (
+          <div className={`flex-1 overflow-y-auto ${currentPaddingClass} ${bodyClassName}`}>
+            {children}
+          </div>
+        ) : null}
 
         {/* Footer */}
         {footer && (
@@ -255,9 +259,19 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   className = '',
 }) => {
   const handleClose = onClose || onCancel || (() => {});
-  const effectiveSubtitle = subtitle || (typeof message === 'string' ? message : undefined);
+  const effectiveSubtitle = subtitle;
+  const effectiveBodyMessage = message;
   const effectiveVariant = (variant || confirmVariant) as 'primary' | 'secondary' | 'sub' | 'surface' | 'outline' | 'soft' | 'danger' | 'danger-solid' | 'success' | 'success-solid' | 'warning' | 'ghost';
   const effectiveLoading = confirmLoading || isLoading;
+
+  const hasBodyContent = Boolean(
+    callout ||
+    (summaryItems && summaryItems.length > 0) ||
+    consequences ||
+    children ||
+    note ||
+    effectiveBodyMessage
+  );
 
   const calloutStyles: Record<string, { border: string; bg: string; text: string; icon: string }> = {
     info: { border: 'theme-border-info', bg: 'theme-bg-info-soft', text: 'theme-text-primary', icon: 'theme-text-info' },
@@ -308,31 +322,39 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       footer={footerActions}
       className={className}
     >
-      <div className="space-y-4 text-xs">
-        {/* Callout Box */}
-        {callout && activeCalloutStyle && (
-          <div
-            className={`flex items-start gap-3 p-3.5 rounded-2xl border ${activeCalloutStyle.border} ${activeCalloutStyle.bg}`}
-          >
-            {callout.icon ? (
-              <callout.icon className={`w-5 h-5 ${activeCalloutStyle.icon} shrink-0 mt-0.5`} />
-            ) : (
-              <AlertCircleIcon className={`w-5 h-5 ${activeCalloutStyle.icon} shrink-0 mt-0.5`} />
-            )}
-            <div className="space-y-1 min-w-0 flex-1">
-              {callout.title && (
-                <p className="font-bold theme-text-primary text-xs">
-                  {callout.title}
-                </p>
-              )}
-              {callout.message && (
-                <div className="text-[11px] theme-text-secondary leading-relaxed">
-                  {callout.message}
-                </div>
-              )}
+      {hasBodyContent ? (
+        <div className="space-y-4 text-xs">
+          {/* Primary Message / Explanation Text */}
+          {effectiveBodyMessage && (
+            <div className="text-xs sm:text-sm theme-text-secondary leading-relaxed">
+              {effectiveBodyMessage}
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Callout Box */}
+          {callout && activeCalloutStyle && (
+            <div
+              className={`flex items-start gap-3 p-3.5 rounded-2xl border ${activeCalloutStyle.border} ${activeCalloutStyle.bg}`}
+            >
+              {callout.icon ? (
+                <callout.icon className={`w-5 h-5 ${activeCalloutStyle.icon} shrink-0 mt-0.5`} />
+              ) : (
+                <AlertCircleIcon className={`w-5 h-5 ${activeCalloutStyle.icon} shrink-0 mt-0.5`} />
+              )}
+              <div className="space-y-1 min-w-0 flex-1">
+                {callout.title && (
+                  <p className="font-bold theme-text-primary text-xs">
+                    {callout.title}
+                  </p>
+                )}
+                {callout.message && (
+                  <div className="text-[11px] theme-text-secondary leading-relaxed">
+                    {callout.message}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
         {/* Dynamic Summary Cards Grid */}
         {summaryItems && summaryItems.length > 0 && (
@@ -420,6 +442,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           </p>
         )}
       </div>
+    ) : null}
     </Modal>
   );
 };

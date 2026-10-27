@@ -57,7 +57,7 @@ export default function DrawerContainer({
 
       {/* Optional Bottom Action Footer Slot */}
       {footer && (
-        <div className="w-full shrink-0 pt-4 border-t theme-border">
+        <div className="w-full shrink-0">
           {footer}
         </div>
       )}
@@ -193,12 +193,12 @@ export function DrawerSection({
             collapsible ? "cursor-pointer select-none group" : ""
           }`}
         >
-          <div className="flex items-center gap-2 min-w-0">
-            {Icon && <Icon className="w-4 h-4 theme-accent shrink-0" />}
-            <div className="min-w-0">
+          <div className="flex items-start gap-2 min-w-0 flex-1">
+            {Icon && <Icon className="w-4 h-4 theme-accent shrink-0 mt-0.5" />}
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 {title && (
-                  <h3 className={`text-xs font-bold uppercase tracking-wider theme-text-primary truncate ${
+                  <h3 className={`text-xs font-bold uppercase tracking-wider theme-text-primary ${
                     collapsible ? "group-hover:theme-accent transition-colors" : ""
                   }`}>
                     {title}
@@ -211,7 +211,7 @@ export function DrawerSection({
                 )}
               </div>
               {subtitle && (
-                <p className="text-[11px] theme-text-secondary font-normal truncate mt-0.5">
+                <p className="text-[11px] theme-text-secondary font-normal mt-0.5 leading-relaxed break-words">
                   {subtitle}
                 </p>
               )}

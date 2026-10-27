@@ -3,6 +3,7 @@ import {
   AppearanceIcon, 
   SunIcon, 
   MoonIcon, 
+  SystemModeIcon,
   FontIcon, 
   CheckIcon, 
   RefreshIcon 
@@ -82,52 +83,40 @@ export default function AppearanceSettings({
       {/* 2. Theme Mode & Palette Presets Card */}
       <div className="w-full theme-bg-surface border theme-border rounded-2xl p-4 @sm:p-5 shadow-xl space-y-5">
         
-        {/* Light / Dark Mode Switcher */}
+        {/* Light / Dark / System Mode Switcher */}
         <div className="space-y-3">
           <div className="pb-1">
             <h3 className="text-xs font-bold theme-text-primary">Interface Theme Mode</h3>
-            <p className="text-[10px] theme-text-secondary">Switch between dark mode and crisp light mode</p>
+            <p className="text-[10px] theme-text-secondary">Switch between crisp light mode, sleek dark mode, or automatic OS system sync</p>
           </div>
 
-          <div className="flex items-center justify-between theme-bg-sub border theme-border p-3.5 rounded-2xl">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl theme-bg-elevated theme-accent">
-                {modeId === "dark" ? <MoonIcon className="w-4 h-4" /> : <SunIcon className="w-4 h-4" />}
-              </div>
-              <div>
-                <div className="text-xs font-bold theme-text-primary">
-                  {modeId === "dark" ? "Dark Mode" : "Light Mode"}
-                </div>
-                <div className="text-[10px] theme-text-secondary">
-                  {modeId === "dark" ? "Sleek dark interface active" : "Crisp bright interface active"}
-                </div>
-              </div>
-            </div>
-
-            {/* Premium Dual-Icon Toggle Switch */}
-            <button
-              type="button"
-              onClick={() => setModeId(modeId === "dark" ? "light" : "dark")}
-              className="relative w-20 h-10 theme-bg-elevated border theme-border rounded-full p-1 transition-all duration-300 cursor-pointer flex items-center justify-between shadow-inner shrink-0"
-              title={`Switch to ${modeId === "dark" ? "Light Mode" : "Dark Mode"}`}
-            >
-              {/* Animated Sliding Pill */}
-              <div
-                className={`absolute top-1 bottom-1 w-8 rounded-full theme-bg-accent transition-transform duration-300 ease-in-out shadow-md ${
-                  modeId === "dark" ? "translate-x-10" : "translate-x-0"
-                }`}
-              />
-
-              {/* Sun Icon (Light side) */}
-              <div className={`relative z-10 w-8 h-8 flex items-center justify-center transition-colors duration-300 ${modeId === "light" ? "theme-accent-text" : "theme-text-secondary opacity-60"}`}>
-                <SunIcon className="w-4 h-4" />
-              </div>
-
-              {/* Moon Icon (Dark side) */}
-              <div className={`relative z-10 w-8 h-8 flex items-center justify-center transition-colors duration-300 ${modeId === "dark" ? "theme-accent-text" : "theme-text-secondary opacity-60"}`}>
-                <MoonIcon className="w-4 h-4 translate-x-[0.5px]" />
-              </div>
-            </button>
+          <div className="grid grid-cols-3 gap-2 theme-bg-sub border theme-border p-1.5 rounded-2xl">
+            {[
+              { id: 'light', label: 'Light', icon: SunIcon, desc: 'Crisp bright' },
+              { id: 'dark', label: 'Dark', icon: MoonIcon, desc: 'Sleek dark' },
+              { id: 'system', label: 'System', icon: SystemModeIcon, desc: 'Auto OS sync' },
+            ].map((m) => {
+              const isSelected = modeId === m.id;
+              const IconComp = m.icon;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setModeId(m.id)}
+                  className={`py-2 px-2.5 rounded-xl text-center transition-all duration-200 cursor-pointer flex flex-col items-center justify-center gap-1 select-none active:scale-95 ${
+                    isSelected
+                      ? 'theme-bg-surface border theme-border theme-text-primary shadow-xs font-bold'
+                      : 'border border-transparent theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated font-medium'
+                  }`}
+                  title={`${m.label} Mode`}
+                >
+                  <div className={`p-1.5 rounded-lg ${isSelected ? 'theme-bg-accent-soft theme-accent' : 'opacity-70'}`}>
+                    <IconComp className="w-4 h-4" />
+                  </div>
+                  <span className="text-xs">{m.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 

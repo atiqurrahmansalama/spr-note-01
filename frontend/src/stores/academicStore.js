@@ -46,6 +46,22 @@ export const students = {
     return list;
   },
 
+  /** Remove student by ID, uniq_id, or predicate function. */
+  remove: (idOrPredicate) => {
+    const list = students.getAll();
+    const updated = list.filter((s) => {
+      if (typeof idOrPredicate === "function") return !idOrPredicate(s);
+      const targetStr = String(idOrPredicate).trim().toLowerCase();
+      const sId = s.id != null ? String(s.id).trim().toLowerCase() : "";
+      const sUniq = s.uniq_id != null ? String(s.uniq_id).trim().toLowerCase() : "";
+      return sId !== targetStr && sUniq !== targetStr;
+    });
+    writeJSON(KEYS.STUDENTS, updated);
+    return updated;
+  },
+
+  delete: (idOrPredicate) => students.remove(idOrPredicate),
+
   /** Update student by label (replace mode). */
   replace: (oldLabel, newStudent) => {
     const list = students.getAll();

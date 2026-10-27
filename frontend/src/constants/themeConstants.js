@@ -50,8 +50,9 @@ export const THEME_PALETTES = [
 ];
 
 export const THEME_MODES = [
-  { id: "dark", name: "Dark Mode", label: "Recommended for low light" },
   { id: "light", name: "Light Mode", label: "Clean bright interface" },
+  { id: "dark", name: "Dark Mode", label: "Recommended for low light" },
+  { id: "system", name: "System Mode", label: "Syncs with OS preferences" },
 ];
 
 export const BRAND_COLORS = {

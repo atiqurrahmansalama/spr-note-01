@@ -74,8 +74,19 @@ export function useProfileSettings() {
 
   // Compute Enterprise Security Health Metric
   const securityMetric = useMemo<SecurityScoreMetric>(() => {
-    let score = 40; // Base verified account score
-    const checks = [
+    const isEmailVerified = Boolean(user?.is_email_verified);
+    let score = 20; // Base active session score
+    if (isEmailVerified) score += 20;
+
+    const checks: SecurityScoreMetric['checks'] = [
+      {
+        id: 'email',
+        label: t('emailVerificationCheckTitle', 'Email & Identity Verification'),
+        passed: isEmailVerified,
+        statusType: 'verification',
+        recommendation: isEmailVerified ? undefined : t('securityRecEmail', 'Verify your email address to secure identity recovery.'),
+        drawerKey: 'profile-change-email',
+      },
       {
         id: 'pwd',
         label: t('securityCheckPassword', 'Strong Credential Protection'),
@@ -126,7 +137,7 @@ export function useProfileSettings() {
     }
 
     return { score, level, label, summary, checks };
-  }, [is2FAEnabled, passkeysCount, t]);
+  }, [user?.is_email_verified, is2FAEnabled, passkeysCount, t]);
 
   const handleExportData = useCallback(() => {
     setConfirmDialog({

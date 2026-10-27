@@ -1254,11 +1254,13 @@ class EmailTemplateCatalogView(APIView):
             'default_subject': 'Verify Your Email Address - SPR Note Suite',
             'fields': [
                 {'key': 'user_name', 'label': 'User Full Name', 'default': 'Atiqur Rahman', 'type': 'text'},
+                {'key': 'verification_code', 'label': '6-Digit Verification Code', 'default': '842915', 'type': 'text'},
                 {'key': 'verification_url', 'label': 'Verification URL', 'default': 'http://localhost:5173/verify-email/sample-verification-token-12345', 'type': 'url'},
                 {'key': 'institution_name', 'label': 'Institution Name', 'default': 'SPR NOTE SUITE', 'type': 'text'},
             ],
             'sample_context': {
                 'user_name': 'Atiqur Rahman',
+                'verification_code': '842915',
                 'verification_url': 'http://localhost:5173/verify-email/sample-verification-token-12345',
                 'institution_name': 'SPR NOTE SUITE',
             }

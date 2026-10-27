@@ -2,9 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useToast } from '../../../context/ToastContext';
 import { fetchWithAuth } from '../../../utils/authService';
 import { auth as authStore } from '../../../utils/localStore';
-import { CameraIcon, LockIcon } from '../../../components/ui/Icons';
+import {
+  CameraIcon,
+  LockIcon,
+  UserCheckIcon,
+  MailIcon,
+  CheckIcon,
+  AlertCircleIcon,
+} from '../../../components/ui/Icons';
+import { useRightSidebar } from '../../../context/RightSidebarContext';
 import CustomInput from '../../../components/ui/CustomInput';
-import { DrawerContainer, DrawerFooter } from '../../../components/layout';
+import { DrawerContainer, DrawerFooter, DrawerSection } from '../../../components/layout';
 import { compressImageFile } from '../../../utils/imageCompressor';
 import { useTranslation } from '../../../i18n';
 import type { UserProfile } from '../types';
@@ -22,6 +30,7 @@ export const EditProfileDrawer: React.FC<EditProfileDrawerProps> = ({
 }) => {
   const { showToast } = useToast();
   const { t } = useTranslation('profile');
+  const { openDrawer } = useRightSidebar();
 
   const [formData, setFormData] = useState({
     name: user?.name || `${user?.first_name || ''} ${user?.last_name || ''}`.trim(),
@@ -172,16 +181,27 @@ export const EditProfileDrawer: React.FC<EditProfileDrawerProps> = ({
   };
 
   return (
-    <DrawerContainer padding="none" spacing="normal">
+    <DrawerContainer
+      padding="none"
+      spacing="normal"
+      footer={
+        <DrawerFooter
+          onCancel={onClose}
+          onSubmit={handleSubmit}
+          saveLabel={t('saveChanges', 'Save Changes')}
+          cancelLabel={t('cancel', 'Cancel')}
+          isSubmitting={saving}
+        />
+      }
+    >
       <form onSubmit={handleSubmit} className="@container space-y-6 pt-2 pb-6 px-1">
         {/* Section 1: Visual Identity & Photo */}
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider theme-text-secondary pb-1 border-b theme-border">
-            {t('profilePhoto', 'Profile Photo & Identity')}
-          </h3>
-
+        <DrawerSection
+          title={t('profilePhoto', 'Profile Photo & Identity')}
+          icon={CameraIcon}
+        >
           <div className="flex items-center gap-4 p-4 rounded-xl theme-bg-sub/50 border theme-border">
-            <div className="relative w-16 h-16 rounded-full border-2 theme-border overflow-hidden theme-bg-surface flex items-center justify-center shrink-0">
+            <div className="relative w-16 h-16 rounded-full border-2 theme-border overflow-hidden theme-bg-surface flex items-center justify-center shrink-0 shadow-xs">
               {formData.avatar_url ? (
                 <img src={formData.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
@@ -195,7 +215,7 @@ export const EditProfileDrawer: React.FC<EditProfileDrawerProps> = ({
               <p className="text-xs theme-text-secondary">
                 {t('avatarGuidelines', 'Square PNG, JPG, or WebP (max 2MB).')}
               </p>
-              <label className="inline-flex items-center gap-1.5 text-xs theme-accent hover:underline cursor-pointer pt-1">
+              <label className="inline-flex items-center gap-1.5 text-xs theme-accent hover:underline cursor-pointer pt-1 font-semibold">
                 <CameraIcon className="w-3.5 h-3.5" />
                 <span>{t('uploadNewPhoto', 'Upload photo')}</span>
                 <input
@@ -207,15 +227,14 @@ export const EditProfileDrawer: React.FC<EditProfileDrawerProps> = ({
               </label>
             </div>
           </div>
-        </div>
+        </DrawerSection>
 
-        {/* Section 2: Personal Names (Paired @[480px]:grid-cols-2) */}
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider theme-text-secondary pb-1 border-b theme-border">
-            {t('personalInformation', 'Personal Information')}
-          </h3>
-
-          <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-4">
+        {/* Section 2: Personal Names (Paired side-by-side in 1 row across all screen sizes) */}
+        <DrawerSection
+          title={t('personalInformation', 'Personal Information')}
+          icon={UserCheckIcon}
+        >
+          <div className="grid grid-cols-2 gap-2.5 @[360px]:gap-3.5">
             <CustomInput
               label={t('firstName', 'First Name')}
               value={formData.first_name}
@@ -229,52 +248,88 @@ export const EditProfileDrawer: React.FC<EditProfileDrawerProps> = ({
               placeholder={t('lastNamePlaceholder', 'Enter last name')}
             />
           </div>
-        </div>
+        </DrawerSection>
 
         {/* Section 3: Contact & Identifiers */}
-        <div className="space-y-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wider theme-text-secondary pb-1 border-b theme-border">
-            {t('contactCredentials', 'Contact & Credentials')}
-          </h3>
+        <DrawerSection
+          title={t('contactCredentials', 'Contact & Credentials')}
+          icon={LockIcon}
+        >
+          <div className="space-y-3.5">
+            {/* Email Credential Card with Status and Change Action */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold theme-text-secondary flex items-center gap-1.5">
+                  <MailIcon className="w-3.5 h-3.5 theme-accent" />
+                  <span>{t('emailAddress', 'Email Address')}</span>
+                </label>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 ${
+                    user?.is_email_verified
+                      ? 'theme-bg-accent-soft theme-accent'
+                      : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                  }`}
+                >
+                  {user?.is_email_verified ? (
+                    <>
+                      <CheckIcon className="w-2.5 h-2.5" />
+                      <span>{t('statusVerified', 'Verified')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircleIcon className="w-2.5 h-2.5" />
+                      <span>{t('statusUnverified', 'Unverified')}</span>
+                    </>
+                  )}
+                </span>
+              </div>
 
-          <CustomInput
-            type="email"
-            label={t('emailAddress', 'Email Address')}
-            value={formData.email}
-            onChange={(e: any) =>
-              setFormData((prev) => ({
-                ...prev,
-                email: typeof e === 'string' ? e : e.target.value,
-              }))
-            }
-            placeholder={t('emailPlaceholder', 'your.email@institution.org')}
-          />
-
-          {/* Institutional Identifier (Locked) */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-semibold theme-text-secondary flex items-center gap-1">
-                <LockIcon className="w-3 h-3" />
-                <span>{t('phoneNumberOrUsername', 'Phone Number / Identifier')}</span>
-              </label>
-              <span className="text-[11px] theme-text-secondary">
-                {t('identifierLocked', 'Institutional ID (Read-only)')}
-              </span>
+              <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl border theme-border theme-bg-sub/60">
+                <span className="text-xs font-mono font-medium theme-text-primary truncate px-1">
+                  {user?.email || formData.email || t('noneProvided', 'None')}
+                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {user?.email && !user?.is_email_verified && (
+                    <button
+                      type="button"
+                      onClick={() => openDrawer('profile-change-email')}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition cursor-pointer"
+                    >
+                      {t('verifyNow', 'Verify Now')}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => openDrawer('profile-change-email')}
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold theme-bg-elevated border theme-border theme-text-primary hover:theme-accent transition cursor-pointer"
+                  >
+                    {t('changeEmail', 'Change Email')}
+                  </button>
+                </div>
+              </div>
+              <p className="text-[11px] theme-text-secondary leading-relaxed">
+                {t('emailChangeNotice', 'Email address updates require OTP code verification to protect account access.')}
+              </p>
             </div>
-            <div className="w-full px-3.5 py-2.5 rounded-xl border theme-border theme-bg-sub/60 theme-text-secondary text-sm font-mono cursor-not-allowed select-text">
-              {formData.phone_number || t('noneProvided', 'None')}
+
+            {/* Institutional Identifier (Locked) */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold theme-text-secondary flex items-center gap-1">
+                  <LockIcon className="w-3 h-3" />
+                  <span>{t('phoneNumberOrUsername', 'Phone Number / Identifier')}</span>
+                </label>
+                <span className="text-[11px] theme-text-secondary">
+                  {t('identifierLocked', 'Institutional ID (Read-only)')}
+                </span>
+              </div>
+              <div className="w-full px-3.5 py-2.5 rounded-xl border theme-border theme-bg-sub/60 theme-text-secondary text-sm font-mono cursor-not-allowed select-text">
+                {formData.phone_number || t('noneProvided', 'None')}
+              </div>
             </div>
           </div>
-        </div>
+        </DrawerSection>
       </form>
-
-      <DrawerFooter
-        onCancel={onClose}
-        onSubmit={handleSubmit}
-        saveLabel={t('saveChanges', 'Save Changes')}
-        cancelLabel={t('cancel', 'Cancel')}
-        isSubmitting={saving}
-      />
     </DrawerContainer>
   );
 };

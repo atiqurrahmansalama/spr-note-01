@@ -199,7 +199,11 @@ export const QRSyncDrawer: React.FC<QRSyncDrawerProps> = ({ onClose }) => {
   });
 
   return (
-    <DrawerContainer padding="none" spacing="normal">
+    <DrawerContainer
+      padding="none"
+      spacing="normal"
+      footer={<DrawerFooter onCancel={onClose} cancelLabel={t('close', 'Close')} />}
+    >
       <div className="@container space-y-4 pt-2 pb-6 px-1">
         {/* Reused Enterprise Drawer Section without Subtitle */}
         <DrawerSection
@@ -302,8 +306,6 @@ export const QRSyncDrawer: React.FC<QRSyncDrawerProps> = ({ onClose }) => {
           )}
         </DrawerSection>
       </div>
-
-      <DrawerFooter onCancel={onClose} cancelLabel={t('close', 'Close')} />
     </DrawerContainer>
   );
 };

@@ -100,7 +100,19 @@ export const ChangePasswordDrawer: React.FC<ChangePasswordDrawerProps> = ({ onCl
   };
 
   return (
-    <DrawerContainer padding="none" spacing="normal">
+    <DrawerContainer
+      padding="none"
+      spacing="normal"
+      footer={
+        <DrawerFooter
+          onCancel={onClose}
+          onSubmit={handleSubmit}
+          saveLabel={t('changePasswordTitle', 'Change Password')}
+          cancelLabel={t('cancel', 'Cancel')}
+          isSubmitting={saving}
+        />
+      }
+    >
       <form onSubmit={handleSubmit} className="@container space-y-5 pt-2 pb-6 px-1">
         <DrawerSection
           title={t('drawerPasswordTitle', 'Update Account Password')}
@@ -185,14 +197,6 @@ export const ChangePasswordDrawer: React.FC<ChangePasswordDrawerProps> = ({ onCl
           />
         </DrawerSection>
       </form>
-
-      <DrawerFooter
-        onCancel={onClose}
-        onSubmit={handleSubmit}
-        saveLabel={t('changePasswordTitle', 'Change Password')}
-        cancelLabel={t('cancel', 'Cancel')}
-        isSubmitting={saving}
-      />
     </DrawerContainer>
   );
 };

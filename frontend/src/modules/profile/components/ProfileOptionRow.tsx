@@ -11,6 +11,7 @@ interface ProfileOptionRowProps {
   badgeStyle?: string;
   onClick?: () => void;
   isDanger?: boolean;
+  isActive?: boolean;
 }
 
 export const ProfileOptionRow: React.FC<ProfileOptionRowProps> = ({
@@ -22,6 +23,7 @@ export const ProfileOptionRow: React.FC<ProfileOptionRowProps> = ({
   badgeStyle,
   onClick,
   isDanger = false,
+  isActive = false,
 }) => {
   const { isRTL } = useTranslation('profile');
 
@@ -55,22 +57,28 @@ export const ProfileOptionRow: React.FC<ProfileOptionRowProps> = ({
         }
       }}
       className={`px-5 py-4 flex items-center justify-between transition-colors cursor-pointer group select-none border-b theme-border last:border-b-0 ${
-        isDanger ? 'hover:theme-bg-danger-soft' : 'hover:theme-bg-sub/60'
+        isDanger
+          ? 'hover:theme-bg-danger-soft'
+          : isActive
+          ? 'theme-bg-accent-soft/70 hover:theme-bg-accent-soft/90'
+          : 'hover:theme-bg-sub/60'
       }`}
     >
       {/* Left Side: Icon Badge + Text Stack */}
-      <div className="flex items-center min-w-0 pr-3 rtl:pr-0 rtl:pl-3">
+      <div className="flex items-center min-w-0 pr-3 rtl:pr-0 rtl:pl-3 flex-1">
         <div
           className={`p-2.5 rounded-xl border flex items-center justify-center mr-3.5 rtl:mr-0 rtl:ml-3.5 w-10 h-10 shrink-0 transition-colors ${
             isDanger
               ? 'theme-bg-danger-soft theme-danger border theme-border-danger'
+              : isActive
+              ? 'theme-bg-accent-soft theme-accent border-[var(--accent-main)]/40 shadow-xs'
               : 'theme-bg-sub theme-accent border theme-border group-hover:border-[var(--border-hover)]'
           }`}
         >
           {icon}
         </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h3
             className={`text-sm font-semibold transition-colors ${
               isDanger ? 'theme-danger' : 'theme-text-primary'

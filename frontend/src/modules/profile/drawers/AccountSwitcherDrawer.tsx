@@ -2,8 +2,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import { multiAccount, auth as authStore } from '../../../utils/localStore';
-import { CheckIcon, TrashIcon, PlusIcon, UserCheckIcon } from '../../../components/ui/Icons';
+import { fetchWithAuth } from '../../../utils/authService';
+import {
+  CheckIcon,
+  TrashIcon,
+  PlusIcon,
+  UserCheckIcon,
+  GoogleIcon,
+  ShieldCheckIcon,
+} from '../../../components/ui/Icons';
 import { DrawerContainer, DrawerFooter, DrawerSection } from '../../../components/layout';
+import { ConfirmModal } from '../../../components/ui/Modal';
+import ActionMenu from '../../../components/ui/ActionMenu';
 import { useTranslation } from '../../../i18n';
 import type { UserProfile } from '../types';
 
@@ -84,22 +94,104 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
     navigate(`/login?action=add_account&returnTo=${encodeURIComponent(currentPath)}`);
   };
 
+  const [linkingGoogle, setLinkingGoogle] = useState(false);
+  const [unlinkingGoogle, setUnlinkingGoogle] = useState(false);
+  const [showUnlinkGoogleConfirm, setShowUnlinkGoogleConfirm] = useState(false);
+
+  const isGoogleLinked = Boolean(
+    activeUser?.has_google_linked || activeUser?.google_sub_id || activeUser?.auth_provider === 'google'
+  );
+
+  const handleLinkGoogle = async () => {
+    setLinkingGoogle(true);
+    try {
+      const res = await fetchWithAuth('/api/v1/auth/google/link/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          google_sub_id: activeUser?.email || `google_${activeUser?.id || 'linked'}`,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        showToast(t('googleAccountLinkedSuccess', 'Google account linked successfully!'), 'success');
+        if (activeUser) {
+          const updatedUser: UserProfile = {
+            ...activeUser,
+            has_google_linked: true,
+            google_sub_id: data.google_sub_id || 'linked',
+          };
+          setActiveUser(updatedUser);
+          authStore.saveUser(updatedUser);
+        }
+        window.dispatchEvent(new CustomEvent('spr_auth_updated'));
+      } else {
+        showToast(data.error || 'Failed to link Google account.', 'error');
+      }
+    } catch {
+      showToast(t('serverOffline', 'Server connection error.'), 'error');
+    } finally {
+      setLinkingGoogle(false);
+    }
+  };
+
+  const [unlinkPassword, setUnlinkPassword] = useState('');
+
+  const handleUnlinkGoogle = async () => {
+    if (!unlinkPassword.trim()) {
+      showToast(t('passwordRequiredToDisconnect', 'Password is required to disconnect Google account.'), 'warning');
+      return;
+    }
+    setUnlinkingGoogle(true);
+    try {
+      const res = await fetchWithAuth('/api/v1/auth/google/unlink/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: unlinkPassword.trim() }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        showToast(t('googleAccountUnlinkedSuccess', 'Google account disconnected successfully!'), 'info');
+        if (activeUser) {
+          const updatedUser: UserProfile = {
+            ...activeUser,
+            has_google_linked: false,
+            google_sub_id: undefined,
+          };
+          setActiveUser(updatedUser);
+          authStore.saveUser(updatedUser);
+        }
+        window.dispatchEvent(new CustomEvent('spr_auth_updated'));
+        setShowUnlinkGoogleConfirm(false);
+        setUnlinkPassword('');
+      } else {
+        showToast(data.error || 'Cannot disconnect Google account.', 'error');
+      }
+    } catch {
+      showToast(t('serverOffline', 'Server connection error.'), 'error');
+    } finally {
+      setUnlinkingGoogle(false);
+    }
+  };
+
+
   return (
-    <DrawerContainer padding="none" spacing="normal">
+    <DrawerContainer
+      padding="none"
+      spacing="normal"
+      footer={<DrawerFooter onCancel={onClose} cancelLabel={t('close', 'Close')} />}
+    >
       <div className="@container space-y-4 pt-2 pb-6 px-1">
         <DrawerSection
           title={t('savedAccounts', 'Saved Accounts')}
           subtitle={t('drawerAccountsSubtitle', 'Switch between multiple saved institutional profiles.')}
           icon={UserCheckIcon}
-          headerRight={
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full theme-bg-sub theme-text-secondary border theme-border">
-              {accounts.length} {accounts.length === 1 ? t('account', 'Account') : t('accounts', 'Accounts')}
-            </span>
-          }
           className="pt-0 first:pt-0"
         >
           {/* Saved Accounts List */}
-          <div className="border theme-border rounded-xl overflow-hidden theme-bg-surface divide-y divide-[var(--border-color)]">
+          <div className="border theme-border rounded-xl overflow-hidden theme-bg-surface">
             {accounts.map((acc, idx) => {
               const accUser = acc.user || {};
               const activeId = activeUser?.phone_number || activeUser?.email || activeUser?.id;
@@ -175,9 +267,146 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
             <span>{t('addAnotherAccount', 'Add Another Account')}</span>
           </button>
         </DrawerSection>
+
+        {/* Section 2: Connected Social & Single Sign-On (SSO) */}
+        <DrawerSection
+          title={t('socialAccountsSection', 'Connected Social & Single Sign-On (SSO)')}
+          subtitle={t(
+            'socialAccountsDesc',
+            'Manage third-party identities and single sign-on providers linked to this account.'
+          )}
+          icon={ShieldCheckIcon}
+        >
+          <div className="space-y-3">
+            {/* Google Workspace Account Card */}
+            <div className="p-3.5 sm:p-4 rounded-xl border theme-border theme-bg-surface shadow-2xs flex items-center justify-between gap-3 transition-colors hover:border-[var(--accent-main)]/30">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-10 h-10 rounded-xl border theme-border theme-bg-sub flex items-center justify-center shrink-0 shadow-2xs">
+                  <GoogleIcon className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold theme-text-primary truncate">
+                      {t('googleAccountTitle', 'Google Workspace / Gmail')}
+                    </span>
+                    {isGoogleLinked && (
+                      <span
+                        className="w-4 h-4 rounded-full theme-bg-accent text-white inline-flex items-center justify-center shadow-xs shrink-0"
+                        title={t('badgeConnected', 'Connected')}
+                        aria-label={t('badgeConnected', 'Connected')}
+                      >
+                        <CheckIcon className="w-2.5 h-2.5 stroke-[2.5]" />
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs theme-text-secondary mt-0.5 leading-relaxed truncate">
+                    {isGoogleLinked
+                      ? activeUser?.email ||
+                        t(
+                          'googleConnectedDesc',
+                          'Linked for one-click SSO sign-in with your Google account.'
+                        )
+                      : t(
+                          'googleDisconnectedDesc',
+                          'Connect your Google account for seamless one-click authentication.'
+                        )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="shrink-0 flex items-center">
+                {isGoogleLinked ? (
+                  <ActionMenu
+                    items={[
+                      {
+                        label: t('disconnectGoogle', 'Disconnect Google Account'),
+                        icon: TrashIcon,
+                        variant: 'danger',
+                        onClick: () => setShowUnlinkGoogleConfirm(true),
+                      },
+                    ]}
+                    size="sm"
+                    align="right"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleLinkGoogle}
+                    disabled={linkingGoogle}
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-semibold theme-bg-elevated border theme-border theme-text-primary hover:theme-accent hover:border-[var(--accent-main)]/30 transition-colors cursor-pointer active:scale-95 flex items-center justify-center gap-1.5"
+                  >
+                    {linkingGoogle ? t('loading', 'Loading...') : t('connectGoogle', 'Connect Google')}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Institutional SSO / SAML Provider Card */}
+            <div className="p-3.5 sm:p-4 rounded-xl border theme-border theme-bg-sub/30 shadow-2xs flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-10 h-10 rounded-xl border theme-border theme-bg-surface flex items-center justify-center shrink-0 shadow-2xs">
+                  <ShieldCheckIcon className="w-5 h-5 theme-accent" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-sm font-semibold theme-text-primary truncate block">
+                    {t('institutionalSsoTitle', 'Institutional Identity Provider (SAML / OIDC)')}
+                  </span>
+                  <p className="text-xs theme-text-secondary mt-0.5 leading-relaxed truncate">
+                    {t(
+                      'institutionalSsoDesc',
+                      'Campus domain SSO is enabled for enterprise single sign-on.'
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="shrink-0 flex items-center">
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 shrink-0 whitespace-nowrap shadow-2xs">
+                  {t('badgeReady', 'Enterprise Ready')}
+                </span>
+              </div>
+            </div>
+          </div>
+        </DrawerSection>
       </div>
 
-      <DrawerFooter onCancel={onClose} cancelLabel={t('close', 'Close')} />
+      <ConfirmModal
+        isOpen={showUnlinkGoogleConfirm}
+        onClose={() => {
+          setShowUnlinkGoogleConfirm(false);
+          setUnlinkPassword('');
+        }}
+        onConfirm={handleUnlinkGoogle}
+        title={t('confirmDisconnectGoogleTitle', 'Disconnect Google Account?')}
+        message={t(
+          'confirmDisconnectGoogleDesc',
+          'Are you sure you want to disconnect this Google account? Enter your account password to confirm.'
+        )}
+        confirmText={t('disconnectGoogle', 'Disconnect')}
+        confirmVariant="danger"
+        confirmLoading={unlinkingGoogle}
+        confirmDisabled={!unlinkPassword.trim() || unlinkingGoogle}
+      >
+        <div className="mt-4 pt-3 border-t theme-border space-y-2 text-left">
+          <label className="block text-xs font-semibold theme-text-secondary">
+            {t('accountPasswordLabel', 'Account Password')} <span className="theme-danger">*</span>
+          </label>
+          <input
+            type="password"
+            value={unlinkPassword}
+            onChange={(e) => setUnlinkPassword(e.target.value)}
+            placeholder={t('enterPasswordToConfirm', 'Enter your account password to confirm')}
+            className="w-full px-3 py-2 rounded-xl border theme-border theme-bg-sub/50 theme-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-main)]"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && unlinkPassword.trim()) {
+                e.preventDefault();
+                handleUnlinkGoogle();
+              }
+            }}
+          />
+        </div>
+      </ConfirmModal>
     </DrawerContainer>
   );
 };

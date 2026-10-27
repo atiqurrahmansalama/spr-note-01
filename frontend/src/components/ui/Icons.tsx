@@ -272,6 +272,16 @@ return (
   );
 }
 
+export function SystemModeIcon({ className = "w-4 h-4", ...props }: IconProps) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" {...props}>
+      <rect x="2" y="3" width="20" height="14" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="8" y1="21" x2="16" y2="21" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="12" y1="17" x2="12" y2="21" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function SearchIcon({ className = "w-4 h-4", ...props }: IconProps) {
 return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" {...props}>

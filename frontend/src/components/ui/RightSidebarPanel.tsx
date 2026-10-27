@@ -172,15 +172,14 @@ export default function RightSidebarPanel({
         <div className="flex items-center gap-2 @sm:gap-2.5 min-w-0 flex-1">
           {/* Back Button (Rendered only when multi-step onBack navigation is present) */}
           {onBack && (
-            <button
-              type="button"
+            <IconButton
+              icon={ChevronLeftIcon}
+              size="sm"
+              variant="ghost"
               onClick={onBack}
-              className="p-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border theme-text-secondary hover:theme-text-primary transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-95 shadow-xs group"
               title="Back to parent page"
-              aria-label="Back to parent page"
-            >
-              <ChevronLeftIcon className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
-            </button>
+              ariaLabel="Back to parent page"
+            />
           )}
 
           {Icon && (
@@ -221,7 +220,7 @@ export default function RightSidebarPanel({
               onClick={onClose}
               ariaLabel="Close Panel"
               title="Close Panel (Esc)"
-              className="hover:!text-rose-500 hover:!border-rose-500/30 hover:!bg-rose-500/10"
+              className="hover:!text-rose-400 dark:hover:!text-rose-400/90 hover:!border-rose-400/20 hover:!bg-rose-500/[0.08] active:!bg-rose-500/[0.14]"
             />
           )}
         </div>

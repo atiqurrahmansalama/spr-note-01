@@ -12,9 +12,13 @@ import {
   LaptopIcon,
   DesktopIcon,
   TabletIcon,
+  EyeIcon,
+  CopyIcon,
+  KeyIcon,
+  CloseIcon,
 } from '../../../components/ui/Icons';
+import ActionMenu from '../../../components/ui/ActionMenu';
 import CustomButton from '../../../components/ui/CustomButton';
-import CollapsibleCard from '../../../components/ui/CollapsibleCard';
 import EmptyState from '../../../components/ui/EmptyState';
 import { DrawerContainer, DrawerFooter, DrawerSection } from '../../../components/layout';
 import { useTranslation } from '../../../i18n';
@@ -36,7 +40,7 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const [deletingId, setDeletingId] = useState<number | string | null>(null);
-  const [expandedKeyId, setExpandedKeyId] = useState<number | string | null>(null);
+  const [viewingPasskey, setViewingPasskey] = useState<PasskeyItem | null>(null);
 
   // Intelligent local platform detection
   const currentDeviceKeyword = useMemo(() => {
@@ -80,6 +84,22 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
         hour: '2-digit',
         minute: '2-digit',
         hour12: true,
+      });
+    } catch {
+      return fallbackDisplay || isoDate;
+    }
+  };
+
+  // Localized date only formatting for compact display on small containers
+  const formatDateOnly = (isoDate?: string, fallbackDisplay?: string) => {
+    if (!isoDate) return fallbackDisplay || 'Active';
+    try {
+      const d = new Date(isoDate);
+      if (isNaN(d.getTime())) return fallbackDisplay || isoDate;
+      return d.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
       });
     } catch {
       return fallbackDisplay || isoDate;
@@ -202,7 +222,11 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
   };
 
   return (
-    <DrawerContainer padding="none" spacing="normal">
+    <DrawerContainer
+      padding="none"
+      spacing="normal"
+      footer={<DrawerFooter onCancel={onClose} cancelLabel={t('close', 'Close')} />}
+    >
       <div className="@container space-y-4 pt-2 pb-6 px-1">
         <DrawerSection
           title={t('drawerPasskeysTitle', 'Manage Passkeys & Biometrics')}
@@ -255,28 +279,23 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Context Banner: Explaining One Passkey Per Physical Device */}
-              <div className="p-3.5 rounded-xl theme-bg-sub/50 border theme-border flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0 mt-0.5">
-                  <PasskeyIcon className="w-4 h-4" />
-                </div>
-                <div className="text-xs space-y-1">
-                  <p className="font-semibold theme-text-primary">
-                    {t('passkeyHelpTitle', 'One Passkey Per Device')}
-                  </p>
-                  <p className="theme-text-secondary leading-relaxed">
-                    {t(
-                      'passkeyHelpDesc',
-                      'Each device (your phone, laptop, or work PC) holds its own hardware security key. Once registered on this device, you can sign in with a single touch without typing a password.'
-                    )}
-                  </p>
-                </div>
+              {/* Context Explanation: Clean without side margins */}
+              <div className="text-xs space-y-1">
+                <p className="font-semibold theme-text-primary">
+                  {t('passkeyHelpTitle', 'One Passkey Per Device')}
+                </p>
+                <p className="theme-text-secondary leading-relaxed">
+                  {t(
+                    'passkeyHelpDesc',
+                    'Each device (your phone, laptop, or work PC) holds its own hardware security key. Once registered on this device, you can sign in with a single touch without typing a password.'
+                  )}
+                </p>
               </div>
 
               {/* Current Device Status & Action Handling */}
               {isCurrentDeviceRegistered ? (
-                <div className="p-3 sm:p-3.5 rounded-xl theme-bg-sub/60 border theme-border flex flex-col @[340px]:flex-row @[340px]:items-center justify-between gap-2.5 @[340px]:gap-3 shadow-2xs">
-                  <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-3 sm:p-3.5 rounded-xl theme-bg-sub/60 border theme-border flex items-center justify-between gap-2.5 shadow-2xs">
+                  <div className="flex items-center gap-2 min-w-0">
                     <CheckCircleIcon className="w-4 h-4 theme-accent shrink-0" />
                     <span className="text-xs font-semibold theme-text-primary truncate">
                       {t('deviceAlreadySecured', 'This Device is Secured')}
@@ -286,7 +305,7 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
                     type="button"
                     onClick={handleRegisterPasskey}
                     disabled={registering}
-                    className="text-xs font-semibold theme-accent hover:underline shrink-0 cursor-pointer transition-colors text-left @[340px]:text-right"
+                    className="text-xs font-semibold theme-accent hover:underline shrink-0 cursor-pointer transition-colors whitespace-nowrap text-right"
                   >
                     {t('reRegisterDevice', 'Re-register Device')}
                   </button>
@@ -304,89 +323,149 @@ export const PasskeysDrawer: React.FC<PasskeysDrawerProps> = ({
                 </CustomButton>
               )}
 
-              {/* Enriched Passkeys List using Reusable CollapsibleCard */}
-              <div className="space-y-3">
+              {/* Enriched Passkeys List */}
+              <div className="space-y-2.5">
                 {passkeys.map((pk) => {
                   const displayName = pk.device_name || pk.name || t('securityKey', 'Security Passkey');
                   const isThisDevice = `${pk.device_name || ''} ${pk.name || ''}`
                     .toLowerCase()
                     .includes(currentDeviceKeyword.toLowerCase());
                   const formattedDateTime = formatDateTime(pk.created_at, pk.created_at_display);
+                  const formattedDateOnly = formatDateOnly(pk.created_at, pk.created_at_display);
                   const DeviceIcon = getDeviceIcon(pk);
 
+                  const menuActions = [
+                    {
+                      label: t('viewCredentialId', 'View Credential Hash'),
+                      icon: EyeIcon,
+                      onClick: () => setViewingPasskey(viewingPasskey?.id === pk.id ? null : pk),
+                    },
+                    {
+                      label: t('copyCredentialId', 'Copy Credential Hash'),
+                      icon: CopyIcon,
+                      onClick: () => {
+                        const keyText = pk.full_credential_id || pk.credential_id || '';
+                        navigator.clipboard.writeText(keyText);
+                        showToast(t('credentialCopied', 'Credential ID copied to clipboard'), 'info');
+                      },
+                    },
+                    {
+                      label: t('deletePasskey', 'Delete Passkey'),
+                      icon: TrashIcon,
+                      variant: 'danger' as const,
+                      disabled: deletingId === pk.id,
+                      onClick: () => handleDeletePasskey(pk.id),
+                    },
+                  ];
+
                   return (
-                    <CollapsibleCard
+                    <div
                       key={pk.id}
-                      icon={DeviceIcon}
-                      className="border theme-border theme-bg-surface rounded-xl overflow-hidden shadow-2xs"
-                      headerClassName="p-3 sm:p-3.5"
-                      title={
-                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                          <span className="text-xs @[360px]:text-sm font-semibold theme-text-primary truncate max-w-[170px] @[360px]:max-w-[220px] @[440px]:max-w-none">
-                            {displayName}
-                          </span>
-                          {isThisDevice && (
-                            <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 shrink-0">
-                              {t('currentDeviceBadge', 'This Device')}
-                            </span>
-                          )}
-                        </div>
-                      }
-                      subtitle={
-                        <div className="flex items-center gap-1.5 flex-wrap text-[11px] theme-text-secondary mt-0.5">
-                          <span>
-                            {t('registeredOn', 'Added')}: {formattedDateTime}
-                          </span>
-                          <span className="opacity-50">&bull;</span>
-                          <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                            {t('biometricProtected', 'Biometric Protected')}
-                          </span>
-                        </div>
-                      }
-                      headerRight={
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeletePasskey(pk.id);
-                          }}
-                          disabled={deletingId === pk.id}
-                          className="p-1.5 rounded-lg theme-text-secondary hover:theme-danger hover:theme-bg-danger-soft transition-colors cursor-pointer shrink-0"
-                          title={t('deletePasskey', 'Delete passkey')}
-                        >
-                          <TrashIcon className="w-4 h-4" />
-                        </button>
-                      }
-                      bodyClassName="p-3 pt-3 theme-bg-sub/30 space-y-2 text-xs"
+                      className="p-3 sm:p-3.5 rounded-xl border theme-border theme-bg-surface flex items-center justify-between gap-3 shadow-2xs hover:border-[var(--accent-main)]/30 transition-colors"
                     >
-                      <div className="flex items-center justify-between text-[11px] font-semibold theme-text-secondary">
-                        <span>{t('credentialHash', 'Credential ID Hash')}:</span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const keyText = pk.full_credential_id || pk.credential_id || '';
-                            navigator.clipboard.writeText(keyText);
-                            showToast('Credential ID copied to clipboard', 'info');
-                          }}
-                          className="theme-accent hover:underline cursor-pointer text-[11px] font-medium"
-                        >
-                          Copy ID
-                        </button>
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-9 h-9 rounded-lg theme-bg-sub flex items-center justify-center shrink-0">
+                          <DeviceIcon className="w-4 h-4 theme-text-secondary" />
+                        </div>
+                        <div className="min-w-0 flex-1 space-y-0.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs sm:text-sm font-semibold theme-text-primary truncate max-w-[150px] @[360px]:max-w-[200px] @[440px]:max-w-none">
+                              {displayName}
+                            </span>
+                            {isThisDevice && (
+                              <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 shrink-0">
+                                {t('currentDeviceBadge', 'This Device')}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10.5px] sm:text-[11px] theme-text-secondary flex-wrap @[420px]:flex-nowrap min-w-0">
+                            <span className="shrink-0 hidden @[420px]:inline">{formattedDateTime}</span>
+                            <span className="shrink-0 @[420px]:hidden">{formattedDateOnly}</span>
+                            <span className="opacity-50 shrink-0">&bull;</span>
+                            <span className="font-medium text-emerald-600 dark:text-emerald-400 shrink-0 whitespace-nowrap">
+                              {t('biometricProtected', 'Biometric Hardware Key')}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <p className="theme-text-primary break-all select-all font-mono text-[10px] theme-bg-surface p-2.5 rounded-lg border theme-border leading-relaxed">
-                        {pk.full_credential_id || pk.credential_id}
-                      </p>
-                    </CollapsibleCard>
+
+                      <div className="shrink-0 flex items-center">
+                        <ActionMenu
+                          actions={menuActions}
+                          size="sm"
+                          align="right"
+                        />
+                      </div>
+                    </div>
                   );
                 })}
               </div>
+
+              {/* Inline Credential Hash Inspector (Opened directly below inside the drawer instead of in a modal) */}
+              {viewingPasskey && (
+                <div className="p-4 rounded-xl border theme-border theme-bg-surface shadow-xs space-y-3 animate-fade-in mt-3">
+                  <div className="flex items-center justify-between pb-2 border-b theme-border">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0">
+                        <KeyIcon className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold theme-text-primary truncate">
+                          {viewingPasskey.device_name || viewingPasskey.name || t('securityKey', 'Security Passkey')}
+                        </h4>
+                        <span className="text-[10px] theme-text-secondary block">
+                          {t('credentialHash', 'Credential ID Hash')}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setViewingPasskey(null)}
+                      className="p-1 rounded-md theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition-colors cursor-pointer"
+                      title={t('close', 'Close')}
+                    >
+                      <CloseIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <p className="text-xs theme-text-secondary leading-relaxed">
+                    {t(
+                      'credentialHashDesc',
+                      'Cryptographic hardware credential identifier registered for this device token.'
+                    )}
+                  </p>
+
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      const keyText = viewingPasskey.full_credential_id || viewingPasskey.credential_id || '';
+                      navigator.clipboard.writeText(keyText);
+                      showToast(t('credentialCopied', 'Credential ID copied to clipboard'), 'info');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        const keyText = viewingPasskey.full_credential_id || viewingPasskey.credential_id || '';
+                        navigator.clipboard.writeText(keyText);
+                        showToast(t('credentialCopied', 'Credential ID copied to clipboard'), 'info');
+                      }
+                    }}
+                    title={t('clickToCopy', 'Click to copy credential hash')}
+                    className="group relative cursor-pointer theme-text-primary break-all select-all font-mono text-xs theme-bg-sub/70 hover:theme-bg-sub p-3 pr-9 rounded-xl border theme-border hover:border-[var(--accent-main)]/50 transition-colors leading-relaxed shadow-2xs"
+                  >
+                    <span>{viewingPasskey.full_credential_id || viewingPasskey.credential_id}</span>
+                    <span className="absolute top-2.5 right-2.5 p-1 rounded-md theme-bg-surface/80 opacity-60 group-hover:opacity-100 transition-opacity">
+                      <CopyIcon className="w-3.5 h-3.5 theme-accent" />
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </DrawerSection>
       </div>
-
-      <DrawerFooter onCancel={onClose} cancelLabel={t('close', 'Close')} />
     </DrawerContainer>
   );
 };
