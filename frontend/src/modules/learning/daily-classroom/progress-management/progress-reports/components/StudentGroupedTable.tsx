@@ -193,7 +193,8 @@ export default function StudentGroupedTable({
         />
       )}
 
-      {/* Main Hierarchical Parent Table */}
+      {/* Main Hierarchical Parent Table (Horizontal scroll with preserved standard columns) */}
+      <div className="w-full overflow-x-auto scrollbar-thin">
       <DataTable
         columns={columns}
         data={paginatedStudents}
@@ -270,6 +271,7 @@ export default function StudentGroupedTable({
         )}
         transparent={false}
       />
+      </div>
 
       {totalItems > 0 && (
         <Pagination

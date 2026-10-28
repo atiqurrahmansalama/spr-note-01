@@ -158,10 +158,7 @@ export default function RecordReportsCardGrid({
         <TableBatchToolbar
           totalItems={totalItems}
           selectedCount={selectedIds.size}
-          isAllExpanded={isAllCurrentSelected}
-          onToggleExpandAll={handleToggleSelectAll}
-          expandAllLabel={t("selectAll", "Select All Visible")}
-          collapseAllLabel={t("deselectAll", "Deselect All Visible")}
+          showExpandAll={false}
           showingLabel={`Showing ${paginatedReports.length} of ${totalItems} reports`}
           showSelectedBadge={true}
           selectedBadgeLabel="selected"

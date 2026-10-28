@@ -467,7 +467,7 @@ export default function StudentGroupedCardGrid({
                                 portions.map((jp, pIdx) => {
                                   const rangesStr = Array.isArray(jp.ranges)
                                     ? jp.ranges
-                                        .map((r) => `p. ${r.start || r.page_start || 0}–${r.end || r.page_end || 0}`)
+                                        .map((r) => `Page ${r.start || r.page_start || 0}–${r.end || r.page_end || 0}`)
                                         .join(", ")
                                     : "";
                                   const hasJuz = jp.juz !== undefined && jp.juz !== null && String(jp.juz).trim() !== "";
@@ -532,7 +532,7 @@ export default function StudentGroupedCardGrid({
                   onClick={() => handleToggleStudentExpand(stu.student_key)}
                   className="theme-accent hover:underline font-semibold cursor-pointer text-[10px]"
                 >
-                  {isExpanded ? "Collapse" : "Expand"}
+                  {isExpanded ? "Less More" : "See More"}
                 </button>
               </div>
             </div>

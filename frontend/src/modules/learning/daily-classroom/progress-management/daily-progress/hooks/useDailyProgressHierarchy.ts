@@ -683,16 +683,22 @@ export function useDailyProgressHierarchy({
       lastSelectedStudentNameRef.current = "";
       return;
     }
-    const trimmed = studentName.trim();
-    if (trimmed === lastSelectedStudentNameRef.current) return;
+    const trimmed = studentName.trim().toLowerCase();
+    if (trimmed === lastSelectedStudentNameRef.current.toLowerCase()) return;
 
-    const match = (allStudentDatabase || []).find((s: any) => {
-      if (selectedStudentId && String(s.id) === String(selectedStudentId)) return true;
+    // First priority: find student by EXACT name to prevent mismatching ID from a previous record
+    let match = (allStudentDatabase || []).find((s: any) => {
       const sName = (s.name_en || s.name || s.label || s.bangla_name || "").trim().toLowerCase();
-      return sName === trimmed.toLowerCase();
+      return sName === trimmed;
     });
 
+    // Second priority: if not found by name, try matching by ID only if name is generic/empty or matches roll/id
+    if (!match && selectedStudentId) {
+      match = (allStudentDatabase || []).find((s: any) => String(s.id) === String(selectedStudentId));
+    }
+
     if (match) {
+      lastSelectedStudentNameRef.current = (match.name_en || match.name || match.label || studentName).trim();
       handleStudentSelect(match);
     }
   }, [studentName, selectedStudentId, allStudentDatabase]);

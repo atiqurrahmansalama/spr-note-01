@@ -146,8 +146,9 @@ export default function RecordReportsTable({
         />
       )}
 
-      {/* Main Single-Pass DataTable */}
-      <DataTable
+      {/* Main Single-Pass DataTable (Horizontal scroll with preserved standard columns) */}
+      <div className="w-full overflow-x-auto scrollbar-thin">
+        <DataTable
         columns={columns}
         data={paginatedReports}
         sortable={true}
@@ -214,6 +215,7 @@ export default function RecordReportsTable({
         }}
         transparent={false}
       />
+      </div>
 
       {totalItems > 0 && (
         <Pagination

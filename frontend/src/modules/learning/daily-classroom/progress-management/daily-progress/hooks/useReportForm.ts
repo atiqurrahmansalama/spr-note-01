@@ -505,8 +505,20 @@ export function useReportForm() {
       rep.created_at
     );
 
+    // Authoritative Student Resolution: Never let a stale or mismatched student ID override the real student name
+    let resolvedStudentId = sId != null ? String(sId) : null;
+    if (sName && sName.trim()) {
+      const matchByName = (defaultAcademicStudents || []).find((s: any) => {
+        const candidate = (s.name_en || s.name || s.label || s.bangla_name || "").trim().toLowerCase();
+        return candidate === sName.trim().toLowerCase();
+      });
+      if (matchByName?.id) {
+        resolvedStudentId = String(matchByName.id);
+      }
+    }
+
     setStudentName(sName);
-    setSelectedStudentId(sId != null ? String(sId) : null);
+    setSelectedStudentId(resolvedStudentId);
     setGroupName(gName);
     setSelectedSession(sSession);
     if (rDate) setSelectedDate(rDate);

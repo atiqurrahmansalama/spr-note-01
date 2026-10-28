@@ -119,12 +119,12 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       <div
         onClick={onClick}
         title={title}
-        className={`theme-bg-surface border theme-border rounded-2xl p-4 sm:p-4.5 shadow-2xs space-y-3 transition-all duration-200 hover:border-[var(--border-hover)] select-none min-w-0 ${
+        className={`theme-bg-surface border theme-border rounded-2xl p-3 sm:p-4.5 space-y-2 sm:space-y-3 transition-all duration-200 hover:border-[var(--border-hover)] select-none min-w-0 ${
           onClick ? 'cursor-pointer hover:theme-bg-sub/30 active:scale-[0.99]' : ''
         } ${className}`}
       >
         {/* 1. Header: Label + Info Indicator / Icon */}
-        <div className="flex items-center justify-between text-[11px] font-bold tracking-wider uppercase theme-text-secondary">
+        <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-bold tracking-wider uppercase theme-text-secondary">
           <span className={`truncate ${labelClassName}`}>{label}</span>
           {Icon ? (
             <Icon className={`w-3.5 h-3.5 theme-text-secondary opacity-50 shrink-0 ml-1 ${iconClassName}`} />
@@ -316,11 +316,11 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({
 }) => {
   if (!items || items.length === 0) return null;
 
-  let gridColsClass = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 @sm:grid-cols-2 @2xl:grid-cols-4';
+  let gridColsClass = 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 @sm:grid-cols-2 @2xl:grid-cols-4';
   if (cols === 1) gridColsClass = 'grid-cols-1';
-  else if (cols === 2) gridColsClass = 'grid-cols-1 sm:grid-cols-2 @sm:grid-cols-2';
-  else if (cols === 3) gridColsClass = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 @sm:grid-cols-2 @xl:grid-cols-3';
-  else if (cols === 4) gridColsClass = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 @sm:grid-cols-2 @2xl:grid-cols-4';
+  else if (cols === 2) gridColsClass = 'grid-cols-2 sm:grid-cols-2 @sm:grid-cols-2';
+  else if (cols === 3) gridColsClass = 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 @sm:grid-cols-2 @xl:grid-cols-3';
+  else if (cols === 4) gridColsClass = 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 @sm:grid-cols-2 @2xl:grid-cols-4';
   else if (cols === 5) gridColsClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 @sm:grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-5';
   else if (cols === 6) gridColsClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 @sm:grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-6';
   else if (items.length === 6) gridColsClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 @sm:grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-6';

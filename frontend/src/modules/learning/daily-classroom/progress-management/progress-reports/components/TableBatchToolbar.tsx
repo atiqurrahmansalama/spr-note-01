@@ -4,10 +4,11 @@ import { ChevronIcon } from "@/components/ui/Icons";
 export interface TableBatchToolbarProps {
   totalItems: number;
   selectedCount?: number;
-  isAllExpanded: boolean;
-  onToggleExpandAll: () => void;
-  expandAllLabel: string;
-  collapseAllLabel: string;
+  isAllExpanded?: boolean;
+  onToggleExpandAll?: () => void;
+  expandAllLabel?: string;
+  collapseAllLabel?: string;
+  showExpandAll?: boolean;
   showingLabel?: string;
   selectedBadgeLabel?: string;
   showSelectedBadge?: boolean;
@@ -21,10 +22,11 @@ export interface TableBatchToolbarProps {
 export function TableBatchToolbar({
   totalItems,
   selectedCount = 0,
-  isAllExpanded,
+  isAllExpanded = false,
   onToggleExpandAll,
-  expandAllLabel,
-  collapseAllLabel,
+  expandAllLabel = "Expand All",
+  collapseAllLabel = "Collapse All",
+  showExpandAll = true,
   showingLabel,
   selectedBadgeLabel = "selected",
   showSelectedBadge = false,
@@ -41,7 +43,7 @@ export function TableBatchToolbar({
       </div>
 
       <div className="flex items-center gap-2.5">
-        {totalItems > 0 && (
+        {showExpandAll && onToggleExpandAll && totalItems > 0 && (
           <button
             type="button"
             onClick={onToggleExpandAll}
