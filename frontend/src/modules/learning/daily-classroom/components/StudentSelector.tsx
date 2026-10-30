@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import AutocompleteDropdown, { type AutocompleteOption } from "@/components/ui/AutocompleteDropdown";
 import { students as studentStore } from "@/utils/localStore";
 import { useAcademicData } from "@/hooks/useAcademicData";
+import { useFeatureControl } from "@/context/FeatureControlContext";
 
 export interface StudentProfileOption {
   id?: string | number;
@@ -77,6 +78,8 @@ export default function StudentSelector({
   inputRef,
 }: StudentSelectorProps) {
   const { students: academicStudents } = useAcademicData();
+  const { isFeatureEnabled } = useFeatureControl();
+  const canAddStudent = isFeatureEnabled('progress_action_add_student');
 
   // 1. Resolve effective student dataset with academic + local fallback and canonical deduplication
   const effectiveStudents = useMemo(() => {
@@ -398,7 +401,7 @@ export default function StudentSelector({
         onQueryChange={(val) => onStudentSelect && onStudentSelect(val)}
         placeholder={placeholder}
         label={label}
-        actionLabel={actionLabel}
+        actionLabel={canAddStudent ? actionLabel : null}
         actionTo={actionTo !== undefined ? actionTo : defaultGetActionUrl}
         actionTitle={actionTitle}
         size={size}

@@ -1,12 +1,14 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { ReportItem, StudentGroupedItem } from "../types";
 import { calendarSettings } from "@/utils/localStore";
-import { getTodayInTimezone } from "@/constants/calendarConstants";
+import { getTodayInTimezone, getClassroomEffectiveTimezone } from "@/constants/calendarConstants";
 
 export interface UseProgressReportsFiltersOptions {
   reportsList: ReportItem[];
   filterProps?: any;
   academicData?: any;
+  canViewAllTeachers?: boolean;
+  currentUser?: any;
   showToast?: (msg: string, type?: "info" | "success" | "warning" | "error") => void;
 }
 
@@ -14,6 +16,8 @@ export function useProgressReportsFilters({
   reportsList,
   filterProps = null,
   academicData = {},
+  canViewAllTeachers = true,
+  currentUser = null,
   showToast,
 }: UseProgressReportsFiltersOptions) {
   // Local academic fallback state when filterProps is not supplied
@@ -61,7 +65,20 @@ export function useProgressReportsFilters({
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [selectedGroupFilter, setSelectedGroupFilter] = useState("ALL");
   const [selectedSessionFilter, setSelectedSessionFilter] = useState("ALL");
-  const [selectedTeacherFilter, setSelectedTeacherFilter] = useState("ALL");
+  const currentTeacherId = currentUser?.id ? String(currentUser.id) : "";
+  const [selectedTeacherFilter, setSelectedTeacherFilter] = useState(() => {
+    if (!canViewAllTeachers && currentTeacherId) {
+      return currentTeacherId;
+    }
+    return "ALL";
+  });
+
+  // Keep teacher locked if canViewAllTeachers is disabled
+  useEffect(() => {
+    if (!canViewAllTeachers && currentTeacherId && selectedTeacherFilter !== currentTeacherId) {
+      setSelectedTeacherFilter(currentTeacherId);
+    }
+  }, [canViewAllTeachers, currentTeacherId, selectedTeacherFilter]);
 
   // Date Range state
   const [startDate, setStartDate] = useState("");
@@ -76,7 +93,7 @@ export function useProgressReportsFilters({
 
   // Date Boundaries Calculation (Timezone-Aware standard)
   const { minEarliestDate, todayMaxDate } = useMemo(() => {
-    const today = getTodayInTimezone(calendarSettings.getTimezone());
+    const today = getTodayInTimezone(getClassroomEffectiveTimezone());
     if (reportsList.length === 0) {
       return { minEarliestDate: today, todayMaxDate: today };
     }
@@ -156,8 +173,19 @@ export function useProgressReportsFilters({
         return false;
       }
 
-      // Teacher Filter
-      if (selectedTeacherFilter && selectedTeacherFilter !== "ALL") {
+      // Teacher Filter & Multi-Teacher Access Control
+      if (!canViewAllTeachers && currentUser) {
+        const uId = String(currentUser.id || "");
+        const uName = String(currentUser.name || currentUser.full_name || currentUser.user_name || "").toLowerCase();
+        const repTeacherId = String(rep.teacher_id || (typeof rep.teacher === "object" ? rep.teacher?.id : rep.teacher) || "");
+        const repTeacherName = String(rep.teacher_name || (typeof rep.teacher === "object" ? rep.teacher?.name : "") || "").toLowerCase();
+
+        const matchesUser = (uId && repTeacherId === uId) ||
+                            (uName && (repTeacherName === uName || repTeacherName.includes(uName)));
+        if (!matchesUser) {
+          return false;
+        }
+      } else if (selectedTeacherFilter && selectedTeacherFilter !== "ALL") {
         const repTeacherId = String(rep.teacher_id || (typeof rep.teacher === "object" ? rep.teacher?.id : rep.teacher) || "");
         const repTeacherName = String(rep.teacher_name || (typeof rep.teacher === "object" ? rep.teacher?.name : "") || "").toLowerCase();
         const target = String(selectedTeacherFilter).toLowerCase();
@@ -182,6 +210,8 @@ export function useProgressReportsFilters({
     selectedDeptFilter,
     selectedClsFilter,
     selectedSecFilter,
+    canViewAllTeachers,
+    currentUser,
   ]);
 
   // Grouped by Student calculation for STUDENT_VIEW
@@ -282,7 +312,7 @@ export function useProgressReportsFilters({
     setSelectedStudentId(null);
     setSelectedGroupFilter("ALL");
     setSelectedSessionFilter("ALL");
-    setSelectedTeacherFilter("ALL");
+    setSelectedTeacherFilter(!canViewAllTeachers && currentTeacherId ? currentTeacherId : "ALL");
     setStartDate("");
     setEndDate("");
     setInternalDeptId("");
@@ -294,7 +324,7 @@ export function useProgressReportsFilters({
     if (showToast) {
       showToast("All filters reset successfully", "info");
     }
-  }, [filterProps, showToast]);
+  }, [filterProps, showToast, canViewAllTeachers, currentTeacherId]);
 
   return {
     effectiveFilterProps,

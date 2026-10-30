@@ -23,10 +23,11 @@ import {
   ShieldCheckIcon,
 } from "../../components/ui/Icons";
 import { AuthActionResult } from "./types";
+import apiClient from "../../api/axios";
 import "./locales"; // Ensure auth locales are registered
 
 export default function LoginView(): React.JSX.Element {
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, saveTokens } = useAuth();
   const { showToast } = useToast();
   const { modeId, setModeId } = useTheme();
   const { t, language, setLanguage, isRTL } = useTranslation("auth");
@@ -42,6 +43,55 @@ export default function LoginView(): React.JSX.Element {
   const [authErrorBanner, setAuthErrorBanner] = useState<string | null>(null);
 
   const isGoogleConfigured = Boolean((import.meta as any).env?.VITE_GOOGLE_CLIENT_ID);
+
+  // Cross-Device QR Sign-In Claim Handler
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const qrTicket = searchParams.get("qr_ticket");
+    if (!qrTicket) return;
+
+    let isCancelled = false;
+    const claimQrTicket = async () => {
+      setLoading(true);
+      setAuthErrorBanner(null);
+      // Clean query parameter immediately from URL so subsequent refreshes don't re-trigger
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      try {
+        const response = await apiClient.get(`/api/v1/auth/qr/status/${qrTicket}/?action=claim`);
+        if (isCancelled) return;
+        const data = response.data;
+
+        if (data.status === "authorized" && data.access) {
+          saveTokens(data);
+          showToast(t("qrSuccess", "Signed in via QR code successfully!"), "success");
+          navigate(getLastActiveRoute("/dashboard"), { replace: true });
+        } else {
+          const errMsg = data.message || t("qrFailed", "QR session expired or invalid.");
+          setAuthErrorBanner(errMsg);
+          showToast(errMsg, "error");
+        }
+      } catch (err: any) {
+        if (!isCancelled) {
+          const errMsg =
+            err?.response?.data?.message ||
+            err?.response?.data?.error ||
+            t("qrFailed", "Failed to sign in via QR code.");
+          setAuthErrorBanner(errMsg);
+          showToast(errMsg, "error");
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    claimQrTicket();
+    return () => {
+      isCancelled = true;
+    };
+  }, [navigate, saveTokens, showToast, t]);
 
   useEffect(() => {
     const savedError = sessionStorage.getItem("spr_auth_error");

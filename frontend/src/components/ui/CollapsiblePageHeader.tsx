@@ -172,18 +172,8 @@ export default function CollapsiblePageHeader({
           title="Click to expand header and tabs"
           className="w-full py-2 px-3 sm:px-4 rounded-xl border theme-border theme-bg-surface hover:theme-bg-sub/30 transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 shadow-2xs group select-none"
         >
-          {/* Left: Icon & Title (On small screens, expand button is at the far left) */}
+          {/* Left: Icon & Title */}
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 text-left">
-            <div className="block @md:hidden shrink-0">
-              <IconButton
-                icon={ChevronDownIcon}
-                ariaLabel="Expand page header"
-                title="Expand header and tabs"
-                size="sm"
-                variant="sub"
-                className="pointer-events-none"
-              />
-            </div>
             {Icon && (
               <div className="w-6 h-6 rounded-lg theme-bg-accent-soft border border-[var(--accent-main)]/20 flex items-center justify-center theme-accent shrink-0">
                 <Icon className="w-3.5 h-3.5" />
@@ -194,10 +184,22 @@ export default function CollapsiblePageHeader({
             </span>
           </div>
 
-          {/* Right: Expand Toggle Button (visible on @md and up) */}
-          <div className="hidden @md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border theme-border theme-bg-sub/50 group-hover:theme-bg-sub text-xs font-semibold theme-text-secondary group-hover:theme-text-primary transition-all duration-150 shrink-0 pointer-events-none">
-            <span>{expandLabel}</span>
-            <ChevronDownIcon className="w-3.5 h-3.5" />
+          {/* Right: Expand Toggle Button (mobile icon and desktop text+icon) */}
+          <div className="flex items-center shrink-0">
+            <div className="block @md:hidden">
+              <IconButton
+                icon={ChevronDownIcon}
+                ariaLabel="Expand page header"
+                title="Expand header and tabs"
+                size="sm"
+                variant="sub"
+                className="pointer-events-none"
+              />
+            </div>
+            <div className="hidden @md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border theme-border theme-bg-sub/50 group-hover:theme-bg-sub text-xs font-semibold theme-text-secondary group-hover:theme-text-primary transition-all duration-150 shrink-0 pointer-events-none">
+              <span>{expandLabel}</span>
+              <ChevronDownIcon className="w-3.5 h-3.5" />
+            </div>
           </div>
         </div>
       </div>
@@ -209,22 +211,10 @@ export default function CollapsiblePageHeader({
     <div className={`@container space-y-3 sm:space-y-4 w-full min-w-0 animate-fade-in ${className}`}>
       {/* 1. Page Header Bar */}
       <div
-        className={`flex flex-col @md:flex-row @md:items-center justify-between gap-3 @md:gap-4 pb-1.5 sm:pb-2.5 w-full min-w-0 ${headerClassName}`}
+        className={`flex items-center justify-between gap-3 @md:gap-4 pb-1.5 sm:pb-2.5 w-full min-w-0 ${headerClassName}`}
       >
-        {/* Left: On small screens, collapse button is at the VERY LEFT! */}
+        {/* Left: Icon, Title & Badge */}
         <div className="flex items-center gap-2.5 @sm:gap-3.5 min-w-0 flex-1">
-          {collapsible && (
-            <div className="block @md:hidden shrink-0">
-              <IconButton
-                icon={ChevronUpIcon}
-                onClick={handleToggle}
-                ariaLabel="Collapse page header"
-                title="Collapse header and tabs"
-                size="sm"
-                variant="sub"
-              />
-            </div>
-          )}
           {Icon && (
             <div className="w-9 h-9 @sm:w-10 @sm:h-10 rounded-2xl theme-bg-accent-soft border border-[var(--accent-main)]/20 flex items-center justify-center theme-accent shrink-0 shadow-xs">
               <Icon className="w-4.5 h-4.5 @sm:w-5 @sm:h-5" />
@@ -240,22 +230,36 @@ export default function CollapsiblePageHeader({
           </div>
         </div>
 
-        {/* Right: Actions + Collapse Toggle Button (with text on desktop) */}
-        <div className="flex flex-wrap items-center gap-2 @sm:gap-2.5 w-full @md:w-auto shrink-0 justify-start @md:justify-end">
+        {/* Right: Actions + Collapse Toggle Button (positioned at the far right on both mobile & desktop) */}
+        <div className="flex items-center gap-2 @sm:gap-2.5 shrink-0 justify-end">
           {headerActions}
           {collapsible && (
-            <div className="hidden @md:block shrink-0">
-              <button
-                type="button"
-                onClick={handleToggle}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border theme-border theme-bg-sub/50 hover:theme-bg-sub text-xs font-semibold theme-text-secondary hover:theme-text-primary transition-all duration-150 cursor-pointer shadow-2xs"
-                title="Collapse header and tabs"
-                aria-label="Collapse page header"
-              >
-                <span>{collapseLabel}</span>
-                <ChevronUpIcon className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <>
+              {/* Mobile Collapse Button (at the far right on small screens) */}
+              <div className="block @md:hidden shrink-0">
+                <IconButton
+                  icon={ChevronUpIcon}
+                  onClick={handleToggle}
+                  ariaLabel="Collapse page header"
+                  title="Collapse header and tabs"
+                  size="sm"
+                  variant="sub"
+                />
+              </div>
+              {/* Desktop Collapse Button */}
+              <div className="hidden @md:block shrink-0">
+                <button
+                  type="button"
+                  onClick={handleToggle}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border theme-border theme-bg-sub/50 hover:theme-bg-sub text-xs font-semibold theme-text-secondary hover:theme-text-primary transition-all duration-150 cursor-pointer shadow-2xs"
+                  title="Collapse header and tabs"
+                  aria-label="Collapse page header"
+                >
+                  <span>{collapseLabel}</span>
+                  <ChevronUpIcon className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>

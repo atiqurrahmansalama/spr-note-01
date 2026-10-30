@@ -86,13 +86,13 @@ export function useReportForm() {
 
   const defaultTeacherName = useMemo(() => {
     const u = user || authStore.getUser?.() || authStore.getUserProfile?.() || null;
-    if (u?.full_name) return String(u.full_name);
-    if (u?.name) return String(u.name);
+    if (u?.name && String(u.name).trim()) return String(u.name).trim();
+    if (u?.full_name && String(u.full_name).trim()) return String(u.full_name).trim();
     if (u?.first_name || u?.last_name) {
       return [u.first_name, u.last_name].filter(Boolean).join(" ");
     }
-    if (u?.user_name) return String(u.user_name);
-    if (u?.username) return String(u.username);
+    if (u?.user_name && String(u.user_name).trim()) return String(u.user_name).trim();
+    if (u?.username && String(u.username).trim()) return String(u.username).trim();
     return "Staff Teacher";
   }, [user]);
 
@@ -229,6 +229,8 @@ export function useReportForm() {
   const historyStackRef = useRef<string[]>([]);
   const redoStackRef = useRef<string[]>([]);
   const isRestoringRef = useRef(false);
+  const isInitialMountRef = useRef(true);
+  const isFormDirtyRef = useRef(false);
   const [canUndoDraft, setCanUndoDraft] = useState(false);
   const [canRedoDraft, setCanRedoDraft] = useState(false);
 
@@ -461,7 +463,27 @@ export function useReportForm() {
       console.error("Redo restore failed", err);
     }
   }, [showToast]);
-  const [draftInfo, setDraftInfo] = useState<DailyProgressDraft[] | null>(null);
+  const [draftInfo, setDraftInfo] = useState<DailyProgressDraft[] | null>(() => {
+    try {
+      const allDrafts = draftReport.getAll();
+      const unsavedDrafts = allDrafts.filter((d: any) => {
+        return Boolean(
+          (d.studentName && String(d.studentName).trim()) ||
+          (d.comment && String(d.comment).trim()) ||
+          d.selectedSession ||
+          (d.bookTitle && String(d.bookTitle).trim()) ||
+          (d.lessonTitle && String(d.lessonTitle).trim()) ||
+          (Array.isArray(d.juzPageData) && d.juzPageData.some((j: any) => j.juz || (j.ranges || []).some((r: any) => r.start || r.end))) ||
+          (Array.isArray(d.mistakeData) && d.mistakeData.some((m: any) => m.page || (m.ayahs || []).some((a: any) => a.value))) ||
+          (Array.isArray(d.bookPageData) && d.bookPageData.some((b: any) => (b.ranges || []).some((r: any) => r.start || r.end))) ||
+          d.hasData
+        );
+      });
+      return unsavedDrafts.length > 0 ? unsavedDrafts : null;
+    } catch {
+      return null;
+    }
+  });
 
   const [currentDraftId] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -794,11 +816,21 @@ export function useReportForm() {
       hasData: hasAnyContent,
     };
 
+    // Guard against clearing or overwriting saved drafts on pristine initial mount / page refresh
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      if (!hasAnyContent) {
+        return;
+      }
+    }
+
     if (hasAnyContent) {
+      isFormDirtyRef.current = true;
       draftReport.save(currentDraftId, draftPayload);
       dailyProgressRepository.saveDraft(currentDraftId, draftPayload).catch(() => {});
       saveStatusStore.set("local", "Saved");
-    } else {
+    } else if (isFormDirtyRef.current) {
+      // Only clear if the user actively interacted and then cleared the form
       draftReport.remove(currentDraftId);
       dailyProgressRepository.clearDraft(currentDraftId).catch(() => {});
     }
@@ -861,9 +893,13 @@ export function useReportForm() {
       );
     }
 
-    setDraftInfo((prev) => (prev ? prev.filter((d) => d.id !== draft.id) : null));
+    setDraftInfo((prev) => {
+      const updated = prev ? prev.filter((d) => d.id !== draft.id) : null;
+      return updated && updated.length > 0 ? updated : null;
+    });
     draftReport.remove(draft.id);
     dailyProgressRepository.clearDraft(draft.id).catch(() => {});
+    isFormDirtyRef.current = true;
     showToast("Report draft recovered successfully!", "success");
     saveStatusStore.set("local", "Saved (Local)");
   };
@@ -1287,8 +1323,13 @@ export function useReportForm() {
     setLessonTitle("");
     draftReport.remove(currentDraftId);
     dailyProgressRepository.clearDraft(currentDraftId).catch(() => {});
-    setDraftInfo(null);
+    setDraftInfo((prev) => {
+      if (!prev) return null;
+      const remaining = prev.filter((d) => d.id !== currentDraftId);
+      return remaining.length > 0 ? remaining : null;
+    });
     setEditingReport(null);
+    isFormDirtyRef.current = false;
   };
 
   const cancelEditMode = () => {
@@ -1299,9 +1340,9 @@ export function useReportForm() {
     showToast("Edit cancelled. Form cleared.", "info");
   };
 
-  const handleSaveRecord = async (context?: AcademicValidationContext) => {
+  const handleSaveRecord = async (context?: AcademicValidationContext, options?: { keepFormOpen?: boolean }) => {
     if (isSaving) return;
-    if (!validateReportForm(context)) return;
+    if (!validateReportForm(context)) return { success: false };
     setIsSaving(true);
 
     try {
@@ -1309,7 +1350,7 @@ export function useReportForm() {
       if (!selectedStudent) {
         setIsSaving(false);
         showToast(`No student found with name "${studentName.trim()}" in Admissions Directory.`, "error");
-        return;
+        return { success: false };
       }
 
       const cleanActiveMistakes = mistakeData.filter(
@@ -1388,6 +1429,8 @@ export function useReportForm() {
         ...(isEditing ? { edited_at: editedAt, is_edited: true } : {}),
       };
 
+      let savedResultReport: any = null;
+
       if (isEditing) {
         const repId = editingReport.id || editingReport.report_unique_id;
         const repUniqueId = editingReport.report_unique_id || (typeof repId === "string" && repId.startsWith("REP-") ? repId : `REP-${String(repId).slice(0, 8)}`);
@@ -1416,7 +1459,7 @@ export function useReportForm() {
           client_updated_at: editedAt,
           teacher: resolvedTeacherId || existingRep?.teacher,
           teacher_id: resolvedTeacherId || existingRep?.teacher_id,
-          teacher_name: selectedTeacherName || defaultTeacherName || existingRep?.teacher_name || "",
+          teacher_name: finalTeacherName,
           student: studentNumericId || realStudentName,
           studentId: studentNumericId,
           studentName: realStudentName,
@@ -1457,47 +1500,41 @@ export function useReportForm() {
           bookStuckData: progressMode === "BOOK" ? cleanActiveStucks : [],
         };
 
+        // 1. Instant Millisecond Local Persistence & Cache Update (< 5ms)
+        const localUpdatedReport = saveReportLocally(updatedRecord, { skipGrace: true, syncStatus: "PENDING" });
+        savedResultReport = localUpdatedReport;
+        dailyProgressRepository.saveOptimistic(localUpdatedReport, "UPDATE", `/reports/${resolvedServerId || updatedRecord.id}/`).catch(() => {});
+        showToast(`Report #${repUniqueId} for "${realStudentName}" updated!`, "success");
+        saveStatusStore.set("local", "Saved (Local)");
+        window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: localUpdatedReport } }));
+
+        // 2. Asynchronous Background Cloud Push (Non-blocking: "পরে ডাটাবেজে যাবে")
         if (isOnline() && (authStore.getAccessToken() || authStore.getRefreshToken())) {
-          if (resolvedServerId) {
-            try {
-              const apiResult = await updateReport(resolvedServerId, payload);
-              if (apiResult.success && apiResult.data) {
-                const resData = apiResult.data;
-                saveReportLocally({ ...updatedRecord, ...resData, server_id: resolvedServerId, sync_status: "SYNCED" }, { skipGrace: true, syncStatus: "SYNCED" });
-                showToast(`Report #${repUniqueId} for "${realStudentName}" updated in Database!`, "success");
+          saveStatusStore.set("saving", "Syncing to Database...");
+          const pushPromise = resolvedServerId
+            ? updateReport(resolvedServerId, payload)
+            : commitReportToCloud(updatedRecord.id);
+
+          pushPromise
+            .then((apiResult: any) => {
+              if (apiResult && (apiResult.success || apiResult.data)) {
+                const resData = apiResult.data || apiResult;
+                saveReportLocally(
+                  { ...updatedRecord, ...resData, server_id: resolvedServerId || resData.id, sync_status: "SYNCED" },
+                  { skipGrace: true, syncStatus: "SYNCED" }
+                );
                 saveStatusStore.set("database", "Database Synced");
-                window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "database", data: resData } }));
+                window.dispatchEvent(
+                  new CustomEvent("spr_report_saved", { detail: { source: "database", data: resData } })
+                );
               } else {
-                saveReportLocally(updatedRecord, { skipGrace: true, syncStatus: "PENDING" });
-                showToast(`Report updated locally. Will sync when possible.`, "info");
                 saveStatusStore.set("local", "Saved (Local)");
-                window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: updatedRecord } }));
               }
-            } catch (error: any) {
-              saveReportLocally(updatedRecord, { skipGrace: true, syncStatus: "PENDING" });
-              showToast("Updated locally: " + error.message, "info");
+            })
+            .catch((err: any) => {
+              console.warn("[useReportForm] Background edit sync notice:", err?.message);
               saveStatusStore.set("local", "Saved (Local)");
-              window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: updatedRecord } }));
-            }
-          } else {
-            // Local report without database server_id yet: commit to database directly!
-            saveReportLocally(updatedRecord, { skipGrace: true, syncStatus: "PENDING" });
-            const syncResult = await commitReportToCloud(updatedRecord.id);
-            if (syncResult && syncResult.success) {
-              const finalId = syncResult.data?.report_unique_id || repUniqueId;
-              showToast(`Report #${finalId} for "${realStudentName}" saved to Database!`, "success");
-              saveStatusStore.set("database", "Database Synced");
-            } else {
-              showToast(`Report #${repUniqueId} for "${realStudentName}" updated locally!`, "info");
-              saveStatusStore.set("local", "Saved (Local)");
-            }
-            window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: updatedRecord } }));
-          }
-        } else {
-          saveReportLocally(updatedRecord, { skipGrace: true, syncStatus: "PENDING" });
-          showToast(`Report #${repUniqueId} for "${realStudentName}" updated locally!`, "success");
-          saveStatusStore.set("local", "Saved (Local)");
-          window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: updatedRecord } }));
+            });
         }
 
         const savedSnapshot = JSON.stringify({
@@ -1528,7 +1565,7 @@ export function useReportForm() {
           ...payload,
           teacher: resolvedTeacherId,
           teacher_id: resolvedTeacherId,
-          teacher_name: selectedTeacherName || defaultTeacherName || "",
+          teacher_name: finalTeacherName,
           student: studentNumericId || realStudentName,
           studentId: studentNumericId,
           studentName: realStudentName,
@@ -1587,25 +1624,33 @@ export function useReportForm() {
           bookStuckData: progressMode === "BOOK" ? cleanActiveStucks : [],
         }, { skipGrace: true, syncStatus: "PENDING" });
 
-        // Enterprise Direct Cloud Commit: when online and authenticated, commit immediately to PostgreSQL!
-        let authoritativeServerId: any = null;
-        if (isOnline() && (authStore.getAccessToken() || authStore.getRefreshToken())) {
-          saveStatusStore.set("saving", "Saving to Database...");
-          const syncResult = await commitReportToCloud(localSavedReport.id);
-          if (syncResult && syncResult.success) {
-            authoritativeServerId = syncResult.data?.id || localSavedReport.server_id;
-            const finalId = syncResult.data?.report_unique_id || localSavedReport.report_unique_id;
-            showToast(`Report #${finalId} for "${realStudentName}" saved to Database!`, "success");
-            saveStatusStore.set("database", "Database Synced");
-          } else {
-            showToast(`Report #${localSavedReport.report_unique_id} for "${realStudentName}" added (will auto-sync)!`, "info");
-            saveStatusStore.set("local", "Saved (Local)");
-          }
-        } else {
-          showToast(`Report #${localSavedReport.report_unique_id} for "${realStudentName}" added to record (Offline)!`, "success");
-          saveStatusStore.set("local", "Saved (Local)");
-        }
+        dailyProgressRepository.saveOptimistic(localSavedReport, "CREATE", "/reports/").catch(() => {});
+        savedResultReport = localSavedReport;
+        showToast(`Report #${localSavedReport.report_unique_id} for "${realStudentName}" saved to Record!`, "success");
+        saveStatusStore.set("local", "Saved (Local)");
         window.dispatchEvent(new CustomEvent("spr_report_saved", { detail: { source: "local", data: localSavedReport } }));
+
+        // 2. Asynchronous Background Cloud Push (Non-blocking: "পরে ডাটাবেজে যাবে")
+        if (isOnline() && (authStore.getAccessToken() || authStore.getRefreshToken())) {
+          saveStatusStore.set("saving", "Syncing to Database...");
+          commitReportToCloud(localSavedReport.id)
+            .then((syncResult) => {
+              if (syncResult && syncResult.success) {
+                saveStatusStore.set("database", "Database Synced");
+                window.dispatchEvent(
+                  new CustomEvent("spr_report_saved", {
+                    detail: { source: "database", data: syncResult.data },
+                  })
+                );
+              } else {
+                saveStatusStore.set("local", "Saved (Local)");
+              }
+            })
+            .catch((err) => {
+              console.warn("[useReportForm] Background cloud sync notice:", err?.message);
+              saveStatusStore.set("local", "Saved (Local)");
+            });
+        }
 
         const savedSnapshot = JSON.stringify({
           studentName: realStudentName,
@@ -1625,7 +1670,7 @@ export function useReportForm() {
           comment,
           savedReportId: localSavedReport.id,
           savedReportKey: localSavedReport.report_unique_id,
-          serverId: authoritativeServerId || localSavedReport.server_id,
+          serverId: localSavedReport.server_id,
           isGracePeriod: false,
         });
         if (historyStackRef.current.length > 0) {
@@ -1635,13 +1680,20 @@ export function useReportForm() {
         }
       }
 
-      resetForm();
-      // Auto-focus student input so teacher can immediately type the next student's name
-      setTimeout(() => {
-        const el = document.getElementById("daily-progress-student-input") as HTMLInputElement;
-        el?.focus();
-        el?.select?.();
-      }, 60);
+      if (!options?.keepFormOpen) {
+        resetForm();
+        // Auto-focus student input so teacher can immediately type the next student's name
+        setTimeout(() => {
+          const el = document.getElementById("daily-progress-student-input") as HTMLInputElement;
+          el?.focus();
+          el?.select?.();
+        }, 60);
+      }
+
+      return {
+        success: true,
+        savedReport: savedResultReport,
+      };
     } finally {
       setIsSaving(false);
     }

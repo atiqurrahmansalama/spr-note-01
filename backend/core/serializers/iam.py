@@ -141,14 +141,29 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 'color_theme': 'purple' if self.user.user_type == 'GUARDIAN' else 'blue',
             }
 
+        # Self-healing: Enforce staff enrollment and profile for any institutional member
+        if getattr(self.user, 'institution_id', None):
+            try:
+                from core.services import ensure_institution_staff_profile
+                ensure_institution_staff_profile(self.user)
+            except Exception:
+                pass
+
+        resolved_name = self.user.name or f"{self.user.first_name or ''} {self.user.last_name or ''}".strip() or self.user.phone_number
+
         data['user'] = {
             'id': self.user.id,
+            'name': resolved_name,
+            'full_name': resolved_name,
             'phone_number': self.user.phone_number,
             'username': self.user.phone_number,
             'email': self.user.email,
             'first_name': self.user.first_name,
             'last_name': self.user.last_name,
             'user_type': self.user.user_type,
+            'is_staff': getattr(self.user, 'is_staff', False),
+            'institution_id': str(self.user.institution_id) if self.user.institution_id else None,
+            'staff_id': str(self.user.staff_profile.id) if hasattr(self.user, 'staff_profile') and self.user.staff_profile else None,
             'role': role_data,
             'role_info': role_data,
             'avatar_url': self.user.avatar_url,

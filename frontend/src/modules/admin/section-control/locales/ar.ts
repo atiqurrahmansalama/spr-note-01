@@ -21,9 +21,11 @@ export const ar = {
   tabs: {
     global: 'الإعدادات العامة',
     role: 'تجاوزات الأدوار',
+    academy: 'تجاوزات الأكاديمية',
     group: 'تجاوزات المجموعات',
     user: 'تجاوزات المستخدمين',
     audit: 'سجلات التدقيق',
+    totalFeatures: 'إجمالي الميزات:',
   },
 
   actions: {
@@ -42,9 +44,12 @@ export const ar = {
 
   targets: {
     targetRole: 'الدور المستهدف:',
+    targetAcademy: 'الأكاديمية المستهدفة:',
     targetGroup: 'المجموعة المستهدفة:',
     targetUser: 'البحث عن المستخدم المستهدف:',
+    academySearchPlaceholder: 'اختر الأكاديمية المستهدفة...',
     userSearchPlaceholder: 'البحث عن المستخدم بالاسم أو الهاتف أو البريد الإلكتروني...',
+    selectedAcademyId: 'الأكاديمية المحددة: #{{id}}',
     selectedUserId: 'معرف المستخدم المحدد: #{{id}}',
     allGroups: 'جميع المجموعات',
     noPhone: 'لا يوجد هاتف',
@@ -60,6 +65,7 @@ export const ar = {
     disabledByParent: 'معطل بواسطة الوحدة الرئيسية',
     globalDefault: 'افتراضي عام',
     roleOverride: 'تجاوز الدور',
+    academyOverride: 'تجاوز الأكاديمية',
     groupOverride: 'تجاوز المجموعة',
     userOverride: 'تجاوز المستخدم',
     categoryKey: 'مفتاح الفئة: {{key}}',
@@ -78,6 +84,7 @@ export const ar = {
     scope: 'النطاق',
     target: 'الهدف',
     sectionKey: 'مفتاح الميزة',
+    featureSection: 'الميزة / الوحدة',
     change: 'التغيير',
     allScopes: 'جميع النطاقات',
     filterByScope: 'تصفية حسب النطاق',

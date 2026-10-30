@@ -102,7 +102,7 @@ export const SectionAuditLogTable: React.FC<SectionAuditLogTableProps> = ({
       },
       {
         key: 'section_key',
-        header: t('audit.sectionKey', 'SECTION KEY'),
+        header: t('audit.featureSection', 'FEATURE / MODULE'),
         sortable: true,
         headerClassName: 'min-w-[180px]',
         render: (log) => (

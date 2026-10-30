@@ -533,6 +533,10 @@ class ControlPanelRulesView(APIView):
         if scope == 'ROLE' and target_id:
             role_overrides = {o.section.section_key: o.is_enabled for o in RoleSectionPermission.objects.filter(role=target_id).select_related('section')}
 
+        academy_overrides = {}
+        if scope in ['ACADEMY', 'INSTITUTION'] and target_id:
+            academy_overrides = {o.section.section_key: o.is_enabled for o in AcademySectionOverride.objects.filter(institution_id=target_id).select_related('section')}
+
         # 4-Tier Resolution Evaluation (Independent of hierarchy first)
         resolved_raw = {}
         origins = {}
@@ -552,6 +556,9 @@ class ControlPanelRulesView(APIView):
             elif scope == 'ROLE' and key in role_overrides:
                 resolved_raw[key] = role_overrides[key]
                 origins[key] = "ROLE"
+            elif scope in ['ACADEMY', 'INSTITUTION'] and key in academy_overrides:
+                resolved_raw[key] = academy_overrides[key]
+                origins[key] = "ACADEMY"
             else:
                 resolved_raw[key] = global_val
                 origins[key] = "GLOBAL"
@@ -628,6 +635,10 @@ class ControlPanelSectionTreeView(APIView):
         if scope == 'ROLE' and target_id:
             role_overrides = {o.section.section_key: o.is_enabled for o in RoleSectionPermission.objects.filter(role=target_id).select_related('section')}
 
+        academy_overrides = {}
+        if scope in ['ACADEMY', 'INSTITUTION'] and target_id:
+            academy_overrides = {o.section.section_key: o.is_enabled for o in AcademySectionOverride.objects.filter(institution_id=target_id).select_related('section')}
+
         # 3. Resolve raw values (independent of hierarchy)
         resolved_raw = {}
         origins = {}
@@ -647,6 +658,9 @@ class ControlPanelSectionTreeView(APIView):
             elif scope == 'ROLE' and key in role_overrides:
                 resolved_raw[key] = role_overrides[key]
                 origins[key] = "ROLE"
+            elif scope in ['ACADEMY', 'INSTITUTION'] and key in academy_overrides:
+                resolved_raw[key] = academy_overrides[key]
+                origins[key] = "ACADEMY"
             else:
                 resolved_raw[key] = global_val
                 origins[key] = "GLOBAL"
@@ -802,6 +816,19 @@ class ControlPanelBatchUpdateView(APIView):
                 prev_state = not enabled if created else (not perm.is_enabled)
                 changed_count += 1
 
+            elif scope_type in ['ACADEMY', 'INSTITUTION']:
+                target_inst_id = target_identifier or request.data.get('target_institution_id', '') or request.data.get('selected_academy', '')
+                inst_obj = AcademicInstitution.objects.filter(
+                    Q(pk=target_inst_id) | Q(code=target_inst_id)
+                ).first() if target_inst_id else None
+                if inst_obj:
+                    perm, created = AcademySectionOverride.objects.update_or_create(
+                        section=sec, institution=inst_obj,
+                        defaults={'is_enabled': enabled}
+                    )
+                    prev_state = not enabled if created else (not perm.is_enabled)
+                    changed_count += 1
+
             elif scope_type == 'USER':
                 # NEVER use request.user here — always use the target_user_id from payload
                 target_user_id = target_identifier or request.data.get('target_user_id', '')
@@ -904,6 +931,9 @@ class ControlPanelResetRulesView(APIView):
         elif scope == 'group' and target_id:
             GroupSectionPermission.objects.filter(group_id=target_id).delete()
             return Response({'message': f'Reset all group overrides for "{target_id}" back to global defaults'}, status=status.HTTP_200_OK)
+        elif scope in ['academy', 'institution'] and target_id:
+            AcademySectionOverride.objects.filter(institution_id=target_id).delete()
+            return Response({'message': f'Reset all academy overrides for academy #{target_id} back to global defaults'}, status=status.HTTP_200_OK)
         elif scope == 'user' and target_id:
             user_obj = User.objects.filter(Q(pk=target_id) | Q(phone_number=target_id)).first()
             if user_obj:
@@ -913,6 +943,7 @@ class ControlPanelResetRulesView(APIView):
             AppSection.objects.all().update(is_globally_enabled=True)
             RoleSectionPermission.objects.all().delete()
             GroupSectionPermission.objects.all().delete()
+            AcademySectionOverride.objects.all().delete()
             UserSectionOverride.objects.all().delete()
             return Response({'message': 'All section control rules reset to global defaults'}, status=status.HTTP_200_OK)
 

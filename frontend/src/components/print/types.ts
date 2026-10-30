@@ -41,6 +41,8 @@ export interface CustomDocxTemplate {
   pageSize?: PrintPageSize;
   orientation?: PrintOrientation;
   margin?: PrintMargin;
+  isShared?: boolean;
+  isGlobalSticky?: boolean;
 }
 
 export interface DocLabCanvasDraft {

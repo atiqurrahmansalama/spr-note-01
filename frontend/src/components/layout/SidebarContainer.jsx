@@ -33,7 +33,6 @@ import {
   AcademicCapIcon,
   ChartBarIcon,
   IdentificationIcon,
-  PrinterIcon,
   BanknotesIcon,
   ScaleIcon,
   CalculatorIcon,
@@ -255,7 +254,6 @@ export default function SidebarContainer({
         { id: "Staff Onboarding", name: "Staff Onboarding", i18nKey: "staffOnboarding", path: "/staff/onboarding", matchPaths: ["/staff/onboarding"], Icon: AdmissionIcon, key: "staff_onboarding" },
       ]
     },
-    { id: "Print Studio", name: "Print Studio", i18nKey: "printStudio", path: "/print-studio", matchPaths: ["/print-studio"], Icon: PrinterIcon, key: "nav_print_studio" },
     {
       id: "Finance & Accounts",
       name: "Finance & Accounts",
@@ -490,8 +488,8 @@ export default function SidebarContainer({
           })}
         </nav>
 
-        {/* Sidebar Bottom Footer: Official Public Website */}
-        <div className="p-3 border-t theme-border shrink-0">
+        {/* Sidebar Bottom Footer: Official Public Website & Version */}
+        <div className="p-3 border-t theme-border shrink-0 space-y-2">
           <button
             type="button"
             onClick={() => {
@@ -513,6 +511,37 @@ export default function SidebarContainer({
               </div>
             )}
           </button>
+
+          {!isCollapsed ? (
+            <div className="flex items-center justify-between px-1.5 pt-0.5 text-[11px] theme-text-secondary">
+              <span className="font-medium tracking-tight">SPR Note Ecosystem</span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isOverlay) onClose();
+                  navigate('/version-control');
+                }}
+                className="font-mono font-semibold px-2 py-0.5 rounded-md theme-bg-sub/80 border theme-border hover:theme-accent hover:border-[var(--accent-main)] transition cursor-pointer select-none"
+                title="View Release Notes"
+              >
+                v1.4.0
+              </button>
+            </div>
+          ) : (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isOverlay) onClose();
+                  navigate('/version-control');
+                }}
+                className="font-mono text-[9px] font-semibold px-1 py-0.5 rounded theme-bg-sub border theme-border hover:theme-accent"
+                title="v1.4.0 • Release Notes"
+              >
+                v1.4
+              </button>
+            </div>
+          )}
         </div>
       </aside>
     </>

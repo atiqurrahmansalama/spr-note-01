@@ -4,7 +4,7 @@ import IconButton from '../../../../components/ui/IconButton';
 import { RefreshIcon } from '../../../../components/ui/Icons';
 import { useHorizontalScroll } from '../../../../hooks';
 import { useSectionTranslation } from '../hooks/useSectionTranslation';
-import { ScopeType, RoleOption, UserSearchResult } from '../types';
+import { ScopeType, RoleOption, UserSearchResult, AcademyOption } from '../types';
 import SectionSearchInput from './SectionSearchInput';
 
 export interface SectionTargetBarProps {
@@ -12,6 +12,9 @@ export interface SectionTargetBarProps {
   selectedRole: string;
   onSelectRole: (roleCode: string) => void;
   dbRoles: RoleOption[];
+  selectedAcademy?: string;
+  onSelectAcademy?: (academyId: string) => void;
+  dbAcademies?: AcademyOption[];
   dbUsers?: UserSearchResult[];
   selectedUser: string;
   onSelectUser: (userId: string) => void;
@@ -31,6 +34,9 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
   selectedRole,
   onSelectRole,
   dbRoles,
+  selectedAcademy,
+  onSelectAcademy,
+  dbAcademies = [],
   dbUsers = [],
   selectedUser,
   onSelectUser,
@@ -53,6 +59,13 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
     }));
   }, [dbRoles]);
 
+  const academyOptions = useMemo(() => {
+    return dbAcademies.map((a) => ({
+      value: String(a.id),
+      label: `${a.name}${a.code ? ` (${a.code})` : ''}`,
+    }));
+  }, [dbAcademies]);
+
   const userOptions = useMemo(() => {
     return dbUsers.map((u) => ({
       value: String(u.id),
@@ -65,6 +78,7 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
       { value: 'ALL', label: t('audit.allScopes', 'All Scopes') },
       { value: 'GLOBAL', label: 'GLOBAL' },
       { value: 'ROLE', label: 'ROLE' },
+      { value: 'ACADEMY', label: 'ACADEMY' },
       { value: 'USER', label: 'USER' },
     ],
     [t]
@@ -76,7 +90,7 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
       {activeScope === 'global' && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
           <div className="flex items-center gap-1 text-xs font-bold theme-text-secondary uppercase tracking-wider">
-            {t('tabs.global', 'Total Feature Key:')}
+            {t('tabs.totalFeatures', 'Total Features:')}
             {typeof totalSectionsCount === 'number' && (
               <span className="text-xs theme-text-secondary ml-1">{formatNumber(totalSectionsCount)}</span>
             )}
@@ -131,7 +145,48 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
         </div>
       )}
 
-      {/* 3. Target User Scope: User Dropdown (Left) + Single Medium Search Bar (Right) */}
+      {/* 3. Target Academy Scope: Academy Dropdown (Left) + Single Medium Search Bar (Right) */}
+      {activeScope === 'academy' && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+            <span className="text-xs font-bold theme-text-secondary uppercase tracking-wider shrink-0 whitespace-nowrap">
+              {t('targets.targetAcademy', 'Target Academy:')}
+            </span>
+
+            <div className="w-full sm:w-72 md:w-80">
+              <CustomSelect
+                options={academyOptions}
+                value={selectedAcademy || ''}
+                onChange={(val) => onSelectAcademy?.(String(val))}
+                placeholder={t('targets.academySearchPlaceholder', 'Select target academy...')}
+                searchable={true}
+                size="sm"
+              />
+            </div>
+
+            {selectedAcademy && (
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 shadow-2xs">
+                  {t('targets.selectedAcademyId', `Selected Academy: #${selectedAcademy}`, { id: selectedAcademy })}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onSelectAcademy?.('')}
+                  className="text-xs theme-text-secondary hover:text-[var(--danger-text)] font-semibold transition cursor-pointer"
+                >
+                  {t('empty.clearSearch', 'Clear')}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="w-full sm:w-80 shrink-0">
+            <SectionSearchInput value={searchFilter} onChange={onSearchFilterChange} />
+          </div>
+        </div>
+      )}
+
+      {/* 4. Target User Scope: User Dropdown (Left) + Single Medium Search Bar (Right) */}
       {activeScope === 'user' && (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1">

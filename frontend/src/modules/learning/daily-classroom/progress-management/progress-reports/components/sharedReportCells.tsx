@@ -1,4 +1,5 @@
 import React from "react";
+import { auth as authStore } from "@/utils/localStore";
 import { ReportItem } from "../types";
 import {
   ResolvedStudentMeta,
@@ -352,7 +353,11 @@ export function ReportCommentsCell({
   teacherName?: string;
 }) {
   const hasComment = Boolean(comment && comment.trim());
-  const hasTeacher = Boolean(teacherName && String(teacherName).trim());
+  const effectiveTeacherName =
+    teacherName && String(teacherName).trim() && String(teacherName).trim() !== "—"
+      ? String(teacherName).trim()
+      : (authStore.getUser?.()?.name || authStore.getUser?.()?.full_name || "Staff Teacher");
+  const hasTeacher = Boolean(effectiveTeacherName && effectiveTeacherName.trim());
 
   if (!hasComment && !hasTeacher) {
     return <span className="text-xs theme-text-secondary opacity-60">—</span>;
@@ -372,7 +377,7 @@ export function ReportCommentsCell({
       )}
       {hasTeacher && (
         <div className="text-[10px] font-mono theme-text-secondary leading-tight truncate">
-          - <span className="font-semibold theme-text-primary">{String(teacherName).trim()}</span>
+          - <span className="font-semibold theme-text-primary">{effectiveTeacherName}</span>
         </div>
       )}
     </div>

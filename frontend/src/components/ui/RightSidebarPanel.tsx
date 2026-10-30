@@ -170,13 +170,13 @@ export default function RightSidebarPanel({
       <div className="theme-bg-surface border-b theme-border px-3 @sm:px-5 py-2 @sm:py-2.5 flex items-center justify-between shrink-0 shadow-md gap-2 h-[48px] @sm:h-[52px]">
         {/* Left: Clean Icon Back Button + Icon + Title + Breadcrumbs */}
         <div className="flex items-center gap-2 @sm:gap-2.5 min-w-0 flex-1">
-          {/* Back Button (Rendered only when multi-step onBack navigation is present) */}
-          {onBack && (
+          {/* Back Button (Always present to return cleanly to parent view) */}
+          {(onBack || onClose) && (
             <IconButton
               icon={ChevronLeftIcon}
               size="sm"
               variant="ghost"
-              onClick={onBack}
+              onClick={onBack || onClose}
               title="Back to parent page"
               ariaLabel="Back to parent page"
             />

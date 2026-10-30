@@ -5,11 +5,9 @@ import {
   buildDailyProgressReportData,
 } from "./dailyProgressDocLabKeys";
 
-// Lazy load DocLab Quick Report Modal to eliminate heavy print/editor bundle on initial mount
-// Refreshed dailyProgressReportData pipeline with clean empty detail-mis & detail-stuck support
-const DocLabQuickReportModal = lazy(
-  () => import("@/components/print/DocLabQuickReportModal")
-);
+// Preloadable DocLab Quick Report Modal for 0ms perceived latency on Make Report
+const loadDocLabModal = () => import("@/components/print/DocLabQuickReportModal");
+const DocLabQuickReportModal = lazy(loadDocLabModal);
 import { PageContainer } from "@/components/layout";
 import { useToast } from "@/context/ToastContext";
 import { useFont } from "@/context/useFont";
@@ -59,6 +57,9 @@ export default function DailyProgressView({
   const { showToast } = useToast();
   const { activeFont, activeFontSize } = useFont();
   const { isFeatureEnabled, loading: featureLoading } = useFeatureControl();
+
+  const isQuranAllowed = isFeatureEnabled("progress_mode_quran");
+  const isBookAllowed = isFeatureEnabled("progress_mode_book");
 
   const sectionConfig: SectionVisibilityConfig = useMemo(
     () => ({
@@ -165,7 +166,7 @@ export default function DailyProgressView({
 
   const studentInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSaveRecordWithContext = useCallback(async () => {
+  const handleSaveRecordWithContext = useCallback(async (options?: { keepFormOpen?: boolean }) => {
     const result = await handleSaveRecord({
       departmentId: selectedDepartmentId,
       classId: selectedClassId,
@@ -174,19 +175,21 @@ export default function DailyProgressView({
       departments,
       classes,
       sections,
-    });
+    }, options);
 
-    // Auto-focus the student input box after saving so teacher can seamlessly enter next student
-    setTimeout(() => {
-      if (studentInputRef.current) {
-        studentInputRef.current.focus();
-        studentInputRef.current.select?.();
-      } else {
-        const el = document.getElementById("daily-progress-student-input") as HTMLInputElement;
-        el?.focus();
-        el?.select?.();
-      }
-    }, 60);
+    if (!options?.keepFormOpen) {
+      // Auto-focus the student input box after saving so teacher can seamlessly enter next student
+      setTimeout(() => {
+        if (studentInputRef.current) {
+          studentInputRef.current.focus();
+          studentInputRef.current.select?.();
+        } else {
+          const el = document.getElementById("daily-progress-student-input") as HTMLInputElement;
+          el?.focus();
+          el?.select?.();
+        }
+      }, 60);
+    }
 
     return result;
   }, [
@@ -240,6 +243,15 @@ export default function DailyProgressView({
     comment,
   ]);
 
+  // Normalize progress mode if restricted by feature flags
+  useEffect(() => {
+    if (isQuranAllowed && !isBookAllowed && progressMode !== "QURAN") {
+      setProgressMode("QURAN");
+    } else if (!isQuranAllowed && isBookAllowed && progressMode !== "BOOK") {
+      setProgressMode("BOOK");
+    }
+  }, [isQuranAllowed, isBookAllowed, progressMode, setProgressMode]);
+
   const { registerScopeHandler } = useUndoRedo();
   const location = useLocation();
   const isEditMode = Boolean(editingReport);
@@ -279,7 +291,15 @@ export default function DailyProgressView({
     }
   }, []);
 
-  const handleMakeReportClick = () => {
+  useEffect(() => {
+    // Preload DocLabQuickReportModal on idle so Make Report opens with 0ms perceived latency
+    const timer = setTimeout(() => {
+      loadDocLabModal().catch(() => {});
+    }, 400);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleMakeReportClick = async () => {
     const isValid = validateReportForm({
       departmentId: selectedDepartmentId,
       classId: selectedClassId,
@@ -291,6 +311,8 @@ export default function DailyProgressView({
     });
     if (!isValid) return;
 
+    // Make Report is strictly for generating and viewing formatted text in the modal.
+    // Saving to record is exclusively handled by "Add to Record".
     setIsReportModalOpen(true);
   };
 
@@ -482,6 +504,7 @@ export default function DailyProgressView({
               classId={selectedClassId}
               sectionId={selectedSectionId}
               onStudentSelect={handleStudentSelect}
+              actionLabel={isFeatureEnabled("progress_action_add_student") ? "+ Add Student" : null}
             />
           )
         }
@@ -496,8 +519,8 @@ export default function DailyProgressView({
         }
       />
 
-      {/* Fallback Mode Switcher (Visible only in standalone page without Hub tab bar) */}
-      {!filterProps && (
+      {/* Fallback Mode Switcher (Visible only in standalone page without Hub tab bar when both modes allowed) */}
+      {!filterProps && isQuranAllowed && isBookAllowed && (
         <div className="flex flex-wrap items-center justify-between gap-2.5 px-1 py-0.5">
           <div className="flex items-center gap-2 text-xs theme-text-secondary font-medium">
             <span className="uppercase tracking-wider text-[11px] font-bold">Progress Mode:</span>
@@ -648,7 +671,9 @@ export default function DailyProgressView({
         <Suspense fallback={null}>
           <DocLabQuickReportModal
             isOpen={isReportModalOpen}
-            onClose={() => setIsReportModalOpen(false)}
+            onClose={() => {
+              setIsReportModalOpen(false);
+            }}
             scopeId={DAILY_PROGRESS_SCOPE_ID}
             scopeName="Daily Progress"
             title="Daily Progress Report"

@@ -13,6 +13,7 @@ import {
   MailIcon,
 } from '../../components/ui/Icons';
 import { ConfirmModal } from '../../components/ui/Modal';
+import RouteLoadingFallback from '../../components/ui/RouteLoadingFallback';
 
 import { useProfileSettings } from './hooks/useProfileSettings';
 import {
@@ -216,13 +217,10 @@ export const ProfileSettingsView: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="@container w-full max-w-6xl mx-auto py-8 px-4 sm:px-6 space-y-6 font-sans animate-pulse select-none">
-        <div className="h-10 w-64 theme-bg-surface border theme-border rounded-xl" />
-        <div className="grid grid-cols-1 @[960px]:grid-cols-12 gap-6">
-          <div className="@[960px]:col-span-5 @[1140px]:col-span-4 h-64 theme-bg-surface border theme-border rounded-2xl" />
-          <div className="@[960px]:col-span-7 @[1140px]:col-span-8 h-96 theme-bg-surface border theme-border rounded-2xl" />
-        </div>
-      </div>
+      <RouteLoadingFallback
+        title={t('loadingProfileTitle', 'Loading Profile Settings...')}
+        subtitle={t('loadingProfileSubtitle', 'Please wait while account settings are being loaded')}
+      />
     );
   }
 

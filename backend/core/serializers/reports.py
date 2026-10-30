@@ -130,6 +130,8 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
     generate_date = serializers.SerializerMethodField()
     formattedDate = serializers.SerializerMethodField()
     formattedTime = serializers.SerializerMethodField()
+    teacher_name  = serializers.SerializerMethodField()
+    teacher       = serializers.SerializerMethodField()
 
     class Meta:
         model = StudentDailyReport
@@ -140,7 +142,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
             'session_name',
             'total_page',
             'total_mistake', 'total_stuck',
-            'score', 'status', 'teacher_id',
+            'score', 'status', 'teacher_id', 'teacher_name', 'teacher',
             'is_edited', 'edit_time', 'edited_at',
             'is_locked', 'lock_time',
             'is_deleted', 'delete_time',
@@ -244,6 +246,63 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         dt = obj.date or obj.created_at
         return dt.strftime("%I:%M %p") if dt else ""
 
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_teacher_name(self, obj):
+        # 1. Direct lookup by teacher_id
+        if obj.teacher_id:
+            try:
+                from core.models import StaffProfile, User
+                staff = StaffProfile.objects.filter(
+                    Q(user_id=obj.teacher_id) | Q(employee_id=str(obj.teacher_id))
+                ).select_related('user').first()
+                if staff and staff.user and staff.user.name:
+                    return staff.user.name
+                user = User.objects.filter(id=obj.teacher_id).first()
+                if user:
+                    return user.name or user.get_full_name() or user.phone_number or "Staff Teacher"
+            except Exception:
+                pass
+
+        # 2. Lookup by created_by
+        if obj.created_by:
+            name = obj.created_by.name or obj.created_by.get_full_name() or obj.created_by.phone_number
+            if name:
+                return name
+
+        # 3. Lookup by student's section / class teacher or institution admin
+        if obj.student_id:
+            try:
+                stu = obj.student
+                if stu:
+                    sec = getattr(stu, 'section', None)
+                    if sec and getattr(sec, 'class_teacher', None):
+                        ct = sec.class_teacher
+                        if hasattr(ct, 'user') and ct.user and ct.user.name:
+                            return ct.user.name
+                    cls = getattr(stu, 'student_class', None)
+                    if cls and getattr(cls, 'class_teacher', None):
+                        ct = cls.class_teacher
+                        if hasattr(ct, 'user') and ct.user and ct.user.name:
+                            return ct.user.name
+                    inst = getattr(stu, 'institution', None)
+                    if inst:
+                        adm = inst.staff_members.filter(staff_type='ADMIN', is_active=True).select_related('user').first()
+                        if adm and adm.user and adm.user.name:
+                            return adm.user.name
+            except Exception:
+                pass
+
+        # 4. Fallback to current authenticated user if in request context
+        req = self.context.get('request')
+        if req and getattr(req, 'user', None) and req.user.is_authenticated:
+            return req.user.name or req.user.get_full_name() or "Staff Teacher"
+
+        return "Staff Teacher"
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_teacher(self, obj):
+        return self.get_teacher_name(obj)
+
     # ── Input pre-processing ─────────────────────────────────
 
     def to_internal_value(self, data):
@@ -280,6 +339,20 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
 
         if 'session_name' not in mutable_data and 'session' in mutable_data:
             mutable_data['session_name'] = mutable_data['session']
+
+        # Normalize teacher / teacher_id
+        raw_teacher = mutable_data.get('teacher_id') or mutable_data.get('teacher')
+        if raw_teacher:
+            if isinstance(raw_teacher, int):
+                mutable_data['teacher_id'] = raw_teacher
+            elif isinstance(raw_teacher, str) and raw_teacher.isdigit():
+                mutable_data['teacher_id'] = int(raw_teacher)
+            elif isinstance(raw_teacher, dict):
+                mutable_data['teacher_id'] = raw_teacher.get('id') or raw_teacher.get('pk')
+        if not mutable_data.get('teacher_id'):
+            req = self.context.get('request')
+            if req and getattr(req, 'user', None) and req.user.is_authenticated:
+                mutable_data['teacher_id'] = req.user.id
 
         # ── Normalize Lesson Title, Book Title & Progress Mode ─────────────
         raw_lesson = (

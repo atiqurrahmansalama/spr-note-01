@@ -7,6 +7,7 @@ import ClassPeriodSwitcherBar from './ClassPeriodSwitcherBar';
 import { classroomSettings, calendarSettings } from '@/stores';
 import { getSystemTimezone } from '@/constants/calendarConstants';
 import { useAcademicData } from '@/hooks/useAcademicData';
+import { useClassroomTimezone } from '../hooks';
 
 export interface DailyClassroomFilterProps {
   showDate?: boolean;
@@ -74,7 +75,13 @@ export interface DailyClassroomFilterControlsProps {
   searchControl?: React.ReactNode;
   studentControl?: React.ReactNode;
   sessionControl?: React.ReactNode;
-  customDateComponent?: React.ReactNode;
+  customDateComponent?:
+    | React.ReactNode
+    | ((props: {
+        isTimezoneEnabled: boolean;
+        effectiveTimezone: string;
+        timezoneLink: string;
+      }) => React.ReactNode);
   extraFields?: React.ReactNode;
   children?:
     | React.ReactNode
@@ -215,64 +222,8 @@ export default function DailyClassroomFilterControls({
 }: DailyClassroomFilterControlsProps) {
   const academicData: any = useAcademicData() || {};
 
-  // Timezone resolution with graceful fallback
-  const [isTimezoneEnabled, setIsTimezoneEnabled] = useState(() => {
-    try {
-      return classroomSettings?.getTimezoneEnabled?.() ?? true;
-    } catch {
-      return true;
-    }
-  });
-
-  const [classroomTz, setClassroomTz] = useState(() => {
-    try {
-      return classroomSettings?.getTimezone?.() ?? 'APP_DEFAULT';
-    } catch {
-      return 'APP_DEFAULT';
-    }
-  });
-
-  const [appTz, setAppTz] = useState(() => {
-    try {
-      return calendarSettings?.getTimezone?.() ?? (typeof getSystemTimezone === 'function' ? getSystemTimezone() : 'UTC');
-    } catch {
-      return 'UTC';
-    }
-  });
-
-  useEffect(() => {
-    const handleClassroomUpdate = (e: any) => {
-      if (e?.detail?.timezoneEnabled !== undefined) {
-        setIsTimezoneEnabled(e.detail.timezoneEnabled);
-      } else {
-        setIsTimezoneEnabled(classroomSettings?.getTimezoneEnabled?.() ?? true);
-      }
-      if (e?.detail?.timezone !== undefined) {
-        setClassroomTz(e.detail.timezone);
-      } else {
-        setClassroomTz(classroomSettings?.getTimezone?.() ?? 'APP_DEFAULT');
-      }
-    };
-
-    const handleCalendarUpdate = (e: any) => {
-      if (e?.detail?.timezone !== undefined) {
-        setAppTz(e.detail.timezone);
-      } else {
-        setAppTz(calendarSettings?.getTimezone?.() ?? 'UTC');
-      }
-    };
-
-    window.addEventListener('spr_classroom_settings_updated', handleClassroomUpdate);
-    window.addEventListener('spr_calendar_settings_updated', handleCalendarUpdate);
-    window.addEventListener('spr_date_time_updated', handleCalendarUpdate);
-    return () => {
-      window.removeEventListener('spr_classroom_settings_updated', handleClassroomUpdate);
-      window.removeEventListener('spr_calendar_settings_updated', handleCalendarUpdate);
-      window.removeEventListener('spr_date_time_updated', handleCalendarUpdate);
-    };
-  }, []);
-
-  const effectiveTimezone = classroomTz && classroomTz !== 'APP_DEFAULT' ? classroomTz : appTz || 'UTC';
+  // Unified Classroom Timezone resolution (configured via /admin-tools?tab=classroom-config)
+  const { isTimezoneEnabled, effectiveTimezone, timezoneLink } = useClassroomTimezone();
 
   // Active labels calculation for collapsed scope badge
   const activeDepartmentLabel = useMemo(() => {
@@ -327,12 +278,14 @@ export default function DailyClassroomFilterControls({
       {/* Slot 1: Date */}
       <div className="col-span-1">
         {customDateComponent ? (
-          customDateComponent
+          typeof customDateComponent === 'function'
+            ? customDateComponent({ isTimezoneEnabled, effectiveTimezone, timezoneLink })
+            : customDateComponent
         ) : showDate ? (
           <ReusableCalendar
             label={dateLabel}
             showTimezone={isTimezoneEnabled}
-            timezoneLink="/admin-tools?tab=classroom-config"
+            timezoneLink={timezoneLink}
             dateFormat={dateFormat}
             timeZone={effectiveTimezone}
             showHijri={false}

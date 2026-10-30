@@ -8,3 +8,6 @@ export * from './useDailyClassroomFilters';
 
 export { default as useAcademicData } from './useAcademicData';
 export * from './useAcademicData';
+
+export { default as useClassroomTimezone } from './useClassroomTimezone';
+export * from './useClassroomTimezone';

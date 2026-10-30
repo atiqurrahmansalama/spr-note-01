@@ -168,7 +168,7 @@ export default function App() {
                 <Route path="/staff-onboarding" element={<Navigate to="/staff/onboarding" replace />} />
                 <Route path="/staff" element={<Navigate to="/staff/roster" replace />} />
                 <Route path="/staff/:id" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><StaffProfileDetailView /></FeatureGuard>} />
-                <Route path="/print-studio" element={<FeatureGuard sectionKey="nav_print_studio" fallback={<Navigate to="/dashboard" replace />}><PrintStudioHubView /></FeatureGuard>} />
+                <Route path="/print-studio" element={<FeatureGuard sectionKey="nav_print_studio" fallback={<Navigate to="/dashboard" replace />}><Suspense fallback={<RouteLoadingFallback title="Loading DocLab Studio..." subtitle="Preparing workspace and layout engine..." />}><PrintStudioHubView /></Suspense></FeatureGuard>} />
                 
                 {/* Student Attendance Multi-Dimensional Routes */}
                 <Route path="/attendance/students/roll-call" element={<Navigate to="/attendance/students/monthly-matrix" replace />} />

@@ -124,7 +124,7 @@ export default function TeacherSelect({
     if (!onlyTeachers) return rawTeachers;
     return rawTeachers.filter((t) => {
       const type = (t.staff_type || t.type || t.user_type || '').toUpperCase();
-      return !type || type === 'TEACHING' || type === 'TEACHER';
+      return !type || type === 'TEACHING' || type === 'TEACHER' || type === 'ADMIN' || type === 'SUPER_ADMIN';
     });
   }, [rawTeachers, onlyTeachers]);
 

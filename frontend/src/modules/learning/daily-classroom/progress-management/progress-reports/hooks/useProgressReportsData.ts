@@ -4,6 +4,7 @@ import { isOnline } from "@/utils/localStore";
 import { triggerCloudSync, isReportUnsynced, getLocalReports, deleteReportFromSync } from "@/utils/syncEngine";
 import { formatDate } from "@/utils/reportGenerator";
 import { dailyProgressRepository, offlineDB } from "@/offline";
+import { auth as authStore } from "@/utils/localStore";
 import { ReportItem, SyncErrorItem } from "../types";
 
 export interface UseProgressReportsDataOptions {
@@ -425,6 +426,104 @@ export function useProgressReportsData({
       const serverId = rep.server_id || (hasNumericId ? Number(rep.id) : undefined);
       const syncStatus = rep.sync_status || (hasNumericId ? "SYNCED" : "PENDING");
 
+      // 5. Authoritative Teacher Resolution (Guaranteed to NEVER be empty or "—")
+      let resolvedTeacherName = "";
+
+      // 5a. Direct teacher_name string
+      if (typeof rep.teacher_name === "string" && rep.teacher_name.trim() && rep.teacher_name.trim() !== "—") {
+        resolvedTeacherName = rep.teacher_name.trim();
+      }
+
+      // 5b. Direct teacher string (if not numeric ID)
+      if (!resolvedTeacherName && typeof rep.teacher === "string" && isNaN(Number(rep.teacher)) && rep.teacher.trim() && rep.teacher.trim() !== "—") {
+        resolvedTeacherName = rep.teacher.trim();
+      }
+
+      // 5c. Object rep.teacher
+      if (!resolvedTeacherName && typeof rep.teacher === "object" && rep.teacher) {
+        resolvedTeacherName = rep.teacher.name || rep.teacher.name_en || rep.teacher.full_name || rep.teacher.user_name || "";
+      }
+
+      // 5d. Match by teacher_id / numeric teacher from academicData staff or teachers list
+      const rawTeacherId =
+        rep.teacher_id ||
+        (typeof rep.teacher === "number" || (typeof rep.teacher === "string" && /^\d+$/.test(rep.teacher.trim()))
+          ? Number(rep.teacher)
+          : null);
+
+      if (!resolvedTeacherName && rawTeacherId) {
+        const staffList = academicData?.staff || academicData?.teachers || [];
+        const matchedStaff = staffList.find(
+          (s: any) =>
+            String(s.id) === String(rawTeacherId) ||
+            String(s.user) === String(rawTeacherId) ||
+            String(s.user_id) === String(rawTeacherId) ||
+            String(s.employee_id) === String(rawTeacherId)
+        );
+        if (matchedStaff) {
+          resolvedTeacherName =
+            matchedStaff.name ||
+            matchedStaff.name_en ||
+            matchedStaff.user_name ||
+            matchedStaff.full_name ||
+            "";
+        }
+      }
+
+      // 5e. Match by report creator (created_by)
+      if (!resolvedTeacherName && rep.created_by) {
+        if (typeof rep.created_by === "object") {
+          resolvedTeacherName =
+            rep.created_by.name ||
+            rep.created_by.full_name ||
+            rep.created_by.first_name ||
+            rep.created_by.username ||
+            "";
+        } else {
+          const staffList = academicData?.staff || academicData?.teachers || [];
+          const matchedCreator = staffList.find(
+            (s: any) => String(s.id) === String(rep.created_by) || String(s.user) === String(rep.created_by)
+          );
+          if (matchedCreator) {
+            resolvedTeacherName =
+              matchedCreator.name ||
+              matchedCreator.name_en ||
+              matchedCreator.user_name ||
+              "";
+          }
+        }
+      }
+
+      // 5f. Match by student's class / section teacher if assigned
+      if (!resolvedTeacherName && matchedStudent) {
+        if (matchedStudent.class_teacher_name) {
+          resolvedTeacherName = matchedStudent.class_teacher_name;
+        }
+      }
+
+      // 5g. Automatically pick the currently logged-in user / teacher
+      if (!resolvedTeacherName) {
+        try {
+          const currentUser = authStore.getUser?.() || authStore.getUserProfile?.() || null;
+          if (currentUser) {
+            resolvedTeacherName =
+              currentUser.name ||
+              currentUser.full_name ||
+              (currentUser.first_name || currentUser.last_name ? [currentUser.first_name, currentUser.last_name].filter(Boolean).join(" ") : "") ||
+              currentUser.user_name ||
+              currentUser.username ||
+              "";
+          }
+        } catch {
+          // fallback gracefully
+        }
+      }
+
+      // 5h. Guaranteed fallback
+      if (!resolvedTeacherName || resolvedTeacherName === "—") {
+        resolvedTeacherName = "Staff Teacher";
+      }
+
       return {
         ...rep,
         server_id: serverId,
@@ -460,26 +559,12 @@ export function useProgressReportsData({
         book_name: rep.book_name || rep.book_title || rep.curriculum_book_name || "",
         lesson_title: rep.lesson_title || rep.lesson_covered || "",
         lesson_covered: rep.lesson_covered || rep.lesson_title || "",
-        teacher: rep.teacher || rep.teacher_name || "",
-        teacher_id:
-          rep.teacher_id ||
-          (typeof rep.teacher === "object"
-            ? rep.teacher?.id
-            : typeof rep.teacher === "number" || (typeof rep.teacher === "string" && /^\d+$/.test(rep.teacher))
-            ? rep.teacher
-            : "") ||
-          "",
-        teacher_name:
-          rep.teacher_name ||
-          (typeof rep.teacher === "object"
-            ? rep.teacher?.name || rep.teacher?.name_en
-            : typeof rep.teacher === "string" && isNaN(Number(rep.teacher))
-            ? rep.teacher
-            : "") ||
-          "",
+        teacher: resolvedTeacherName,
+        teacher_id: rawTeacherId ? String(rawTeacherId) : "",
+        teacher_name: resolvedTeacherName,
       };
     },
-    [academicData?.students, academicData?.classes, academicData?.sections, academicData?.departments]
+    [academicData?.students, academicData?.classes, academicData?.sections, academicData?.departments, academicData?.staff, academicData?.teachers]
   );
 
   // Load Reports from IndexedDB / LocalStorage & API with multi-endpoint fallback
@@ -521,6 +606,24 @@ export function useProgressReportsData({
         });
       };
 
+      // 1. Immediate synchronous local cache ingestion (0ms perceived latency)
+      try {
+        ingestLocal(getLocalReports());
+      } catch {}
+      try {
+        ingestLocal(JSON.parse(localStorage.getItem(tenantScopedStorageKey) || "[]"));
+      } catch {}
+      try {
+        ingestLocal(JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]"));
+      } catch {}
+
+      localReps = Array.from(localMap.values());
+      if (localReps.length > 0) {
+        setReportsList(localReps.map(normalizeReport));
+        setLoading(false); // Cache hit! Zero loading delay
+      }
+
+      // 2. Asynchronous IndexedDB storage layer
       try {
         const idbReps = await dailyProgressRepository.list(undefined, { tenantId: activeTenantId });
         ingestLocal(idbReps);
@@ -530,31 +633,17 @@ export function useProgressReportsData({
           ingestLocal(defaultIdbReps);
         }
 
-        try {
-          ingestLocal(JSON.parse(localStorage.getItem(tenantScopedStorageKey) || "[]"));
-        } catch {}
-        try {
-          ingestLocal(JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]"));
-        } catch {}
-        try {
-          ingestLocal(getLocalReports());
-        } catch {}
-
         localReps = Array.from(localMap.values());
-        if (!isOnline() || reportsListRef.current.length === 0) {
-          if (localReps.length > 0) {
-            setReportsList(localReps.map(normalizeReport));
-          } else {
-            setReportsList([]);
-          }
+        if (localReps.length > 0) {
+          setReportsList(localReps.map(normalizeReport));
+          setLoading(false);
         }
-      } catch {
-        if (!isOnline() || reportsListRef.current.length === 0) {
-          setReportsList([]);
-        }
+      } catch (err) {
+        console.warn("[useProgressReportsData] IndexedDB cache read warning:", err);
       }
 
-      if (!isSilent && localReps.length === 0) {
+      // 3. Only show loading if cache is completely empty and no reports on screen
+      if (!isSilent && localReps.length === 0 && reportsListRef.current.length === 0) {
         setLoading(true);
       }
 
@@ -723,6 +812,29 @@ export function useProgressReportsData({
   useEffect(() => {
     const handleReportSaved = (e: any) => {
       if (e?.detail?.source === "sync") return;
+      const savedData = e?.detail?.data;
+      if (savedData) {
+        const normalized = normalizeReport(savedData);
+        setReportsList((prev) => {
+          const uniq = normalized.report_unique_id ? String(normalized.report_unique_id).toLowerCase() : "";
+          const idStr = normalized.id !== undefined && normalized.id !== null ? String(normalized.id).toLowerCase() : "";
+          const serverStr = normalized.server_id ? String(normalized.server_id).toLowerCase() : "";
+
+          const existingIdx = prev.findIndex((r) => {
+            const rUniq = r.report_unique_id ? String(r.report_unique_id).toLowerCase() : "";
+            const rId = r.id !== undefined && r.id !== null ? String(r.id).toLowerCase() : "";
+            const rServer = r.server_id ? String(r.server_id).toLowerCase() : "";
+            return (uniq && rUniq === uniq) || (idStr && rId === idStr) || (serverStr && rServer === serverStr);
+          });
+
+          if (existingIdx > -1) {
+            const updated = [...prev];
+            updated[existingIdx] = { ...updated[existingIdx], ...normalized };
+            return updated;
+          }
+          return [normalized, ...prev];
+        });
+      }
       loadReports(true);
     };
     const handleReportDeleted = (e: any) => {
@@ -949,40 +1061,6 @@ export function useProgressReportsData({
         })
       );
 
-      if (isOnline()) {
-        const uniqueLookupIds = Array.from(new Set(serverLookupIds));
-        let bulkSuccess = false;
-        try {
-          const bulkRes = await fetchWithAuth("/api/v1/reports/bulk-delete/", {
-            method: "POST",
-            body: JSON.stringify({ ids: uniqueLookupIds }),
-          });
-          if (bulkRes && (bulkRes.ok || bulkRes.status === 200 || bulkRes.status === 204)) {
-            bulkSuccess = true;
-          }
-        } catch {
-          bulkSuccess = false;
-        }
-
-        if (!bulkSuccess) {
-          for (const lookupId of uniqueLookupIds) {
-            const endpoints = [
-              `/api/v1/reports/${lookupId}/`,
-              `/api/reports/${lookupId}/`,
-              `/reports/${lookupId}/`,
-            ];
-            for (const ep of endpoints) {
-              try {
-                const res = await fetchWithAuth(ep, { method: "DELETE" });
-                if (res && (res.ok || res.status === 200 || res.status === 204 || res.status === 404)) {
-                  break;
-                }
-              } catch {}
-            }
-          }
-        }
-      }
-
       window.dispatchEvent(
         new CustomEvent("spr_report_deleted", {
           detail: { source: "progress_reports_view", deletedKeys: allTargetKeys },
@@ -996,6 +1074,49 @@ export function useProgressReportsData({
         showToast(`Report ${reportIdStr} deleted permanently!`, "success");
       } else {
         showToast(`${targetItems.length} reports deleted permanently!`, "success");
+      }
+
+      // Close modal and unblock UI immediately (< 5ms)
+      setIsDeleting(false);
+      setReportToDelete(null);
+
+      // Asynchronous Background Cloud Delete ("পরে ডাটাবেজে যাবে")
+      if (isOnline() && serverLookupIds.length > 0) {
+        const uniqueLookupIds = Array.from(new Set(serverLookupIds));
+        (async () => {
+          let bulkSuccess = false;
+          try {
+            const bulkRes = await fetchWithAuth("/api/v1/reports/bulk-delete/", {
+              method: "POST",
+              body: JSON.stringify({ ids: uniqueLookupIds }),
+            });
+            if (bulkRes && (bulkRes.ok || bulkRes.status === 200 || bulkRes.status === 204)) {
+              bulkSuccess = true;
+            }
+          } catch {
+            bulkSuccess = false;
+          }
+
+          if (!bulkSuccess) {
+            for (const lookupId of uniqueLookupIds) {
+              const endpoints = [
+                `/api/v1/reports/${lookupId}/`,
+                `/api/reports/${lookupId}/`,
+                `/reports/${lookupId}/`,
+              ];
+              for (const ep of endpoints) {
+                try {
+                  const res = await fetchWithAuth(ep, { method: "DELETE" });
+                  if (res && (res.ok || res.status === 200 || res.status === 204 || res.status === 404)) {
+                    break;
+                  }
+                } catch {}
+              }
+            }
+          }
+        })().catch((err) => {
+          console.warn("[useProgressReportsData] Background delete sync notice:", err);
+        });
       }
     } finally {
       setIsDeleting(false);

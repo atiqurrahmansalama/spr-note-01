@@ -12,7 +12,8 @@ import {
   setDefaultTemplateForScope,
   validateTemplateForScope,
 } from './scopeTemplateStore';
-import { getSavedDocxTemplates } from './docxTemplateEngine';
+import { getSavedDocxTemplates, fetchCloudDocxTemplates } from './docxTemplateEngine';
+import { FontLoadingCoordinator } from './layout/performance/FontLoadingCoordinator';
 import {
   usePrintStudioState,
   usePrintDocxEngine,
@@ -317,6 +318,37 @@ export default function UniversalPrintStudio({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // DocLab Studio readiness & initialization loader state
+  const [isStudioReady, setIsStudioReady] = React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      setIsStudioReady(false);
+      return;
+    }
+
+    let isMounted = true;
+    const prepareStudio = async () => {
+      try {
+        await Promise.allSettled([
+          FontLoadingCoordinator.waitForFontsReady(),
+          fetchCloudDocxTemplates().catch(() => {}),
+          new Promise((resolve) => setTimeout(resolve, 320)),
+        ]);
+      } finally {
+        if (isMounted) {
+          setIsStudioReady(true);
+        }
+      }
+    };
+
+    prepareStudio();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const studioContent = (
@@ -346,12 +378,32 @@ export default function UniversalPrintStudio({
       />
 
       <div
-        className={`universal-print-studio-container ${
+        className={`universal-print-studio-container relative ${
           isFullscreen
             ? 'w-full h-full flex flex-col overflow-hidden'
             : 'w-full max-w-7xl h-[92vh] rounded-3xl theme-bg-surface border theme-border shadow-2xl overflow-hidden flex flex-col animate-scale-up'
         } print:static print:block print:w-full print:max-w-none print:h-auto print:rounded-none print:border-none print:shadow-none print:bg-white print:overflow-visible`}
       >
+        {/* DocLab Initialization Loader */}
+        {!isStudioReady && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center theme-bg-app/90 backdrop-blur-md transition-opacity duration-300 print:hidden">
+            <div className="flex flex-col items-center gap-4 p-8 rounded-3xl border theme-border theme-bg-surface shadow-2xl max-w-sm w-full mx-4 animate-scale-up">
+              <div className="relative flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full border-2 border-transparent border-t-[var(--accent-main)] border-r-[var(--accent-main)] animate-spin" />
+                <div className="absolute w-7 h-7 rounded-full theme-bg-accent-soft" />
+              </div>
+              <div className="text-center space-y-1.5">
+                <div className="text-sm font-bold theme-text-primary tracking-wide">
+                  DocLab Studio
+                </div>
+                <div className="text-xs theme-text-secondary">
+                  Preparing templates, fonts, and layout engine...
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 1. Master Top Action Toolbar */}
         <DocLabHeader
           title={title}

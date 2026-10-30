@@ -369,6 +369,7 @@ export function usePrintDocxEngine({
             recordsCount: wt.recordsCount,
             sourceTemplateId: wt.sourceTemplateId,
             detectedPlaceholders: wt.detectedPlaceholders || [],
+            isGlobalSticky: Boolean(wt.isGlobalSticky || (wt as any).is_global_sticky),
             createdAt: wt.createdAt,
             updatedAt: wt.updatedAt,
           });

@@ -167,6 +167,8 @@ export default {
   drawerAccountsSubtitle: "Switch between multiple saved institutional profiles.",
   drawerQrTitle: "Cross-Device QR Sign-In",
   drawerQrSubtitle: "Scan with a logged-in mobile device to sign in instantly.",
+  copyLink: "Copy Link",
+  linkCopied: "Sign-in link copied to clipboard!",
   generatingQR: "Generating secure ticket...",
   qrGeneratingDesc: "Establishing a cryptographic session handshake...",
   drawer2FaTitle: "Two-Factor Authentication (2FA)",

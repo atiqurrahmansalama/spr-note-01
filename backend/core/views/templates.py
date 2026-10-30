@@ -1,6 +1,7 @@
 import uuid
 from django.db.models import Q
 from rest_framework import viewsets, status
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from core.models.templates import SavedMessage, CustomDocxTemplate
@@ -62,14 +63,15 @@ class CustomDocxTemplateViewSet(viewsets.ModelViewSet):
         # Users can see:
         # 1. Their own created templates
         # 2. Templates shared within their institution scope
+        # 3. Global sticky templates (visible to all users across modules)
         if getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser:
             qs = self.queryset.all()
         elif tenant_id:
             qs = self.queryset.filter(
-                Q(user=user) | Q(is_shared=True, institution_id=tenant_id)
+                Q(user=user) | Q(is_shared=True, institution_id=tenant_id) | Q(is_global_sticky=True)
             )
         else:
-            qs = self.queryset.filter(user=user)
+            qs = self.queryset.filter(Q(user=user) | Q(is_global_sticky=True))
 
         scope_id = self.request.query_params.get('scope_id') or self.request.query_params.get('scopeId')
         if scope_id:
@@ -93,11 +95,35 @@ class CustomDocxTemplateViewSet(viewsets.ModelViewSet):
         if not template_id:
             template_id = str(uuid.uuid4())
             
+        is_super = getattr(self.request.user, 'user_type', '').upper() == 'SUPER_ADMIN' or self.request.user.is_superuser
+        is_sticky = bool(self.request.data.get('is_global_sticky') or self.request.data.get('isGlobalSticky', False)) if is_super else False
+
         serializer.save(
             id=template_id,
             user=self.request.user,
             institution=inst,
+            is_global_sticky=is_sticky,
         )
+
+    @action(detail=True, methods=['post'], url_path='toggle-sticky')
+    def toggle_sticky(self, request, pk=None):
+        user = request.user
+        is_super = getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser
+        if not is_super:
+            return Response(
+                {'detail': 'Permission denied. Only Super Admin can toggle global sticky templates.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        template = self.get_object()
+        template.is_global_sticky = not template.is_global_sticky
+        template.save(update_fields=['is_global_sticky', 'updated_at'])
+        return Response({
+            'id': template.id,
+            'is_global_sticky': template.is_global_sticky,
+            'isGlobalSticky': template.is_global_sticky,
+            'scope_id': template.scope_id,
+            'message': f"Template is now {'globally sticky' if template.is_global_sticky else 'unpinned'}"
+        })
 
     def perform_destroy(self, instance):
         # Soft delete to prevent catastrophic data loss

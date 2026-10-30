@@ -204,7 +204,10 @@ class StudentDailyReportViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
-        report = serializer.save(created_by=user)
+        save_kwargs = {'created_by': user}
+        if user and not serializer.validated_data.get('teacher_id'):
+            save_kwargs['teacher_id'] = user.id
+        report = serializer.save(**save_kwargs)
         try:
             from core.notifications import notify_report_saved
             notify_report_saved(report, action="CREATED")

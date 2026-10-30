@@ -8,7 +8,7 @@ and backward-compatible legacy service functions.
 from .auth_service import seed_system_roles_11_tier, create_security_session
 from .tenant_service import provision_new_institution, update_tenant_taxonomy
 from .student_service import register_student, promote_student_class
-from .staff_service import onboard_staff_member, assign_teacher_periods
+from .staff_service import onboard_staff_member, assign_teacher_periods, ensure_institution_staff_profile
 from .exam_service import calculate_exam_tabulation_stats
 from .attendance_service import record_bulk_classroom_attendance
 

@@ -125,13 +125,26 @@ class GoogleOAuthExchangeView(APIView):
                 import logging
                 logging.getLogger('core').warning(f"UserSession creation warning: {sess_ex}")
 
+            if getattr(user, 'institution_id', None):
+                try:
+                    from core.services import ensure_institution_staff_profile
+                    ensure_institution_staff_profile(user)
+                except Exception:
+                    pass
+
+            resolved_name = user.name or f"{user.first_name or ''} {user.last_name or ''}".strip() or user.phone_number
             user_data = {
                 'id': user.id,
+                'name': resolved_name,
+                'full_name': resolved_name,
                 'phone_number': user.phone_number,
                 'email': user.email,
                 'first_name': user.first_name,
                 'last_name': user.last_name,
                 'user_type': user.user_type,
+                'is_staff': getattr(user, 'is_staff', False),
+                'institution_id': str(user.institution_id) if user.institution_id else None,
+                'staff_id': str(user.staff_profile.id) if hasattr(user, 'staff_profile') and user.staff_profile else None,
                 'role': user.user_type,
                 'avatar_url': user.avatar_url,
                 'is_email_verified': user.is_email_verified,

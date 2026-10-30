@@ -26,6 +26,7 @@ import {
 import {
   parseDocxDocument,
   saveDocxTemplate,
+  toggleGlobalStickyDocxTemplate,
   CustomDocxTemplate,
 } from '@/components/print/docxTemplateEngine';
 import { useToast } from '@/context/ToastContext';
@@ -46,6 +47,7 @@ export interface DocLabTemplatesTabProps {
   onSaveCurrentTemplate?: (name: string, docType: 'template' | 'generated') => void;
   onDocxRenderModeChange?: (mode: 'template' | 'sample' | 'all') => void;
   onToggleScopeDefault?: (templateId: string) => void;
+  onToggleGlobalSticky?: (template: DocxTemplate) => void;
 }
 
 /**
@@ -69,6 +71,7 @@ export const DocLabTemplatesTab: React.FC<DocLabTemplatesTabProps> = ({
   onSaveCurrentTemplate,
   onDocxRenderModeChange,
   onToggleScopeDefault,
+  onToggleGlobalSticky,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -136,6 +139,25 @@ export const DocLabTemplatesTab: React.FC<DocLabTemplatesTabProps> = ({
       description: renameDescription.trim(),
     });
     setTemplateToRename(null);
+  };
+
+  const handleToggleGlobalSticky = async (targetTemplate: DocxTemplate) => {
+    try {
+      const nextVal = await toggleGlobalStickyDocxTemplate(targetTemplate.id);
+      if (showToast) {
+        showToast(
+          nextVal
+            ? `Template "${targetTemplate.name}" is now set as Global Sticky for all users.`
+            : `Template "${targetTemplate.name}" is no longer Global Sticky.`,
+          'success'
+        );
+      }
+      onToggleGlobalSticky?.(targetTemplate);
+    } catch (err: any) {
+      if (showToast) {
+        showToast(err.message || 'Failed to update global sticky status.', 'error');
+      }
+    }
   };
 
   // Direct Word (.docx) File Ingestion
@@ -217,6 +239,11 @@ export const DocLabTemplatesTab: React.FC<DocLabTemplatesTabProps> = ({
     });
 
     const sortFn = (a: any, b: any) => {
+      const stickyA = Boolean(a.isGlobalSticky || a.is_global_sticky);
+      const stickyB = Boolean(b.isGlobalSticky || b.is_global_sticky);
+      if (stickyA && !stickyB) return -1;
+      if (!stickyA && stickyB) return 1;
+
       const nameA = String(a.name || a.title || a.id || '').trim().toLowerCase();
       const nameB = String(b.name || b.title || b.id || '').trim().toLowerCase();
       return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
@@ -313,6 +340,7 @@ export const DocLabTemplatesTab: React.FC<DocLabTemplatesTabProps> = ({
                 onDuplicate={onDuplicateDocxTemplate}
                 onDelete={(target) => setTemplateToDelete(target)}
                 onToggleScopeDefault={onToggleScopeDefault}
+                onToggleGlobalSticky={handleToggleGlobalSticky}
               />
             ))}
           </div>
@@ -349,6 +377,7 @@ export const DocLabTemplatesTab: React.FC<DocLabTemplatesTabProps> = ({
                 onDuplicate={onDuplicateDocxTemplate}
                 onDelete={(target) => setTemplateToDelete(target)}
                 onToggleScopeDefault={onToggleScopeDefault}
+                onToggleGlobalSticky={handleToggleGlobalSticky}
               />
             ))}
           </div>

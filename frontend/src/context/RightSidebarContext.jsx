@@ -81,6 +81,20 @@ function updateUrlParams(updater) {
 }
 
 /**
+ * Helper to push new history entry for drawer so physical back button dismisses drawer
+ */
+function pushUrlParams(updater, state = {}) {
+  if (typeof window === 'undefined') return;
+  try {
+    const url = new URL(window.location.href);
+    updater(url.searchParams);
+    window.history.pushState(state, '', url.toString());
+  } catch (e) {
+    console.warn('Failed to push URL parameters:', e);
+  }
+}
+
+/**
  * Helper to get current URL search parameters
  */
 function getUrlParams() {
@@ -124,16 +138,20 @@ export function RightSidebarProvider({ children }) {
 
   const closeRightSidebar = useCallback((skipUrlClean = false) => {
     if (!skipUrlClean) {
-      updateUrlParams((params) => {
-        params.delete('drawer');
-        params.delete('drawerId');
-        params.delete('mode');
-        params.delete('date');
-        params.delete('eventId');
-        params.delete('targetId');
-        params.delete('classId');
-        params.delete('type');
-      });
+      if (typeof window !== 'undefined' && window.history.state?.sprDrawer) {
+        window.history.back();
+      } else {
+        updateUrlParams((params) => {
+          params.delete('drawer');
+          params.delete('drawerId');
+          params.delete('mode');
+          params.delete('date');
+          params.delete('eventId');
+          params.delete('targetId');
+          params.delete('classId');
+          params.delete('type');
+        });
+      }
     }
 
     if (configRef.current?.onClose) {
@@ -195,7 +213,7 @@ export function RightSidebarProvider({ children }) {
       : (drawerKey !== 'notifications' && drawerKey !== 'notification_detail');
 
     if (syncUrl) {
-      updateUrlParams((params) => {
+      pushUrlParams((params) => {
         // Clear previous drawer-specific params
         const drawerParamKeys = ['id', 'mode', 'studentId', 'bookId', 'bookName', 'subjectName', 'lessonTitle', 'startUnit', 'endUnit', 'slotId'];
         drawerParamKeys.forEach((k) => params.delete(k));
@@ -208,7 +226,7 @@ export function RightSidebarProvider({ children }) {
             params.delete(k);
           }
         });
-      });
+      }, { sprDrawer: drawerKey });
     }
 
     const renderer = drawerRegistry.get(drawerKey);

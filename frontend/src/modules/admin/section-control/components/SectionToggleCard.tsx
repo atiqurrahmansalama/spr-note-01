@@ -58,6 +58,13 @@ export const SectionToggleCard: React.FC<SectionToggleCardProps> = ({
             {t('badges.roleOverride', 'Role Override')}
           </span>
         );
+      case 'ACADEMY':
+        return (
+          <span className="theme-bg-accent-soft theme-accent text-[9px] px-1.5 py-0.5 rounded font-mono font-bold flex items-center gap-1 shadow-2xs shrink-0 border border-current/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 shrink-0" />
+            {t('badges.academyOverride', 'Academy Override')}
+          </span>
+        );
       case 'GLOBAL':
       default:
         return null;
@@ -137,18 +144,14 @@ export const SectionToggleCard: React.FC<SectionToggleCardProps> = ({
           )}
         </div>
 
-        {/* Line 2: Description + Key in a single line */}
-        <div className="flex items-center gap-1.5 text-[11px] theme-text-secondary min-w-0 leading-tight">
-          {section.description ? (
-            <span className="truncate max-w-[80%] opacity-85">
+        {/* Line 2: Subtitle / Description */}
+        {section.description ? (
+          <div className="text-[11px] theme-text-secondary min-w-0 leading-tight">
+            <span className="truncate opacity-85 block">
               {section.description}
             </span>
-          ) : null}
-          {section.description && <span className="opacity-30 shrink-0">•</span>}
-          <span className="font-mono text-[10px] opacity-60 truncate shrink-0">
-            {t('badges.keyLabel', `Key: ${section.section_key}`, { key: section.section_key })}
-          </span>
-        </div>
+          </div>
+        ) : null}
       </div>
 
       {/* Right: Dedicated Switch Toggle Zone (Independent Action) */}

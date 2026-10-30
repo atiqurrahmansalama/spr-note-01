@@ -413,16 +413,6 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
                   'Your account is protected with TOTP-based two-factor authentication. An authenticator app code is required at sign-in.'
                 )}
               </p>
-
-              <div className="pt-2 border-t theme-border flex items-center justify-between text-xs theme-text-secondary">
-                <span className="flex items-center gap-1.5">
-                  <InfoIcon className="w-3.5 h-3.5 theme-accent" />
-                  {t('standardTOTP', 'RFC 6238 Standard (30-second rotation)')}
-                </span>
-                <span className="font-mono text-[11px] px-2 py-0.5 rounded-md theme-bg-sub border theme-border font-bold">
-                  SHA-1 / 6 Digits
-                </span>
-              </div>
             </div>
 
             {/* Emergency Recovery Codes Status & Regeneration */}
@@ -620,10 +610,12 @@ export const Setup2FADrawer: React.FC<Setup2FADrawerProps> = ({
               )}
             </DrawerSection>
 
-            {/* Disable 2FA Section (Enterprise Guarded) */}
+            {/* Disable 2FA Section (Enterprise Guarded - Collapsed by Default) */}
             <DrawerSection
               title={t('disable2FA', 'Disable 2FA Protection')}
               icon={AlertCircleIcon}
+              collapsible={true}
+              defaultExpanded={false}
             >
               <form onSubmit={handleDisable2FA} className="p-4 rounded-2xl theme-bg-surface border theme-border space-y-4">
                 <p className="text-xs theme-text-secondary leading-relaxed">

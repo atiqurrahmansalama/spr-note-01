@@ -31,9 +31,10 @@ assert.deepStrictEqual(arKeys, enKeys, 'Arabic keys must match English keys 100%
 assert.deepStrictEqual(urKeys, enKeys, 'Urdu keys must match English keys 100%');
 console.log(`[PASS] 4-Language localization parity verified across all ${enKeys.length} keys.`);
 
-// 2. Inheritance Evaluation Simulation (3-Tier: User > Role > Global)
+// 2. Inheritance Evaluation Simulation (4-Tier: User > Role > Academy > Global)
 interface EvaluationContext {
   globalRules: Record<string, boolean>;
+  academyOverrides?: Record<string, boolean>;
   roleOverrides: Record<string, boolean>;
   userOverrides: Record<string, boolean>;
 }
@@ -47,6 +48,9 @@ function resolveSectionState(
   }
   if (context.roleOverrides[sectionKey] !== undefined) {
     return { enabled: context.roleOverrides[sectionKey], origin: 'ROLE' };
+  }
+  if (context.academyOverrides && context.academyOverrides[sectionKey] !== undefined) {
+    return { enabled: context.academyOverrides[sectionKey], origin: 'ACADEMY' };
   }
   return {
     enabled: context.globalRules[sectionKey] !== undefined ? context.globalRules[sectionKey] : true,
@@ -75,6 +79,18 @@ const resultB = resolveSectionState('student_admit', ctxRoleOverride);
 assert.strictEqual(resultB.enabled, false);
 assert.strictEqual(resultB.origin, 'ROLE');
 console.log('[PASS] Role override takes precedence over global default.');
+
+// Test Case B2: Academy override takes precedence over global default when no role or user override
+const ctxAcademyOverride: EvaluationContext = {
+  globalRules: { fee_waiver: true },
+  academyOverrides: { fee_waiver: false },
+  roleOverrides: {},
+  userOverrides: {},
+};
+const resultB2 = resolveSectionState('fee_waiver', ctxAcademyOverride);
+assert.strictEqual(resultB2.enabled, false);
+assert.strictEqual(resultB2.origin, 'ACADEMY');
+console.log('[PASS] Academy override takes precedence over global default.');
 
 // Test Case C: Falls back to global default if no subordinate overrides
 const ctxGlobalOnly: EvaluationContext = {

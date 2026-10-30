@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import AutocompleteDropdown, { type AutocompleteOption } from "@/components/ui/AutocompleteDropdown";
 import { curriculumStore } from "@/stores";
 import { useTenant } from "@/context/TenantContext";
+import { useFeatureControl } from "@/context/FeatureControlContext";
 import type { StudentProfileOption, SessionItem } from "../types";
 
 import StudentSelector, {
@@ -23,13 +24,27 @@ export interface SessionInputSectionProps {
   sessionList?: (string | SessionItem)[];
   selectedSession?: string;
   onSessionChange?: (val: string) => void;
+  actionLabel?: string | null;
+  actionTo?: string | null;
 }
 
 export function SessionInputSection({
   sessionList = [],
   selectedSession = "",
   onSessionChange,
+  actionLabel,
+  actionTo,
 }: SessionInputSectionProps) {
+  const { isFeatureEnabled } = useFeatureControl();
+  const canAddSession = isFeatureEnabled('progress_action_add_session');
+
+  const effectiveActionLabel = actionLabel !== undefined
+    ? actionLabel
+    : (canAddSession ? "+ Add Session" : undefined);
+  const effectiveActionTo = actionTo !== undefined
+    ? actionTo
+    : (canAddSession ? "/admin-tools?tab=report-sessions" : undefined);
+
   const sessionOptions: AutocompleteOption[] = useMemo(() => {
     return sessionList.map((s) => ({
       label: typeof s === "object" ? (s.name || s.label || "") : String(s),
@@ -55,8 +70,8 @@ export function SessionInputSection({
         onQueryChange={(val) => onSessionChange && onSessionChange(val || "")}
         placeholder="e.g. Sobok, Dour..."
         label="SESSION"
-        actionLabel="+ Add Session"
-        actionTo="/admin-tools?tab=report-sessions"
+        actionLabel={effectiveActionLabel}
+        actionTo={effectiveActionTo}
         actionTitle="Add or manage sessions"
         size="md"
       />

@@ -3,9 +3,9 @@
  * Enterprise 4-Tier Precedence Evaluation System
  */
 
-export type ScopeType = 'global' | 'role' | 'user' | 'audit';
+export type ScopeType = 'global' | 'role' | 'academy' | 'user' | 'audit';
 
-export type InheritanceOrigin = 'GLOBAL' | 'ROLE' | 'GROUP' | 'USER';
+export type InheritanceOrigin = 'GLOBAL' | 'ROLE' | 'GROUP' | 'ACADEMY' | 'USER';
 
 export interface SectionItem {
   id?: number | string;
@@ -38,6 +38,13 @@ export interface AuditLogEntry {
   section_key: string;
   previous_state: boolean | string | number | null;
   new_state: boolean | string | number | null;
+}
+
+export interface AcademyOption {
+  id: number | string;
+  name: string;
+  code?: string;
+  short_name?: string;
 }
 
 export interface RoleOption {

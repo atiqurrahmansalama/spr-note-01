@@ -2650,6 +2650,7 @@ export async function fetchCloudDocxTemplates(): Promise<CustomDocxTemplate[]> {
           orientation: t.orientation || 'PORTRAIT',
           margin: t.margin || 'NORMAL',
           isShared: t.isShared ?? t.is_shared ?? false,
+          isGlobalSticky: t.isGlobalSticky ?? t.is_global_sticky ?? false,
           createdAt: t.createdAt || t.created_at || new Date().toISOString(),
           updatedAt: t.updatedAt || t.updated_at || new Date().toISOString(),
         })
@@ -2700,6 +2701,7 @@ async function syncDocxTemplateToCloud(template: CustomDocxTemplate): Promise<vo
       orientation: template.orientation || 'PORTRAIT',
       margin: template.margin || 'NORMAL',
       is_shared: !!(template as any).isShared,
+      is_global_sticky: !!(template as any).isGlobalSticky,
     };
 
     try {
@@ -2728,6 +2730,35 @@ async function deleteDocxTemplateFromCloud(id: string): Promise<void> {
     });
   } catch (err) {
     console.warn('[DocLab] Failed to delete template from backend database:', err);
+  }
+}
+
+/**
+ * Toggles global sticky status for a template in the backend database and local cache.
+ * Restricted to Super Admin on backend.
+ */
+export async function toggleGlobalStickyDocxTemplate(templateId: string): Promise<boolean> {
+  try {
+    const res: any = await fetchWithAuth(`/api/v1/docx-templates/${encodeURIComponent(templateId)}/toggle-sticky/`, {
+      method: 'POST',
+    });
+    const nextSticky = res && typeof res.is_global_sticky === 'boolean' ? res.is_global_sticky : false;
+    const existing = getSavedDocxTemplates();
+    const updated = existing.map((t) =>
+      t.id === templateId ? { ...t, isGlobalSticky: nextSticky } : t
+    );
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(updated));
+        window.dispatchEvent(
+          new CustomEvent('spr_doclab_template_saved', { detail: { templateId, isGlobalSticky: nextSticky } })
+        );
+      } catch {}
+    }
+    return nextSticky;
+  } catch (err) {
+    console.error('[DocLab] Failed to toggle global sticky status:', err);
+    throw err;
   }
 }
 

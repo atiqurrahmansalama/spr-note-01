@@ -178,6 +178,7 @@ def evaluate_section_config_for_user(user=None):
         UserSectionOverride,
         GroupSectionPermission,
         RoleSectionPermission,
+        AcademySectionOverride,
     )
     from .feature_registry import FEATURE_REGISTRY
     registry_keys = {item["key"] for item in FEATURE_REGISTRY}
@@ -193,6 +194,7 @@ def evaluate_section_config_for_user(user=None):
     user_overrides = {}
     group_overrides = {}
     role_overrides = {}
+    academy_overrides = {}
 
     if user and user.is_authenticated:
         # Tier 1: User Overrides
@@ -225,6 +227,13 @@ def evaluate_section_config_for_user(user=None):
             for o in role_perms:
                 role_overrides[o.section.section_key] = o.is_enabled
 
+        # Tier 4: Academy Overrides
+        if getattr(user, 'institution_id', None):
+            academy_overrides = {
+                o.section.section_key: o.is_enabled
+                for o in AcademySectionOverride.objects.filter(institution_id=user.institution_id).select_related('section')
+            }
+
     # 4-Tier Resolution Evaluation (Independent of hierarchy first)
     for sec in sections:
         key = sec.section_key
@@ -242,6 +251,9 @@ def evaluate_section_config_for_user(user=None):
         elif user and user.is_authenticated and key in role_overrides:
             resolved_raw[key] = role_overrides[key]
             origins[key] = "ROLE"
+        elif user and user.is_authenticated and key in academy_overrides:
+            resolved_raw[key] = academy_overrides[key]
+            origins[key] = "ACADEMY"
         else:
             resolved_raw[key] = global_val
             origins[key] = "GLOBAL"

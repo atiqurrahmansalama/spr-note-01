@@ -12,6 +12,7 @@ import {
   ChevronIcon,
 } from "@/components/ui/Icons";
 import { RecordReportsTableProps, ReportItem } from "../types";
+import { auth as authStore } from "@/utils/localStore";
 import {
   useStudentMetaResolver,
   getPortions,
@@ -416,7 +417,7 @@ export default function RecordReportsCardGrid({
                   <span className="inline-flex items-center gap-1 text-[10px] font-mono opacity-90 pl-1.5 border-l theme-border">
                     <span className="font-bold opacity-75">REPORTED BY:</span>
                     <span className="theme-text-primary font-semibold">
-                      {report.teacher_name || report.teacher || "—"}
+                      {report.teacher_name || report.teacher || authStore.getUser?.()?.name || authStore.getUser?.()?.full_name || "Staff Teacher"}
                     </span>
                   </span>
 

@@ -60,6 +60,18 @@ class GroupSectionPermission(models.Model):
         return f"Group [{self.group_id}] -> {self.section.section_key}: {self.is_enabled}"
 
 
+class AcademySectionOverride(models.Model):
+    institution = models.ForeignKey('core.AcademicInstitution', on_delete=models.CASCADE, related_name='section_overrides')
+    section = models.ForeignKey(AppSection, on_delete=models.CASCADE, related_name='academy_overrides')
+    is_enabled = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ('institution', 'section')
+
+    def __str__(self):
+        return f"Academy [{self.institution_id}] -> {self.section.section_key}: {self.is_enabled}"
+
+
 class UserSectionOverride(models.Model):
     user = models.ForeignKey('core.User', on_delete=models.CASCADE, related_name='section_overrides')
     section = models.ForeignKey(AppSection, on_delete=models.CASCADE, related_name='user_overrides')
@@ -77,6 +89,7 @@ class FeatureFlagAuditLog(models.Model):
         ('GLOBAL', 'Global Default'),
         ('ROLE', 'Role Permission'),
         ('GROUP', 'Group Permission'),
+        ('ACADEMY', 'Academy Override'),
         ('USER', 'User Override'),
     )
 

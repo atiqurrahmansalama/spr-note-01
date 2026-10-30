@@ -17,6 +17,7 @@ from core.models import (
     StudentAcademicHistory,
     Session,
     SavedMessage,
+    CustomDocxTemplate,
     StudentDailyReport,
     ReportStatus,
     ReportPortion,
@@ -36,6 +37,7 @@ from core.models import (
     AppSection,
     RoleSectionPermission,
     GroupSectionPermission,
+    AcademySectionOverride,
     UserSectionOverride,
     FeatureFlagAuditLog,
     UserPasskey,
@@ -625,6 +627,13 @@ class GroupSectionPermissionAdmin(admin.ModelAdmin):
     search_fields = ('section__title', 'section__section_key', 'group_id')
 
 
+@admin.register(AcademySectionOverride)
+class AcademySectionOverrideAdmin(admin.ModelAdmin):
+    list_display = ('institution', 'section', 'is_enabled')
+    list_filter = ('is_enabled', 'institution')
+    search_fields = ('institution__name', 'institution__code', 'section__title', 'section__section_key')
+
+
 @admin.register(UserSectionOverride)
 class UserSectionOverrideAdmin(admin.ModelAdmin):
     list_display = ('user', 'section', 'is_enabled')
@@ -647,9 +656,35 @@ class UserPasskeyAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at',)
 
 
+@admin.register(CustomDocxTemplate)
+class CustomDocxTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'scope_id', 'is_global_sticky', 'is_shared', 'user', 'institution', 'created_at', 'updated_at')
+    list_filter = ('is_global_sticky', 'is_shared', 'scope_id', 'is_deleted')
+    search_fields = ('name', 'description', 'scope_id', 'user__phone_number', 'user__email')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+
 @admin.register(QRSessionTicket)
 class QRSessionTicketAdmin(admin.ModelAdmin):
     list_display = ('ticket_id', 'status', 'authorized_user', 'expires_at', 'created_at')
     list_filter = ('status', 'created_at')
     search_fields = ('authorized_user__phone_number', 'authorized_user__email')
     readonly_fields = ('created_at',)
+
+
+@admin.register(CustomDocxTemplate)
+class CustomDocxTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'scope_id', 'is_global_sticky', 'is_shared', 'user', 'institution', 'created_at', 'updated_at')
+    list_filter = ('is_global_sticky', 'is_shared', 'scope_id', 'is_deleted')
+    search_fields = ('name', 'description', 'scope_id', 'user__phone_number', 'user__email')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+
+@admin.register(CustomDocxTemplate)
+class CustomDocxTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'scope_id', 'is_global_sticky', 'is_shared', 'user', 'institution', 'created_at', 'updated_at')
+    list_filter = ('is_global_sticky', 'is_shared', 'scope_id', 'is_deleted')
+    search_fields = ('name', 'description', 'scope_id', 'user__phone_number', 'user__email')
+    readonly_fields = ('created_at', 'updated_at')

@@ -6,6 +6,7 @@ import {
   SectionControlIcon,
   GlobeIcon,
   UsersIcon,
+  BuildingLibraryIcon,
   StudentIcon,
   TimerIcon,
 } from '../../../components/ui/Icons';
@@ -31,9 +32,12 @@ export const SectionControlView: React.FC = () => {
     setActiveScope,
     selectedRole,
     setSelectedRole,
+    selectedAcademy,
+    setSelectedAcademy,
     selectedUser,
     setSelectedUser,
     dbRoles,
+    dbAcademies,
     dbUsers,
     categories,
     modifiedFlags,
@@ -88,6 +92,11 @@ export const SectionControlView: React.FC = () => {
       id: 'role',
       label: t('tabs.role', 'Role Scopes'),
       icon: UsersIcon,
+    },
+    {
+      id: 'academy',
+      label: t('tabs.academy', 'Academy Overrides'),
+      icon: BuildingLibraryIcon,
     },
     {
       id: 'user',
@@ -156,6 +165,9 @@ export const SectionControlView: React.FC = () => {
         selectedRole={selectedRole}
         onSelectRole={setSelectedRole}
         dbRoles={dbRoles}
+        dbAcademies={dbAcademies}
+        selectedAcademy={selectedAcademy}
+        onSelectAcademy={setSelectedAcademy}
         dbUsers={dbUsers}
         selectedUser={selectedUser}
         onSelectUser={setSelectedUser}

@@ -218,8 +218,14 @@ export default function DailyClassroomHubView({
     }
   }, [activeTabs, activeTab]);
 
+  // ── Progress Mode Feature Flags ───────────────────────────────────────────
+  const isQuranAllowed = isSectionEnabled('progress_mode_quran');
+  const isBookAllowed = isSectionEnabled('progress_mode_book');
+
   // ── Progress Mode State (Quran vs Book/Subject) ───────────────────────────
   const [progressMode, setProgressMode] = useState<'QURAN' | 'BOOK'>(() => {
+    if (isQuranAllowed && !isBookAllowed) return 'QURAN';
+    if (!isQuranAllowed && isBookAllowed) return 'BOOK';
     if (path.includes('/daily-progress/book')) return 'BOOK';
     if (path.includes('/daily-progress/quran')) return 'QURAN';
     if (defaultMode) return defaultMode;
@@ -229,6 +235,17 @@ export default function DailyClassroomHubView({
       return 'QURAN';
     }
   });
+
+  // Normalize progress mode if one of the modes is restricted
+  useEffect(() => {
+    if (isQuranAllowed && !isBookAllowed && progressMode !== 'QURAN') {
+      setProgressMode('QURAN');
+      try { localStorage.setItem('spr_daily_progress_mode', 'QURAN'); } catch {}
+    } else if (!isQuranAllowed && isBookAllowed && progressMode !== 'BOOK') {
+      setProgressMode('BOOK');
+      try { localStorage.setItem('spr_daily_progress_mode', 'BOOK'); } catch {}
+    }
+  }, [isQuranAllowed, isBookAllowed, progressMode]);
 
   // Sync mode on URL path changes
   useEffect(() => {
@@ -853,6 +870,74 @@ export default function DailyClassroomHubView({
     handleProgressModeChange,
   ]);
 
+  // ── Separate Independent Filter State for Progress Reports (Point 4) ─────────
+  const [reportsDeptId, setReportsDeptId] = useState('');
+  const [reportsClassId, setReportsClassId] = useState('');
+  const [reportsSectionId, setReportsSectionId] = useState('');
+
+  const reportsClassOptions = useMemo(() => {
+    let raw = (classes || []).map((c: any) => ({
+      value: String(c.id),
+      label: c.name || c.class_name,
+      departmentId: c.department || c.department_id,
+    }));
+    if (reportsDeptId) {
+      raw = raw.filter((c: any) => String(c.departmentId) === String(reportsDeptId));
+    }
+    return [{ value: '', label: 'All Classes' }, ...raw];
+  }, [classes, reportsDeptId]);
+
+  const reportsSectionOptions = useMemo(() => {
+    let raw = (sections || []).map((s: any) => ({
+      value: String(s.id),
+      label: s.name || s.section_name,
+      classId: s.academic_class || s.class_id,
+    }));
+    if (reportsClassId) {
+      raw = raw.filter((s: any) => String(s.classId) === String(reportsClassId));
+    }
+    return [{ value: '', label: 'All Sections' }, ...raw];
+  }, [sections, reportsClassId]);
+
+  const reportsFilterProps = useMemo(() => ({
+    hasDepartments,
+    selectedDepartmentId: reportsDeptId,
+    onDepartmentChange: (val: any) => {
+      const v = typeof val === 'object' ? val?.value || val?.id || '' : val || '';
+      setReportsDeptId(v);
+      setReportsClassId('');
+      setReportsSectionId('');
+    },
+    departmentSelectOptions,
+    selectedClassId: reportsClassId,
+    onClassChange: (val: any) => {
+      const v = typeof val === 'object' ? val?.value || val?.id || '' : val || '';
+      setReportsClassId(v);
+      setReportsSectionId('');
+    },
+    classSelectOptions: reportsClassOptions,
+    hasSectionsForClass: reportsSectionOptions.length > 1,
+    selectedSectionId: reportsSectionId,
+    onSectionChange: (val: any) => {
+      const v = typeof val === 'object' ? val?.value || val?.id || '' : val || '';
+      setReportsSectionId(v);
+    },
+    sectionSelectOptions: reportsSectionOptions,
+    onBatchHierarchyChange: ({ departmentId, classId, sectionId }: { departmentId?: string; classId?: string; sectionId?: string }) => {
+      if (departmentId !== undefined) setReportsDeptId(departmentId || '');
+      if (classId !== undefined) setReportsClassId(classId || '');
+      if (sectionId !== undefined) setReportsSectionId(sectionId || '');
+    },
+  }), [
+    hasDepartments,
+    reportsDeptId,
+    departmentSelectOptions,
+    reportsClassId,
+    reportsClassOptions,
+    reportsSectionOptions,
+    reportsSectionId,
+  ]);
+
   return (
     <PageContainer isEmbedded={isEmbedded} className="space-y-4">
       {/* 1. Collapsible Header & Tab Switcher */}
@@ -887,16 +972,18 @@ export default function DailyClassroomHubView({
               Evaluate Student
             </CustomButton>
           ) : isProgressHub && activeTab === 'PROGRESS' ? (
-            <SegmentedSwitch<'QURAN' | 'BOOK'>
-              value={progressMode}
-              onChange={handleProgressModeChange}
-              hideIconsOnMobile={true}
-              options={[
-                { value: 'QURAN', label: 'Quran', icon: BookOpenIcon, hideIconOnMobile: true },
-                { value: 'BOOK', label: 'Book', icon: LayersIcon, hideIconOnMobile: true },
-              ]}
-              size="sm"
-            />
+            isQuranAllowed && isBookAllowed ? (
+              <SegmentedSwitch<'QURAN' | 'BOOK'>
+                value={progressMode}
+                onChange={handleProgressModeChange}
+                hideIconsOnMobile={true}
+                options={[
+                  { value: 'QURAN', label: 'Quran', icon: BookOpenIcon, hideIconOnMobile: true },
+                  { value: 'BOOK', label: 'Book', icon: LayersIcon, hideIconOnMobile: true },
+                ]}
+                size="sm"
+              />
+            ) : null
           ) : null
         }
       />
@@ -990,7 +1077,7 @@ export default function DailyClassroomHubView({
           <Suspense fallback={<HubTabSkeletonLoader isReports={true} />}>
             <StudentReportsView
               isEmbedded={true}
-              filterProps={sharedFilterProps}
+              filterProps={reportsFilterProps}
               defaultReportView={defaultReportView}
             />
           </Suspense>

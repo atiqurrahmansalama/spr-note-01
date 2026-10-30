@@ -54,7 +54,13 @@ export const HARD_DEFAULTS: Record<string, boolean> = {
   lesson_tab_analytics: true,
   progress_management: true,
   progress_tab_daily_progress: true,
+  progress_mode_quran: true,
+  progress_mode_book: true,
+  progress_action_add_student: true,
+  progress_action_add_session: true,
   progress_tab_reports: true,
+  progress_reports_analytics: true,
+  progress_reports_view_all_teachers: true,
   progress_tab_analytics: true,
 
   // 4. Examination & Results

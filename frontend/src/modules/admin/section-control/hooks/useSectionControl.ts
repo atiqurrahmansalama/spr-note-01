@@ -12,9 +12,10 @@ import {
   RoleOption,
   UserSearchResult,
   BatchUpdatePayload,
+  AcademyOption,
 } from '../types';
 
-const VALID_SCOPES: ScopeType[] = ['global', 'role', 'user', 'audit'];
+const VALID_SCOPES: ScopeType[] = ['global', 'role', 'academy', 'user', 'audit'];
 
 export function useSectionControl() {
   const { showToast } = useToast();
@@ -43,6 +44,22 @@ export function useSectionControl() {
     if (dbRoles.length > 0) return dbRoles[0].code;
     return '';
   }, [searchParams, dbRoles]);
+
+  const [dbAcademies, setDbAcademies] = useState<AcademyOption[]>(() => {
+    try {
+      const saved = localStorage.getItem('spr_local_academies_v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const selectedAcademy = useMemo(() => {
+    const academyParam = searchParams.get('academy');
+    if (academyParam) return academyParam;
+    if (dbAcademies.length > 0) return String(dbAcademies[0].id);
+    return '';
+  }, [searchParams, dbAcademies]);
 
   const selectedUser = useMemo(() => {
     return searchParams.get('user') || '';
@@ -105,6 +122,24 @@ export function useSectionControl() {
     [setSearchParams]
   );
 
+
+  const setSelectedAcademy = useCallback(
+    (academyId: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (academyId) {
+            next.set('academy', academyId);
+          } else {
+            next.delete('academy');
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
 
   const setSelectedUser = useCallback(
     (userId: string) => {
@@ -184,7 +219,33 @@ export function useSectionControl() {
       }
     };
 
+    const fetchAcademies = async () => {
+      const paths = ['/api/v1/institutions/', '/api/institutions/', '/institutions/'];
+      for (const path of paths) {
+        try {
+          const res = await fetchWithAuth(path);
+          if (res.ok && isMounted) {
+            const data = await res.json();
+            const list: AcademyOption[] = (Array.isArray(data) ? data : data.results || []).map((inst: any) => ({
+              id: inst.id,
+              name: inst.name || inst.institution_name || `Academy #${inst.id}`,
+              code: inst.code,
+              short_name: inst.short_name,
+            }));
+            if (list.length > 0) {
+              setDbAcademies(list);
+              try {
+                localStorage.setItem('spr_local_academies_v1', JSON.stringify(list));
+              } catch {}
+              return;
+            }
+          }
+        } catch {}
+      }
+    };
+
     fetchRoles();
+    fetchAcademies();
     fetchUsers();
 
     return () => {
@@ -195,9 +256,10 @@ export function useSectionControl() {
   // 2. Target Identifier Computation based on Scope
   const currentTargetId = useMemo(() => {
     if (activeScope === 'role') return selectedRole;
+    if (activeScope === 'academy') return selectedAcademy;
     if (activeScope === 'user') return selectedUser;
     return '';
-  }, [activeScope, selectedRole, selectedUser]);
+  }, [activeScope, selectedRole, selectedAcademy, selectedUser]);
 
   // 3. Fetch Rules for selected scope and target
   const loadRules = useCallback(async () => {
@@ -520,6 +582,8 @@ export function useSectionControl() {
     setActiveScope,
     selectedRole,
     setSelectedRole,
+    selectedAcademy,
+    setSelectedAcademy,
     selectedUser,
     setSelectedUser,
     userSearchQuery,
@@ -527,6 +591,7 @@ export function useSectionControl() {
     userSearchResults,
     setUserSearchResults,
     dbRoles,
+    dbAcademies,
     dbUsers,
     categories,
     modifiedFlags,

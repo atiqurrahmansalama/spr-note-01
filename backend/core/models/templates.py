@@ -73,6 +73,7 @@ class CustomDocxTemplate(models.Model):
         related_name='custom_docx_templates'
     )
     is_shared = models.BooleanField(default=False, db_index=True)
+    is_global_sticky = models.BooleanField(default=False, db_index=True)
     is_deleted = models.BooleanField(default=False, db_index=True)
     
     created_at = models.DateTimeField(auto_now_add=True)

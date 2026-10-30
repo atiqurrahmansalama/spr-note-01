@@ -136,16 +136,6 @@ export default function AppHeader({
         {/* Multi-Language & RTL Switcher */}
         <LanguageSelector />
 
-        {/* Client Version & Update Status Badge */}
-        {versionControl && (
-          <UpdateBadge
-            currentVersion={versionControl.currentVersion}
-            hasUpdate={versionControl.hasUpdate}
-            isChecking={versionControl.isChecking}
-            onClick={versionControl.onClick}
-          />
-        )}
-
         {/* Real-time In-App Notification Bell */}
         <NotificationBellDropdown />
 

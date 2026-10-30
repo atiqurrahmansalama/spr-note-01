@@ -165,6 +165,8 @@ export default {
   drawerAccountsSubtitle: "التبديل بين الحسابات المحفوظة بسهولة.",
   drawerQrTitle: "تسجيل الدخول عبر رمز QR",
   drawerQrSubtitle: "مسح الرمز ضوئياً بجهاز مسجل للدخول الفوري.",
+  copyLink: "نسخ الرابط",
+  linkCopied: "تم نسخ رابط تسجيل الدخول إلى الحافظة!",
   generatingQR: "جارٍ إنشاء رمز جلسة آمن...",
   qrGeneratingDesc: "جارٍ تأسيس مصافحة أمنية مشفرة للجلسة...",
   drawer2FaTitle: "المصادقة الثنائية (2FA)",

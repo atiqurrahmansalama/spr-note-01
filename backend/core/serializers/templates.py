@@ -35,6 +35,7 @@ class CustomDocxTemplateSerializer(serializers.ModelSerializer):
     pageProperties = serializers.DictField(source='page_properties', required=False)
     pageSize = serializers.CharField(source='page_size', required=False, allow_blank=True)
     isShared = serializers.BooleanField(source='is_shared', required=False)
+    isGlobalSticky = serializers.BooleanField(source='is_global_sticky', required=False)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
     userName = serializers.SerializerMethodField()
@@ -75,6 +76,8 @@ class CustomDocxTemplateSerializer(serializers.ModelSerializer):
             'institution',
             'is_shared',
             'isShared',
+            'is_global_sticky',
+            'isGlobalSticky',
             'created_at',
             'createdAt',
             'updated_at',

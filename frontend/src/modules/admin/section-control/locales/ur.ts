@@ -21,9 +21,11 @@ export const ur = {
   tabs: {
     global: 'عمومی ڈیفالٹس',
     role: 'کردار کے اوور رائیڈز',
+    academy: 'اکیڈمی اوور رائیڈز',
     group: 'گروپ کے اوور رائیڈز',
     user: 'صارف کے اوور رائیڈز',
     audit: 'آڈٹ لاگز',
+    totalFeatures: 'کل فیچرز:',
   },
 
   actions: {
@@ -42,9 +44,12 @@ export const ur = {
 
   targets: {
     targetRole: 'ہدف کردار:',
+    targetAcademy: 'ہدف اکیڈمی:',
     targetGroup: 'ہدف گروپ:',
     targetUser: 'ہدف صارف تلاش کریں:',
+    academySearchPlaceholder: 'ہدف اکیڈمی منتخب کریں...',
     userSearchPlaceholder: 'نام، فون یا ای میل سے صارف تلاش کریں...',
+    selectedAcademyId: 'منتخب کردہ اکیڈمی: #{{id}}',
     selectedUserId: 'منتخب صارف کی شناخت: #{{id}}',
     allGroups: 'تمام گروپس',
     noPhone: 'کوئی فون نہیں',
@@ -60,6 +65,7 @@ export const ur = {
     disabledByParent: 'پیرنٹ کے ذریعے غیر فعال',
     globalDefault: 'عمومی ڈیفالٹ',
     roleOverride: 'کردار اوور رائیڈ',
+    academyOverride: 'اکیڈمی اوور رائیڈ',
     groupOverride: 'گروپ اوور رائیڈ',
     userOverride: 'صارف اوور رائیڈ',
     categoryKey: 'زمرہ کلید: {{key}}',
@@ -78,6 +84,7 @@ export const ur = {
     scope: 'دائرہ کار',
     target: 'ہدف',
     sectionKey: 'فیچر کلید',
+    featureSection: 'فیچر / ماڈیول',
     change: 'تبدیلی',
     allScopes: 'تمام دائرہ کار',
     filterByScope: 'دائرہ کار کے لحاظ سے فلٹر کریں',

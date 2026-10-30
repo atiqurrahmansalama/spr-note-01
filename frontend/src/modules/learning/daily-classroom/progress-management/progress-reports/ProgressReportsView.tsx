@@ -27,6 +27,9 @@ import { isReportUnsynced } from "@/utils/syncEngine";
 import { normalizeToISODate } from "../../utils/dailyClassroomUtils";
 import { useAcademicData } from "@/hooks/useAcademicData";
 import { useTenant } from "@/context/TenantContext";
+import { useFeatureControl } from "@/context/FeatureControlContext";
+import { useAuth } from "@/context/AuthContext";
+import { students as studentStore } from "@/utils/localStore";
 import {
   RecordReportsTable,
   RecordReportsCardGrid,
@@ -86,6 +89,11 @@ export default function ProgressReportsView({
     showToast,
   });
 
+  const { isFeatureEnabled } = useFeatureControl();
+  const { user: currentUser } = useAuth() as any;
+  const canViewAnalytics = isFeatureEnabled("progress_reports_analytics");
+  const canViewAllTeachers = isFeatureEnabled("progress_reports_view_all_teachers");
+
   // 2. Filters & Selection hook (Search, department/class/section, date boundaries, grouping)
   const {
     effectiveFilterProps,
@@ -124,6 +132,8 @@ export default function ProgressReportsView({
     reportsList,
     filterProps,
     academicData,
+    canViewAllTeachers,
+    currentUser,
     showToast,
   });
 
@@ -217,6 +227,8 @@ export default function ProgressReportsView({
       return next;
     });
   };
+
+  const effectiveShowAnalytics = canViewAnalytics && showAnalytics;
 
   // Context Menu state
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -406,7 +418,7 @@ export default function ProgressReportsView({
           )}
 
           {/* Expand All / Collapse All Button when Analytics is Expanded */}
-          {showAnalytics && (
+          {effectiveShowAnalytics && (
             <button
               type="button"
               onClick={handleToggleExpandAll}
@@ -458,8 +470,15 @@ export default function ProgressReportsView({
         filterProps={effectiveFilterProps}
         showPeriodSwitcher={false}
         hasTeachers={true}
+        allowAllTeachers={canViewAllTeachers}
         selectedTeacherId={selectedTeacherFilter}
-        onTeacherChange={(tId: any) => setSelectedTeacherFilter(tId ? String(tId) : "ALL")}
+        onTeacherChange={(tId: any) => {
+          if (!canViewAllTeachers && currentUser?.id) {
+            setSelectedTeacherFilter(String(currentUser.id));
+            return;
+          }
+          setSelectedTeacherFilter(tId ? String(tId) : "ALL");
+        }}
         searchControl={
           <StudentSelector
             studentName={searchQuery}
@@ -476,12 +495,103 @@ export default function ProgressReportsView({
               if (!selected) {
                 setSearchQuery("");
                 setSelectedStudentId(null);
-              } else if (typeof selected === "string") {
-                setSearchQuery(selected);
-                setSelectedStudentId(null);
+                return;
+              }
+
+              let chosenName = "";
+              let studentId = "";
+              let studentObj: any = null;
+
+              if (typeof selected === "string") {
+                chosenName = selected;
               } else {
-                setSearchQuery(selected.label || selected.name || "");
-                setSelectedStudentId(selected.id ? String(selected.id) : null);
+                chosenName = selected.label || selected.name || "";
+                studentId = selected.id ? String(selected.id) : "";
+                studentObj = selected.originalData || selected;
+              }
+
+              setSearchQuery(chosenName);
+              setSelectedStudentId(studentId || null);
+
+              // Auto-fill Department, Class, and Section based on selected student (Point 4)
+              const allCandidates = [
+                ...(academicData?.students || []),
+                ...(studentStore?.getAll?.() || []),
+              ];
+
+              let matchedProfile = studentObj;
+              if (studentId) {
+                const found = allCandidates.find((s: any) => String(s.id) === studentId);
+                if (found) matchedProfile = { ...found, ...studentObj };
+              } else if (chosenName) {
+                const q = chosenName.toLowerCase().trim();
+                const found = allCandidates.find(
+                  (s: any) => (s.name_en || s.name || s.label || "").toLowerCase().trim() === q
+                );
+                if (found) matchedProfile = found;
+              }
+
+              if (matchedProfile) {
+                // 1. Resolve Section
+                let candSecId =
+                  matchedProfile.student_section ||
+                  matchedProfile.section_id ||
+                  matchedProfile.section ||
+                  "";
+                if (typeof candSecId === "object") candSecId = candSecId?.id || "";
+                candSecId = candSecId ? String(candSecId) : "";
+
+                // 2. Resolve Class
+                let candClassId =
+                  matchedProfile.student_class ||
+                  matchedProfile.class_id ||
+                  matchedProfile.academic_class ||
+                  matchedProfile.academic_class_id ||
+                  "";
+                if (typeof candClassId === "object") candClassId = candClassId?.id || "";
+                candClassId = candClassId ? String(candClassId) : "";
+
+                if (!candClassId && candSecId) {
+                  const secObj = (academicData?.sections || []).find((s: any) => String(s.id) === candSecId);
+                  if (secObj) {
+                    candClassId = String(secObj.academic_class || secObj.class_id || "");
+                  }
+                }
+
+                // 3. Resolve Department
+                let candDeptId =
+                  matchedProfile.department ||
+                  matchedProfile.department_id ||
+                  matchedProfile.dept_id ||
+                  "";
+                if (typeof candDeptId === "object") candDeptId = candDeptId?.id || "";
+                candDeptId = candDeptId ? String(candDeptId) : "";
+
+                if (!candDeptId && candClassId) {
+                  const classObj = (academicData?.classes || []).find((c: any) => String(c.id) === candClassId);
+                  if (classObj) {
+                    candDeptId = String(classObj.department || classObj.department_id || "");
+                  }
+                }
+
+                // Apply to Progress Reports independent hierarchy filters
+                if (effectiveFilterProps?.onBatchHierarchyChange) {
+                  effectiveFilterProps.onBatchHierarchyChange({
+                    departmentId: candDeptId,
+                    classId: candClassId,
+                    sectionId: candSecId,
+                  });
+                } else {
+                  if (candDeptId && effectiveFilterProps?.onDepartmentChange) {
+                    effectiveFilterProps.onDepartmentChange(candDeptId);
+                  }
+                  if (candClassId && effectiveFilterProps?.onClassChange) {
+                    effectiveFilterProps.onClassChange(candClassId);
+                  }
+                  if (candSecId && effectiveFilterProps?.onSectionChange) {
+                    effectiveFilterProps.onSectionChange(candSecId);
+                  }
+                }
               }
             }}
           />
@@ -499,10 +609,12 @@ export default function ProgressReportsView({
             size="md"
           />
         }
-        customDateComponent={
+        customDateComponent={({ isTimezoneEnabled, effectiveTimezone, timezoneLink }: any) => (
           <DateRangePicker
             label="Date Range"
-            showTimezone={false}
+            showTimezone={isTimezoneEnabled}
+            timeZone={effectiveTimezone}
+            timezoneLink={timezoneLink}
             actionLabel={null}
             startDate={startDate}
             endDate={endDate}
@@ -518,11 +630,11 @@ export default function ProgressReportsView({
               setEndDate("");
             }}
           />
-        }
+        )}
       >
         {({ moreButton }: { moreButton: React.ReactNode }) => (
           <div className="pt-2.5 border-t theme-border w-full">
-            {showAnalytics ? (
+            {effectiveShowAnalytics ? (
               <div className="flex items-center justify-between gap-3 w-full">
                 <div className="flex items-center gap-2 text-xs font-semibold theme-text-secondary select-none">
                   <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse shrink-0" />
@@ -562,16 +674,18 @@ export default function ProgressReportsView({
               renderTableActionToolbar(
                 <>
                   {moreButton}
-                  <button
-                    type="button"
-                    onClick={handleToggleAnalytics}
-                    className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary"
-                    title={t("showAnalytics", "Show Analytics")}
-                  >
-                    <TrendingUpIcon className="w-3.5 h-3.5 shrink-0" />
-                    <span>{t("analytics", "Analytics")}</span>
-                    <ChevronIcon isOpen={false} className="w-3 h-3 shrink-0" />
-                  </button>
+                  {canViewAnalytics && (
+                    <button
+                      type="button"
+                      onClick={handleToggleAnalytics}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary"
+                      title={t("showAnalytics", "Show Analytics")}
+                    >
+                      <TrendingUpIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>{t("analytics", "Analytics")}</span>
+                      <ChevronIcon isOpen={false} className="w-3 h-3 shrink-0" />
+                    </button>
+                  )}
 
                   <IconButton
                     icon={RefreshIcon}
@@ -592,7 +706,7 @@ export default function ProgressReportsView({
       </DailyClassroomFilterControls>
 
       {/* 2. Real-Time Analytics & Trends Dashboard */}
-      {showAnalytics && (
+      {effectiveShowAnalytics && (
         <ProgressAnalyticsDashboard
           reports={filteredReports}
           startDate={startDate}
@@ -628,7 +742,7 @@ export default function ProgressReportsView({
       )}
 
       {/* 2c. Dedicated Table Controls Box when Analytics is Expanded */}
-      {showAnalytics && (
+      {effectiveShowAnalytics && (
         <div className="w-full theme-bg-surface border theme-border rounded-2xl p-2.5 sm:px-4 sm:py-2.5 shadow-2xs select-none">
           {renderTableActionToolbar()}
         </div>
@@ -656,7 +770,7 @@ export default function ProgressReportsView({
                 onRefresh={handleRefresh}
                 isAllExpanded={isAllExpanded}
                 onToggleExpandAll={handleToggleExpandAll}
-                hideBatchToolbar={showAnalytics}
+                hideBatchToolbar={effectiveShowAnalytics}
               />
             ) : (
               <RecordReportsCardGrid
@@ -674,7 +788,7 @@ export default function ProgressReportsView({
                 onRefresh={handleRefresh}
                 isAllExpanded={isAllExpanded}
                 onToggleExpandAll={handleToggleExpandAll}
-                hideBatchToolbar={showAnalytics}
+                hideBatchToolbar={effectiveShowAnalytics}
               />
             )
           )}
@@ -698,7 +812,7 @@ export default function ProgressReportsView({
                 onRefresh={handleRefresh}
                 isAllExpanded={isAllExpanded}
                 onToggleExpandAll={handleToggleExpandAll}
-                hideBatchToolbar={showAnalytics}
+                hideBatchToolbar={effectiveShowAnalytics}
               />
             ) : (
               <StudentGroupedCardGrid
@@ -718,7 +832,7 @@ export default function ProgressReportsView({
                 onRefresh={handleRefresh}
                 isAllExpanded={isAllExpanded}
                 onToggleExpandAll={handleToggleExpandAll}
-                hideBatchToolbar={showAnalytics}
+                hideBatchToolbar={effectiveShowAnalytics}
               />
             )
           )}

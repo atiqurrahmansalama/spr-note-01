@@ -443,6 +443,20 @@ export function getSavedTemplatesForScope(scopeId: string, onlyValid: boolean = 
   });
 
   return [...filtered].sort((a, b) => {
+    // 1. Global Sticky templates always pinned to the top
+    const stickyA = Boolean((a as any).isGlobalSticky || (a as any).is_global_sticky);
+    const stickyB = Boolean((b as any).isGlobalSticky || (b as any).is_global_sticky);
+    if (stickyA && !stickyB) return -1;
+    if (!stickyA && stickyB) return 1;
+
+    // 2. Scope Default template
+    const defId = getDefaultTemplateIdForScope(canonicalScope);
+    if (defId) {
+      if (a.id === defId && b.id !== defId) return -1;
+      if (a.id !== defId && b.id === defId) return 1;
+    }
+
+    // 3. Alphabetical sort
     const nameA = String(a.name || a.id || '').trim().toLowerCase();
     const nameB = String(b.name || b.id || '').trim().toLowerCase();
     return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });

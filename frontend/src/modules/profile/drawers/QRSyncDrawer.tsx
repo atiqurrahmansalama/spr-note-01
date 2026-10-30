@@ -11,6 +11,7 @@ import {
   SmartphoneIcon,
   ClockIcon,
   SpinnerIcon,
+  CopyIcon,
 } from '../../../components/ui/Icons';
 import CustomButton from '../../../components/ui/CustomButton';
 import EmptyState from '../../../components/ui/EmptyState';
@@ -74,14 +75,16 @@ export const QRSyncDrawer: React.FC<QRSyncDrawerProps> = ({ onClose }) => {
             cleanupTimers();
             setStatus('authorized');
             setAuthorizedUser(data.user);
+            showToastRef.current(
+              tRef.current('loginAuthorizedSuccess', 'Session authorized successfully!'),
+              'success'
+            );
 
-            if (data.tokens) {
-              authStore.saveTokens(data.tokens);
+            // If tokens are present and current device was not logged in as this user, save and reload
+            const currentUser = authStore.getUserProfile();
+            if (data.access && (!currentUser || currentUser.id !== data.user?.id)) {
+              authStore.saveTokens(data.access, data.refresh);
               if (data.user) authStore.saveUser(data.user);
-              showToastRef.current(
-                tRef.current('loginAuthorizedSuccess', 'Session authorized successfully!'),
-                'success'
-              );
               window.dispatchEvent(new CustomEvent('spr_auth_updated'));
               setTimeout(() => {
                 onCloseRef.current();
@@ -192,11 +195,8 @@ export const QRSyncDrawer: React.FC<QRSyncDrawerProps> = ({ onClose }) => {
   const seconds = timeLeft % 60;
   const timeFormatted = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 
-  const qrPayload = JSON.stringify({
-    type: 'SPR_QR_AUTH',
-    ticket_id: ticketId,
-    endpoint: typeof window !== 'undefined' ? window.location.origin : '',
-  });
+  const qrUrl = typeof window !== 'undefined' && ticketId ? `${window.location.origin}/login?qr_ticket=${ticketId}` : '';
+  const qrPayload = qrUrl;
 
   return (
     <DrawerContainer
@@ -289,15 +289,29 @@ export const QRSyncDrawer: React.FC<QRSyncDrawerProps> = ({ onClose }) => {
                 <span className="font-bold theme-accent">{timeFormatted}</span>
               </div>
 
-              {/* Refresh Action: pushed down with pt-2 and spinner indicator */}
-              <div className="pt-2">
+              {/* Action Buttons: Copy Link & Refresh Code */}
+              <div className="pt-2 flex items-center justify-center gap-2">
+                <CustomButton
+                  variant="sub"
+                  size="sm"
+                  onClick={() => {
+                    if (qrUrl) {
+                      navigator.clipboard.writeText(qrUrl);
+                      showToast(t('linkCopied', 'Sign-in link copied to clipboard!'), 'success');
+                    }
+                  }}
+                  icon={CopyIcon}
+                  disabled={!ticketId || status !== 'pending'}
+                >
+                  {t('copyLink', 'Copy Link')}
+                </CustomButton>
+
                 <CustomButton
                   variant="sub"
                   size="sm"
                   onClick={generateTicket}
                   loading={isRefreshing}
                   icon={RefreshIcon}
-                  className="mx-auto"
                 >
                   {t('regenerateQR', 'Refresh Code')}
                 </CustomButton>

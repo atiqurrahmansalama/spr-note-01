@@ -6,14 +6,26 @@ import qrcode
 
 class QRGenerateView(APIView):
     """
-    Public endpoint: Generates a 3-minute QRSessionTicket.
+    Public/Authenticated endpoint: Generates a 3-minute QRSessionTicket.
+    If called by an authenticated user (e.g. from Profile -> Cross-Device QR Sign-In),
+    it attaches the user's session tokens so a remote device can claim them.
     """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        user = request.user if request.user and request.user.is_authenticated else None
         ticket = QRSessionTicket.objects.create(
-            expires_at=timezone.now() + timedelta(minutes=3)
+            expires_at=timezone.now() + timedelta(minutes=3),
+            authorized_user=user,
+            status='pending'
         )
+
+        if user:
+            token = RefreshToken.for_user(user)
+            ticket.access_token = str(token.access_token)
+            ticket.refresh_token = str(token)
+            ticket.save()
+
         return Response({
             'status': 'success',
             'ticket_id': str(ticket.ticket_id),
@@ -24,29 +36,73 @@ class QRGenerateView(APIView):
 
 class QRStatusView(APIView):
     """
-    Polling endpoint: Waiting device checks if ticket has been authorized.
+    Polling & Claim endpoint:
+    - When called with ?action=claim (e.g. mobile scanner visiting the sign-in URL):
+      marks the ticket as claimed/authorized and returns access & refresh tokens.
+    - When polled by the desktop:
+      returns current status ('pending', 'authorized', 'expired') and user info.
     """
     permission_classes = [AllowAny]
 
     def get(self, request, ticket_id):
         try:
             ticket = QRSessionTicket.objects.get(ticket_id=ticket_id)
-        except QRSessionTicket.DoesNotExist:
+        except (QRSessionTicket.DoesNotExist, ValueError):
             return Response({'status': 'invalid', 'message': 'Ticket not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        if ticket.expires_at < timezone.now():
+        if ticket.expires_at < timezone.now() or ticket.status == 'expired':
             ticket.status = 'expired'
             ticket.save()
             return Response({'status': 'expired', 'message': 'Ticket has expired'}, status=status.HTTP_200_OK)
 
+        action = request.query_params.get('action')
+        user = ticket.authorized_user
+
+        if action == 'claim':
+            if not user or not ticket.access_token:
+                return Response({'status': 'error', 'message': 'Ticket has not been authorized yet.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            role_data = None
+            if hasattr(user, 'role') and user.role:
+                role_data = {'id': user.role.id, 'name': user.role.name, 'code': user.role.code}
+
+            full_name = user.name or f"{user.first_name or ''} {user.last_name or ''}".strip()
+            user_data = {
+                'id': user.id,
+                'name': full_name,
+                'first_name': user.first_name or "",
+                'last_name': user.last_name or "",
+                'email': user.email or "",
+                'phone_number': user.phone_number or "",
+                'avatar_url': user.avatar_url or "",
+                'user_type': user.user_type,
+                'role': role_data,
+                'is_2fa_enabled': getattr(user, 'is_2fa_enabled', False),
+            }
+            resp_data = {
+                'status': 'authorized',
+                'access': ticket.access_token,
+                'refresh': ticket.refresh_token,
+                'user': user_data
+            }
+            ticket.status = 'authorized'
+            ticket.save()
+            return Response(resp_data, status=status.HTTP_200_OK)
+
         if ticket.status == 'authorized' and ticket.access_token:
-            user = ticket.authorized_user
+            role_data = None
+            if user and hasattr(user, 'role') and user.role:
+                role_data = {'id': user.role.id, 'name': user.role.name, 'code': user.role.code}
+
+            full_name = (user.name or f"{user.first_name or ''} {user.last_name or ''}".strip()) if user else "Authorized User"
             user_data = {
                 'id': user.id if user else None,
-                'name': user.name if user else "Authorized User",
+                'name': full_name,
                 'email': user.email if user else "",
                 'phone_number': user.phone_number if user else "",
                 'avatar_url': user.avatar_url if user else "",
+                'user_type': user.user_type if user else "",
+                'role': role_data,
             } if user else {}
 
             resp_data = {
@@ -55,8 +111,6 @@ class QRStatusView(APIView):
                 'refresh': ticket.refresh_token,
                 'user': user_data
             }
-            # One-time read: delete ticket after consumption
-            ticket.delete()
             return Response(resp_data, status=status.HTTP_200_OK)
 
         return Response({'status': ticket.status, 'message': 'Waiting for authorization'}, status=status.HTTP_200_OK)
@@ -158,5 +212,3 @@ class VerifySessionView(APIView):
             }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': f'Invalid or expired session token: {str(e)}'}, status=status.HTTP_401_UNAUTHORIZED)
-
-

@@ -33,6 +33,7 @@ export interface DocLabSidebarProps {
   placeholderKeys?: any[];
   requiredKeys?: string[];
   onToggleScopeDefault?: (templateId: string) => void;
+  onToggleGlobalSticky?: (template: DocxTemplate) => void;
   isScopeDefault?: boolean;
   onInsertKey?: (keyObj: any) => void;
   activeRecord?: Record<string, any>;
@@ -77,6 +78,7 @@ export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
   placeholderKeys = EMPTY_PLACEHOLDER_KEYS,
   requiredKeys = EMPTY_REQUIRED_KEYS,
   onToggleScopeDefault,
+  onToggleGlobalSticky,
   isScopeDefault = false,
   onInsertKey,
   activeRecord = EMPTY_RECORD,
@@ -231,6 +233,7 @@ export const DocLabSidebar: React.FC<DocLabSidebarProps> = ({
               onSaveCurrentTemplate={onSaveCurrentTemplate}
               onDocxRenderModeChange={onDocxRenderModeChange}
               onToggleScopeDefault={onToggleScopeDefault}
+              onToggleGlobalSticky={onToggleGlobalSticky}
             />
           )}
 

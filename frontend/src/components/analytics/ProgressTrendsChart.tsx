@@ -832,34 +832,50 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
     >
       {/* 1. Header Toolbar: Left Title + Right Unified Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b theme-border pb-3 w-full min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0">
-            <TrendingUpIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </div>
-          <div className="min-w-0 flex items-center gap-2">
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h4 className="text-xs font-bold tracking-wider uppercase theme-text-primary whitespace-nowrap">
-                  Recitation Trends
-                </h4>
-                <InfoIcon className="w-3.5 h-3.5 theme-text-secondary opacity-60 shrink-0" />
-              </div>
-              <p className="text-[11px] theme-text-secondary truncate hidden lg:block">
-                Chronological progress driven by date criteria
-              </p>
+        {/* Row 1 on mobile: Left Title + Right 3-Dot ActionMenu */}
+        <div className="flex items-center justify-between w-full sm:w-auto min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0">
+              <TrendingUpIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
+            <div className="min-w-0 flex items-center gap-2">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <h4 className="text-xs font-bold tracking-wider uppercase theme-text-primary whitespace-nowrap">
+                    Recitation Trends
+                  </h4>
+                  <InfoIcon className="w-3.5 h-3.5 theme-text-secondary opacity-60 shrink-0" />
+                </div>
+                <p className="text-[11px] theme-text-secondary truncate hidden lg:block">
+                  Chronological progress driven by date criteria
+                </p>
+              </div>
 
-            {copiedSuccess && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 animate-fade-in select-none whitespace-nowrap shadow-xs">
-                <CheckIcon className="w-3 h-3 shrink-0" />
-                <span>Copied to Clipboard!</span>
-              </span>
-            )}
+              {copiedSuccess && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 animate-fade-in select-none whitespace-nowrap shadow-xs">
+                  <CheckIcon className="w-3 h-3 shrink-0" />
+                  <span>Copied to Clipboard!</span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile 3-dot button: stays on the exact same line as Recitation Trends */}
+          <div className="sm:hidden shrink-0">
+            <ActionMenu
+              items={exportMenuItems}
+              size="sm"
+              variant="ghost"
+              align="right"
+              showChevron={false}
+              title="Export Trends Chart"
+              ariaLabel="Export Options"
+            />
           </div>
         </div>
 
-        {/* Right: Unified Controls using project's SegmentedSwitch */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-wrap sm:flex-nowrap justify-start sm:justify-end">
+        {/* Row 2 on mobile: All Pages Errors Bars Line on ONE single line */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-nowrap overflow-x-auto no-scrollbar justify-start sm:justify-end w-full sm:w-auto">
           <SegmentedSwitch
             options={metricOptions}
             value={currentMetric}
@@ -876,16 +892,18 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
             ariaLabel="Chart View Mode Switcher"
           />
 
-
-          <ActionMenu
-            items={exportMenuItems}
-            size="sm"
-            variant="ghost"
-            align="right"
-            showChevron={false}
-            title="Export Trends Chart"
-            ariaLabel="Export Options"
-          />
+          {/* Desktop 3-dot button: sits at the end of the controls bar */}
+          <div className="hidden sm:block shrink-0">
+            <ActionMenu
+              items={exportMenuItems}
+              size="sm"
+              variant="ghost"
+              align="right"
+              showChevron={false}
+              title="Export Trends Chart"
+              ariaLabel="Export Options"
+            />
+          </div>
         </div>
       </div>
 

@@ -54,8 +54,16 @@ export default function DocLabQuickReportModal({
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const [savedTemplates, setSavedTemplates] = useState<CustomDocxTemplate[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [savedTemplates, setSavedTemplates] = useState<CustomDocxTemplate[]>(() => {
+    return scopeId ? getSavedTemplatesForScope(scopeId) : [];
+  });
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(() => {
+    if (!scopeId) return null;
+    const defId = getDefaultTemplateIdForScope(scopeId);
+    if (defId) return defId;
+    const tmpls = getSavedTemplatesForScope(scopeId);
+    return tmpls.length > 0 ? tmpls[0].id : null;
+  });
   const [currentText, setCurrentText] = useState('');
   const [copied, setCopied] = useState(false);
 

@@ -39,10 +39,15 @@ export default function SidebarScreenBlockView({
   dockDisabledReason = "Right sidebar dock is disabled while an active action panel is open"
 }: SidebarScreenBlockViewProps) {
   const navigate = useNavigate();
-  const { isRightSidebarOpen } = useRightSidebar();
+  const { isRightSidebarOpen, closeRightSidebar } = useRightSidebar();
   const shouldDisableDock = isDockDisabled || isRightSidebarOpen;
 
   const handleBackNavigation = () => {
+    // If a drawer/right sidebar is currently active, back navigation dismisses the drawer first
+    if (isRightSidebarOpen) {
+      closeRightSidebar();
+      return;
+    }
     if (onBack) {
       onBack();
     } else if (typeof window !== "undefined" && window.history.length > 1) {

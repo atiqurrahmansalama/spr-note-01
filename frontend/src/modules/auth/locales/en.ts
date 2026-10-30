@@ -21,4 +21,6 @@ export default {
   validationRequired: "Please enter your email/phone and password.",
   googleSuccess: "Signed in with Google successfully!",
   loginSuccess: "Signed in successfully!",
+  qrSuccess: "Signed in via QR code successfully!",
+  qrFailed: "QR sign-in session expired or invalid.",
 };

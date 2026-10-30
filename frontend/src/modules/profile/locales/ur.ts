@@ -165,6 +165,8 @@ export default {
   drawerAccountsSubtitle: "محفوظ کردہ اکاؤنٹس کے درمیان آسانی سے سوئچ کریں۔",
   drawerQrTitle: "کیو آر سائن ان",
   drawerQrSubtitle: "فوری لاگ ان کے لیے کیمرے سے اسکین کریں۔",
+  copyLink: "لنک کاپی کریں",
+  linkCopied: "سائن ان لنک کلپ بورڈ پر کاپی ہو گیا!",
   generatingQR: "محفوظ سیشن ٹکٹ تیار کیا جا رہا ہے...",
   qrGeneratingDesc: "محفوظ کرپٹوگرافک مصافحہ قائم کیا جا رہا ہے...",
   drawer2FaTitle: "دو فیکٹر تصدیق (2FA)",

@@ -63,7 +63,7 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
   "/staff/daily-attendance": { title: "Staff Daily Attendance", category: "Staff Management" },
   "/staff/onboarding": { title: "Staff Onboarding", category: "Staff Management" },
   "/staff": { title: "Teacher & Staff Roster", category: "Staff Management" },
-  "/print-studio": { title: "Print Studio", category: "Print Studio" },
+  "/print-studio": { title: "DocLab Studio", category: "DocLab" },
   "/finance": { title: "Finance & Accounts", category: "Finance" },
   "/finance/overview": { title: "Finance Overview", category: "Finance" },
   "/finance/student-billing": { title: "Student Billing & Fees", category: "Finance" },

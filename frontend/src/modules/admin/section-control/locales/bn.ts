@@ -21,9 +21,11 @@ export const bn = {
   tabs: {
     global: 'গ্লোবাল ডিফল্ট',
     role: 'ভূমিকা ওভাররাইড',
+    academy: 'একাডেমি ওভাররাইড',
     group: 'গ্রুপ ওভাররাইড',
     user: 'ইউজার ওভাররাইড',
     audit: 'অডিট লগ',
+    totalFeatures: 'মোট ফিচার:',
   },
 
   actions: {
@@ -42,9 +44,12 @@ export const bn = {
 
   targets: {
     targetRole: 'টার্গেট ভূমিকা:',
+    targetAcademy: 'টার্গেট একাডেমি:',
     targetGroup: 'টার্গেট গ্রুপ:',
     targetUser: 'টার্গেট ইউজার সার্চ:',
+    academySearchPlaceholder: 'টার্গেট একাডেমি নির্বাচন করুন...',
     userSearchPlaceholder: 'নাম, ফোন বা ইমেইল দিয়ে ইউজার খুঁজুন...',
+    selectedAcademyId: 'নির্বাচিত একাডেমি: #{{id}}',
     selectedUserId: 'নির্বাচিত ইউজার আইডি: #{{id}}',
     allGroups: 'সকল গ্রুপ',
     noPhone: 'ফোন নম্বর নেই',
@@ -60,6 +65,7 @@ export const bn = {
     disabledByParent: 'প্যারেন্ট দ্বারা নিষ্ক্রিয়',
     globalDefault: 'গ্লোবাল ডিফল্ট',
     roleOverride: 'ভূমিকা ওভাররাইড',
+    academyOverride: 'একাডেমি ওভাররাইড',
     groupOverride: 'গ্রুপ ওভাররাইড',
     userOverride: 'ইউজার ওভাররাইড',
     categoryKey: 'ক্যাটাগরি কি: {{key}}',
@@ -78,6 +84,7 @@ export const bn = {
     scope: 'স্কোপ',
     target: 'টার্গেট',
     sectionKey: 'ফিচার কি',
+    featureSection: 'ফিচার / মডিউল',
     change: 'পরিবর্তন',
     allScopes: 'সবগুলো স্কোপ',
     filterByScope: 'স্কোপ অনুযায়ী ফিল্টার',

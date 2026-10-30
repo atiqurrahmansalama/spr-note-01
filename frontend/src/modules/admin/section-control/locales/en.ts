@@ -21,9 +21,11 @@ export const en = {
   tabs: {
     global: 'Global Defaults',
     role: 'Role Overrides',
+    academy: 'Academy Overrides',
     group: 'Group Overrides',
     user: 'User Overrides',
     audit: 'Audit Logs',
+    totalFeatures: 'Total Features:',
   },
 
   actions: {
@@ -42,9 +44,12 @@ export const en = {
 
   targets: {
     targetRole: 'Target Role:',
+    targetAcademy: 'Target Academy:',
     targetGroup: 'Target Group:',
     targetUser: 'Target User Search:',
+    academySearchPlaceholder: 'Select target academy...',
     userSearchPlaceholder: 'Search user by name, phone, or email...',
+    selectedAcademyId: 'Selected Academy: #{{id}}',
     selectedUserId: 'Selected User ID: #{{id}}',
     allGroups: 'All Groups',
     noPhone: 'No Phone',
@@ -60,6 +65,7 @@ export const en = {
     disabledByParent: 'Disabled by Parent',
     globalDefault: 'Global Default',
     roleOverride: 'Role Override',
+    academyOverride: 'Academy Override',
     groupOverride: 'Group Override',
     userOverride: 'User Override',
     categoryKey: 'Category Key: {{key}}',
@@ -78,6 +84,7 @@ export const en = {
     scope: 'SCOPE',
     target: 'TARGET',
     sectionKey: 'SECTION KEY',
+    featureSection: 'FEATURE / MODULE',
     change: 'CHANGE',
     allScopes: 'All Scopes',
     filterByScope: 'Filter by scope',
