@@ -671,20 +671,3 @@ class QRSessionTicketAdmin(admin.ModelAdmin):
     list_filter = ('status', 'created_at')
     search_fields = ('authorized_user__phone_number', 'authorized_user__email')
     readonly_fields = ('created_at',)
-
-
-@admin.register(CustomDocxTemplate)
-class CustomDocxTemplateAdmin(admin.ModelAdmin):
-    list_display = ('name', 'scope_id', 'is_global_sticky', 'is_shared', 'user', 'institution', 'created_at', 'updated_at')
-    list_filter = ('is_global_sticky', 'is_shared', 'scope_id', 'is_deleted')
-    search_fields = ('name', 'description', 'scope_id', 'user__phone_number', 'user__email')
-    readonly_fields = ('created_at', 'updated_at')
-
-
-
-@admin.register(CustomDocxTemplate)
-class CustomDocxTemplateAdmin(admin.ModelAdmin):
-    list_display = ('name', 'scope_id', 'is_global_sticky', 'is_shared', 'user', 'institution', 'created_at', 'updated_at')
-    list_filter = ('is_global_sticky', 'is_shared', 'scope_id', 'is_deleted')
-    search_fields = ('name', 'description', 'scope_id', 'user__phone_number', 'user__email')
-    readonly_fields = ('created_at', 'updated_at')

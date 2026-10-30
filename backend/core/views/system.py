@@ -535,7 +535,10 @@ class ControlPanelRulesView(APIView):
 
         academy_overrides = {}
         if scope in ['ACADEMY', 'INSTITUTION'] and target_id:
-            academy_overrides = {o.section.section_key: o.is_enabled for o in AcademySectionOverride.objects.filter(institution_id=target_id).select_related('section')}
+            inst_query = Q(code=target_id)
+            if str(target_id).isdigit():
+                inst_query |= Q(institution_id=int(target_id))
+            academy_overrides = {o.section.section_key: o.is_enabled for o in AcademySectionOverride.objects.filter(inst_query).select_related('section')}
 
         # 4-Tier Resolution Evaluation (Independent of hierarchy first)
         resolved_raw = {}
@@ -615,9 +618,20 @@ class ControlPanelSectionTreeView(APIView):
         scope = (request.query_params.get('scope') or request.query_params.get('scope_type') or 'global').upper()
         target_id = request.query_params.get('target_id', '')
 
+        # 0. Ensure feature registry is fully synced into AppSection database table
+        from core.services import sync_feature_registry_to_db
+        from core.feature_registry import FEATURE_REGISTRY
+        registry_keys = {item["key"] for item in FEATURE_REGISTRY}
+        db_keys = set(AppSection.objects.values_list('section_key', flat=True))
+        if not registry_keys.issubset(db_keys) or not AppSectionCategory.objects.exists():
+            sync_feature_registry_to_db()
+
         user_obj = None
         if scope == 'USER' and target_id:
-            user_obj = User.objects.filter(Q(pk=target_id) | Q(phone_number=target_id)).first()
+            user_query = Q(phone_number=target_id)
+            if str(target_id).isdigit():
+                user_query |= Q(pk=int(target_id))
+            user_obj = User.objects.filter(user_query).first()
 
         # 1. Fetch all sections
         sections = AppSection.objects.all().select_related('category').order_by('category__order', 'order', 'title')
@@ -726,16 +740,20 @@ class ControlPanelSectionTreeView(APIView):
             }
             categories_dict[cat_key]["sections"].append(sec_data)
 
-        # Nest children under their parents
+        # Nest children under their parents recursively
         for cat_key, cat_data in categories_dict.items():
             all_sec_list = cat_data["sections"]
-            parent_map = {s["section_key"]: s for s in all_sec_list if s["is_parent"]}
+            sec_lookup = {s["section_key"]: s for s in all_sec_list}
+            parent_keys_with_children = {s["parent_key"] for s in all_sec_list if s["parent_key"]}
+            for p_key in parent_keys_with_children:
+                if p_key in sec_lookup:
+                    sec_lookup[p_key]["is_parent"] = True
             
             roots = []
             for s in all_sec_list:
                 p_key = s["parent_key"]
-                if p_key and p_key in parent_map:
-                    parent_map[p_key]["children"].append(s)
+                if p_key and p_key in sec_lookup:
+                    sec_lookup[p_key]["children"].append(s)
                 else:
                     roots.append(s)
             

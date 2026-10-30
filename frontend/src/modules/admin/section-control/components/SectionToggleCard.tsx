@@ -178,7 +178,7 @@ export const SectionToggleCard: React.FC<SectionToggleCardProps> = ({
             }
           }}
           className={`relative inline-flex items-center rounded-full transition-all duration-200 shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-main)] cursor-pointer select-none hover:ring-2 hover:ring-[var(--accent-main)]/35 ${
-            isChild ? 'w-10 h-5.5 p-0.5' : 'w-11 h-6 p-0.5 sm:p-1'
+            isChild ? 'w-9 h-5 p-0.5' : 'w-11 h-6 p-0.5 sm:p-1'
           } ${
             isEffectivelyEnabled
               ? 'theme-bg-accent shadow-xs'
@@ -187,11 +187,11 @@ export const SectionToggleCard: React.FC<SectionToggleCardProps> = ({
         >
           <span
             className={`inline-block rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out shrink-0 ${
-              isChild ? 'w-4.5 h-4.5' : 'w-4.5 h-4.5 sm:w-4 sm:h-4'
+              isChild ? 'w-4 h-4' : 'w-4 h-4 sm:w-4 sm:h-4'
             } ${
               isEffectivelyEnabled
                 ? isChild
-                  ? 'translate-x-4.5'
+                  ? 'translate-x-4'
                   : 'translate-x-5'
                 : 'translate-x-0'
             }`}

@@ -69,7 +69,14 @@ export function useSectionControl() {
   const [userSearchResults, setUserSearchResults] = useState<UserSearchResult[]>([]);
 
   // Control Rules Data State
-  const [categories, setCategories] = useState<SectionCategory[]>([]);
+  const [categories, setCategories] = useState<SectionCategory[]>(() => {
+    try {
+      const saved = localStorage.getItem('spr_section_control_tree_cache');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [modifiedFlags, setModifiedFlags] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
@@ -277,11 +284,44 @@ export function useSectionControl() {
         const data = await res.json();
         const resCats: SectionCategory[] = Array.isArray(data) ? data : data.categories || [];
         setCategories(resCats);
+        if (resCats.length > 0) {
+          try {
+            localStorage.setItem('spr_section_control_tree_cache', JSON.stringify(resCats));
+            localStorage.setItem(
+              `spr_section_control_tree_${activeScope}_${currentTargetId || 'default'}`,
+              JSON.stringify(resCats)
+            );
+          } catch {}
+        }
       } else {
-        setCategories([]);
+        try {
+          const scopedCache = localStorage.getItem(
+            `spr_section_control_tree_${activeScope}_${currentTargetId || 'default'}`
+          );
+          const fallbackCache = scopedCache || localStorage.getItem('spr_section_control_tree_cache');
+          if (fallbackCache) {
+            setCategories(JSON.parse(fallbackCache));
+          } else {
+            setCategories([]);
+          }
+        } catch {
+          setCategories([]);
+        }
       }
     } catch {
-      setCategories([]);
+      try {
+        const scopedCache = localStorage.getItem(
+          `spr_section_control_tree_${activeScope}_${currentTargetId || 'default'}`
+        );
+        const fallbackCache = scopedCache || localStorage.getItem('spr_section_control_tree_cache');
+        if (fallbackCache) {
+          setCategories(JSON.parse(fallbackCache));
+        } else {
+          setCategories([]);
+        }
+      } catch {
+        setCategories([]);
+      }
     } finally {
       setLoading(false);
     }
