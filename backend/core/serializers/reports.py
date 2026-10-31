@@ -84,15 +84,15 @@ class ReportStatusSerializer(serializers.ModelSerializer):
 
 
 class StudentDailyReportSerializer(serializers.ModelSerializer):
-    # ── Normalized nested (writable) ────────────────────────
+    # â”€â”€ Normalized nested (writable) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     portions = ReportPortionSerializer(many=True, required=False, default=list)
     error_details = ReportErrorDetailSerializer(many=True, required=False, default=list)
 
-    # ── Backward-compat computed fields (read-only) ──────────
+    # â”€â”€ Backward-compat computed fields (read-only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     mistake_details = serializers.SerializerMethodField()
     stuck_details   = serializers.SerializerMethodField()
 
-    # ── Report Status (Nested & Flattened) ────────────────────
+    # â”€â”€ Report Status (Nested & Flattened) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     status_info = ReportStatusSerializer(read_only=True)
     report_status = ReportStatusSerializer(source='status_info', read_only=True)
     is_edited = serializers.SerializerMethodField()
@@ -103,7 +103,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
     is_deleted = serializers.SerializerMethodField()
     delete_time = serializers.SerializerMethodField()
 
-    # ── Related info ─────────────────────────────────────────
+    # â”€â”€ Related info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     student_details = StudentSerializer(source='student', read_only=True)
     student_name = serializers.CharField(required=False, allow_blank=True)
     student_group = serializers.CharField(source='student.group_name', read_only=True)
@@ -116,7 +116,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
     created_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", read_only=True)
     updated_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", read_only=True)
 
-    # ── Lesson & Book progress metadata ──────────────────────
+    # â”€â”€ Lesson & Book progress metadata â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     lesson_title = serializers.CharField(required=False, allow_blank=True, default='')
     book_title = serializers.CharField(required=False, allow_blank=True, default='')
     progress_mode = serializers.CharField(required=False, allow_blank=True, default='QURAN')
@@ -124,7 +124,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
     curriculum_book_name = serializers.CharField(source='book_title', read_only=True)
     book_name = serializers.CharField(source='book_title', read_only=True)
 
-    # ── Display helpers ───────────────────────────────────────
+    # â”€â”€ Display helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     date_time     = serializers.SerializerMethodField()
     report_date   = serializers.SerializerMethodField()
     generate_date = serializers.SerializerMethodField()
@@ -161,7 +161,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_by', 'report_unique_id']
 
-    # ── Computed status fields ────────────────────────────────
+    # â”€â”€ Computed status fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_is_edited(self, obj):
@@ -197,7 +197,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         st = getattr(obj, 'status_info', None)
         return st.delete_time.strftime("%Y-%m-%d %H:%M:%S") if (st and st.delete_time) else None
 
-    # ── Computed compat fields ───────────────────────────────
+    # â”€â”€ Computed compat fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @extend_schema_field(OpenApiTypes.OBJECT)
     def get_mistake_details(self, obj):
@@ -248,7 +248,13 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_teacher_name(self, obj):
-        # 1. Direct lookup by teacher_id
+        # 1. Direct lookup by created_by (zero DB query, pre-loaded in select_related)
+        if obj.created_by:
+            name = getattr(obj.created_by, 'name', '') or obj.created_by.get_full_name() or getattr(obj.created_by, 'phone_number', '')
+            if name:
+                return name
+
+        # 2. Direct lookup by teacher_id
         if obj.teacher_id:
             try:
                 from core.models import StaffProfile, User
@@ -259,15 +265,9 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
                     return staff.user.name
                 user = User.objects.filter(id=obj.teacher_id).first()
                 if user:
-                    return user.name or user.get_full_name() or user.phone_number or "Staff Teacher"
+                    return user.name or user.get_full_name() or getattr(user, 'phone_number', '') or "Staff Teacher"
             except Exception:
                 pass
-
-        # 2. Lookup by created_by
-        if obj.created_by:
-            name = obj.created_by.name or obj.created_by.get_full_name() or obj.created_by.phone_number
-            if name:
-                return name
 
         # 3. Lookup by student's section / class teacher or institution admin
         if obj.student_id:
@@ -303,7 +303,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
     def get_teacher(self, obj):
         return self.get_teacher_name(obj)
 
-    # ── Input pre-processing ─────────────────────────────────
+    # â”€â”€ Input pre-processing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def to_internal_value(self, data):
         mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
@@ -354,7 +354,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
             if req and getattr(req, 'user', None) and req.user.is_authenticated:
                 mutable_data['teacher_id'] = req.user.id
 
-        # ── Normalize Lesson Title, Book Title & Progress Mode ─────────────
+        # â”€â”€ Normalize Lesson Title, Book Title & Progress Mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         raw_lesson = (
             mutable_data.get('lesson_title')
             or mutable_data.get('lesson_covered')
@@ -433,7 +433,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
 
         return super().to_internal_value(mutable_data)
 
-    # ── Internal helpers ─────────────────────────────────────
+    # â”€â”€ Internal helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def _safe_int(self, val, default=0):
         try:
@@ -493,11 +493,11 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
             for idx, p in enumerate(portions):
                 if p.get('start_juz') is None:
                     raise serializers.ValidationError({
-                        'portions': f"Recitation portion #{idx + 1} must include a valid Juz number (1–30)."
+                        'portions': f"Recitation portion #{idx + 1} must include a valid Juz number (1â€“30)."
                     })
                 if p.get('end_juz') is None:
                     raise serializers.ValidationError({
-                        'portions': f"Recitation portion #{idx + 1} must include a valid end Juz number (1–30)."
+                        'portions': f"Recitation portion #{idx + 1} must include a valid end Juz number (1â€“30)."
                     })
 
         error_details = attrs.get('error_details', [])
@@ -505,7 +505,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
             for idx, err in enumerate(error_details):
                 if err.get('juz') is None:
                     raise serializers.ValidationError({
-                        'error_details': f"Error detail #{idx + 1} must specify a valid Juz number (1–30)."
+                        'error_details': f"Error detail #{idx + 1} must specify a valid Juz number (1â€“30)."
                     })
 
         return super().validate(attrs)
@@ -525,7 +525,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         for item in portions_data:
             ReportPortion.objects.create(report=report, **item)
 
-    # ── CREATE ───────────────────────────────────────────────
+    # â”€â”€ CREATE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @transaction.atomic
     def create(self, validated_data):
@@ -570,7 +570,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         report.refresh_from_db()
         return report
 
-    # ── UPDATE ───────────────────────────────────────────────
+    # â”€â”€ UPDATE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @transaction.atomic
     def update(self, instance, validated_data):

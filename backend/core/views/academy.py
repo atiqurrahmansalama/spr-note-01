@@ -86,8 +86,8 @@ class ClassSectionViewSet(viewsets.ModelViewSet):
         qs = ClassSection.objects.filter(is_deleted=True) if show_trash else ClassSection.objects.filter(is_deleted=False)
 
         tenant_id = get_scoped_tenant_id(self.request) or getattr(user, 'institution_id', None)
-        if tenant_id:
-            qs = qs.filter(student_class__institution_id=tenant_id)
+        if tenant_id and str(tenant_id).upper() != 'ALL':
+            qs = qs.filter(Q(student_class__institution_id=tenant_id) | Q(branch__institution_id=tenant_id))
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
             qs = qs.none()
 
@@ -274,7 +274,7 @@ class StudentClassViewSet(viewsets.ModelViewSet):
         qs = StudentClass.objects.filter(is_deleted=True) if show_trash else StudentClass.objects.filter(is_deleted=False)
         
         tenant_id = get_scoped_tenant_id(self.request)
-        if tenant_id:
+        if tenant_id and str(tenant_id).upper() != 'ALL':
             qs = qs.filter(institution_id=tenant_id)
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
             if user.institution_id:
@@ -711,7 +711,7 @@ class ResidentialBuildingViewSet(viewsets.ModelViewSet):
         show_trash = self.request.query_params.get('trash') == 'true'
         qs = ResidentialBuilding.objects.filter(is_deleted=show_trash).select_related('institution', 'branch', 'warden__user')
         tenant_id = get_scoped_tenant_id(self.request)
-        if tenant_id:
+        if tenant_id and str(tenant_id).upper() != 'ALL':
             qs = qs.filter(institution_id=tenant_id)
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
             if user.institution_id:
@@ -758,7 +758,7 @@ class DormitoryRoomViewSet(viewsets.ModelViewSet):
             'institution', 'branch', 'building', 'supervisor__user', 'prefect'
         ).prefetch_related('beds')
         tenant_id = get_scoped_tenant_id(self.request)
-        if tenant_id:
+        if tenant_id and str(tenant_id).upper() != 'ALL':
             qs = qs.filter(institution_id=tenant_id)
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
             if user.institution_id:

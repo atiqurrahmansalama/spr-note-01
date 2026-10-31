@@ -59,15 +59,15 @@ export function TenantProvider({ children }) {
 
       // If no valid savedTenantId (e.g. initial login or switched environment):
       if (items.length > 0) {
-        // Priority 1: User's explicitly assigned institution
-        const userInst = user?.institution_id ? items.find(i => String(i.id) === String(user.institution_id)) : null;
-        // Priority 2: Primary institution matching Darus Salam (DS)
+        // Priority 1: Primary production academy matching Darus Salam (DS)
         const preferredInst = items.find(i => 
           /darus\s*salam/i.test(i.name || '') || 
           /\bds\b/i.test(i.code || '') || 
           /darus/i.test(i.slug || '')
         );
-        const target = userInst || preferredInst || items[0];
+        // Priority 2: User's explicitly assigned institution
+        const userInst = user?.institution_id ? items.find(i => String(i.id) === String(user.institution_id)) : null;
+        const target = preferredInst || userInst || items[0];
         setCurrentInstitution(target);
         setActiveTenantId(String(target.id));
         try {

@@ -109,7 +109,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 DB_SSL_REQUIRE = os.getenv("DB_SSL_REQUIRE", "False").lower() in ("true", "1", "t")
 # Connection pooler optimization (Supavisor / PgBouncer):
 is_pooler = bool(DATABASE_URL and ("pooler" in DATABASE_URL or ":6543" in DATABASE_URL))
-default_conn_max_age = "0" if is_pooler else "600"
+default_conn_max_age = "60" if is_pooler else "600"
 DB_CONN_MAX_AGE = int(os.getenv("DB_CONN_MAX_AGE", default_conn_max_age))
 
 if DATABASE_URL and not USE_SQLITE:

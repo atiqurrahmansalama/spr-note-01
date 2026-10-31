@@ -83,9 +83,9 @@ def get_scoped_tenant_id(request):
     return None
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # 1. System Role & Section Seeding Services
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def seed_system_roles():
     """
@@ -171,9 +171,9 @@ def sync_feature_registry_to_db():
     AppSectionCategory.objects.exclude(key__in=category_titles.keys()).delete()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # 2. 4-Tier Section Control & Feature Flagging Evaluation Engine
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def evaluate_section_config_for_user(user=None):
     """
@@ -242,10 +242,14 @@ def evaluate_section_config_for_user(user=None):
 
         # Tier 4: Academy Overrides
         if getattr(user, 'institution_id', None):
-            academy_overrides = {
-                o.section.section_key: o.is_enabled
-                for o in AcademySectionOverride.objects.filter(institution_id=user.institution_id).select_related('section')
-            }
+            try:
+                academy_overrides = {
+                    o.section.section_key: o.is_enabled
+                    for o in AcademySectionOverride.objects.filter(institution_id=user.institution_id).select_related('section')
+                }
+            except Exception as e:
+                logger.warning(f"Could not load AcademySectionOverride: {e}")
+                academy_overrides = {}
 
     # 4-Tier Resolution Evaluation (Independent of hierarchy first)
     for sec in sections:
@@ -342,9 +346,9 @@ def get_resolved_feature_flags_for_user(user=None):
     return flags, origins
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # 3. Google OAuth Authentication & User Provisioning Services
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def verify_google_token_or_code(id_token_input=None, access_token_input=None, code_input=None, redirect_uri_input=None):
     """
@@ -524,9 +528,9 @@ def get_or_create_google_user(profile_data):
     return user, created
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # 6. Enterprise Class & Group Migration and Academic History Services
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def delete_class_with_migration(source_class_id, target_class_id, performed_by=None):
     """
@@ -1037,7 +1041,7 @@ def seed_default_departments():
 
 
 # ==============================================================================
-# 🎯 7. ENTERPRISE TEACHER & STAFF MANAGEMENT SERVICES
+# ðŸŽ¯ 7. ENTERPRISE TEACHER & STAFF MANAGEMENT SERVICES
 # ==============================================================================
 
 class StaffOnboardingService:
@@ -1366,7 +1370,7 @@ class StaffLeaveService:
             leave_request.action_date = timezone.now()
             leave_request.save(update_fields=['status', 'approved_by', 'admin_remarks', 'action_date', 'updated_at'])
 
-            # 🎯 CRITICAL SYNC: Auto-sync ON_LEAVE status to StaffAttendance records upon approval
+            # ðŸŽ¯ CRITICAL SYNC: Auto-sync ON_LEAVE status to StaffAttendance records upon approval
             if action_status == 'APPROVED':
                 curr_date = leave_request.start_date
                 while curr_date <= leave_request.end_date:

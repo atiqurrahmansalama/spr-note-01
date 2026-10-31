@@ -367,7 +367,7 @@ class AcademicDepartmentViewSet(viewsets.ModelViewSet):
         qs = AcademicDepartment.objects.filter(is_deleted=True) if show_trash else AcademicDepartment.objects.filter(is_deleted=False)
 
         tenant_id = get_scoped_tenant_id(self.request)
-        if tenant_id:
+        if tenant_id and str(tenant_id).upper() != 'ALL':
             qs = qs.filter(institution_id=tenant_id)
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
             if user.institution_id:

@@ -92,11 +92,24 @@ class StudentDailyReportViewSet(viewsets.ModelViewSet):
         params = self.request.query_params
         is_trash = params.get('trash') == 'true' or params.get('is_deleted') == 'true'
 
+        select_relations = (
+            'student',
+            'student__details',
+            'student__institution',
+            'student__student_class',
+            'student__student_class__department',
+            'student__section',
+            'student__student_group',
+            'student__academic_detail',
+            'status_info',
+            'created_by',
+        )
+
         if is_trash:
             qs = (
                 StudentDailyReport.objects
                 .filter(status_info__is_deleted=True)
-                .select_related('student', 'status_info')
+                .select_related(*select_relations)
                 .prefetch_related('portions', 'error_details')
                 .order_by('-date', '-created_at')
             )
@@ -104,7 +117,7 @@ class StudentDailyReportViewSet(viewsets.ModelViewSet):
             qs = (
                 StudentDailyReport.objects
                 .filter(Q(status_info__is_deleted=False) | Q(status_info__isnull=True))
-                .select_related('student', 'status_info')
+                .select_related(*select_relations)
                 .prefetch_related('portions', 'error_details')
                 .order_by('-date', '-created_at')
             )
@@ -633,7 +646,7 @@ class AcademicGoalViewSet(viewsets.ModelViewSet):
 
 
 class DailyLessonPlanViewSet(viewsets.ModelViewSet):
-    """ViewSet for assigning and managing daily class lessons (পড়া দেওয়া / Sabaq delivery)."""
+    """ViewSet for assigning and managing daily class lessons (à¦ªà§œà¦¾ à¦¦à§‡à¦“à§Ÿà¦¾ / Sabaq delivery)."""
     serializer_class = DailyLessonPlanSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -670,7 +683,7 @@ class DailyLessonPlanViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='bulk-evaluate')
     def bulk_evaluate(self, request, pk=None):
-        """Record recitation evaluations (পড়া আদায়) for multiple students."""
+        """Record recitation evaluations (à¦ªà§œà¦¾ à¦†à¦¦à¦¾à§Ÿ) for multiple students."""
         lesson_plan = self.get_object()
         evaluations_data = request.data.get('evaluations', [])
         
@@ -711,7 +724,7 @@ class DailyLessonPlanViewSet(viewsets.ModelViewSet):
 
 
 class LessonEvaluationViewSet(viewsets.ModelViewSet):
-    """ViewSet for individual and bulk lesson evaluations (পড়া আদায়)."""
+    """ViewSet for individual and bulk lesson evaluations (à¦ªà§œà¦¾ à¦†à¦¦à¦¾à§Ÿ)."""
     serializer_class = LessonEvaluationSerializer
     permission_classes = [permissions.IsAuthenticated]
 

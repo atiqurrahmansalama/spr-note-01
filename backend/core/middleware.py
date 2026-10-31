@@ -112,6 +112,57 @@ def _log_activity_async(user_id, action_name, endpoint, http_method, ip_address)
         close_old_connections()
 
 
+def _update_user_session_async(user_id, device_type, device_info, ip_address):
+    """
+    Asynchronously updates or creates UserSession in a background thread
+    so API responses are never delayed by session tracking.
+    """
+    try:
+        close_old_connections()
+        from core.models import UserSession, User
+        user = User.objects.filter(id=user_id).first()
+        if not user:
+            return
+        now = timezone.now()
+        session = UserSession.objects.filter(
+            user=user,
+            device_type=device_type,
+            is_active=True
+        ).order_by('-last_activity').first()
+
+        if session:
+            delta_sec = (now - session.last_activity).total_seconds()
+            if delta_sec > 1800:  # 30 minutes of inactivity closes session
+                session.is_active = False
+                session.logout_at = session.last_activity
+                session.save(update_fields=['is_active', 'logout_at'])
+
+                UserSession.objects.create(
+                    user=user,
+                    device_type=device_type,
+                    device_info=device_info,
+                    ip_address=ip_address,
+                    is_active=True
+                )
+            elif delta_sec > 120:  # Throttle updates to at most once per 2 minutes
+                session.device_info = device_info
+                session.ip_address = ip_address
+                session.last_activity = now
+                session.save(update_fields=['device_info', 'ip_address', 'last_activity'])
+        else:
+            UserSession.objects.create(
+                user=user,
+                device_type=device_type,
+                device_info=device_info,
+                ip_address=ip_address,
+                is_active=True
+            )
+    except Exception:
+        pass
+    finally:
+        close_old_connections()
+
+
 def derive_action_name(request):
     """Generates human-readable action name from header or endpoint path."""
     header_action = request.headers.get('X-Action-Name') or request.META.get('HTTP_X_ACTION_NAME')
@@ -150,9 +201,17 @@ class UserActivityMiddleware:
             except Exception:
                 pass
 
-        # 2. Update active UserSession if authenticated
+        # 2. Asynchronously update active UserSession in background without blocking response
         if request.user and request.user.is_authenticated:
-            self._update_user_session(request)
+            user_id = request.user.id
+            dev_type = detect_device_type(request)
+            dev_info = detect_device_info(request)
+            client_ip = get_client_ip(request)
+            threading.Thread(
+                target=_update_user_session_async,
+                args=(user_id, dev_type, dev_info, client_ip),
+                daemon=True
+            ).start()
 
         # 3. Asynchronously log state-changing HTTP methods (POST, PUT, DELETE, PATCH)
         if request.method in ['POST', 'PUT', 'DELETE', 'PATCH']:
@@ -173,49 +232,6 @@ class UserActivityMiddleware:
 
         response = self.get_response(request)
         return response
-
-    def _update_user_session(self, request):
-        try:
-            from core.models import UserSession
-            device_type = detect_device_type(request)
-            device_info = detect_device_info(request)
-            ip_address = get_client_ip(request)
-            now = timezone.now()
-
-            session = UserSession.objects.filter(
-                user=request.user,
-                device_type=device_type,
-                is_active=True
-            ).order_by('-last_activity').first()
-
-            if session:
-                delta_sec = (now - session.last_activity).total_seconds()
-                if delta_sec > 1800:  # 30 minutes of inactivity closes session
-                    session.is_active = False
-                    session.logout_at = session.last_activity
-                    session.save()
-
-                    UserSession.objects.create(
-                        user=request.user,
-                        device_type=device_type,
-                        device_info=device_info,
-                        ip_address=ip_address,
-                        is_active=True
-                    )
-                elif delta_sec > 60:  # Throttle updates to max once per minute
-                    session.device_info = device_info
-                    session.ip_address = ip_address
-                    session.save()
-            else:
-                UserSession.objects.create(
-                    user=request.user,
-                    device_type=device_type,
-                    device_info=device_info,
-                    ip_address=ip_address,
-                    is_active=True
-                )
-        except Exception:
-            pass
 
 
 class RequestCorrelationMiddleware:

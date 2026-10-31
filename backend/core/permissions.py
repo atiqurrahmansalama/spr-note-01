@@ -1,4 +1,7 @@
+import logging
 from rest_framework.permissions import BasePermission
+
+logger = logging.getLogger(__name__)
 
 class IsAdminUserRole(BasePermission):
     """
@@ -22,15 +25,25 @@ class HasSectionAccess(BasePermission):
         section_key = getattr(view, 'required_section_key', None)
         if not section_key:
             return True
-            
+
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        # Super Admin / Superuser has full platform-wide access
+        if request.user.is_superuser or getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN':
+            return True
+
         # Allow self-profile updates even if general user management feature is disabled
-        if request.user and request.user.is_authenticated:
-            pk = view.kwargs.get('pk')
-            if pk == 'me' or str(pk) == str(request.user.id):
-                return True
-                
-        from core.services import get_resolved_feature_flags_for_user
-        flags, _ = get_resolved_feature_flags_for_user(request.user)
+        pk = view.kwargs.get('pk')
+        if pk == 'me' or str(pk) == str(request.user.id):
+            return True
+
+        try:
+            from core.services import get_resolved_feature_flags_for_user
+            flags, _ = get_resolved_feature_flags_for_user(request.user)
+        except Exception as err:
+            logger.warning(f"[HasSectionAccess] Error evaluating feature flags: {err}")
+            return True
         
         if isinstance(section_key, (list, tuple, set)):
             return any(flags.get(k, False) for k in section_key)

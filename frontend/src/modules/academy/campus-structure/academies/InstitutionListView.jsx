@@ -39,7 +39,7 @@ export default function InstitutionListView({
   showStructureQuotas = false,
 }) {
   const { showToast } = useToast();
-  const { requestSwitchInstitution, activeTenantId, isMultiTenantAdmin, refreshInstitutions } = useTenant();
+  const { switchInstitution, requestSwitchInstitution, activeTenantId, isMultiTenantAdmin, refreshInstitutions } = useTenant();
   const { openDrawer, closeDrawer } = useRightSidebar();
 
   const [viewMode, setViewMode] = useState(() => {
@@ -240,15 +240,15 @@ export default function InstitutionListView({
   const handleSwitchContext = useCallback((inst) => {
     if (!inst) return;
     if (inst === 'ALL' || inst?.id === 'ALL' || inst === 'global') {
-      requestSwitchInstitution('ALL');
+      switchInstitution('ALL');
       showToast('Active workspace switched to "All Campuses (Global Scope)"', 'info');
       return;
     }
     const targetId = typeof inst === 'object' ? inst.id : inst;
     const targetName = typeof inst === 'object' ? inst.name : institutions.find((i) => String(i.id) === String(inst))?.name || 'Selected Academy';
-    requestSwitchInstitution(targetId);
+    switchInstitution(targetId);
     showToast(`Active academy switched to "${targetName}"`, 'info');
-  }, [requestSwitchInstitution, institutions, showToast]);
+  }, [switchInstitution, institutions, showToast]);
 
   const activeAcademyOptions = useMemo(() => {
     const isAllActive = !activeTenantId || activeTenantId === 'ALL';
@@ -689,7 +689,7 @@ export default function InstitutionListView({
               </div>
 
               <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 space-y-1.5 leading-relaxed">
-                <p className="font-bold">⚠️ Warning: Complete Data Isolation Deletion</p>
+                <p className="font-bold">âš ï¸ Warning: Complete Data Isolation Deletion</p>
                 <p className="text-[11px] opacity-90">
                   You are about to decommission <strong className="text-white font-bold">{deletingInst.name}</strong> ({deletingInst.slug}). All associated students, classes, and records will be permanently archived.
                 </p>
