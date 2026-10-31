@@ -64,7 +64,7 @@ def get_scoped_tenant_id(request):
         if target_tenant and str(target_tenant).strip().upper() == 'ALL':
             return None
 
-        # Super Admin default fallback: strictly isolate to their assigned institution
+        # Super Admin fallback: isolate to their assigned institution if set; otherwise return None (global)
         inst_id = getattr(request.user, 'institution_id', None)
         if inst_id:
             try:
@@ -72,9 +72,6 @@ def get_scoped_tenant_id(request):
             except (ValueError, AttributeError, TypeError):
                 return str(inst_id)
 
-        first_inst = AcademicInstitution.objects.first()
-        if first_inst:
-            return str(first_inst.id)
         return None
 
     inst_id = getattr(request.user, 'institution_id', None)

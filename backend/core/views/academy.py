@@ -90,12 +90,6 @@ class ClassSectionViewSet(viewsets.ModelViewSet):
             qs = qs.filter(student_class__institution_id=tenant_id)
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
             qs = qs.none()
-        else:
-            first_inst = AcademicInstitution.objects.first()
-            if first_inst:
-                qs = qs.filter(student_class__institution_id=first_inst.id)
-            else:
-                qs = qs.none()
 
         dept_id = self.request.query_params.get('department')
         if dept_id and dept_id != 'ALL':
@@ -129,12 +123,8 @@ class ClassSectionViewSet(viewsets.ModelViewSet):
         filter_kwargs = {'is_deleted': False}
         if tenant_id:
             filter_kwargs['student_class__institution_id'] = tenant_id
-        else:
-            first_inst = AcademicInstitution.objects.first()
-            if first_inst:
-                filter_kwargs['student_class__institution_id'] = first_inst.id
-            else:
-                filter_kwargs['student_class__institution_id'] = None
+        elif not (request.user.is_superuser or getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            filter_kwargs['student_class__institution_id'] = None
 
         total_sections = ClassSection.objects.filter(**filter_kwargs).count()
         from django.db.models import Sum
@@ -192,12 +182,6 @@ class ClassPeriodSlotViewSet(viewsets.ModelViewSet):
             qs = qs.filter(institution_id=tenant_id)
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
             qs = qs.none()
-        else:
-            first_inst = AcademicInstitution.objects.first()
-            if first_inst:
-                qs = qs.filter(institution_id=first_inst.id)
-            else:
-                qs = qs.none()
 
         dept_id = self.request.query_params.get('department')
         if dept_id and dept_id != 'ALL':
@@ -380,12 +364,6 @@ class StudentGroupViewSet(viewsets.ModelViewSet):
             qs = qs.filter(institution_id=tenant_id)
         elif not (getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser):
             qs = qs.none()
-        else:
-            first_inst = AcademicInstitution.objects.first()
-            if first_inst:
-                qs = qs.filter(institution_id=first_inst.id)
-            else:
-                qs = qs.none()
 
         class_id = self.request.query_params.get('student_class') or self.request.query_params.get('class')
         if class_id and class_id != 'ALL':

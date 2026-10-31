@@ -154,7 +154,7 @@ export const DocLabTemplatesTab: React.FC<DocLabTemplatesTabProps> = ({
           'success'
         );
       }
-      onToggleGlobalSticky?.(targetTemplate);
+      onToggleGlobalSticky?.({ ...targetTemplate, isGlobalSticky: nextVal });
     } catch (err: any) {
       if (showToast) {
         showToast(err.message || 'Failed to update global sticky status.', 'error');

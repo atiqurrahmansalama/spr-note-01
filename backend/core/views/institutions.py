@@ -243,12 +243,6 @@ class AcademicBranchViewSet(viewsets.ModelViewSet):
             qs = qs.filter(institution_id=tenant_id)
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
             qs = qs.none()
-        else:
-            first_inst = AcademicInstitution.objects.first()
-            if first_inst:
-                qs = qs.filter(institution_id=first_inst.id)
-            else:
-                qs = qs.none()
 
         branch_type = self.request.query_params.get('branch_type') or self.request.query_params.get('type')
         if branch_type and branch_type != 'ALL':

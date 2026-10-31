@@ -51,13 +51,23 @@ export function TenantProvider({ children }) {
           } catch {}
           return;
         }
+      } else if (savedTenantId === 'ALL' && isMultiTenantAdmin) {
+        setCurrentInstitution(null);
+        setActiveTenantId('ALL');
+        return;
       }
 
       // If no valid savedTenantId (e.g. initial login or switched environment):
-      // ALWAYS bind to user.institution_id or the first valid institution. NEVER leak data via 'ALL'.
       if (items.length > 0) {
+        // Priority 1: User's explicitly assigned institution
         const userInst = user?.institution_id ? items.find(i => String(i.id) === String(user.institution_id)) : null;
-        const target = userInst || items[0];
+        // Priority 2: Primary institution matching Darus Salam (DS)
+        const preferredInst = items.find(i => 
+          /darus\s*salam/i.test(i.name || '') || 
+          /\bds\b/i.test(i.code || '') || 
+          /darus/i.test(i.slug || '')
+        );
+        const target = userInst || preferredInst || items[0];
         setCurrentInstitution(target);
         setActiveTenantId(String(target.id));
         try {

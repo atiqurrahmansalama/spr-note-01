@@ -92,12 +92,6 @@ class StudentViewSet(viewsets.ModelViewSet):
             base_qs = base_qs.filter(institution_id=tenant_id)
         elif not (getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser):
             base_qs = base_qs.none()
-        else:
-            first_inst = AcademicInstitution.objects.first()
-            if first_inst:
-                base_qs = base_qs.filter(institution_id=first_inst.id)
-            else:
-                base_qs = base_qs.none()
 
         # Optional class or group filter
         class_param = self.request.query_params.get('student_class') or self.request.query_params.get('class')

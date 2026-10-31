@@ -56,7 +56,9 @@ export const DocLabTemplateCard: React.FC<DocLabTemplateCardProps> = ({
 
   const isSticky = Boolean((template as any).isGlobalSticky || (template as any).is_global_sticky);
   const globalBadgeText = t('global', 'Global');
-  const titleDisplay = isSticky ? `${template.name} [${globalBadgeText}]` : template.name;
+  // Strip redundant text suffix if already present in template name to avoid double indicator
+  const cleanTitle = template.name.replace(/\s*[\(\[]\s*global\s*[\)\]]/gi, '').trim();
+  const titleDisplay = cleanTitle || template.name;
 
   const menuItems = useMemo(() => {
     const items: any[] = [];

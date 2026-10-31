@@ -1,6 +1,7 @@
 import { DocumentScopeDefinition, ScopeValidationResult, KeyTaxonomyItem } from './keyLibrary/types';
-import { CustomDocxTemplate, getSavedDocxTemplates, UNIVERSAL_SYNONYM_GROUPS } from './docxTemplateEngine';
+import { CustomDocxTemplate, getSavedDocxTemplates } from './docxTemplateEngine';
 import { createDynamicKeyItem } from './keyLibrary/universalKeyTaxonomy';
+import { UNIVERSAL_SYNONYM_GROUPS } from './keyLibrary/tokenSynonyms';
 
 export type { CustomDocxTemplate };
 
