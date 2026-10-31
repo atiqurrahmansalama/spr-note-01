@@ -189,20 +189,6 @@ export interface AcademicContextInfo {
 }
 
 /**
- * Counts valid mistake or stuck items from detail rows
- */
-function countValidAyahItems(data?: DetailRowData[]): number {
-  if (!Array.isArray(data)) return 0;
-  return data.reduce((total, row) => {
-    if (!row.page || String(row.page).trim() === '') return total;
-    const validAyahs = (row.ayahs || []).filter(
-      (a) => a.value !== undefined && a.value !== null && String(a.value).trim() !== ''
-    ).length;
-    return total + (validAyahs > 0 ? validAyahs : 0);
-  }, 0);
-}
-
-/**
  * Formats mistake or stuck items with strict "one item per line" rule.
  */
 function formatDetailLines(
@@ -270,80 +256,6 @@ function formatDetailLines(
 }
 
 /**
- * Extracts and formats Juz number string (e.g. "30" or "22, 23")
- */
-function extractJuzNumberString(juzPageData?: JuzRowData[]): string {
-  if (!Array.isArray(juzPageData)) return '';
-  const juzSet = new Set<string>();
-  juzPageData.forEach((row) => {
-    if (row.juz !== undefined && row.juz !== null) {
-      const jStr = String(row.juz).trim();
-      if (jStr) juzSet.add(jStr);
-    }
-  });
-  return Array.from(juzSet).join(', ');
-}
-
-/**
- * Extracts and formats page range string
- */
-function extractJuzPageString(juzPageData?: JuzRowData[]): string {
-  if (!Array.isArray(juzPageData) || juzPageData.length === 0) return '';
-
-  const groupMap = new Map<string, string[]>();
-
-  juzPageData.forEach((row) => {
-    const jStr = (row.juz !== undefined && row.juz !== null) ? String(row.juz).trim() : '';
-    if (!row.ranges || !Array.isArray(row.ranges)) return;
-
-    const currentRanges: string[] = [];
-    row.ranges.forEach((r) => {
-      const s = (r.start || '').toString().trim();
-      const e = (r.end || '').toString().trim();
-      if (s) {
-        if (e && e !== s) {
-          currentRanges.push(`${s}–${e}`);
-        } else {
-          currentRanges.push(s);
-        }
-      }
-    });
-
-    if (currentRanges.length > 0) {
-      if (!groupMap.has(jStr)) {
-        groupMap.set(jStr, []);
-      }
-      groupMap.get(jStr)!.push(...currentRanges);
-    }
-  });
-
-  if (groupMap.size === 0) return '';
-
-  const distinctJuzs = Array.from(groupMap.keys()).filter((j) => j !== '');
-  const isMultiJuz = distinctJuzs.length > 1;
-
-  if (!isMultiJuz) {
-    const allRanges: string[] = [];
-    groupMap.forEach((ranges) => {
-      allRanges.push(...ranges);
-    });
-    return allRanges.join(', ');
-  }
-
-  const lines: string[] = [];
-  groupMap.forEach((ranges, juz) => {
-    const rangesStr = ranges.join(', ');
-    if (juz) {
-      lines.push(`${juz}: ${rangesStr}`);
-    } else {
-      lines.push(rangesStr);
-    }
-  });
-
-  return lines.join('\n');
-}
-
-/**
  * Transforms live Daily Progress state into a normalized record matching the 14 keys
  */
 export function buildDailyProgressReportData(
@@ -384,8 +296,8 @@ export function buildDailyProgressReportData(
   });
   const sessionJuzs = Array.from(sessionJuzSet);
 
-  const juzNumber = extractJuzNumberString(juzPageData);
-  const juzPage = extractJuzPageString(juzPageData);
+  const juzNumber = extractJuzNumberSummary(juzPageData);
+  const juzPage = extractJuzPageSummary(juzPageData);
 
   const mistakeJuzSet = new Set<string>();
   (mistakeData || []).forEach((r) => {
@@ -407,8 +319,16 @@ export function buildDailyProgressReportData(
   const isMultiJuz = !isBookMode && (sessionJuzs.length > 1 || mistakeJuzSet.size > 1 || stuckJuzSet.size > 1);
   const sessionName = (selectedSession || '').trim();
 
-  const totalMistakesCount = countValidAyahItems(mistakeData);
-  const totalStuckCount = countValidAyahItems(stuckData);
+  // Authoritative domain counts: consume pre-calculated domain values if passed,
+  // otherwise fallback cleanly to the pure domain calculations utility.
+  const totalMistakesCount = reportData.totalMistakes !== undefined
+    ? Number(reportData.totalMistakes)
+    : calculateTotalMistakes(mistakeData);
+
+  const totalStuckCount = reportData.totalStuck !== undefined
+    ? Number(reportData.totalStuck)
+    : calculateTotalStucks(stuckData);
+
   const totalMisStr = String(totalMistakesCount);
   const totalStuckStr = String(totalStuckCount);
 

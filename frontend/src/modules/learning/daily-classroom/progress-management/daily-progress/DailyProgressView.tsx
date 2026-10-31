@@ -112,6 +112,8 @@ export default function DailyProgressView({
     setBookMistakeData,
     bookStuckData,
     setBookStuckData,
+    totalMistakes,
+    totalStuck,
     comment,
     setComment,
     savedComments,
@@ -244,6 +246,8 @@ export default function DailyProgressView({
         juzPageData,
         mistakeData,
         stuckData,
+        totalMistakes,
+        totalStuck,
         comment,
       },
       resolvedAcademicContext
@@ -259,6 +263,8 @@ export default function DailyProgressView({
     juzPageData,
     mistakeData,
     stuckData,
+    totalMistakes,
+    totalStuck,
     comment,
     configuredDateFormat,
   ]);

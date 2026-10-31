@@ -34,6 +34,7 @@ import {
   normalizeToISODate,
 } from "@/modules/learning/daily-classroom/utils/dailyClassroomUtils";
 import type { JuzRowData, DetailRowData, DailyProgressDraft } from "../types";
+import { calculateTotalMistakes, calculateTotalStucks } from "../progressCalculations";
 
 export interface AcademicValidationContext {
   departmentId?: string | number | null;
@@ -283,6 +284,10 @@ export function useReportForm() {
   const setBookMistakeData = setMistakeData;
   const bookStuckData = stuckData;
   const setBookStuckData = setStuckData;
+
+  // Authoritative Domain Calculations (Decoupled Single Source of Truth)
+  const totalMistakes = useMemo(() => calculateTotalMistakes(mistakeData), [mistakeData]);
+  const totalStuck = useMemo(() => calculateTotalStucks(stuckData), [stuckData]);
 
   const [comment, setComment] = useState<string>(() => initialActiveDraft?.comment || "");
   const [savedComments, setSavedComments] = useState<string[]>(() => commentStore.getAll());
@@ -1602,6 +1607,9 @@ export function useReportForm() {
         juz_and_pages: activePages,
         mistakes: cleanActiveMistakes,
         stucks: cleanActiveStucks,
+        total_mistake: totalMistakes,
+        total_stuck: totalStuck,
+        total_mistakes: totalMistakes,
         comment: comment,
         overall_status: "Completed",
         status: "Completed",
@@ -1672,6 +1680,11 @@ export function useReportForm() {
           juz_and_pages: activePages,
           mistakes: cleanActiveMistakes,
           stucks: cleanActiveStucks,
+          total_mistake: totalMistakes,
+          total_stuck: totalStuck,
+          total_mistakes: totalMistakes,
+          totalMistakes,
+          totalStuck,
           juzPageData: activePages,
           bookPageData: progressMode === "BOOK" ? activePages : [],
           mistakeData: cleanActiveMistakes,
@@ -1796,6 +1809,11 @@ export function useReportForm() {
           juz_and_pages: activePages,
           mistakes: cleanActiveMistakes,
           stucks: cleanActiveStucks,
+          total_mistake: totalMistakes,
+          total_stuck: totalStuck,
+          total_mistakes: totalMistakes,
+          totalMistakes,
+          totalStuck,
           juzPageData: activePages,
           bookPageData: progressMode === "BOOK" ? activePages : [],
           mistakeData: cleanActiveMistakes,
@@ -1951,6 +1969,8 @@ export function useReportForm() {
     setBookMistakeData,
     bookStuckData,
     setBookStuckData,
+    totalMistakes,
+    totalStuck,
     comment,
     setComment,
     savedComments,
