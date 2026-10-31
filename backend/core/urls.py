@@ -279,8 +279,11 @@ def root_health_check(request):
     })
 
 urlpatterns = [
-    # Root Health Check
+    # Root Health Check & Monitoring Ping Aliases
     path('health/', root_health_check, name='health_check'),
+    path('ping/', root_health_check, name='ping'),
+    path('api/health/', root_health_check, name='api_health'),
+    path('api/v1/health/', root_health_check, name='api_v1_health'),
 
     # OpenAPI 3.0 Documentation Endpoints
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

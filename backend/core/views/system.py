@@ -163,10 +163,22 @@ class UserActivitySummaryView(APIView):
 
 class HeartbeatView(APIView):
     """
-    POST /api/v1/auth/heartbeat/
-    Periodic ping endpoint for Web, Android, and iOS clients to update active session metrics.
+    Periodic ping and heartbeat endpoint for Web, Android, iOS clients, and uptime monitoring services.
+    Supports GET, HEAD, and POST without mandatory authentication.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({
+            "status": "healthy",
+            "message": "Heartbeat pong",
+            "timestamp": timezone.now().isoformat(),
+        }, status=status.HTTP_200_OK)
+
+    def head(self, request):
+        response = Response(status=status.HTTP_200_OK)
+        response['X-Health-Status'] = 'healthy'
+        return response
 
     @extend_schema(
         summary="Record Periodic Client Session Heartbeat",
@@ -204,6 +216,13 @@ class HeartbeatView(APIView):
     )
     def post(self, request):
         user = request.user
+        if not user or not user.is_authenticated:
+            return Response({
+                "status": "success",
+                "message": "Heartbeat ping acknowledged",
+                "timestamp": timezone.now().isoformat(),
+            }, status=status.HTTP_200_OK)
+
         device_type = request.data.get('device_type') or detect_device_type(request)
         device_info = request.data.get('device_info') or detect_device_info(request)
         client_ip = get_client_ip(request)
@@ -848,7 +867,7 @@ class ControlPanelBatchUpdateView(APIView):
                     changed_count += 1
 
             elif scope_type == 'USER':
-                # NEVER use request.user here — always use the target_user_id from payload
+                # NEVER use request.user here â€” always use the target_user_id from payload
                 target_user_id = target_identifier or request.data.get('target_user_id', '')
                 user_obj = User.objects.filter(
                     Q(pk=target_user_id) | Q(phone_number=target_user_id)
