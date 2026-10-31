@@ -130,6 +130,7 @@ else:
             "NAME": BASE_DIR / "db.sqlite3",
             "OPTIONS": {
                 "timeout": 60,
+                "transaction_mode": "IMMEDIATE",
             },
         }
     }

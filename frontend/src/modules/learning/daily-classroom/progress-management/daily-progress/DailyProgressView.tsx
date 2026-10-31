@@ -16,6 +16,7 @@ import { useFeatureControl } from "@/context/FeatureControlContext";
 import DailyClassroomFilterControls from "../../components/DailyClassroomFilterControls";
 import SegmentedSwitch from "@/components/ui/SegmentedSwitch";
 import { getClassroomTodayDate } from "@/constants/calendarConstants";
+import { classroomSettings } from "@/stores";
 
 import type {
   DailyProgressViewProps,
@@ -209,6 +210,24 @@ export default function DailyProgressView({
     }
   }, [filterProps?.selectedDate, selectedDate, setSelectedDate, editingReport]);
 
+  const [configuredDateFormat, setConfiguredDateFormat] = useState<string>(
+    () => classroomSettings?.getDateFormat?.() || "DD/MM/YYYY"
+  );
+
+  useEffect(() => {
+    const handleFormatChange = () => {
+      setConfiguredDateFormat(classroomSettings?.getDateFormat?.() || "DD/MM/YYYY");
+    };
+    window.addEventListener("spr_copy_settings_updated", handleFormatChange);
+    window.addEventListener("spr_classroom_date_format_changed", handleFormatChange);
+    window.addEventListener("storage", handleFormatChange);
+    return () => {
+      window.removeEventListener("spr_copy_settings_updated", handleFormatChange);
+      window.removeEventListener("spr_classroom_date_format_changed", handleFormatChange);
+      window.removeEventListener("storage", handleFormatChange);
+    };
+  }, []);
+
   const dailyProgressReportData = useMemo(() => {
     return buildDailyProgressReportData(
       {
@@ -241,6 +260,7 @@ export default function DailyProgressView({
     mistakeData,
     stuckData,
     comment,
+    configuredDateFormat,
   ]);
 
   // Normalize progress mode if restricted by feature flags
@@ -292,9 +312,14 @@ export default function DailyProgressView({
   }, []);
 
   useEffect(() => {
-    // Preload DocLabQuickReportModal on idle so Make Report opens with 0ms perceived latency
+    // Preload DocLabQuickReportModal and cloud templates on idle so Make Report opens with 0ms perceived latency
     const timer = setTimeout(() => {
       loadDocLabModal().catch(() => {});
+      import("@/components/print/docxTemplateEngine")
+        .then((mod) => {
+          mod.fetchCloudDocxTemplates().catch(() => {});
+        })
+        .catch(() => {});
     }, 400);
     return () => clearTimeout(timer);
   }, []);

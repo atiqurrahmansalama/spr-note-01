@@ -207,7 +207,20 @@ class StudentDailyReportViewSet(viewsets.ModelViewSet):
         save_kwargs = {'created_by': user}
         if user and not serializer.validated_data.get('teacher_id'):
             save_kwargs['teacher_id'] = user.id
-        report = serializer.save(**save_kwargs)
+
+        from django.db import OperationalError
+        import time
+        report = None
+        for attempt in range(4):
+            try:
+                report = serializer.save(**save_kwargs)
+                break
+            except OperationalError as oe:
+                if 'locked' in str(oe).lower() and attempt < 3:
+                    time.sleep(0.1 * (attempt + 1))
+                    continue
+                raise
+
         try:
             from core.notifications import notify_report_saved
             notify_report_saved(report, action="CREATED")
@@ -216,7 +229,19 @@ class StudentDailyReportViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         """Auto-set is_edited and edit_time on any update via ReportStatus."""
-        report = serializer.save()
+        from django.db import OperationalError
+        import time
+        report = None
+        for attempt in range(4):
+            try:
+                report = serializer.save()
+                break
+            except OperationalError as oe:
+                if 'locked' in str(oe).lower() and attempt < 3:
+                    time.sleep(0.1 * (attempt + 1))
+                    continue
+                raise
+
         try:
             from core.notifications import notify_report_saved
             notify_report_saved(report, action="UPDATED")

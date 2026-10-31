@@ -78,4 +78,6 @@ export const common = {
   savedToDrive: 'ڈرائیو میں محفوظ ہو گیا',
   savedLocally: 'مقامی طور پر محفوظ ہو گیا',
   saveFailed: 'محفوظ کرنا ناکام رہا',
+  global: 'عالمی',
+  globalSticky: 'عالمی چسپاں',
 };

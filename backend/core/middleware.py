@@ -88,14 +88,24 @@ def _log_activity_async(user_id, action_name, endpoint, http_method, ip_address)
     try:
         close_old_connections()
         from core.models import ActivityLog, User
+        from django.db import OperationalError
+        import time
         user_obj = User.objects.filter(id=user_id).first() if user_id else None
-        ActivityLog.objects.create(
-            user=user_obj,
-            action_name=action_name[:100],
-            endpoint=endpoint[:255],
-            http_method=http_method[:10],
-            ip_address=ip_address
-        )
+        for attempt in range(3):
+            try:
+                ActivityLog.objects.create(
+                    user=user_obj,
+                    action_name=action_name[:100],
+                    endpoint=endpoint[:255],
+                    http_method=http_method[:10],
+                    ip_address=ip_address
+                )
+                break
+            except OperationalError as oe:
+                if 'locked' in str(oe).lower() and attempt < 2:
+                    time.sleep(0.05 * (attempt + 1))
+                    continue
+                break
     except Exception:
         pass
     finally:

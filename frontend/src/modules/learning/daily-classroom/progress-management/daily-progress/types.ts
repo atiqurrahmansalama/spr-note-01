@@ -35,6 +35,8 @@ export interface DailyProgressDraft {
   bookPageData?: JuzRowData[];
   bookMistakeData?: DetailRowData[];
   bookStuckData?: DetailRowData[];
+  totalMistakes?: number;
+  totalStuck?: number;
   comment?: string;
   savedAtDate?: string;
   savedAtTime?: string;
@@ -68,6 +70,8 @@ export interface DailyProgressData {
   bookPageData?: JuzRowData[];
   bookMistakeData?: DetailRowData[];
   bookStuckData?: DetailRowData[];
+  totalMistakes?: number;
+  totalStuck?: number;
   comment?: string;
   report_unique_id?: string;
   id?: string;

@@ -377,33 +377,15 @@ export default function ProgressReportsView({
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-3 w-full">
-        {/* Left: Reports Count */}
-        <div className="flex items-center justify-center sm:justify-start gap-2 text-xs font-semibold theme-text-secondary select-none">
-          <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse shrink-0" />
-          <span className="theme-text-primary font-bold">
-            {filteredReports.length} / {reportsList.length}
-          </span>
-          <span>Reports</span>
-        </div>
-
-        {/* Center: Reusable Segmented Switch (Record Reports vs By Student) */}
-        <div className="flex items-center justify-center">
-          <SegmentedSwitch<"RECORD_REPORTS" | "STUDENT_VIEW">
-            value={viewMode}
-            onChange={handleViewModeChange}
-            options={reportViewOptions}
-          />
-        </div>
-
-        {/* Right: Actions / Pending Sync + Cards/Table Toggle + Extra Controls */}
-        <div className="flex items-center justify-center sm:justify-end gap-2 shrink-0">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 w-full">
+        {/* Left: Actions / Pending Sync + Cards/Table Toggle + Extra Controls */}
+        <div className="flex items-center flex-wrap gap-2">
           {pendingSyncCount > 0 && !offline && (
             <button
               type="button"
               onClick={handleSyncOfflineReports}
               disabled={loading || isSyncing}
-              className="py-1 px-2.5 rounded-xl text-xs font-semibold theme-bg-amber/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="py-1 px-3 rounded-xl text-xs font-semibold theme-bg-amber/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-2xs"
               title="Sync offline reports to database"
             >
               {isSyncing ? (
@@ -451,6 +433,15 @@ export default function ProgressReportsView({
           </button>
 
           {extraRightControls}
+        </div>
+
+        {/* Right: Reusable Segmented Switch (Record Reports vs By Student) */}
+        <div className="flex items-center justify-end shrink-0">
+          <SegmentedSwitch<"RECORD_REPORTS" | "STUDENT_VIEW">
+            value={viewMode}
+            onChange={handleViewModeChange}
+            options={reportViewOptions}
+          />
         </div>
       </div>
     );

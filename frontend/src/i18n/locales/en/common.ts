@@ -78,4 +78,6 @@ export const common = {
   savedToDrive: 'Saved to Drive',
   savedLocally: 'Saved locally',
   saveFailed: 'Save failed',
+  global: 'Global',
+  globalSticky: 'Global Sticky',
 };

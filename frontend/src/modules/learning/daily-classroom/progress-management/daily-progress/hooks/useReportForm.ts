@@ -55,6 +55,39 @@ export function useReportForm() {
     students: defaultAcademicStudents = [],
   } = academicData;
 
+  // Resolve currently active in-progress draft for seamless 0-click auto-hydration on mount/route transition
+  const initialActiveDraft = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const recoverId = params.get("recover_draft_id");
+      if (recoverId) {
+        const d = draftReport.getById(recoverId);
+        if (d) return d;
+      }
+      const active = draftReport.getById("active_report_draft");
+      if (
+        active &&
+        typeof active === "object" &&
+        (active.hasData ||
+          (active.studentName && String(active.studentName).trim()) ||
+          active.selectedSession ||
+          (active.comment && String(active.comment).trim()) ||
+          (active.bookTitle && String(active.bookTitle).trim()) ||
+          (active.lessonTitle && String(active.lessonTitle).trim()) ||
+          (Array.isArray(active.juzPageData) &&
+            active.juzPageData.some((j: any) => j.juz || (j.ranges || []).some((r: any) => r.start || r.end))) ||
+          (Array.isArray(active.mistakeData) &&
+            active.mistakeData.some((m: any) => m.page || (m.ayahs || []).some((a: any) => a.value))) ||
+          (Array.isArray(active.stuckData) &&
+            active.stuckData.some((s: any) => s.page || (s.ayahs || []).some((a: any) => a.value))))
+      ) {
+        return active;
+      }
+    } catch {}
+    return null;
+  }, []);
+
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -64,12 +97,12 @@ export function useReportForm() {
         if (norm) return norm;
       }
     }
-    return getClassroomTodayDate();
+    return initialActiveDraft?.selectedDate || getClassroomTodayDate();
   });
-  const [studentName, setStudentName] = useState<string>("");
-  const [selectedStudentId, setSelectedStudentId] = useState<string | number | null>(null);
-  const [groupName, setGroupName] = useState<string>("");
-  const [selectedSession, setSelectedSession] = useState<string>("");
+  const [studentName, setStudentName] = useState<string>(() => initialActiveDraft?.studentName || "");
+  const [selectedStudentId, setSelectedStudentId] = useState<string | number | null>(() => initialActiveDraft?.selectedStudentId || null);
+  const [groupName, setGroupName] = useState<string>(() => initialActiveDraft?.groupName || "");
+  const [selectedSession, setSelectedSession] = useState<string>(() => initialActiveDraft?.selectedSession || "");
 
   // Current logged-in user as default teacher (guaranteed fallback to never be empty)
   const authContext = (useAuth() as any) || {};
@@ -96,8 +129,8 @@ export function useReportForm() {
     return "Staff Teacher";
   }, [user]);
 
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string>(() => defaultTeacherId);
-  const [selectedTeacherName, setSelectedTeacherName] = useState<string>(() => defaultTeacherName);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>(() => initialActiveDraft?.selectedTeacherId || defaultTeacherId);
+  const [selectedTeacherName, setSelectedTeacherName] = useState<string>(() => initialActiveDraft?.selectedTeacherName || defaultTeacherName);
 
   // Guarantee teacher is never empty or "ALL" in Daily Progress
   useEffect(() => {
@@ -114,6 +147,7 @@ export function useReportForm() {
       if (window.location.pathname.includes("/daily-progress/book")) return "BOOK";
       if (window.location.pathname.includes("/daily-progress/quran")) return "QURAN";
     }
+    if (initialActiveDraft?.progressMode) return initialActiveDraft.progressMode;
     try {
       return (localStorage.getItem("spr_daily_progress_mode") as "QURAN" | "BOOK") || "QURAN";
     } catch {
@@ -162,25 +196,85 @@ export function useReportForm() {
     return () => window.removeEventListener("popstate", handleUrlSync);
   }, []);
 
-  const [bookTitle, setBookTitle] = useState<string>("");
-  const [lessonTitle, setLessonTitle] = useState<string>("");
+  const [bookTitle, setBookTitle] = useState<string>(() => initialActiveDraft?.bookTitle || "");
+  const [lessonTitle, setLessonTitle] = useState<string>(() => initialActiveDraft?.lessonTitle || "");
 
   // Single Unified Form Engine State
-  const [juzPageData, setJuzPageData] = useState<JuzRowData[]>([
-    {
-      id: crypto.randomUUID(),
-      juz: "",
-      ranges: [{ id: crypto.randomUUID(), start: "", end: "" }],
-    },
-  ]);
+  const [juzPageData, setJuzPageData] = useState<JuzRowData[]>(() => {
+    const rawPages = initialActiveDraft?.juzPageData?.length
+      ? initialActiveDraft.juzPageData
+      : initialActiveDraft?.bookPageData?.length
+      ? initialActiveDraft.bookPageData
+      : null;
+    if (Array.isArray(rawPages) && rawPages.length > 0) {
+      return rawPages.map((jp: any) => ({
+        id: jp.id || crypto.randomUUID(),
+        juz: jp.juz !== undefined ? String(jp.juz) : "",
+        ranges: Array.isArray(jp.ranges) && jp.ranges.length > 0
+          ? jp.ranges.map((r: any) => ({
+              id: r.id || crypto.randomUUID(),
+              start: r.start !== undefined ? String(r.start) : "",
+              end: r.end !== undefined ? String(r.end) : "",
+            }))
+          : [{ id: crypto.randomUUID(), start: "", end: "" }],
+      }));
+    }
+    return [
+      {
+        id: crypto.randomUUID(),
+        juz: "",
+        ranges: [{ id: crypto.randomUUID(), start: "", end: "" }],
+      },
+    ];
+  });
 
-  const [mistakeData, setMistakeData] = useState<DetailRowData[]>([
-    { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] },
-  ]);
+  const [mistakeData, setMistakeData] = useState<DetailRowData[]>(() => {
+    const rawMistakes = initialActiveDraft?.mistakeData?.length
+      ? initialActiveDraft.mistakeData
+      : initialActiveDraft?.bookMistakeData?.length
+      ? initialActiveDraft.bookMistakeData
+      : null;
+    if (Array.isArray(rawMistakes) && rawMistakes.length > 0) {
+      return rawMistakes.map((m: any) => ({
+        id: m.id || crypto.randomUUID(),
+        juz: m.juz !== undefined ? String(m.juz) : "",
+        page: m.page !== undefined ? String(m.page) : "",
+        ayahs: Array.isArray(m.ayahs) && m.ayahs.length > 0
+          ? m.ayahs.map((a: any) => ({
+              id: a.id || crypto.randomUUID(),
+              value: a.value !== undefined ? String(a.value) : (typeof a === "string" || typeof a === "number" ? String(a) : ""),
+            }))
+          : [{ id: crypto.randomUUID(), value: "" }],
+      }));
+    }
+    return [
+      { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] },
+    ];
+  });
 
-  const [stuckData, setStuckData] = useState<DetailRowData[]>([
-    { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] },
-  ]);
+  const [stuckData, setStuckData] = useState<DetailRowData[]>(() => {
+    const rawStucks = initialActiveDraft?.stuckData?.length
+      ? initialActiveDraft.stuckData
+      : initialActiveDraft?.bookStuckData?.length
+      ? initialActiveDraft.bookStuckData
+      : null;
+    if (Array.isArray(rawStucks) && rawStucks.length > 0) {
+      return rawStucks.map((s: any) => ({
+        id: s.id || crypto.randomUUID(),
+        juz: s.juz !== undefined ? String(s.juz) : "",
+        page: s.page !== undefined ? String(s.page) : "",
+        ayahs: Array.isArray(s.ayahs) && s.ayahs.length > 0
+          ? s.ayahs.map((a: any) => ({
+              id: a.id || crypto.randomUUID(),
+              value: a.value !== undefined ? String(a.value) : (typeof a === "string" || typeof a === "number" ? String(a) : ""),
+            }))
+          : [{ id: crypto.randomUUID(), value: "" }],
+      }));
+    }
+    return [
+      { id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] },
+    ];
+  });
 
   // Backward-compatible unified aliases
   const bookPageData = juzPageData;
@@ -190,7 +284,7 @@ export function useReportForm() {
   const bookStuckData = stuckData;
   const setBookStuckData = setStuckData;
 
-  const [comment, setComment] = useState<string>("");
+  const [comment, setComment] = useState<string>(() => initialActiveDraft?.comment || "");
   const [savedComments, setSavedComments] = useState<string[]>(() => commentStore.getAll());
 
   const [studentDatabase, setStudentDatabase] = useState<any[]>(() => {
@@ -467,6 +561,8 @@ export function useReportForm() {
     try {
       const allDrafts = draftReport.getAll();
       const unsavedDrafts = allDrafts.filter((d: any) => {
+        // Exclude active_report_draft because it auto-hydrates directly into the input fields seamlessly
+        if (d.id === "active_report_draft") return false;
         return Boolean(
           (d.studentName && String(d.studentName).trim()) ||
           (d.comment && String(d.comment).trim()) ||
@@ -704,9 +800,10 @@ export function useReportForm() {
         showToast("Report draft recovered successfully!", "success");
       }
     } else {
-      // Check for unsaved drafts with substantive content across storage
+      // Check for other unsaved drafts across storage (excluding active in-progress draft which is already loaded)
       const allDrafts = draftReport.getAll();
       const unsavedDrafts = allDrafts.filter((d: any) => {
+        if (d.id === "active_report_draft" || d.id === currentDraftId) return false;
         const hasContent = Boolean(
           (d.studentName && String(d.studentName).trim()) ||
           (d.comment && String(d.comment).trim()) ||
@@ -721,20 +818,32 @@ export function useReportForm() {
         return hasContent;
       });
 
-      if (unsavedDrafts.length > 0) {
-        setDraftInfo(unsavedDrafts);
-      } else {
-        // Fallback: check Central IndexedDB draft if localStorage was cleared
-        dailyProgressRepository.getDraft(currentDraftId).then((idbDraft) => {
-          if (idbDraft && typeof idbDraft === "object") {
-            const hasIdbContent = Boolean(
-              idbDraft.studentName || idbDraft.comment || idbDraft.selectedSession || idbDraft.hasData
-            );
-            if (hasIdbContent) {
-              setDraftInfo([{ id: currentDraftId, ...idbDraft }]);
-            }
-          }
-        }).catch(() => {});
+      setDraftInfo(unsavedDrafts.length > 0 ? unsavedDrafts : null);
+    }
+
+    // Auto-sync academic hierarchy filters on mount if initial active draft has department/class/section
+    if (initialActiveDraft) {
+      if (
+        initialActiveDraft.departmentId ||
+        initialActiveDraft.classId ||
+        initialActiveDraft.sectionId ||
+        initialActiveDraft.selectedDepartmentId ||
+        initialActiveDraft.selectedClassId ||
+        initialActiveDraft.selectedSectionId
+      ) {
+        setTimeout(() => {
+          window.dispatchEvent(
+            new CustomEvent("spr_sync_hierarchy_filters", {
+              detail: {
+                departmentId: initialActiveDraft.departmentId || initialActiveDraft.selectedDepartmentId,
+                classId: initialActiveDraft.classId || initialActiveDraft.selectedClassId,
+                sectionId: initialActiveDraft.sectionId || initialActiveDraft.selectedSectionId,
+                student_name: initialActiveDraft.studentName,
+                selectedDate: initialActiveDraft.selectedDate,
+              },
+            })
+          );
+        }, 60);
       }
     }
 
@@ -799,6 +908,8 @@ export function useReportForm() {
       selectedStudentId,
       groupName,
       selectedSession,
+      selectedTeacherId,
+      selectedTeacherName,
       progressMode,
       bookTitle,
       lessonTitle,
@@ -806,9 +917,9 @@ export function useReportForm() {
       juzPageData,
       mistakeData,
       stuckData,
-      bookPageData,
-      bookMistakeData,
-      bookStuckData,
+      bookPageData: juzPageData,
+      bookMistakeData: mistakeData,
+      bookStuckData: stuckData,
       comment,
       departmentId: activeStudentObj?.department_id || activeStudentObj?.department,
       classId: activeStudentObj?.academic_class_id || activeStudentObj?.class_id || activeStudentObj?.student_class,
@@ -839,6 +950,8 @@ export function useReportForm() {
     selectedStudentId,
     groupName,
     selectedSession,
+    selectedTeacherId,
+    selectedTeacherName,
     progressMode,
     bookTitle,
     lessonTitle,
@@ -855,23 +968,90 @@ export function useReportForm() {
 
   const recoverDraft = (draft: any) => {
     if (!draft) return;
+    isRestoringRef.current = true;
+
+    // Explicitly guarantee edit mode is disabled for draft recovery (no "Editing report for" banner)
+    setEditingReport(null);
+
     if (draft.studentName !== undefined) setStudentName(draft.studentName);
     if (draft.selectedStudentId !== undefined) setSelectedStudentId(draft.selectedStudentId);
     if (draft.groupName !== undefined) setGroupName(draft.groupName);
     if (draft.selectedSession !== undefined) setSelectedSession(draft.selectedSession);
+    if (draft.selectedTeacherId !== undefined) setSelectedTeacherId(draft.selectedTeacherId);
+    if (draft.selectedTeacherName !== undefined) setSelectedTeacherName(draft.selectedTeacherName);
     if (draft.progressMode !== undefined) setProgressMode(draft.progressMode);
     if (draft.bookTitle !== undefined) setBookTitle(draft.bookTitle);
     if (draft.lessonTitle !== undefined) setLessonTitle(draft.lessonTitle);
     if (draft.selectedDate !== undefined) setSelectedDate(draft.selectedDate);
-    if (draft.juzPageData?.length) setJuzPageData(draft.juzPageData);
-    if (draft.mistakeData?.length) setMistakeData(draft.mistakeData);
-    if (draft.stuckData?.length) setStuckData(draft.stuckData);
-    if (draft.bookPageData?.length) setBookPageData(draft.bookPageData);
-    if (draft.bookMistakeData?.length) setBookMistakeData(draft.bookMistakeData);
-    if (draft.bookStuckData?.length) setBookStuckData(draft.bookStuckData);
+
+    const isBook = draft.progressMode === "BOOK";
+
+    // Recover Juz / Pages with all ranges fully intact
+    const pagesSource = isBook
+      ? (draft.bookPageData?.length ? draft.bookPageData : draft.juzPageData)
+      : (draft.juzPageData?.length ? draft.juzPageData : draft.bookPageData);
+
+    if (Array.isArray(pagesSource) && pagesSource.length > 0) {
+      setJuzPageData(
+        pagesSource.map((jp: any) => ({
+          id: jp.id || crypto.randomUUID(),
+          juz: jp.juz !== undefined ? String(jp.juz) : "",
+          ranges: Array.isArray(jp.ranges) && jp.ranges.length > 0
+            ? jp.ranges.map((r: any) => ({
+                id: r.id || crypto.randomUUID(),
+                start: r.start !== undefined ? String(r.start) : "",
+                end: r.end !== undefined ? String(r.end) : "",
+              }))
+            : [{ id: crypto.randomUUID(), start: "", end: "" }],
+        }))
+      );
+    }
+
+    // Recover Mistakes
+    const mistakesSource = isBook
+      ? (draft.bookMistakeData?.length ? draft.bookMistakeData : draft.mistakeData)
+      : (draft.mistakeData?.length ? draft.mistakeData : draft.bookMistakeData);
+
+    if (Array.isArray(mistakesSource) && mistakesSource.length > 0) {
+      setMistakeData(
+        mistakesSource.map((m: any) => ({
+          id: m.id || crypto.randomUUID(),
+          juz: m.juz !== undefined ? String(m.juz) : "",
+          page: m.page !== undefined ? String(m.page) : "",
+          ayahs: Array.isArray(m.ayahs) && m.ayahs.length > 0
+            ? m.ayahs.map((a: any) => ({
+                id: a.id || crypto.randomUUID(),
+                value: a.value !== undefined ? String(a.value) : (typeof a === "string" || typeof a === "number" ? String(a) : ""),
+              }))
+            : [{ id: crypto.randomUUID(), value: "" }],
+        }))
+      );
+    }
+
+    // Recover Stucks
+    const stucksSource = isBook
+      ? (draft.bookStuckData?.length ? draft.bookStuckData : draft.stuckData)
+      : (draft.stuckData?.length ? draft.stuckData : draft.bookStuckData);
+
+    if (Array.isArray(stucksSource) && stucksSource.length > 0) {
+      setStuckData(
+        stucksSource.map((s: any) => ({
+          id: s.id || crypto.randomUUID(),
+          juz: s.juz !== undefined ? String(s.juz) : "",
+          page: s.page !== undefined ? String(s.page) : "",
+          ayahs: Array.isArray(s.ayahs) && s.ayahs.length > 0
+            ? s.ayahs.map((a: any) => ({
+                id: a.id || crypto.randomUUID(),
+                value: a.value !== undefined ? String(a.value) : (typeof a === "string" || typeof a === "number" ? String(a) : ""),
+              }))
+            : [{ id: crypto.randomUUID(), value: "" }],
+        }))
+      );
+    }
+
     if (draft.comment !== undefined) setComment(draft.comment);
 
-    // Sync academic hierarchy if stored with draft
+    // Sync academic hierarchy WITHOUT dispatching spr_edit_report (preventing EditModeBanner and data wipe)
     if (
       draft.departmentId ||
       draft.classId ||
@@ -881,7 +1061,7 @@ export function useReportForm() {
       draft.selectedSectionId
     ) {
       window.dispatchEvent(
-        new CustomEvent("spr_edit_report", {
+        new CustomEvent("spr_sync_hierarchy_filters", {
           detail: {
             departmentId: draft.departmentId || draft.selectedDepartmentId,
             classId: draft.classId || draft.selectedClassId,

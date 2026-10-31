@@ -1,18 +1,67 @@
 import type { KeyTaxonomyItem } from '@/components/print/keyLibrary/types';
 import { registerTokenFilterInterceptor } from '@/components/print/docxTemplateEngine';
-import type { DailyProgressData, DetailRowData, JuzRowData } from './types';
+import { classroomSettings } from '@/stores';
+import type { DailyProgressData, DetailRowData } from './types';
+import {
+  calculateTotalMistakes,
+  calculateTotalStucks,
+  extractJuzNumberSummary,
+  extractJuzPageSummary,
+} from './progressCalculations';
 
 /**
- * Standard date formatter for reports
+ * Standard date formatter for Daily Progress reports matching the configured
+ * Report Date Format from /admin-tools?tab=classroom-config
  */
-function formatReportDate(selectedDate?: string): string {
+export function formatReportDate(selectedDate?: string, customFormat?: string): string {
   if (!selectedDate) return '';
-  const d = new Date(selectedDate);
-  if (isNaN(d.getTime())) return String(selectedDate);
+  let d: Date;
+  const cleanDateStr = String(selectedDate).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDateStr)) {
+    const [y, m, dayNum] = cleanDateStr.split('-').map(Number);
+    d = new Date(y, m - 1, dayNum);
+  } else {
+    d = new Date(cleanDateStr);
+  }
+  if (isNaN(d.getTime())) return cleanDateStr;
+
+  const format =
+    customFormat ||
+    classroomSettings?.getDateFormat?.() ||
+    (typeof window !== 'undefined' ? localStorage.getItem('spr_copy_date_format') : null) ||
+    'DD/MM/YYYY';
+
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
+
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const fullMonthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  const mmm = monthNames[d.getMonth()] || month;
+  const mmmm = fullMonthNames[d.getMonth()] || month;
+
+  switch (format) {
+    case 'MM/DD/YYYY':
+      return `${month}/${day}/${year}`;
+    case 'YYYY-MM-DD':
+      return `${year}-${month}-${day}`;
+    case 'DD MMM YYYY':
+      return `${day} ${mmm} ${year}`;
+    case 'DD MMMM YYYY':
+      return `${day} ${mmmm} ${year}`;
+    case 'MMM DD, YYYY':
+      return `${mmm} ${day}, ${year}`;
+    case 'MMMM DD, YYYY':
+      return `${mmmm} ${day}, ${year}`;
+    case 'DD.MM.YYYY':
+      return `${day}.${month}.${year}`;
+    case 'YYYY/MM/DD':
+      return `${year}/${month}/${day}`;
+    case 'DD/MM/YYYY':
+    default:
+      return `${day}/${month}/${year}`;
+  }
 }
 
 /**
@@ -317,7 +366,7 @@ export function buildDailyProgressReportData(
     teacherName: propTeacherName = '',
   } = reportData;
 
-  const rawDate = selectedDate || '';
+  const rawDate = selectedDate || (typeof window !== 'undefined' ? new Date().toISOString().split('T')[0] : '');
   const formattedDate = rawDate ? formatReportDate(rawDate) : '';
   const safeStudentName = (studentName || '').trim();
   const safeBookTitle = (bookTitle || (reportData as any)?.book_name || (reportData as any)?.bookName || (reportData as any)?.book || '').trim();
@@ -402,6 +451,9 @@ export function buildDailyProgressReportData(
     'delivery_date': formattedDate,
     'report_date': formattedDate,
     'selected_date': formattedDate,
+    'evaluation_date': formattedDate,
+    'formatted_date': formattedDate,
+    'formattedDate': formattedDate,
     'student_name': safeStudentName,
     'studentName': safeStudentName,
     'StudentName': safeStudentName,

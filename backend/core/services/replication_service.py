@@ -112,10 +112,6 @@ class CloudReplicationService:
         for item in mutations:
             success, err_msg = cls._sync_single_mutation(item, supabase_url, supabase_key)
             if success:
-                item.status = 'SYNCED'
-                item.synced_at = timezone.now()
-                item.last_error = ''
-                item.save(update_fields=['status', 'synced_at', 'last_error'])
                 replicated_ids.append(item.id)
             else:
                 item.retry_count += 1
@@ -123,6 +119,13 @@ class CloudReplicationService:
                 item.status = 'FAILED' if item.retry_count >= 5 else 'PENDING'
                 item.save(update_fields=['status', 'retry_count', 'last_error'])
                 failed_ids.append(item.id)
+
+        if replicated_ids:
+            DataMutationOutbox.objects.filter(id__in=replicated_ids).update(
+                status='SYNCED',
+                synced_at=timezone.now(),
+                last_error=''
+            )
 
         return {
             "success": True,
@@ -183,12 +186,11 @@ class CloudReplicationService:
         ready for instant upload to the Cloud Storage Bucket.
         """
         now = timezone.now()
-        synced_ids = []
-        for item in mutations:
-            item.status = 'SYNCED'
-            item.synced_at = now
-            item.save(update_fields=['status', 'synced_at'])
-            synced_ids.append(item.id)
+        synced_ids = [item.id for item in mutations]
+        DataMutationOutbox.objects.filter(id__in=synced_ids).update(
+            status='SYNCED',
+            synced_at=now
+        )
 
         logger.info(f"[CloudReplication] Staged {len(synced_ids)} mutations to Local Replicated Vault.")
         return {

@@ -41,7 +41,8 @@ def configure_sqlite_pragmas(sender, connection, **kwargs):
                 cursor.execute('PRAGMA journal_mode = WAL;')
                 cursor.execute('PRAGMA synchronous = NORMAL;')
                 cursor.execute('PRAGMA cache_size = -64000;')
-                cursor.execute('PRAGMA busy_timeout = 5000;')
+                cursor.execute('PRAGMA busy_timeout = 60000;')
+                cursor.execute('PRAGMA wal_autocheckpoint = 1000;')
                 cursor.execute('PRAGMA foreign_keys = ON;')
         except Exception as e:
             logger.warning(f"[OutboxService] SQLite PRAGMA tuning notice: {e}")
@@ -153,21 +154,30 @@ class OutboxService:
 
         try:
             from core.models import DataMutationOutbox
-            from django.db import transaction
+            from django.db import transaction, OperationalError
+            import time
 
             payload = {}
             if operation in ('INSERT', 'UPDATE'):
                 payload = serialize_model_instance(instance)
 
-            with transaction.atomic():
-                DataMutationOutbox.objects.create(
-                    table_name=table,
-                    record_pk=record_pk,
-                    operation=operation,
-                    payload=payload,
-                    tenant_id=t_id,
-                    status='PENDING'
-                )
+            for attempt in range(3):
+                try:
+                    with transaction.atomic():
+                        DataMutationOutbox.objects.create(
+                            table_name=table,
+                            record_pk=record_pk,
+                            operation=operation,
+                            payload=payload,
+                            tenant_id=t_id,
+                            status='PENDING'
+                        )
+                    break
+                except OperationalError as oe:
+                    if 'locked' in str(oe).lower() and attempt < 2:
+                        time.sleep(0.05 * (attempt + 1))
+                        continue
+                    raise
         except Exception as err:
             logger.warning(
                 f"[OutboxService] Non-blocking outbox capture error on {table}#{record_pk}: {err}"

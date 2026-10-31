@@ -20,6 +20,7 @@ import CustomButton from '../ui/CustomButton';
 import ActionMenu from '../ui/ActionMenu';
 import EmptyState from '../ui/EmptyState';
 import { useToast } from '../../context/ToastContext';
+import { useTranslation } from '../../i18n';
 
 export interface DocLabQuickReportModalProps {
   isOpen: boolean;
@@ -53,7 +54,13 @@ export default function DocLabQuickReportModal({
 }: DocLabQuickReportModalProps) {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { t } = useTranslation('common');
+  const globalLabel = t('global', 'Global');
 
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState<boolean>(() => {
+    if (!scopeId) return false;
+    return getSavedTemplatesForScope(scopeId).length === 0;
+  });
   const [savedTemplates, setSavedTemplates] = useState<CustomDocxTemplate[]>(() => {
     return scopeId ? getSavedTemplatesForScope(scopeId) : [];
   });
@@ -102,35 +109,48 @@ export default function DocLabQuickReportModal({
       return;
     }
 
-    const templates = getSavedTemplatesForScope(scopeId);
-    setSavedTemplates(templates);
+    const syncScopeTemplates = (templates: CustomDocxTemplate[]) => {
+      setSavedTemplates(templates);
+      const defaultTmplId = getDefaultTemplateIdForScope(scopeId);
+      if (defaultTmplId && templates.some((t) => t.id === defaultTmplId)) {
+        setSelectedTemplateId(defaultTmplId);
+      } else if (templates.length > 0) {
+        const sticky = templates.find((t) => Boolean((t as any).isGlobalSticky || (t as any).is_global_sticky));
+        setSelectedTemplateId(sticky ? sticky.id : templates[0].id);
+      } else {
+        setSelectedTemplateId(null);
+      }
+    };
 
-    const defaultTmplId = getDefaultTemplateIdForScope(scopeId);
-    if (defaultTmplId && templates.some((t) => t.id === defaultTmplId)) {
-      setSelectedTemplateId(defaultTmplId);
-    } else if (templates.length > 0) {
-      setSelectedTemplateId(templates[0].id);
+    const initial = getSavedTemplatesForScope(scopeId);
+    if (initial.length > 0) {
+      syncScopeTemplates(initial);
+      setIsLoadingTemplates(false);
     } else {
-      setSelectedTemplateId(null);
+      setIsLoadingTemplates(true);
     }
-
     setCopied(false);
 
     // Asynchronously synchronize latest templates from cloud backend (for seamless multi-device / online sync)
+    let isMounted = true;
     fetchCloudDocxTemplates()
       .then(() => {
+        if (!isMounted) return;
         const fresh = getSavedTemplatesForScope(scopeId);
-        if (fresh.length > 0) {
-          setSavedTemplates(fresh);
-          const defId = getDefaultTemplateIdForScope(scopeId);
-          if (defId && fresh.some((t) => t.id === defId)) {
-            setSelectedTemplateId(defId);
-          } else if (fresh.length > 0) {
-            setSelectedTemplateId((prev) => (prev && fresh.some((t) => t.id === prev) ? prev : fresh[0].id));
-          }
-        }
+        syncScopeTemplates(fresh);
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn('[DocLabQuickReportModal] Template sync error:', err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingTemplates(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [isOpen, scopeId]);
 
   // 2. Active Template derivation
@@ -139,15 +159,25 @@ export default function DocLabQuickReportModal({
     return savedTemplates.find((t) => t.id === selectedTemplateId) || savedTemplates[0] || null;
   }, [selectedTemplateId, savedTemplates]);
 
+  const activeTemplateTitle = useMemo(() => {
+    if (!activeTemplate?.name) return 'Template';
+    const isSticky = Boolean((activeTemplate as any).isGlobalSticky || (activeTemplate as any).is_global_sticky);
+    return isSticky ? `${activeTemplate.name} [${globalLabel}]` : activeTemplate.name;
+  }, [activeTemplate, globalLabel]);
+
   // Menu items for project standard ActionMenu
   const templateMenuItems = useMemo(() => {
-    return savedTemplates.map((t) => ({
-      label: t.name,
-      icon: t.id === selectedTemplateId ? SleekCheckIcon : undefined,
-      iconClassName: t.id === selectedTemplateId ? 'theme-accent' : undefined,
-      onClick: () => handleSelectTemplate(t.id),
-    }));
-  }, [savedTemplates, selectedTemplateId, handleSelectTemplate]);
+    return savedTemplates.map((t) => {
+      const isSticky = Boolean((t as any).isGlobalSticky || (t as any).is_global_sticky);
+      const displayName = isSticky ? `${t.name} [${globalLabel}]` : t.name;
+      return {
+        label: displayName,
+        icon: t.id === selectedTemplateId ? SleekCheckIcon : undefined,
+        iconClassName: t.id === selectedTemplateId ? 'theme-accent' : undefined,
+        onClick: () => handleSelectTemplate(t.id),
+      };
+    });
+  }, [savedTemplates, selectedTemplateId, handleSelectTemplate, globalLabel]);
 
   // 3. Populate template with data strictly when modal is open and data has genuinely changed
   useEffect(() => {
@@ -253,7 +283,7 @@ export default function DocLabQuickReportModal({
       {/* Template selector switcher in footer if multiple templates exist */}
       {hasTemplates && savedTemplates.length > 1 ? (
         <ActionMenu
-          label={activeTemplate?.name || 'Template'}
+          label={activeTemplateTitle}
           icon={FileIcon}
           items={templateMenuItems}
           align="left"
@@ -263,7 +293,7 @@ export default function DocLabQuickReportModal({
         />
       ) : (
         <div className="text-[11px] theme-text-secondary hidden sm:block truncate">
-          {activeTemplate?.name ? `Template: ${activeTemplate.name}` : ''}
+          {activeTemplate?.name ? `Template: ${activeTemplateTitle}` : ''}
         </div>
       )}
 
@@ -309,7 +339,14 @@ export default function DocLabQuickReportModal({
       bodyClassName="p-4 sm:p-5"
     >
       <div className="h-[420px] sm:h-[460px] relative flex flex-col rounded-2xl overflow-hidden border theme-border theme-bg-app">
-        {hasTemplates ? (
+        {isLoadingTemplates ? (
+          <div className="w-full h-full flex flex-col items-center justify-center p-6 space-y-3">
+            <div className="w-7 h-7 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+            <p className="text-xs theme-text-secondary font-medium font-sans">
+              {t('loading', 'Loading template...')}
+            </p>
+          </div>
+        ) : hasTemplates ? (
           <textarea
             value={currentText}
             onChange={(e) => setCurrentText(e.target.value)}

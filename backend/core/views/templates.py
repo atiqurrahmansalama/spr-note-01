@@ -87,6 +87,16 @@ class CustomDocxTemplateViewSet(viewsets.ModelViewSet):
 
         return qs
 
+    def create(self, request, *args, **kwargs):
+        template_id = request.data.get('id')
+        if template_id and CustomDocxTemplate.objects.filter(id=template_id).exists():
+            instance = CustomDocxTemplate.objects.get(id=template_id)
+            serializer = self.get_serializer(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         tenant_id = get_scoped_tenant_id(self.request) or getattr(self.request.user, 'institution_id', None)
         inst = AcademicInstitution.objects.filter(id=tenant_id).first() if tenant_id else None
@@ -104,6 +114,14 @@ class CustomDocxTemplateViewSet(viewsets.ModelViewSet):
             institution=inst,
             is_global_sticky=is_sticky,
         )
+
+    def perform_update(self, serializer):
+        is_super = getattr(self.request.user, 'user_type', '').upper() == 'SUPER_ADMIN' or self.request.user.is_superuser
+        if is_super and ('is_global_sticky' in self.request.data or 'isGlobalSticky' in self.request.data):
+            is_sticky = bool(self.request.data.get('is_global_sticky') or self.request.data.get('isGlobalSticky', False))
+            serializer.save(is_global_sticky=is_sticky)
+        else:
+            serializer.save()
 
     @action(detail=True, methods=['post'], url_path='toggle-sticky')
     def toggle_sticky(self, request, pk=None):

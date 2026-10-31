@@ -1,6 +1,7 @@
 export { default as DailyProgressView } from "./DailyProgressView";
 export * from "./DailyProgressView";
 export * from "./dailyProgressDocLabKeys";
+export * from "./progressCalculations";
 export * from "./types";
 export * from "./quranRules";
 export * from "./hooks";

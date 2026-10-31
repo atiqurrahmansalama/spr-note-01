@@ -101,6 +101,7 @@ export default function ClassroomConfigurationView() {
       setDateFormat(targetId);
       copyStore.saveDateFormat(targetId);
       window.dispatchEvent(new CustomEvent('spr_copy_settings_updated', { detail: { dateFormat: targetId } }));
+      window.dispatchEvent(new CustomEvent('spr_classroom_date_format_changed', { detail: { dateFormat: targetId } }));
     }
   };
 

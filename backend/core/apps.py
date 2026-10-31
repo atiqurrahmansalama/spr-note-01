@@ -14,11 +14,13 @@ class CoreConfig(AppConfig):
 
         try:
             import os
-            # Avoid starting worker during manage.py migrate, test, or make_migrations
             import sys
-            cmd = " ".join(sys.argv)
-            if not any(x in cmd for x in ["migrate", "makemigrations", "test", "check"]):
-                if os.environ.get('RUN_MAIN') == 'true' or not os.environ.get('SERVER_SOFTWARE'):
+            cmd = " ".join(sys.argv).lower()
+            is_management_cmd = any(x in cmd for x in ["migrate", "makemigrations", "test", "check", "shell", "seed"])
+            if not is_management_cmd:
+                is_runserver = "runserver" in cmd
+                should_start = (os.environ.get('RUN_MAIN') == 'true') if is_runserver else True
+                if should_start:
                     from core.services.replication_service import CloudReplicationService
                     CloudReplicationService.start_replication_worker(interval_seconds=15.0)
         except Exception:

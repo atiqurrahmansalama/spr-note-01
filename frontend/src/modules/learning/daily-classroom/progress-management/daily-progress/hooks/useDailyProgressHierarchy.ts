@@ -172,7 +172,11 @@ export function useDailyProgressHierarchy({
     } catch {}
 
     window.addEventListener("spr_edit_report", handleEditSync);
-    return () => window.removeEventListener("spr_edit_report", handleEditSync);
+    window.addEventListener("spr_sync_hierarchy_filters", handleEditSync);
+    return () => {
+      window.removeEventListener("spr_edit_report", handleEditSync);
+      window.removeEventListener("spr_sync_hierarchy_filters", handleEditSync);
+    };
   }, [rawOnDepartmentChange, rawOnClassChange, rawOnSectionChange]);
 
   const sectionSelectOptions = useMemo(() => {

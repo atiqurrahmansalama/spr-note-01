@@ -78,4 +78,6 @@ export const common = {
   savedToDrive: 'تم الحفظ في Drive',
   savedLocally: 'تم الحفظ محلياً',
   saveFailed: 'فشل الحفظ',
+  global: 'عالمي',
+  globalSticky: 'عالمي مثبت',
 };

@@ -330,6 +330,7 @@ export const UNIVERSAL_SYNONYM_GROUPS: string[][] = [
   ['juz_page', 'juzpage', 'page', 'pages', 'juz_pages', 'juzpages'],
   ['remarks', 'remark', 'comment', 'comments', 'teacher_remarks', 'teacher_comment', 'teacher_comments', 'note', 'notes'],
   ['mention_teacher_name', 'mentionteachername', 'teacher_name', 'teachername', 'teacher', 'evaluated_by', 'evaluator'],
+  ['date', 'report_date', 'reportdate', 'delivery_date', 'deliverydate', 'selected_date', 'selecteddate', 'evaluation_date', 'evaluationdate', 'formatted_date', 'formatteddate'],
 ];
 
 /**
@@ -2628,7 +2629,12 @@ export async function fetchCloudDocxTemplates(): Promise<CustomDocxTemplate[]> {
   if (typeof window === 'undefined') return [];
   try {
     const res: any = await fetchWithAuth('/api/v1/docx-templates/?all=true');
-    const items = res?.results || (Array.isArray(res) ? res : []);
+    if (!res || !res.ok) {
+      console.warn('[DocLab] Failed to fetch templates from cloud backend, status:', res?.status);
+      return getSavedDocxTemplates();
+    }
+    const data = await res.json();
+    const items = Array.isArray(data) ? data : (data?.results || []);
     
     if (Array.isArray(items)) {
       const cloudTemplates: CustomDocxTemplate[] = items.map((t: any) =>
@@ -2650,7 +2656,7 @@ export async function fetchCloudDocxTemplates(): Promise<CustomDocxTemplate[]> {
           orientation: t.orientation || 'PORTRAIT',
           margin: t.margin || 'NORMAL',
           isShared: t.isShared ?? t.is_shared ?? false,
-          isGlobalSticky: t.isGlobalSticky ?? t.is_global_sticky ?? false,
+          isGlobalSticky: Boolean(t.isGlobalSticky ?? t.is_global_sticky ?? false),
           createdAt: t.createdAt || t.created_at || new Date().toISOString(),
           updatedAt: t.updatedAt || t.updated_at || new Date().toISOString(),
         })
@@ -2661,7 +2667,18 @@ export async function fetchCloudDocxTemplates(): Promise<CustomDocxTemplate[]> {
       const templateMap = new Map<string, CustomDocxTemplate>();
 
       local.forEach((tmpl) => templateMap.set(tmpl.id, tmpl));
-      cloudTemplates.forEach((tmpl) => templateMap.set(tmpl.id, tmpl));
+      cloudTemplates.forEach((tmpl) => {
+        const existing = templateMap.get(tmpl.id);
+        if (existing) {
+          templateMap.set(tmpl.id, {
+            ...existing,
+            ...tmpl,
+            isGlobalSticky: Boolean(tmpl.isGlobalSticky ?? (existing as any).isGlobalSticky),
+          });
+        } else {
+          templateMap.set(tmpl.id, tmpl);
+        }
+      });
 
       const merged = Array.from(templateMap.values());
       localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(merged));
@@ -2687,7 +2704,7 @@ async function syncDocxTemplateToCloud(template: CustomDocxTemplate): Promise<vo
       id: template.id,
       name: template.name,
       description: template.description || '',
-      scope_id: template.scopeId || '',
+      scope_id: template.scopeId || (template as any).scope_id || '',
       raw_html: template.rawHtml || '',
       detected_placeholders: template.detectedPlaceholders || [],
       is_table_document: !!template.isTableDocument,
@@ -2701,15 +2718,15 @@ async function syncDocxTemplateToCloud(template: CustomDocxTemplate): Promise<vo
       orientation: template.orientation || 'PORTRAIT',
       margin: template.margin || 'NORMAL',
       is_shared: !!(template as any).isShared,
-      is_global_sticky: !!(template as any).isGlobalSticky,
+      is_global_sticky: !!((template as any).isGlobalSticky || (template as any).is_global_sticky),
     };
 
-    try {
-      await fetchWithAuth('/api/v1/docx-templates/', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-    } catch {
+    const postRes: any = await fetchWithAuth('/api/v1/docx-templates/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    if (!postRes || !postRes.ok) {
       await fetchWithAuth(`/api/v1/docx-templates/${encodeURIComponent(template.id)}/`, {
         method: 'PUT',
         body: JSON.stringify(payload),
@@ -2739,11 +2756,25 @@ async function deleteDocxTemplateFromCloud(id: string): Promise<void> {
  */
 export async function toggleGlobalStickyDocxTemplate(templateId: string): Promise<boolean> {
   try {
+    const existing = getSavedDocxTemplates();
+    const currentTmpl = existing.find((t) => t.id === templateId);
+    if (currentTmpl) {
+      // First ensure the template exists in cloud backend
+      await syncDocxTemplateToCloud(currentTmpl);
+    }
+
     const res: any = await fetchWithAuth(`/api/v1/docx-templates/${encodeURIComponent(templateId)}/toggle-sticky/`, {
       method: 'POST',
     });
-    const nextSticky = res && typeof res.is_global_sticky === 'boolean' ? res.is_global_sticky : false;
-    const existing = getSavedDocxTemplates();
+
+    if (!res || !res.ok) {
+      console.error('[DocLab] Failed to toggle global sticky status, HTTP status:', res?.status);
+      return false;
+    }
+
+    const data = await res.json();
+    const nextSticky = Boolean(data.is_global_sticky ?? data.isGlobalSticky);
+
     const updated = existing.map((t) =>
       t.id === templateId ? { ...t, isGlobalSticky: nextSticky } : t
     );
@@ -2758,7 +2789,7 @@ export async function toggleGlobalStickyDocxTemplate(templateId: string): Promis
     return nextSticky;
   } catch (err) {
     console.error('[DocLab] Failed to toggle global sticky status:', err);
-    throw err;
+    return false;
   }
 }
 

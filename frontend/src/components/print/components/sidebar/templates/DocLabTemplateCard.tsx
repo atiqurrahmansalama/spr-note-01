@@ -11,6 +11,7 @@ import {
 import { DocxTemplate } from '@/components/print/types';
 import { useAuth } from '@/context/AuthContext';
 import { auth as authStore } from '@/utils/localStore';
+import { useTranslation } from '@/i18n';
 import { DocLabItemCard } from '../DocLabItemCard';
 
 export interface DocLabTemplateCardProps {
@@ -44,6 +45,7 @@ export const DocLabTemplateCard: React.FC<DocLabTemplateCardProps> = ({
   onToggleScopeDefault,
   onToggleGlobalSticky,
 }) => {
+  const { t } = useTranslation('common');
   const { user } = useAuth() as any;
   const isUserSuperAdmin = isSuperAdmin ?? Boolean(
     user?.user_type?.toUpperCase() === 'SUPER_ADMIN' ||
@@ -53,6 +55,8 @@ export const DocLabTemplateCard: React.FC<DocLabTemplateCardProps> = ({
   );
 
   const isSticky = Boolean((template as any).isGlobalSticky || (template as any).is_global_sticky);
+  const globalBadgeText = t('global', 'Global');
+  const titleDisplay = isSticky ? `${template.name} [${globalBadgeText}]` : template.name;
 
   const menuItems = useMemo(() => {
     const items: any[] = [];
@@ -134,7 +138,7 @@ export const DocLabTemplateCard: React.FC<DocLabTemplateCardProps> = ({
   return (
     <DocLabItemCard
       icon={<FileIcon className="w-4 h-4" />}
-      title={template.name}
+      title={titleDisplay}
       isActive={isActive}
       indicator={
         isSticky ? (
@@ -143,7 +147,7 @@ export const DocLabTemplateCard: React.FC<DocLabTemplateCardProps> = ({
             className="theme-bg-accent-soft theme-accent text-[9px] px-1.5 py-0.5 rounded font-mono font-bold flex items-center gap-1 shadow-2xs border border-current/20 shrink-0"
           >
             <SparklesIcon className="w-2.5 h-2.5 shrink-0" />
-            <span>Global Sticky</span>
+            <span>{globalBadgeText}</span>
           </span>
         ) : isScopeDefault ? (
           <span

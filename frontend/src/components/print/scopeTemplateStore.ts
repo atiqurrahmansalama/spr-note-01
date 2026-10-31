@@ -221,8 +221,13 @@ export function extractTagsFromText(text: string): string[] {
 export function resolveTemplateScopeId(template: any): string {
   if (!template) return 'general_document';
 
-  const rawScope = template.scopeId || template.templateMeta?.scopeId;
+  const rawScope = template.scopeId || (template as any).scope_id || template.templateMeta?.scopeId;
   const canonicalRaw = rawScope ? (SCOPE_ALIASES[rawScope] || rawScope) : null;
+
+  // If template already has an explicit canonical scope assigned (other than general_document), honor it directly
+  if (canonicalRaw && ALL_DOCUMENT_SCOPES.some((s) => s.id === canonicalRaw) && canonicalRaw !== 'general_document') {
+    return canonicalRaw;
+  }
 
   // Extract all tags from the template
   const templateHtml = template.rawHtml || template.html || '';
@@ -427,13 +432,24 @@ export function getScopeKeysBlueprint(
  */
 export function getSavedTemplatesForScope(scopeId: string, onlyValid: boolean = false): CustomDocxTemplate[] {
   const allTemplates = getSavedDocxTemplates();
-  const canonicalScope = getScopeById(scopeId)?.id || scopeId;
+  const canonicalScope = getScopeById(scopeId)?.id || SCOPE_ALIASES[scopeId] || scopeId;
   const filtered = allTemplates.filter((t) => {
+    const isSticky = Boolean((t as any).isGlobalSticky || (t as any).is_global_sticky);
     const tScope = resolveTemplateScopeId(t);
     if (tScope === canonicalScope) {
       if (!onlyValid) return true;
       const val = validateTemplateForScope(t, canonicalScope);
       return val.isValid;
+    }
+    // Also include if Global Sticky and satisfies scope tags or explicit raw scope
+    if (isSticky) {
+      const rawScope = t.scopeId || (t as any).scope_id || (t as any).templateMeta?.scopeId;
+      const tCanonical = rawScope ? (SCOPE_ALIASES[rawScope] || rawScope) : null;
+      if (tCanonical === canonicalScope) return true;
+      const val = validateTemplateForScope(t, canonicalScope);
+      if (val.isValid || val.matchScore >= 30) {
+        return true;
+      }
     }
     if (onlyValid) {
       const val = validateTemplateForScope(t, canonicalScope);
@@ -486,7 +502,7 @@ export function getScopeDefaultMap(): Record<string, string> {
 export function setDefaultTemplateForScope(scopeId: string, templateId: string | null): void {
   if (typeof window === 'undefined') return;
   try {
-    const canonicalScope = getScopeById(scopeId)?.id || scopeId;
+    const canonicalScope = getScopeById(scopeId)?.id || SCOPE_ALIASES[scopeId] || scopeId;
     const current = getScopeDefaultMap();
     if (!templateId) {
       delete current[canonicalScope];
@@ -504,9 +520,29 @@ export function setDefaultTemplateForScope(scopeId: string, templateId: string |
  * Gets the active default template ID for a specific scope
  */
 export function getDefaultTemplateIdForScope(scopeId: string): string | null {
-  const canonicalScope = getScopeById(scopeId)?.id || scopeId;
+  const canonicalScope = getScopeById(scopeId)?.id || SCOPE_ALIASES[scopeId] || scopeId;
+  const allTemplates = getSavedDocxTemplates();
+
+  // 1. Priority #1: Global Sticky template for this scope (set by Super Admin)
+  const globalSticky = allTemplates.find((t) => {
+    const isSticky = Boolean((t as any).isGlobalSticky || (t as any).is_global_sticky);
+    if (!isSticky) return false;
+    const tScope = resolveTemplateScopeId(t);
+    return tScope === canonicalScope;
+  });
+  if (globalSticky) {
+    return globalSticky.id;
+  }
+
+  // 2. Priority #2: Explicit user-defined scope default
   const map = getScopeDefaultMap();
-  return map[canonicalScope] || null;
+  if (map[canonicalScope]) {
+    return map[canonicalScope];
+  }
+
+  // 3. Fallback: First matching template
+  const matching = allTemplates.find((t) => resolveTemplateScopeId(t) === canonicalScope);
+  return matching ? matching.id : null;
 }
 
 /**
