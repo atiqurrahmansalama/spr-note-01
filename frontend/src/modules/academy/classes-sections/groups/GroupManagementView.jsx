@@ -18,6 +18,7 @@ import { ClassSelect, SectionSelect } from "../../../../components/selectors";
 import DataTable from "../../../../components/ui/DataTable";
 import DataCardGrid from "../../../../components/ui/DataCardGrid";
 import { useRightSidebar, useDrawerRegistration } from "../../../../context/RightSidebarContext";
+import { useTenant } from "../../../../context/TenantContext";
 import GroupForm from "./GroupForm";
 import GroupMigrationModal from "./GroupMigrationModal";
 import DeleteImpactModal from "../../../../components/common/DeleteImpactModal";
@@ -29,6 +30,7 @@ export default function GroupManagementView({
 }) {
   const { showToast } = useToast();
   const { openDrawer, closeDrawer } = useRightSidebar();
+  const { activeTenantId } = useTenant();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialClassFilter = searchParams.get("student_class") || searchParams.get("class") || "ALL";
@@ -77,7 +79,8 @@ export default function GroupManagementView({
   const loadGroups = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetchWithAuth("/api/v1/groups/?page_size=500&all=true");
+      const tenantParam = activeTenantId && activeTenantId !== 'ALL' ? `&institution=${activeTenantId}` : '';
+      const res = await fetchWithAuth(`/api/v1/groups/?page_size=500&all=true${tenantParam}`);
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : data.results || [];
@@ -88,13 +91,14 @@ export default function GroupManagementView({
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, activeTenantId]);
 
   const loadLookups = useCallback(async () => {
     try {
+      const tenantParam = activeTenantId && activeTenantId !== 'ALL' ? `&institution=${activeTenantId}` : '';
       const [classRes, secRes, teacherRes] = await Promise.allSettled([
-        fetchWithAuth("/api/v1/classes/?page_size=500&all=true"),
-        fetchWithAuth("/api/v1/academy/sections/"),
+        fetchWithAuth(`/api/v1/classes/?page_size=500&all=true${tenantParam}`),
+        fetchWithAuth(`/api/v1/academy/sections/?page_size=500&all=true${tenantParam}`),
         fetchWithAuth("/api/v1/users/"),
       ]);
 
@@ -116,7 +120,7 @@ export default function GroupManagementView({
         setTeachers(list.filter((u) => u.is_active && !u.is_deactivated));
       }
     } catch {}
-  }, []);
+  }, [activeTenantId]);
 
   useEffect(() => {
     loadGroups();

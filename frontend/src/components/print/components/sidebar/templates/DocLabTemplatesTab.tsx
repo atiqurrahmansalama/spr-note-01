@@ -143,7 +143,9 @@ export const DocLabTemplatesTab: React.FC<DocLabTemplatesTabProps> = ({
 
   const handleToggleGlobalSticky = async (targetTemplate: DocxTemplate) => {
     try {
-      const nextVal = await toggleGlobalStickyDocxTemplate(targetTemplate.id);
+      const isCurrentlySticky = Boolean((targetTemplate as any).isGlobalSticky || (targetTemplate as any).is_global_sticky);
+      const targetState = !isCurrentlySticky;
+      const nextVal = await toggleGlobalStickyDocxTemplate(targetTemplate.id, targetState);
       if (showToast) {
         showToast(
           nextVal

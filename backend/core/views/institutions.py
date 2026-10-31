@@ -238,12 +238,15 @@ class AcademicBranchViewSet(viewsets.ModelViewSet):
         show_trash = self.request.query_params.get('trash') == 'true'
         qs = AcademicBranch.objects.filter(is_deleted=True) if show_trash else AcademicBranch.objects.filter(is_deleted=False)
 
-        tenant_id = get_scoped_tenant_id(self.request)
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(user, 'institution_id', None)
         if tenant_id:
             qs = qs.filter(institution_id=tenant_id)
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
-            if user.institution_id:
-                qs = qs.filter(institution_id=user.institution_id)
+            qs = qs.none()
+        else:
+            first_inst = AcademicInstitution.objects.first()
+            if first_inst:
+                qs = qs.filter(institution_id=first_inst.id)
             else:
                 qs = qs.none()
 

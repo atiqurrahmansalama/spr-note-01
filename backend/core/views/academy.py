@@ -85,12 +85,15 @@ class ClassSectionViewSet(viewsets.ModelViewSet):
         show_trash = self.request.query_params.get('trash') == 'true'
         qs = ClassSection.objects.filter(is_deleted=True) if show_trash else ClassSection.objects.filter(is_deleted=False)
 
-        tenant_id = get_scoped_tenant_id(self.request)
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(user, 'institution_id', None)
         if tenant_id:
             qs = qs.filter(student_class__institution_id=tenant_id)
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
-            if user.institution_id:
-                qs = qs.filter(student_class__institution_id=user.institution_id)
+            qs = qs.none()
+        else:
+            first_inst = AcademicInstitution.objects.first()
+            if first_inst:
+                qs = qs.filter(student_class__institution_id=first_inst.id)
             else:
                 qs = qs.none()
 
@@ -122,13 +125,16 @@ class ClassSectionViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='metrics')
     def metrics(self, request):
-        tenant_id = get_scoped_tenant_id(request)
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
         filter_kwargs = {'is_deleted': False}
         if tenant_id:
             filter_kwargs['student_class__institution_id'] = tenant_id
-        elif not (request.user.is_superuser or getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN'):
-            if request.user.institution_id:
-                filter_kwargs['student_class__institution_id'] = request.user.institution_id
+        else:
+            first_inst = AcademicInstitution.objects.first()
+            if first_inst:
+                filter_kwargs['student_class__institution_id'] = first_inst.id
+            else:
+                filter_kwargs['student_class__institution_id'] = None
 
         total_sections = ClassSection.objects.filter(**filter_kwargs).count()
         from django.db.models import Sum
@@ -181,12 +187,15 @@ class ClassPeriodSlotViewSet(viewsets.ModelViewSet):
         show_trash = self.request.query_params.get('trash') == 'true'
         qs = ClassPeriodSlot.objects.filter(is_deleted=True) if show_trash else ClassPeriodSlot.objects.filter(is_deleted=False)
 
-        tenant_id = get_scoped_tenant_id(self.request)
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(user, 'institution_id', None)
         if tenant_id:
             qs = qs.filter(institution_id=tenant_id)
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
-            if user.institution_id:
-                qs = qs.filter(institution_id=user.institution_id)
+            qs = qs.none()
+        else:
+            first_inst = AcademicInstitution.objects.first()
+            if first_inst:
+                qs = qs.filter(institution_id=first_inst.id)
             else:
                 qs = qs.none()
 
@@ -366,12 +375,15 @@ class StudentGroupViewSet(viewsets.ModelViewSet):
         show_trash = self.request.query_params.get('trash') == 'true'
         qs = StudentGroup.objects.filter(is_deleted=True) if show_trash else StudentGroup.objects.filter(is_deleted=False)
 
-        tenant_id = get_scoped_tenant_id(self.request)
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(user, 'institution_id', None)
         if tenant_id:
             qs = qs.filter(institution_id=tenant_id)
         elif not (getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser):
-            if user.institution_id:
-                qs = qs.filter(institution_id=user.institution_id)
+            qs = qs.none()
+        else:
+            first_inst = AcademicInstitution.objects.first()
+            if first_inst:
+                qs = qs.filter(institution_id=first_inst.id)
             else:
                 qs = qs.none()
 

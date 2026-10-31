@@ -18,6 +18,7 @@ import { ClassSelect } from '../../../../components/selectors';
 import DataTable from '../../../../components/ui/DataTable';
 import DataCardGrid from '../../../../components/ui/DataCardGrid';
 import { useRightSidebar, useDrawerRegistration } from '../../../../context/RightSidebarContext';
+import { useTenant } from '../../../../context/TenantContext';
 import SectionForm from './SectionForm';
 import SectionMigrationModal from './SectionMigrationModal';
 import DeleteImpactModal from '../../../../components/common/DeleteImpactModal';
@@ -32,6 +33,7 @@ export default function SectionManagementView({
   const { showToast } = useToast();
   const navigate = useNavigate();
   const { openDrawer, closeDrawer } = useRightSidebar();
+  const { activeTenantId } = useTenant();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const queryClass = searchParams.get('class') || searchParams.get('student_class') || 'ALL';
@@ -75,9 +77,10 @@ export default function SectionManagementView({
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      const tenantParam = activeTenantId && activeTenantId !== 'ALL' ? `&institution=${activeTenantId}` : '';
       const [secRes, classRes, branchRes, teacherRes] = await Promise.allSettled([
-        getSections({ page_size: 500, all: true }),
-        fetchWithAuth('/api/v1/classes/?page_size=500&all=true'),
+        getSections({ page_size: 500, all: true, ...(activeTenantId && activeTenantId !== 'ALL' ? { institution: activeTenantId } : {}) }),
+        fetchWithAuth(`/api/v1/classes/?page_size=500&all=true${tenantParam}`),
         getBranches(),
         fetchWithAuth('/api/v1/users/'),
       ]);
@@ -109,7 +112,7 @@ export default function SectionManagementView({
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, activeTenantId]);
 
   useEffect(() => {
     loadData();

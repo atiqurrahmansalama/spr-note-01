@@ -16,6 +16,7 @@ import ActionMenu from "../../../../components/ui/ActionMenu";
 import DataTable from "../../../../components/ui/DataTable";
 import DataCardGrid from "../../../../components/ui/DataCardGrid";
 import { useRightSidebar, useDrawerRegistration } from "../../../../context/RightSidebarContext";
+import { useTenant } from "../../../../context/TenantContext";
 import ClassForm from "./ClassForm";
 import ClassMigrationModal from "./ClassMigrationModal";
 import DeleteImpactModal from "../../../../components/common/DeleteImpactModal";
@@ -28,6 +29,7 @@ export default function ClassManagementView({
   const { showToast } = useToast();
   const navigate = useNavigate();
   const { openDrawer, closeDrawer } = useRightSidebar();
+  const { activeTenantId } = useTenant();
   const [searchParams] = useSearchParams();
 
   const queryDept = searchParams.get("department") || "ALL";
@@ -60,7 +62,8 @@ export default function ClassManagementView({
   const loadClasses = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetchWithAuth("/api/v1/classes/?page_size=500&all=true");
+      const tenantParam = activeTenantId && activeTenantId !== 'ALL' ? `&institution=${activeTenantId}` : '';
+      const res = await fetchWithAuth(`/api/v1/classes/?page_size=500&all=true${tenantParam}`);
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : data.results || [];
@@ -71,7 +74,7 @@ export default function ClassManagementView({
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, activeTenantId]);
 
   useEffect(() => {
     loadClasses();

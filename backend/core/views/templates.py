@@ -118,10 +118,13 @@ class CustomDocxTemplateViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         is_super = getattr(self.request.user, 'user_type', '').upper() == 'SUPER_ADMIN' or self.request.user.is_superuser
         if is_super and ('is_global_sticky' in self.request.data or 'isGlobalSticky' in self.request.data):
-            is_sticky = bool(self.request.data.get('is_global_sticky') or self.request.data.get('isGlobalSticky', False))
-            serializer.save(is_global_sticky=is_sticky)
-        else:
-            serializer.save()
+            raw_val = self.request.data.get('is_global_sticky')
+            if raw_val is None:
+                raw_val = self.request.data.get('isGlobalSticky')
+            if raw_val is not None:
+                serializer.save(is_global_sticky=bool(raw_val))
+                return
+        serializer.save()
 
     @action(detail=True, methods=['post'], url_path='toggle-sticky')
     def toggle_sticky(self, request, pk=None):
@@ -133,7 +136,17 @@ class CustomDocxTemplateViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         template = self.get_object()
-        template.is_global_sticky = not template.is_global_sticky
+
+        # Support explicit target sticky value from client to prevent out-of-sync flips
+        target_state = request.data.get('is_global_sticky')
+        if target_state is None:
+            target_state = request.data.get('isGlobalSticky')
+
+        if target_state is not None:
+            template.is_global_sticky = bool(target_state)
+        else:
+            template.is_global_sticky = not template.is_global_sticky
+
         template.save(update_fields=['is_global_sticky', 'updated_at'])
         return Response({
             'id': template.id,

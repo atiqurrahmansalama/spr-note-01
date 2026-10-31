@@ -135,6 +135,8 @@ export const deleteBranch = async (id) => {
 export const getSections = async (params = {}) => {
   const query = new URLSearchParams();
   if (params.search) query.append('search', params.search);
+  if (params.institution && params.institution !== 'ALL') query.append('institution', params.institution);
+  if (params.institution_id && params.institution_id !== 'ALL') query.append('institution', params.institution_id);
   if (params.class && params.class !== 'ALL') query.append('class', params.class);
   if (params.student_class && params.student_class !== 'ALL') query.append('class', params.student_class);
   if (params.branch && params.branch !== 'ALL') query.append('branch', params.branch);
@@ -157,8 +159,12 @@ export const getSectionDetails = async (id) => {
   return await response.json();
 };
 
-export const getSectionMetrics = async () => {
-  const response = await fetchWithAuth('/api/v1/academy/sections/metrics/');
+export const getSectionMetrics = async (params = {}) => {
+  const query = new URLSearchParams();
+  if (params.institution && params.institution !== 'ALL') query.append('institution', params.institution);
+  if (params.institution_id && params.institution_id !== 'ALL') query.append('institution', params.institution_id);
+  const qs = query.toString() ? `?${query.toString()}` : '';
+  const response = await fetchWithAuth(`/api/v1/academy/sections/metrics/${qs}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch section metrics (Status: ${response.status})`);
   }

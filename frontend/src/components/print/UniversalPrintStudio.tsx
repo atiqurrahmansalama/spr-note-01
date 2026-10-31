@@ -541,6 +541,19 @@ export default function UniversalPrintStudio({
                   onDuplicateDocxTemplate={(t: any) => handleDuplicateDocxTemplate(t?.id || t)}
                   onUpdateDocxTemplate={handleUpdateDocxTemplate}
                   onSetScopeDefault={handleSetScopeDefault}
+                  onToggleGlobalSticky={(tmpl: any) => {
+                    const tmplId = tmpl?.id || tmpl;
+                    if (customDocxTemplate?.id === tmplId || customDocxTemplate?.templateMeta?.id === tmplId) {
+                      setCustomDocxTemplate((prev: any) =>
+                        prev
+                          ? {
+                              ...prev,
+                              isGlobalSticky: !(prev.isGlobalSticky ?? (prev as any).is_global_sticky),
+                            }
+                          : prev
+                      );
+                    }
+                  }}
                   scopeId={scopeId}
                   scopeName={scopeName}
                   scopeDescription={scopeDescription}

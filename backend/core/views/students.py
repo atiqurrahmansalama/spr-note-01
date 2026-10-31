@@ -87,14 +87,17 @@ class StudentViewSet(viewsets.ModelViewSet):
         base_qs = Student.objects.filter(is_deleted=True) if show_trash else Student.objects.filter(is_deleted=False)
         base_qs = base_qs.select_related('details', 'student_class', 'section', 'student_group', 'institution').distinct()
 
-        tenant_id = get_scoped_tenant_id(self.request)
+        tenant_id = get_scoped_tenant_id(self.request) or getattr(user, 'institution_id', None)
         if tenant_id:
             base_qs = base_qs.filter(institution_id=tenant_id)
         elif not (getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser):
-            if user.institution_id:
-                base_qs = base_qs.filter(institution_id=user.institution_id)
+            base_qs = base_qs.none()
+        else:
+            first_inst = AcademicInstitution.objects.first()
+            if first_inst:
+                base_qs = base_qs.filter(institution_id=first_inst.id)
             else:
-                base_qs = base_qs.filter(created_by=user)
+                base_qs = base_qs.none()
 
         # Optional class or group filter
         class_param = self.request.query_params.get('student_class') or self.request.query_params.get('class')

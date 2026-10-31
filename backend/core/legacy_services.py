@@ -59,6 +59,22 @@ def get_scoped_tenant_id(request):
                 if inst:
                     return str(inst.id)
                 return None
+
+        # Explicit 'ALL' requested by superuser
+        if target_tenant and str(target_tenant).strip().upper() == 'ALL':
+            return None
+
+        # Super Admin default fallback: strictly isolate to their assigned institution
+        inst_id = getattr(request.user, 'institution_id', None)
+        if inst_id:
+            try:
+                return str(uuid.UUID(str(inst_id)))
+            except (ValueError, AttributeError, TypeError):
+                return str(inst_id)
+
+        first_inst = AcademicInstitution.objects.first()
+        if first_inst:
+            return str(first_inst.id)
         return None
 
     inst_id = getattr(request.user, 'institution_id', None)
@@ -66,7 +82,7 @@ def get_scoped_tenant_id(request):
         try:
             return str(uuid.UUID(str(inst_id)))
         except (ValueError, AttributeError, TypeError):
-            return None
+            return str(inst_id)
     return None
 
 

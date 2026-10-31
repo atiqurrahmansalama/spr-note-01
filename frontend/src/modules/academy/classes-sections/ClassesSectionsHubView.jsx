@@ -19,6 +19,7 @@ import { PageContainer } from '../../../components/layout';
 import { fetchWithAuth } from '../../../utils/authService';
 import { useRightSidebar } from '../../../context/RightSidebarContext';
 import { useFeatureControl } from '../../../context/FeatureControlContext';
+import { useTenant } from '../../../context/TenantContext';
 import { ClassManagementView } from './classes';
 import { SectionManagementView } from './sections';
 import { GroupManagementView } from './groups';
@@ -28,6 +29,7 @@ export default function ClassesSectionsHubView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { openDrawer } = useRightSidebar();
   const { isSectionEnabled } = useFeatureControl();
+  const { activeTenantId } = useTenant();
   const rawTab = searchParams.get('tab');
 
   // Metrics for tabs
@@ -58,14 +60,16 @@ export default function ClassesSectionsHubView() {
 
   const loadAllMetrics = useCallback(async () => {
     try {
+      const tenantParam = activeTenantId && activeTenantId !== 'ALL' ? `?institution=${activeTenantId}` : '';
+      const tenantJoinParam = activeTenantId && activeTenantId !== 'ALL' ? `&institution=${activeTenantId}` : '';
       const [classRes, deptRes, secRes, groupRes, groupsListRes, classesListRes, sectionsListRes] = await Promise.allSettled([
-        fetchWithAuth('/api/v1/classes/metrics/'),
-        fetchWithAuth('/api/v1/departments/metrics/'),
-        getSectionMetrics(),
-        fetchWithAuth('/api/v1/groups/metrics/'),
-        fetchWithAuth('/api/v1/groups/'),
-        fetchWithAuth('/api/v1/classes/?page_size=500&all=true'),
-        fetchWithAuth('/api/v1/academy/sections/?page_size=500&all=true'),
+        fetchWithAuth(`/api/v1/classes/metrics/${tenantParam}`),
+        fetchWithAuth(`/api/v1/departments/metrics/${tenantParam}`),
+        getSectionMetrics({ ...(activeTenantId && activeTenantId !== 'ALL' ? { institution: activeTenantId } : {}) }),
+        fetchWithAuth(`/api/v1/groups/metrics/${tenantParam}`),
+        fetchWithAuth(`/api/v1/groups/${tenantParam}`),
+        fetchWithAuth(`/api/v1/classes/?page_size=500&all=true${tenantJoinParam}`),
+        fetchWithAuth(`/api/v1/academy/sections/?page_size=500&all=true${tenantJoinParam}`),
       ]);
 
       if (classRes.status === 'fulfilled' && classRes.value.ok) {
@@ -138,7 +142,7 @@ export default function ClassesSectionsHubView() {
     } catch {
       // Graceful fallback
     }
-  }, []);
+  }, [activeTenantId]);
 
   useEffect(() => {
     loadAllMetrics();

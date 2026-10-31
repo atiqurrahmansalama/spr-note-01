@@ -2754,43 +2754,51 @@ async function deleteDocxTemplateFromCloud(id: string): Promise<void> {
  * Toggles global sticky status for a template in the backend database and local cache.
  * Restricted to Super Admin on backend.
  */
-export async function toggleGlobalStickyDocxTemplate(templateId: string): Promise<boolean> {
-  try {
-    const existing = getSavedDocxTemplates();
-    const currentTmpl = existing.find((t) => t.id === templateId);
-    if (currentTmpl) {
-      // First ensure the template exists in cloud backend
-      await syncDocxTemplateToCloud(currentTmpl);
-    }
+export async function toggleGlobalStickyDocxTemplate(templateId: string, explicitTarget?: boolean): Promise<boolean> {
+  const existing = getSavedDocxTemplates();
+  const currentTmpl = existing.find((t) => t.id === templateId);
 
-    const res: any = await fetchWithAuth(`/api/v1/docx-templates/${encodeURIComponent(templateId)}/toggle-sticky/`, {
-      method: 'POST',
+  const currentSticky = Boolean(currentTmpl?.isGlobalSticky || (currentTmpl as any)?.is_global_sticky);
+  const targetSticky = explicitTarget !== undefined ? explicitTarget : !currentSticky;
+
+  if (currentTmpl) {
+    // First ensure the template exists in cloud backend with target status
+    await syncDocxTemplateToCloud({
+      ...currentTmpl,
+      isGlobalSticky: targetSticky,
     });
-
-    if (!res || !res.ok) {
-      console.error('[DocLab] Failed to toggle global sticky status, HTTP status:', res?.status);
-      return false;
-    }
-
-    const data = await res.json();
-    const nextSticky = Boolean(data.is_global_sticky ?? data.isGlobalSticky);
-
-    const updated = existing.map((t) =>
-      t.id === templateId ? { ...t, isGlobalSticky: nextSticky } : t
-    );
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(updated));
-        window.dispatchEvent(
-          new CustomEvent('spr_doclab_template_saved', { detail: { templateId, isGlobalSticky: nextSticky } })
-        );
-      } catch {}
-    }
-    return nextSticky;
-  } catch (err) {
-    console.error('[DocLab] Failed to toggle global sticky status:', err);
-    return false;
   }
+
+  const res: any = await fetchWithAuth(`/api/v1/docx-templates/${encodeURIComponent(templateId)}/toggle-sticky/`, {
+    method: 'POST',
+    body: JSON.stringify({ is_global_sticky: targetSticky }),
+  });
+
+  if (!res || !res.ok) {
+    let errMsg = `Failed to toggle global sticky status (HTTP ${res?.status || 'network error'})`;
+    try {
+      const errData = await res.json();
+      errMsg = errData?.detail || errData?.message || errData?.error || errMsg;
+    } catch {}
+    console.error('[DocLab] Failed to toggle global sticky status:', errMsg);
+    throw new Error(errMsg);
+  }
+
+  const data = await res.json();
+  const nextSticky = Boolean(data.is_global_sticky ?? data.isGlobalSticky ?? targetSticky);
+
+  const updated = existing.map((t) =>
+    t.id === templateId ? { ...t, isGlobalSticky: nextSticky } : t
+  );
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(updated));
+      window.dispatchEvent(
+        new CustomEvent('spr_doclab_template_saved', { detail: { templateId, isGlobalSticky: nextSticky } })
+      );
+    } catch {}
+  }
+  return nextSticky;
 }
 
 export function saveDocxTemplate(template: Omit<CustomDocxTemplate, 'createdAt' | 'updatedAt'>): CustomDocxTemplate {
@@ -2802,8 +2810,17 @@ export function saveDocxTemplate(template: Omit<CustomDocxTemplate, 'createdAt' 
 
   const sanitizedHtml = template.rawHtml ? sanitizeLogicalDocumentHtml(template.rawHtml) : '';
 
+  const isSticky = Boolean(
+    (template as any).isGlobalSticky ??
+    (template as any).is_global_sticky ??
+    existingItem?.isGlobalSticky ??
+    (existingItem as any)?.is_global_sticky ??
+    false
+  );
+
   const newTemplate: CustomDocxTemplate = {
     ...template,
+    isGlobalSticky: isSticky,
     rawHtml: sanitizedHtml,
     createdAt: existingItem?.createdAt || (template as any).createdAt || now,
     updatedAt: now,

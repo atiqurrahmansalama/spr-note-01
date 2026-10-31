@@ -39,58 +39,31 @@ export function TenantProvider({ children }) {
       const items = Array.isArray(data) ? data : (data.results || []);
       setInstitutions(items);
 
-      const savedTenantId = localStorage.getItem('active_tenant_id');
+      const savedTenantId = localStorage.getItem('active_tenant_id') || localStorage.getItem('spr_active_tenant_id');
       if (savedTenantId && savedTenantId !== 'ALL') {
         const found = items.find(i => String(i.id) === String(savedTenantId));
         if (found) {
           setCurrentInstitution(found);
           setActiveTenantId(savedTenantId);
-        } else if (items.length > 0) {
-          if (isMultiTenantAdmin) {
-            setCurrentInstitution(null);
-            setActiveTenantId('ALL');
-            try {
-              localStorage.setItem('active_tenant_id', 'ALL');
-            } catch {}
-          } else {
-            const userInst = user?.institution_id ? items.find(i => String(i.id) === String(user.institution_id)) : null;
-            const target = userInst || items[0];
-            setCurrentInstitution(target);
-            setActiveTenantId(String(target.id));
-            try {
-              localStorage.setItem('active_tenant_id', String(target.id));
-            } catch {}
-          }
-        }
-      } else if (savedTenantId === 'ALL') {
-        setCurrentInstitution(null);
-        setActiveTenantId('ALL');
-      } else if (items.length > 0) {
-        // Multi-tenant Admin defaults to ALL (Global Scope) so all data across all institutions is visible immediately
-        if (isMultiTenantAdmin) {
-          const userInst = user?.institution_id ? items.find(i => String(i.id) === String(user.institution_id)) : null;
-          if (userInst) {
-            setCurrentInstitution(userInst);
-            setActiveTenantId(String(userInst.id));
-            try {
-              localStorage.setItem('active_tenant_id', String(userInst.id));
-            } catch {}
-          } else {
-            setCurrentInstitution(null);
-            setActiveTenantId('ALL');
-            try {
-              localStorage.setItem('active_tenant_id', 'ALL');
-            } catch {}
-          }
-        } else {
-          const userInst = user?.institution_id ? items.find(i => String(i.id) === String(user.institution_id)) : null;
-          const target = userInst || items[0];
-          setCurrentInstitution(target);
-          setActiveTenantId(String(target.id));
           try {
-            localStorage.setItem('active_tenant_id', String(target.id));
+            localStorage.setItem('active_tenant_id', savedTenantId);
+            localStorage.setItem('spr_active_tenant_id', savedTenantId);
           } catch {}
+          return;
         }
+      }
+
+      // If no valid savedTenantId (e.g. initial login or switched environment):
+      // ALWAYS bind to user.institution_id or the first valid institution. NEVER leak data via 'ALL'.
+      if (items.length > 0) {
+        const userInst = user?.institution_id ? items.find(i => String(i.id) === String(user.institution_id)) : null;
+        const target = userInst || items[0];
+        setCurrentInstitution(target);
+        setActiveTenantId(String(target.id));
+        try {
+          localStorage.setItem('active_tenant_id', String(target.id));
+          localStorage.setItem('spr_active_tenant_id', String(target.id));
+        } catch {}
       }
     } catch (err) {
       console.error('[TenantProvider] Error loading institutions:', err);
@@ -110,10 +83,12 @@ export function TenantProvider({ children }) {
     let targetName = 'All Institutions';
     if (!targetId || targetId === 'ALL') {
       localStorage.setItem('active_tenant_id', 'ALL');
+      localStorage.setItem('spr_active_tenant_id', 'ALL');
       setActiveTenantId('ALL');
       setCurrentInstitution(null);
     } else {
       localStorage.setItem('active_tenant_id', targetId);
+      localStorage.setItem('spr_active_tenant_id', targetId);
       setActiveTenantId(targetId);
       const found = institutions.find(i => String(i.id) === String(targetId));
       if (found) {
