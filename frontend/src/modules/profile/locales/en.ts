@@ -253,6 +253,8 @@ export default {
   badgeVerified: "Verified",
   badgeUnverified: "Unverified",
   securityRecEmail: "Verify your email address to secure identity recovery.",
+  allInstitutionsScope: "All Academies (Global Scope)",
+  activeAcademy: "Active Academy",
 
   // Common Controls
   saveChanges: "Save Changes",

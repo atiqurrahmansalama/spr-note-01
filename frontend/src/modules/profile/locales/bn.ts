@@ -252,6 +252,8 @@ export default {
   badgeVerified: "যাচাইকৃত",
   badgeUnverified: "অযাচাইকৃত",
   securityRecEmail: "অ্যাকাউন্ট পুনরুদ্ধার নিশ্চিত করতে আপনার ইমেইল যাচাই করুন।",
+  allInstitutionsScope: "সকল একাডেমি (গ্লোবাল নেটওয়ার্ক)",
+  activeAcademy: "সক্রিয় একাডেমি",
 
   // Common Controls
   saveChanges: "পরিবর্তন সংরক্ষণ করুন",

@@ -252,6 +252,8 @@ export default {
   badgeVerified: "تم التحقق",
   badgeUnverified: "غير متحقق",
   securityRecEmail: "تحقق من بريدك الإلكتروني لضمان استرداد الحساب.",
+  allInstitutionsScope: "جميع الأكاديميات (نطاق عام)",
+  activeAcademy: "الأكاديمية النشطة",
 
   // Common Controls
   saveChanges: "حفظ التغييرات",

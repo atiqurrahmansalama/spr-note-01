@@ -151,10 +151,8 @@ export const SectionControlView: React.FC = () => {
             activeScope={activeScope}
             modifiedCount={modifiedCount}
             saving={saving}
-            resetting={resetting}
             onSaveBatch={handleSaveBatch}
             onClearOverridesGlobally={handleClearOverridesGlobally}
-            onResetOverrides={handleResetOverrides}
           />
         }
       />

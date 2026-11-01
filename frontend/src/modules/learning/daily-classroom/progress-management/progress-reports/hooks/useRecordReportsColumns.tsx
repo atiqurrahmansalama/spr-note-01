@@ -55,8 +55,8 @@ export function useRecordReportsColumns({
       header: t("studentAndId", "Student & ID"),
       sortable: true,
       align: "left",
-      width: "22%",
-      minWidth: "170px",
+      width: "240px",
+      minWidth: "240px",
       headerClassName: "!pl-0",
       cellClassName: "!pl-0",
       sortValue: (rep: ReportItem) => resolveStudentMeta(rep).name,
@@ -78,8 +78,8 @@ export function useRecordReportsColumns({
       header: t("deptClassSec", "Dept · Class · Sec"),
       sortable: true,
       align: "left",
-      width: "22%",
-      minWidth: "170px",
+      width: "220px",
+      minWidth: "220px",
       sortValue: (rep: ReportItem) => resolveStudentMeta(rep).className,
       render: (rep: ReportItem) => {
         const meta = resolveStudentMeta(rep);
@@ -98,8 +98,8 @@ export function useRecordReportsColumns({
       header: t("dateTime", "Date & Time"),
       sortable: true,
       align: "left",
-      width: "18%",
-      minWidth: "130px",
+      width: "180px",
+      minWidth: "180px",
       sortValue: (rep: ReportItem) => rep.isoDateOnly || rep.report_date || rep.date || "",
       render: (rep: ReportItem) => (
         <ReportDateTimeCell
@@ -113,8 +113,8 @@ export function useRecordReportsColumns({
       header: t("sessionAndPages", "Session & Pages"),
       sortable: true,
       align: "left",
-      width: "18%",
-      minWidth: "140px",
+      width: "220px",
+      minWidth: "220px",
       sortValue: (rep: ReportItem) => rep.session_name || "",
       render: (rep: ReportItem) => (
         <ReportSessionPagesCell
@@ -129,8 +129,8 @@ export function useRecordReportsColumns({
       header: t("mistakesAndStucks", "Mistakes & Stucks"),
       sortable: true,
       align: "left",
-      width: "14%",
-      minWidth: "130px",
+      width: "180px",
+      minWidth: "180px",
       sortValue: (rep: ReportItem) => getMistakesCount(rep) + getStucksCount(rep),
       render: (rep: ReportItem) => (
         <MistakesStucksBadge
@@ -144,9 +144,9 @@ export function useRecordReportsColumns({
       key: "actions",
       header: t("actions", "Actions"),
       align: "center",
-      width: "70px",
-      minWidth: "70px",
-      maxWidth: "70px",
+      width: "72px",
+      minWidth: "72px",
+      maxWidth: "72px",
       headerClassName: "text-center",
       cellClassName: "text-center",
       render: (rep: ReportItem) => {

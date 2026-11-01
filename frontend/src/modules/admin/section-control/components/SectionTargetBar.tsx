@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import CustomButton from '../../../../components/ui/CustomButton';
 import CustomSelect from '../../../../components/ui/CustomSelect';
 import IconButton from '../../../../components/ui/IconButton';
 import { RefreshIcon } from '../../../../components/ui/Icons';
@@ -121,19 +122,16 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
                 roleList.map((roleObj) => {
                   const isSelected = selectedRole === roleObj.id;
                   return (
-                    <button
+                    <CustomButton
                       key={roleObj.id}
-                      type="button"
+                      size="sm"
+                      variant={isSelected ? 'primary' : 'sub'}
                       onClick={() => onSelectRole(roleObj.id)}
                       title={roleObj.name || roleObj.label}
-                      className={`h-[38px] px-3 text-xs font-semibold rounded-xl transition-all cursor-pointer border whitespace-nowrap select-none shrink-0 flex items-center justify-center text-center w-[130px] min-w-[120px] max-w-[120px] ${
-                        isSelected
-                          ? 'theme-bg-accent theme-accent-text border-transparent shadow-xs'
-                          : 'theme-bg-sub theme-text-secondary hover:theme-text-primary theme-border hover:theme-bg-elevated'
-                      }`}
+                      className="shrink-0 text-xs select-none max-w-[120px]"
                     >
                       <span className="truncate">{roleObj.label}</span>
-                    </button>
+                    </CustomButton>
                   );
                 })
               )}
@@ -163,21 +161,6 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
                 size="sm"
               />
             </div>
-
-            {selectedAcademy && (
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 shadow-2xs">
-                  {t('targets.selectedAcademyId', `Selected Academy: #${selectedAcademy}`, { id: selectedAcademy })}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => onSelectAcademy?.('')}
-                  className="text-xs theme-text-secondary hover:text-[var(--danger-text)] font-semibold transition cursor-pointer"
-                >
-                  {t('empty.clearSearch', 'Clear')}
-                </button>
-              </div>
-            )}
           </div>
 
           <div className="w-full sm:w-80 shrink-0">

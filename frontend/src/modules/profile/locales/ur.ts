@@ -252,6 +252,8 @@ export default {
   badgeVerified: "تصدیق شدہ",
   badgeUnverified: "غیر تصدیق شدہ",
   securityRecEmail: "اکاؤنٹ کی بحالی کو محفوظ بنانے کے لیے اپنا ای میل ایڈریس تصدیق کریں۔",
+  allInstitutionsScope: "تمام اکیڈمیاں (عالمی دائرہ کار)",
+  activeAcademy: "فعال اکیڈمی",
 
   // Common Controls
   saveChanges: "تبدیلیاں محفوظ کریں",

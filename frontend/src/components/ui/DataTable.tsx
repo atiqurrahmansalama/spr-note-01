@@ -810,6 +810,7 @@ function DataTable<T = any>({
         >
           {selectable && (
             <td
+              style={{ width: '48px', minWidth: '48px', maxWidth: '48px' }}
               className={`${defaultCellPad} ${selectionCellClassName} ${
                 isExpanded && !renderExpandedRow ? 'border-b-0' : 'border-b theme-border'
               }`}
@@ -947,6 +948,7 @@ function DataTable<T = any>({
             >
               {selectable && (
                 <td
+                  style={{ width: '48px', minWidth: '48px', maxWidth: '48px' }}
                   className={`${selectionCellClassName} px-3 pt-3 pb-2 text-center align-top border-0`}
                 />
               )}
@@ -997,6 +999,7 @@ function DataTable<T = any>({
                 >
                   {selectable && (
                     <td
+                      style={{ width: '48px', minWidth: '48px', maxWidth: '48px' }}
                       className={`${selectionCellClassName} px-3 py-2 text-center border-b theme-border`}
                     />
                   )}
@@ -1141,7 +1144,7 @@ function DataTable<T = any>({
             : 'theme-bg-surface border theme-border rounded-2xl shadow-xs'
         } overflow-hidden ${wrapperClassName}`}
       >
-        <div className="overflow-x-auto">
+        <div className={isNestedTable ? "w-full" : "overflow-x-auto"}>
           <table className={`w-full text-left text-xs border-collapse ${tableClassName}`}>
             {!hideHeader && (
               <thead
@@ -1152,6 +1155,7 @@ function DataTable<T = any>({
                 <tr>
                   {selectable && (
                     <th
+                      style={{ width: '48px', minWidth: '48px', maxWidth: '48px' }}
                       className={`${defaultHeaderPad} ${selectionHeaderClassName} ${
                         isVertical ? 'align-middle' : ''
                       } ${isNestedTable ? 'bg-transparent' : 'theme-bg-sub'} max-h-[96px]`}

@@ -242,7 +242,7 @@ export default function StudentGroupedTable({
         selectionCellClassName="!w-12 !min-w-[48px] !max-w-[48px] !p-0 text-center"
         headerPaddingClass="py-2.5 px-3 sm:px-4 text-xs font-bold uppercase tracking-wider"
         cellPaddingClass="py-2.5 px-3 sm:px-4 text-xs"
-        tableClassName="w-full min-w-[880px] table-fixed"
+        tableClassName="w-full min-w-[1340px] table-fixed"
         rowClassName={(stu: EnrichedStudentRow) =>
           expandedStudents.has(stu.student_key) ? "[&>td]:!border-b-0" : ""
         }

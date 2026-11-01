@@ -1,0 +1,11 @@
+{
+  "name": "spr-note-workspace",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "node run-dev.js",
+    "backend": "cd backend && python manage.py runserver",
+    "frontend": "npm --prefix frontend run dev"
+  }
+}
+

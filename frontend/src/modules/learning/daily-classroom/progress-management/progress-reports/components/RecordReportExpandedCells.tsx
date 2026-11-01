@@ -105,8 +105,8 @@ export function RecordReportExpandedCells({
         </div>
       </ExpandedCell>
 
-      {/* 6. Empty Spacer under parent 70px Actions column */}
-      <td className="!w-[70px] !min-w-[70px] !max-w-[70px] p-0 border-0 pointer-events-none select-none" />
+      {/* 6. Empty Spacer under parent 72px Actions column */}
+      <td className="!w-[72px] !min-w-[72px] !max-w-[72px] p-0 border-t theme-border pointer-events-none select-none" />
     </>
   );
 }

@@ -7,6 +7,7 @@ import {
 } from '../../../components/ui/Icons';
 import IconButton from '../../../components/ui/IconButton';
 import { useTranslation } from '../../../i18n';
+import { useTenant } from '../../../context/TenantContext';
 import type { UserProfile } from '../types';
 
 interface ProfileHeroCardProps {
@@ -23,6 +24,7 @@ export const ProfileHeroCard: React.FC<ProfileHeroCardProps> = ({
   onVerifyEmail,
 }) => {
   const { t } = useTranslation('profile');
+  const { currentInstitution, activeTenantId, isMultiTenantAdmin } = useTenant();
 
   if (!user) return null;
 
@@ -44,6 +46,18 @@ export const ProfileHeroCard: React.FC<ProfileHeroCardProps> = ({
     .split(' ')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
+
+  const isGlobalScope = activeTenantId === 'ALL' && isMultiTenantAdmin;
+  const academyName = isGlobalScope
+    ? t('allInstitutionsScope', 'All Academies (Global Scope)')
+    : (
+        currentInstitution?.name ||
+        user.institution_details?.name ||
+        user.institution_name ||
+        user.campus ||
+        user.branch ||
+        ''
+      );
 
   return (
     <div className="theme-bg-surface border theme-border rounded-2xl p-7 sm:p-8 text-center shadow-xs relative overflow-hidden select-none">
@@ -107,11 +121,22 @@ export const ProfileHeroCard: React.FC<ProfileHeroCardProps> = ({
           <p className="text-xs sm:text-[13px] theme-text-secondary">{user.phone_number}</p>
         )}
 
-        {/* Dynamic Role Badge */}
-        <div className="pt-2">
+        {/* Dynamic Role & Active Academy Badges */}
+        <div className="pt-2.5 flex items-center justify-center gap-2 flex-wrap">
+          {/* Role Badge */}
           <span className="theme-bg-accent-soft theme-accent border theme-border text-xs px-3.5 py-1 rounded-full font-semibold inline-flex items-center gap-1.5 shadow-2xs">
             <span>{roleName}</span>
           </span>
+
+          {/* Active Academy (Plain text without background, border, or icon) */}
+          {academyName && (
+            <span
+              className="text-xs font-medium theme-text-secondary truncate max-w-[200px] sm:max-w-[260px]"
+              title={`${t('activeAcademy', 'Active Academy')}: ${academyName}`}
+            >
+              {academyName}
+            </span>
+          )}
         </div>
       </div>
 

@@ -69,8 +69,8 @@ export function StudentSessionTimeline({
       key: "date_time",
       header: t("dateTime", "Date & Time"),
       align: "left",
-      width: "16%",
-      minWidth: "150px",
+      width: "240px",
+      minWidth: "240px",
       headerClassName: "!pl-0 theme-bg-sub/40 border-t border-b theme-border",
       cellClassName: "!pl-0 align-top",
       render: (rep: ReportItem) => {
@@ -102,8 +102,8 @@ export function StudentSessionTimeline({
       key: "session_portions",
       header: portionHeaderTitle,
       align: "left",
-      width: "18%",
-      minWidth: "165px",
+      width: "220px",
+      minWidth: "220px",
       headerClassName: "theme-bg-sub/40 border-t border-b theme-border",
       cellClassName: "align-top",
       render: (rep: ReportItem) => <ReportPortionsCell report={rep} />,
@@ -113,8 +113,8 @@ export function StudentSessionTimeline({
       header: t("mistakeDetails", "Mistake Details"),
       headerClassName: "text-rose-400 theme-bg-sub/40 border-t border-b theme-border",
       align: "left",
-      width: "16%",
-      minWidth: "150px",
+      width: "180px",
+      minWidth: "180px",
       cellClassName: "align-top",
       render: (rep: ReportItem) => <ReportMistakesCell report={rep} />,
     },
@@ -123,8 +123,8 @@ export function StudentSessionTimeline({
       header: t("stuckDetails", "Stuck Details"),
       headerClassName: "text-amber-400 theme-bg-sub/40 border-t border-b theme-border",
       align: "left",
-      width: "20%",
-      minWidth: "175px",
+      width: "180px",
+      minWidth: "180px",
       cellClassName: "align-top",
       render: (rep: ReportItem) => <ReportStucksCell report={rep} />,
     },
@@ -133,8 +133,8 @@ export function StudentSessionTimeline({
       header: t("commentsReporter", "Comments & Reporter"),
       headerClassName: "theme-bg-sub/40 border-t border-b theme-border",
       align: "left",
-      width: "16%",
-      minWidth: "150px",
+      width: "220px",
+      minWidth: "220px",
       cellClassName: "align-top",
       render: (rep: ReportItem) => (
         <ReportCommentsCell
@@ -148,8 +148,8 @@ export function StudentSessionTimeline({
       header: t("actions", "Actions"),
       headerClassName: "border-t border-b theme-border text-left theme-bg-sub/40",
       align: "left",
-      width: "14%",
-      minWidth: "125px",
+      width: "180px",
+      minWidth: "180px",
       cellClassName: "align-top",
       sticky: false,
       render: (rep: ReportItem) => {
@@ -185,11 +185,11 @@ export function StudentSessionTimeline({
     {
       key: "spacer_right",
       header: "",
-      width: "70px",
-      minWidth: "70px",
-      maxWidth: "70px",
-      headerClassName: "!w-[70px] !min-w-[70px] !max-w-[70px] !p-0 !border-0 !border-t-0 !border-b-0 !bg-transparent pointer-events-none select-none",
-      cellClassName: "!w-[70px] !min-w-[70px] !max-w-[70px] !p-0 !border-0 !border-b-0 !bg-transparent pointer-events-none select-none align-top",
+      width: "72px",
+      minWidth: "72px",
+      maxWidth: "72px",
+      headerClassName: "!w-[72px] !min-w-[72px] !max-w-[72px] !p-0 !border-0 !border-t-0 !border-b-0 !bg-transparent pointer-events-none select-none",
+      cellClassName: "!w-[72px] !min-w-[72px] !max-w-[72px] !p-0 !border-0 !border-b-0 !bg-transparent pointer-events-none select-none align-top",
       render: () => null,
     },
   ], [
@@ -223,8 +223,8 @@ export function StudentSessionTimeline({
         rowClassName={(_item, idx) =>
           `align-top ${idx === reports.length - 1 ? "[&>td]:!border-b-0" : "border-b theme-border"}`
         }
-        wrapperClassName="border-0 shadow-none bg-transparent rounded-none"
-        tableClassName="w-full table-fixed bg-transparent !border-separate border-spacing-0 [&_td]:align-top"
+        wrapperClassName="border-0 shadow-none bg-transparent rounded-none w-full"
+        tableClassName="w-full min-w-[1340px] table-fixed bg-transparent border-collapse [&_td]:align-top"
       />
     </div>
   );
