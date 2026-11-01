@@ -133,6 +133,8 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
     formattedTime = serializers.SerializerMethodField()
     teacher_name  = serializers.SerializerMethodField()
     teacher       = serializers.SerializerMethodField()
+    total_mistake = serializers.SerializerMethodField()
+    total_stuck   = serializers.SerializerMethodField()
 
     class Meta:
         model = StudentDailyReport
@@ -243,6 +245,22 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
     @extend_schema_field(OpenApiTypes.OBJECT)
     def get_stucks(self, obj):
         return self.get_stuck_details(obj)
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_total_mistake(self, obj):
+        if hasattr(obj, 'error_details'):
+            items = [ed for ed in obj.error_details.all() if ed.type == 'Mistake']
+            if items:
+                return len(items)
+        return obj.total_mistake or 0
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_total_stuck(self, obj):
+        if hasattr(obj, 'error_details'):
+            items = [ed for ed in obj.error_details.all() if ed.type == 'Stuck']
+            if items:
+                return len(items)
+        return obj.total_stuck or 0
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_date_time(self, obj):
@@ -587,8 +605,8 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         elif mistakes_input or stucks_input:
             tot_mistakes, tot_stucks = self._parse_legacy_errors(report, mistakes_input, stucks_input)
         else:
-            tot_mistakes = validated_data.get('total_mistake', 0)
-            tot_stucks   = validated_data.get('total_stuck', 0)
+            tot_mistakes = initial.get('total_mistake', validated_data.get('total_mistake', 0))
+            tot_stucks   = initial.get('total_stuck', validated_data.get('total_stuck', 0))
 
         report.total_mistake = tot_mistakes
         report.total_stuck   = tot_stucks
@@ -663,6 +681,15 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
             instance.total_mistake = 0
             instance.total_stuck   = 0
             instance.save(update_fields=['total_mistake', 'total_stuck'])
+        else:
+            current_errs = list(instance.error_details.all())
+            if current_errs:
+                tot_m = sum(1 for e in current_errs if e.type == 'Mistake')
+                tot_s = sum(1 for e in current_errs if e.type == 'Stuck')
+                if instance.total_mistake != tot_m or instance.total_stuck != tot_s:
+                    instance.total_mistake = tot_m
+                    instance.total_stuck = tot_s
+                    instance.save(update_fields=['total_mistake', 'total_stuck'])
 
         return instance
 

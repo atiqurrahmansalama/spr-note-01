@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { StudentGroupedItem, ReportItem } from "../types";
-import { ResolvedStudentMeta } from "../utils/studentMetaResolver";
+import { ResolvedStudentMeta, getMistakesCount, getStucksCount } from "../utils/studentMetaResolver";
 import { isReportUnsynced } from "@/utils/syncEngine";
 
 export interface EnrichedStudentRow {
@@ -55,11 +55,11 @@ export function useStudentGroupedData(
         0
       );
       const totalMistakes = stu.reports.reduce(
-        (sum, r) => sum + (r.mistakesCount || r.total_mistake || 0),
+        (sum, r) => sum + getMistakesCount(r),
         0
       );
       const totalStucks = stu.reports.reduce(
-        (sum, r) => sum + (r.stucksCount || r.total_stuck || 0),
+        (sum, r) => sum + getStucksCount(r),
         0
       );
       const hasPendingSync = stu.reports.some(isReportUnsynced);

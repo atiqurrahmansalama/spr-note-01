@@ -424,6 +424,40 @@ export function getStucks(report: ReportItem | null | undefined): ReportStuckDet
 }
 
 /**
+ * Authoritative Single Source of Truth for Mistakes Count across all views, tables, parent rows, and analytics.
+ */
+export function getMistakesCount(report: ReportItem | null | undefined): number {
+  if (!report) return 0;
+  const resolvedMistakes = getMistakes(report).filter(
+    (m) => (m.page && String(m.page).trim()) || (m.ayah && String(m.ayah).trim())
+  );
+  // 1. Authoritative: if resolved detail rows exist, count them directly
+  if (resolvedMistakes.length > 0) {
+    return resolvedMistakes.length;
+  }
+  // 2. Fallback: if no detail items are listed, check numeric totals
+  const raw = (report as any).total_mistake ?? (report as any).total_mistakes ?? (report as any).mistakesCount;
+  return Number(raw) || 0;
+}
+
+/**
+ * Authoritative Single Source of Truth for Stucks Count across all views, tables, parent rows, and analytics.
+ */
+export function getStucksCount(report: ReportItem | null | undefined): number {
+  if (!report) return 0;
+  const resolvedStucks = getStucks(report).filter(
+    (s) => (s.page && String(s.page).trim()) || (s.ayah && String(s.ayah).trim())
+  );
+  // 1. Authoritative: if resolved detail rows exist, count them directly
+  if (resolvedStucks.length > 0) {
+    return resolvedStucks.length;
+  }
+  // 2. Fallback: if no detail items are listed, check numeric totals
+  const raw = (report as any).total_stuck ?? (report as any).total_stucks ?? (report as any).stucksCount;
+  return Number(raw) || 0;
+}
+
+/**
  * Clean student name initials generator
  */
 export function getInitials(name?: string): string {

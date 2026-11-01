@@ -23,7 +23,12 @@ export function countValidDetailItems(data?: DetailRowData[]): number {
     const validAyahs = (row.ayahs || []).filter(
       (a) => a.value !== undefined && a.value !== null && String(a.value).trim() !== ''
     ).length;
-    return total + (validAyahs > 0 ? validAyahs : 0);
+    if (validAyahs > 0) return total + validAyahs;
+    const singleVal = (row as any).ayah ?? (row as any).line;
+    if (singleVal !== undefined && singleVal !== null && String(singleVal).trim() !== '') {
+      return total + 1;
+    }
+    return total + 1;
   }, 0);
 }
 

@@ -3,7 +3,7 @@ import { Column } from "@/components/ui/DataTable";
 import { ChevronIcon, ChecklistIcon } from "@/components/ui/Icons";
 import ActionMenu from "@/components/ui/ActionMenu";
 import { ReportItem } from "../types";
-import { ResolvedStudentMeta } from "../utils/studentMetaResolver";
+import { ResolvedStudentMeta, getMistakesCount, getStucksCount } from "../utils/studentMetaResolver";
 import {
   StudentInfoCell,
   AcademicClassDeptCell,
@@ -131,12 +131,11 @@ export function useRecordReportsColumns({
       align: "left",
       width: "14%",
       minWidth: "130px",
-      sortValue: (rep: ReportItem) =>
-        (Number(rep.mistakesCount) || 0) + (Number(rep.stucksCount) || 0),
+      sortValue: (rep: ReportItem) => getMistakesCount(rep) + getStucksCount(rep),
       render: (rep: ReportItem) => (
         <MistakesStucksBadge
-          totalMistakes={Number(rep.mistakesCount) || 0}
-          totalStucks={Number(rep.stucksCount) || 0}
+          totalMistakes={getMistakesCount(rep)}
+          totalStucks={getStucksCount(rep)}
           t={t}
         />
       ),

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { ReportItem } from "../../progress-management/progress-reports/types";
+import { getMistakesCount, getStucksCount } from "../../progress-management/progress-reports/utils/studentMetaResolver";
 import {
   MetricType,
   ProgressTrendPoint,
@@ -20,37 +21,9 @@ const getReportPages = (r: ReportItem): number => {
   return Number(r.total_page ?? r.total_pages ?? r.pages ?? r.totalPages ?? 0) || 0;
 };
 
-const getReportMistakes = (r: ReportItem): number => {
-  if (r.total_mistake !== undefined && r.total_mistake !== null) {
-    return Number(r.total_mistake) || 0;
-  }
-  if (r.mistakesCount !== undefined && r.mistakesCount !== null) {
-    return Number(r.mistakesCount) || 0;
-  }
-  if (Array.isArray(r.mistake_details)) {
-    return r.mistake_details.length;
-  }
-  if (Array.isArray(r.mistakes)) {
-    return r.mistakes.length;
-  }
-  return 0;
-};
+const getReportMistakes = (r: ReportItem): number => getMistakesCount(r);
 
-const getReportStucks = (r: ReportItem): number => {
-  if (r.total_stuck !== undefined && r.total_stuck !== null) {
-    return Number(r.total_stuck) || 0;
-  }
-  if (r.stucksCount !== undefined && r.stucksCount !== null) {
-    return Number(r.stucksCount) || 0;
-  }
-  if (Array.isArray(r.stuck_details)) {
-    return r.stuck_details.length;
-  }
-  if (Array.isArray(r.stucks)) {
-    return r.stucks.length;
-  }
-  return 0;
-};
+const getReportStucks = (r: ReportItem): number => getStucksCount(r);
 
 const formatDayLabel = (dateStr: string): string => {
   try {

@@ -6,6 +6,7 @@ import { formatDate } from "@/utils/reportGenerator";
 import { dailyProgressRepository, offlineDB } from "@/offline";
 import { auth as authStore } from "@/utils/localStore";
 import { ReportItem, SyncErrorItem } from "../types";
+import { getMistakesCount, getStucksCount } from "../utils/studentMetaResolver";
 
 export interface UseProgressReportsDataOptions {
   activeTenantId?: string | null;
@@ -148,55 +149,9 @@ export function useProgressReportsData({
       const hasEditedFlag = Boolean(rep.is_edited);
       const editedAtTime = hasEditedFlag ? (rep.edited_at || rep.edit_time || null) : null;
 
-      // Mistakes count
-      let mistakesCount = 0;
-      if (rep.total_mistake !== undefined && rep.total_mistake !== null) {
-        mistakesCount = Number(rep.total_mistake) || 0;
-      } else if (Array.isArray(rep.mistake_details) && rep.mistake_details.length > 0) {
-        mistakesCount = rep.mistake_details.filter(
-          (m: any) => (m.page && String(m.page).trim()) || (m.ayah && String(m.ayah).trim())
-        ).length;
-      } else if (Array.isArray(rep.error_details)) {
-        mistakesCount = rep.error_details.filter((e: any) => e.type === "Mistake").length;
-      } else if (Array.isArray(rep.mistakes)) {
-        let count = 0;
-        rep.mistakes.forEach((m: any) => {
-          if (m.ayahs && Array.isArray(m.ayahs)) {
-            m.ayahs.forEach((a: any) => {
-              const val = typeof a === "object" ? a.value || a.ayah : a;
-              if (val && String(val).trim()) count += 1;
-            });
-          } else if (m.page && String(m.page).trim()) {
-            count += 1;
-          }
-        });
-        mistakesCount = count;
-      }
-
-      // Stucks count
-      let stucksCount = 0;
-      if (rep.total_stuck !== undefined && rep.total_stuck !== null) {
-        stucksCount = Number(rep.total_stuck) || 0;
-      } else if (Array.isArray(rep.stuck_details) && rep.stuck_details.length > 0) {
-        stucksCount = rep.stuck_details.filter(
-          (s: any) => (s.page && String(s.page).trim()) || (s.ayah && String(s.ayah).trim())
-        ).length;
-      } else if (Array.isArray(rep.error_details)) {
-        stucksCount = rep.error_details.filter((e: any) => e.type === "Stuck").length;
-      } else if (Array.isArray(rep.stucks)) {
-        let count = 0;
-        rep.stucks.forEach((s: any) => {
-          if (s.ayahs && Array.isArray(s.ayahs)) {
-            s.ayahs.forEach((a: any) => {
-              const val = typeof a === "object" ? a.value || a.ayah : a;
-              if (val && String(val).trim()) count += 1;
-            });
-          } else if (s.page && String(s.page).trim()) {
-            count += 1;
-          }
-        });
-        stucksCount = count;
-      }
+      // Mistakes & Stucks Count (Authoritative Single Source of Truth)
+      const mistakesCount = getMistakesCount(rep);
+      const stucksCount = getStucksCount(rep);
 
       // 4. Academic Metadata & Hierarchy extraction
       const rawStudentId =
@@ -543,6 +498,10 @@ export function useProgressReportsData({
         totalPages: totalPagesValue,
         mistakesCount,
         stucksCount,
+        total_mistake: mistakesCount,
+        total_stuck: stucksCount,
+        total_mistakes: mistakesCount,
+        total_stucks: stucksCount,
         classId: studentClassId,
         className: studentClassName,
         sectionId: studentSectionId,
