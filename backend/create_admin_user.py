@@ -38,7 +38,7 @@ def create_admin():
             password=password,
             email=email,
             name=name,
-            institution=inst,
+            institution=None,
             user_type="SUPER_ADMIN"
         )
         print(f"[SUCCESS] Superuser created successfully! Phone: {user.phone_number}, ID: {user.id}")
@@ -46,7 +46,7 @@ def create_admin():
         user.set_password(password)
         user.email = email
         user.name = name
-        user.institution = inst
+        user.institution = None
         user.is_superuser = True
         user.is_staff = True
         user.user_type = "SUPER_ADMIN"

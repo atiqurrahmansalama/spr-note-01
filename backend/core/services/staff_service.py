@@ -56,6 +56,10 @@ def ensure_institution_staff_profile(user, institution=None):
     if not user:
         return None
 
+    # 0. Global Super Admins are platform-level operators; never auto-recruit into institutional HR rosters
+    if user.is_superuser or (getattr(user, 'user_type', '') or '').upper() == 'SUPER_ADMIN':
+        return None
+
     inst = institution or getattr(user, 'institution', None)
     if not inst:
         return None
@@ -82,7 +86,7 @@ def ensure_institution_staff_profile(user, institution=None):
 
         # 3. Determine staff type & designation based on user type & role
         u_type = (getattr(user, 'user_type', '') or '').upper()
-        if u_type in ['ADMIN', 'SUPER_ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL']:
+        if u_type in ['ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL']:
             staff_type = 'ADMIN'
             designation = 'Academy Administrator'
         elif u_type in ['STAFF', 'ACCOUNTANT']:
