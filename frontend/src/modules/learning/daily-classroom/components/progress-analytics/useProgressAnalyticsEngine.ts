@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { ReportItem } from "../../progress-management/progress-reports/types";
-import { getMistakesCount, getStucksCount } from "../../progress-management/progress-reports/utils/studentMetaResolver";
+import { getMistakesCount, getStucksCount, getTotalPages } from "../../progress-management/progress-reports/utils/studentMetaResolver";
 import {
   MetricType,
   ProgressTrendPoint,
@@ -17,9 +17,7 @@ const getReportDate = (r: ReportItem): string => {
   return String(raw).substring(0, 10);
 };
 
-const getReportPages = (r: ReportItem): number => {
-  return Number(r.total_page ?? r.total_pages ?? r.pages ?? r.totalPages ?? 0) || 0;
-};
+const getReportPages = (r: ReportItem): number => getTotalPages(r);
 
 const getReportMistakes = (r: ReportItem): number => getMistakesCount(r);
 

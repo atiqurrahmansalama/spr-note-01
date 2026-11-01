@@ -314,6 +314,31 @@ export function getPortions(report: ReportItem | null | undefined): ReportPortio
 }
 
 /**
+ * Authoritative Single Source of Truth for Total Recited / Studied Pages.
+ */
+export function getTotalPages(report: ReportItem | null | undefined): number {
+  if (!report) return 0;
+  const rawTotal = (report as any).total_page ?? (report as any).totalPages ?? (report as any).total_pages ?? (report as any).pages;
+  if (rawTotal !== undefined && rawTotal !== null && Number(rawTotal) > 0) {
+    return Number(rawTotal);
+  }
+  const portions = getPortions(report);
+  if (portions.length > 0) {
+    let pages = 0;
+    portions.forEach((p) => {
+      (p.ranges || []).forEach((r) => {
+        const s = Number(r.start || (r as any).page_start) || 0;
+        const e = Number(r.end || (r as any).page_end) || s;
+        if (e >= s && s > 0) pages += (e - s + 1);
+        else if (s > 0) pages += 1;
+      });
+    });
+    if (pages > 0) return pages;
+  }
+  return 0;
+}
+
+/**
  * Extracts mistake items in standard format: [{ juz, page, ayah }]
  */
 export function getMistakes(report: ReportItem | null | undefined): ReportMistakeDetail[] {

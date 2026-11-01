@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { StudentGroupedItem, ReportItem } from "../types";
-import { ResolvedStudentMeta, getMistakesCount, getStucksCount } from "../utils/studentMetaResolver";
+import { ResolvedStudentMeta, getMistakesCount, getStucksCount, getTotalPages } from "../utils/studentMetaResolver";
 import { isReportUnsynced } from "@/utils/syncEngine";
 
 export interface EnrichedStudentRow {
@@ -51,7 +51,7 @@ export function useStudentGroupedData(
 
       const totalReports = stu.reports.length;
       const totalPages = stu.reports.reduce(
-        (sum, r) => sum + (r.totalPages || r.total_page || r.total_pages || r.pages || 0),
+        (sum, r) => sum + getTotalPages(r),
         0
       );
       const totalMistakes = stu.reports.reduce(

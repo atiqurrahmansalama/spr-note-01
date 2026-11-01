@@ -18,6 +18,7 @@ import {
   getPortions,
   getMistakes,
   getStucks,
+  getTotalPages,
   isBookReport,
   getBookTitle,
   getLessonTitle,
@@ -461,7 +462,7 @@ export default function StudentGroupedCardGrid({
                                     <span className="theme-text-secondary opacity-90"> · Lesson: {lessonTitle}</span>
                                   )}
                                   <span className="mx-1 opacity-50">·</span>
-                                  <span className="theme-accent font-bold">{rep.totalPages || 0} Pages</span>
+                                  <span className="theme-accent font-bold">{getTotalPages(rep)} Pages</span>
                                 </div>
                               ) : portions.length > 0 ? (
                                 portions.map((jp, pIdx) => {
@@ -484,7 +485,7 @@ export default function StudentGroupedCardGrid({
                                 })
                               ) : (
                                 <span className="theme-text-secondary opacity-70">
-                                  {rep.totalPages || 0} Pages
+                                  {getTotalPages(rep)} Pages
                                 </span>
                               )}
                             </div>

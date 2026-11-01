@@ -6,7 +6,7 @@ import { formatDate } from "@/utils/reportGenerator";
 import { dailyProgressRepository, offlineDB } from "@/offline";
 import { auth as authStore } from "@/utils/localStore";
 import { ReportItem, SyncErrorItem } from "../types";
-import { getMistakesCount, getStucksCount } from "../utils/studentMetaResolver";
+import { getMistakesCount, getStucksCount, getTotalPages } from "../utils/studentMetaResolver";
 
 export interface UseProgressReportsDataOptions {
   activeTenantId?: string | null;
@@ -113,38 +113,8 @@ export function useProgressReportsData({
         }
       }
 
-      // 3. Calculated Pages from portions or juz_and_pages
-      let calculatedPages = 0;
-      if (Array.isArray(rep.juz_and_pages) && rep.juz_and_pages.length > 0) {
-        rep.juz_and_pages.forEach((jp: any) => {
-          if (Array.isArray(jp.ranges)) {
-            jp.ranges.forEach((r: any) => {
-              const start = parseInt(r.start || r.page_start || 0, 10);
-              const end = parseInt(r.end || r.page_end || 0, 10);
-              if (end >= start && start > 0) {
-                calculatedPages += end - start + 1;
-              } else if (start > 0) {
-                calculatedPages += 1;
-              }
-            });
-          }
-        });
-      } else if (Array.isArray(rep.portions) && rep.portions.length > 0) {
-        rep.portions.forEach((p: any) => {
-          const start = parseInt(p.start_page || 0, 10);
-          const end = parseInt(p.end_page || p.start_page || 0, 10);
-          if (end >= start && start > 0) {
-            calculatedPages += end - start + 1;
-          } else if (start > 0) {
-            calculatedPages += 1;
-          }
-        });
-      }
-
-      const totalPagesValue =
-        rep.total_page !== undefined && rep.total_page !== null && Number(rep.total_page) > 0
-          ? Number(rep.total_page)
-          : (calculatedPages || rep.total_pages || rep.pages || 0);
+      // 3. Calculated Total Pages (Authoritative Single Source of Truth)
+      const totalPagesValue = getTotalPages(rep);
 
       const hasEditedFlag = Boolean(rep.is_edited);
       const editedAtTime = hasEditedFlag ? (rep.edited_at || rep.edit_time || null) : null;

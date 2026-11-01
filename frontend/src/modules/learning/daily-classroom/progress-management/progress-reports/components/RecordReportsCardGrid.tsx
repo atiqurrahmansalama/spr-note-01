@@ -18,6 +18,7 @@ import {
   getPortions,
   getMistakes,
   getStucks,
+  getTotalPages,
   isBookReport,
   getBookTitle,
   getLessonTitle,
@@ -369,7 +370,7 @@ export default function RecordReportsCardGrid({
                   <div className="p-2 rounded-xl theme-bg-sub/20 border theme-border">
                     <span className="text-[10px] theme-text-secondary block font-medium">Pages</span>
                     <span className="text-sm font-bold font-mono theme-accent">
-                      {report.totalPages || report.total_page || report.pages || 0}
+                      {getTotalPages(report)}
                     </span>
                   </div>
 

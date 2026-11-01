@@ -6,6 +6,7 @@ import {
   getPortions,
   getMistakes,
   getStucks,
+  getTotalPages,
   isBookReport,
   getBookTitle,
   getLessonTitle,
@@ -132,7 +133,10 @@ export function ReportSessionPagesCell({
 }) {
   const isBook = isBookReport(report);
   const bookTitle = isBook ? getBookTitle(report) : "";
-  const displayPages = totalPages || 0;
+  const displayPages =
+    totalPages !== undefined && totalPages !== null && Number(totalPages) > 0
+      ? Number(totalPages)
+      : getTotalPages(report);
 
   return (
     <div className="space-y-0.5 flex flex-col items-start justify-start text-left min-w-0">
@@ -184,7 +188,7 @@ export function ReportPortionsCell({
             {report.session_name || "General Session"}
           </span>
           <span className="text-[11px] font-mono font-semibold theme-text-secondary opacity-80 whitespace-nowrap">
-            · {report.totalPages || 0} Pages
+            · {getTotalPages(report)} Pages
           </span>
         </div>
       )}
@@ -220,9 +224,9 @@ export function ReportPortionsCell({
                     return "";
                   }).filter(Boolean)
                 )
-                .join(", ") || (report.totalPages ? `Page: ${report.totalPages} Pages` : "—")
+                .join(", ") || `${getTotalPages(report)} Pages`
             ) : (
-              report.totalPages ? `Page: ${report.totalPages} Pages` : "—"
+              `${getTotalPages(report)} Pages`
             )}
           </div>
         </div>
