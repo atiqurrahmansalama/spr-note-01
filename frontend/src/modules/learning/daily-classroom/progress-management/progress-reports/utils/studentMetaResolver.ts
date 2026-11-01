@@ -330,32 +330,38 @@ export function getMistakes(report: ReportItem | null | undefined): ReportMistak
     if (Array.isArray(src) && src.length > 0) {
       const list: ReportMistakeDetail[] = [];
       src.forEach((row: any) => {
-        const juz = row.juz || "";
-        const page = row.page || "";
-        if (Array.isArray(row.ayahs)) {
+        const juz = row.juz !== undefined && row.juz !== null ? String(row.juz) : "";
+        const page = row.page !== undefined && row.page !== null ? String(row.page) : "";
+        let pushed = false;
+        if (Array.isArray(row.ayahs) && row.ayahs.length > 0) {
           row.ayahs.forEach((a: any) => {
             const val = typeof a === "object" ? (a.value || a.ayah || "") : (a || "");
             if (val && String(val).trim()) {
-              list.push({ juz, page, ayah: val });
+              list.push({ juz, page, ayah: String(val).trim() });
+              pushed = true;
             }
           });
-        } else if (row.ayah && String(row.ayah).trim()) {
-          list.push({ juz, page, ayah: row.ayah });
-        } else if (page && String(page).trim()) {
-          list.push({ juz, page, ayah: "" });
+        }
+        if (!pushed) {
+          const singleAyah = row.ayah || row.line || "";
+          if (singleAyah && String(singleAyah).trim()) {
+            list.push({ juz, page, ayah: String(singleAyah).trim() });
+          } else if (page && String(page).trim()) {
+            list.push({ juz, page, ayah: "" });
+          }
         }
       });
       if (list.length > 0) return list;
     }
   }
 
-  if (Array.isArray(report.error_details)) {
+  if (Array.isArray(report.error_details) && report.error_details.length > 0) {
     const serverMistakes = report.error_details
       .filter((e: any) => e.type === "Mistake")
       .map((e: any) => ({
-        juz: e.juz || "",
-        page: e.page || "",
-        ayah: e.ayah || "",
+        juz: e.juz !== undefined && e.juz !== null ? String(e.juz) : "",
+        page: e.page !== undefined && e.page !== null ? String(e.page) : "",
+        ayah: e.ayah !== undefined && e.ayah !== null ? String(e.ayah) : "",
       }));
     if (serverMistakes.length > 0) return serverMistakes;
   }
@@ -379,32 +385,38 @@ export function getStucks(report: ReportItem | null | undefined): ReportStuckDet
     if (Array.isArray(src) && src.length > 0) {
       const list: ReportStuckDetail[] = [];
       src.forEach((row: any) => {
-        const juz = row.juz || "";
-        const page = row.page || "";
-        if (Array.isArray(row.ayahs)) {
+        const juz = row.juz !== undefined && row.juz !== null ? String(row.juz) : "";
+        const page = row.page !== undefined && row.page !== null ? String(row.page) : "";
+        let pushed = false;
+        if (Array.isArray(row.ayahs) && row.ayahs.length > 0) {
           row.ayahs.forEach((a: any) => {
             const val = typeof a === "object" ? (a.value || a.ayah || "") : (a || "");
             if (val && String(val).trim()) {
-              list.push({ juz, page, ayah: val });
+              list.push({ juz, page, ayah: String(val).trim() });
+              pushed = true;
             }
           });
-        } else if (row.ayah && String(row.ayah).trim()) {
-          list.push({ juz, page, ayah: row.ayah });
-        } else if (page && String(page).trim()) {
-          list.push({ juz, page, ayah: "" });
+        }
+        if (!pushed) {
+          const singleAyah = row.ayah || row.line || "";
+          if (singleAyah && String(singleAyah).trim()) {
+            list.push({ juz, page, ayah: String(singleAyah).trim() });
+          } else if (page && String(page).trim()) {
+            list.push({ juz, page, ayah: "" });
+          }
         }
       });
       if (list.length > 0) return list;
     }
   }
 
-  if (Array.isArray(report.error_details)) {
+  if (Array.isArray(report.error_details) && report.error_details.length > 0) {
     const serverStucks = report.error_details
       .filter((e: any) => e.type === "Stuck")
       .map((e: any) => ({
-        juz: e.juz || "",
-        page: e.page || "",
-        ayah: e.ayah || "",
+        juz: e.juz !== undefined && e.juz !== null ? String(e.juz) : "",
+        page: e.page !== undefined && e.page !== null ? String(e.page) : "",
+        ayah: e.ayah !== undefined && e.ayah !== null ? String(e.ayah) : "",
       }));
     if (serverStucks.length > 0) return serverStucks;
   }

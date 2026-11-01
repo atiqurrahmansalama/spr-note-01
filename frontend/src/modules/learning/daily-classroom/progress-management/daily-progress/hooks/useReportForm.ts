@@ -1712,13 +1712,23 @@ export function useReportForm() {
             .then((apiResult: any) => {
               if (apiResult && (apiResult.success || apiResult.data)) {
                 const resData = apiResult.data || apiResult;
+                const mergedReport = {
+                  ...updatedRecord,
+                  ...resData,
+                  mistakes: updatedRecord.mistakes || resData.mistakes || resData.mistake_details,
+                  stucks: updatedRecord.stucks || resData.stucks || resData.stuck_details,
+                  mistakeData: updatedRecord.mistakeData || resData.mistake_details || resData.mistakes,
+                  stuckData: updatedRecord.stuckData || resData.stuck_details || resData.stucks,
+                  server_id: resolvedServerId || resData.id,
+                  sync_status: "SYNCED" as const,
+                };
                 saveReportLocally(
-                  { ...updatedRecord, ...resData, server_id: resolvedServerId || resData.id, sync_status: "SYNCED" },
+                  mergedReport,
                   { skipGrace: true, syncStatus: "SYNCED" }
                 );
                 saveStatusStore.set("database", "Database Synced");
                 window.dispatchEvent(
-                  new CustomEvent("spr_report_saved", { detail: { source: "database", data: resData } })
+                  new CustomEvent("spr_report_saved", { detail: { source: "database", data: mergedReport } })
                 );
               } else {
                 saveStatusStore.set("local", "Saved (Local)");

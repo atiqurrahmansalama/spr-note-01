@@ -142,17 +142,29 @@ export const transformFormToApiPayload = (reportData) => {
       const rawJuz = row.juz !== undefined && row.juz !== null ? String(row.juz).trim() : "";
       const jNum = rawJuz && !isNaN(parseInt(rawJuz, 10)) ? parseInt(rawJuz, 10) : sessionJuz;
 
+      let foundAyah = false;
       (row.ayahs || []).forEach((a) => {
         const aVal = typeof a === "object" ? parseInt(a.value || a.ayah, 10) : parseInt(a, 10);
-        if (!isNaN(aVal)) {
+        if (!isNaN(aVal) && aVal > 0) {
+          foundAyah = true;
           error_details.push({
             type: "Mistake",
-            juz: jNum,
+            juz: isBookMode ? null : (jNum || 1),
             page: pNum,
             ayah: aVal,
           });
         }
       });
+
+      if (!foundAyah) {
+        const rawSingleAyah = parseInt(row.ayah || row.line, 10);
+        error_details.push({
+          type: "Mistake",
+          juz: isBookMode ? null : (jNum || 1),
+          page: pNum,
+          ayah: !isNaN(rawSingleAyah) && rawSingleAyah > 0 ? rawSingleAyah : 1,
+        });
+      }
     });
 
     // Stucks
@@ -162,17 +174,29 @@ export const transformFormToApiPayload = (reportData) => {
       const rawJuz = row.juz !== undefined && row.juz !== null ? String(row.juz).trim() : "";
       const jNum = rawJuz && !isNaN(parseInt(rawJuz, 10)) ? parseInt(rawJuz, 10) : sessionJuz;
 
+      let foundAyah = false;
       (row.ayahs || []).forEach((a) => {
         const aVal = typeof a === "object" ? parseInt(a.value || a.ayah, 10) : parseInt(a, 10);
-        if (!isNaN(aVal)) {
+        if (!isNaN(aVal) && aVal > 0) {
+          foundAyah = true;
           error_details.push({
             type: "Stuck",
-            juz: jNum,
+            juz: isBookMode ? null : (jNum || 1),
             page: pNum,
             ayah: aVal,
           });
         }
       });
+
+      if (!foundAyah) {
+        const rawSingleAyah = parseInt(row.ayah || row.line, 10);
+        error_details.push({
+          type: "Stuck",
+          juz: isBookMode ? null : (jNum || 1),
+          page: pNum,
+          ayah: !isNaN(rawSingleAyah) && rawSingleAyah > 0 ? rawSingleAyah : 1,
+        });
+      }
     });
   }
 
@@ -197,6 +221,12 @@ export const transformFormToApiPayload = (reportData) => {
     book_name: (reportData?.book_name || reportData?.book_title || reportData?.curriculum_book_name || reportData?.bookTitle || reportData?.book || "").trim(),
     lesson_title: (reportData?.lesson_title || reportData?.lesson_covered || reportData?.lessonTitle || reportData?.lesson || "").trim(),
     lesson_covered: (reportData?.lesson_covered || reportData?.lesson_title || reportData?.lessonTitle || reportData?.lesson || "").trim(),
+    mistakes: mistakeData,
+    stucks: stuckData,
+    mistake_details: error_details.filter((e) => e.type === "Mistake"),
+    stuck_details: error_details.filter((e) => e.type === "Stuck"),
+    total_mistake: error_details.filter((e) => e.type === "Mistake").length,
+    total_stuck: error_details.filter((e) => e.type === "Stuck").length,
   };
 
   // Only pass numeric student foreign key ID; string IDs like 'stu_...' would cause DRF type validation error

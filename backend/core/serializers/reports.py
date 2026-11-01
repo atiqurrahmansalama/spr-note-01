@@ -88,9 +88,10 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
     portions = ReportPortionSerializer(many=True, required=False, default=list)
     error_details = ReportErrorDetailSerializer(many=True, required=False, default=list)
 
-    # â”€â”€ Backward-compat computed fields (read-only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     mistake_details = serializers.SerializerMethodField()
     stuck_details   = serializers.SerializerMethodField()
+    mistakes        = serializers.SerializerMethodField()
+    stucks          = serializers.SerializerMethodField()
 
     # â”€â”€ Report Status (Nested & Flattened) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     status_info = ReportStatusSerializer(read_only=True)
@@ -156,6 +157,8 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
             'error_details',
             'mistake_details',
             'stuck_details',
+            'mistakes',
+            'stucks',
             'created_by',
             'created_at', 'updated_at',
         ]
@@ -206,7 +209,13 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
             if ed.type == 'Mistake'
         ]
         return [
-            {'id': ed.id, 'juz': str(ed.juz), 'page': str(ed.page), 'ayah': str(ed.ayah)}
+            {
+                'id': ed.id,
+                'juz': str(ed.juz) if ed.juz is not None else '',
+                'page': str(ed.page),
+                'ayah': str(ed.ayah) if ed.ayah else '',
+                'ayahs': [{'id': f"a_{ed.id}", 'value': str(ed.ayah)}] if ed.ayah else []
+            }
             for ed in items
         ]
 
@@ -217,9 +226,23 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
             if ed.type == 'Stuck'
         ]
         return [
-            {'id': ed.id, 'juz': str(ed.juz), 'page': str(ed.page), 'ayah': str(ed.ayah)}
+            {
+                'id': ed.id,
+                'juz': str(ed.juz) if ed.juz is not None else '',
+                'page': str(ed.page),
+                'ayah': str(ed.ayah) if ed.ayah else '',
+                'ayahs': [{'id': f"a_{ed.id}", 'value': str(ed.ayah)}] if ed.ayah else []
+            }
             for ed in items
         ]
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_mistakes(self, obj):
+        return self.get_mistake_details(obj)
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_stucks(self, obj):
+        return self.get_stuck_details(obj)
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_date_time(self, obj):
@@ -458,12 +481,17 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
                 ]
                 valid_ayahs = [a for a in valid_ayahs if a]
 
+                juz_val = self._safe_int(juz)
+                if not juz_val and report.progress_mode != 'BOOK':
+                    portion = report.portions.first()
+                    juz_val = portion.start_juz if (portion and portion.start_juz) else 1
+
                 if valid_ayahs:
                     for a_val in valid_ayahs:
                         ReportErrorDetail.objects.create(
                             report=report,
                             type=error_type,
-                            juz=self._safe_int(juz),
+                            juz=juz_val,
                             page=self._safe_int(page),
                             ayah=self._safe_int(a_val),
                         )
@@ -473,7 +501,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
                     ReportErrorDetail.objects.create(
                         report=report,
                         type=error_type,
-                        juz=self._safe_int(juz),
+                        juz=juz_val,
                         page=self._safe_int(page),
                         ayah=self._safe_int(line_val),
                     )
@@ -502,11 +530,10 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
 
         error_details = attrs.get('error_details', [])
         if progress_mode != 'BOOK' and error_details:
+            default_juz = portions[0].get('start_juz') if portions and portions[0].get('start_juz') else 1
             for idx, err in enumerate(error_details):
                 if err.get('juz') is None:
-                    raise serializers.ValidationError({
-                        'error_details': f"Error detail #{idx + 1} must specify a valid Juz number (1â€“30)."
-                    })
+                    err['juz'] = default_juz
 
         return super().validate(attrs)
 
@@ -611,24 +638,30 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
             status_obj.delete_time = None
         status_obj.save()
 
-        if portions_data is not None:
+        if portions_data:
             instance.portions.all().delete()
             self._create_portions(instance, portions_data)
 
-        if error_details_data is not None:
+        if error_details_data:
             instance.error_details.all().delete()
             tot_mistakes, tot_stucks = self._create_normalized_errors(instance, error_details_data)
             instance.total_mistake = tot_mistakes
             instance.total_stuck   = tot_stucks
             instance.save(update_fields=['total_mistake', 'total_stuck'])
 
-        elif mistakes_input is not None or stucks_input is not None:
+        elif mistakes_input or stucks_input:
             instance.error_details.all().delete()
             tot_mistakes, tot_stucks = self._parse_legacy_errors(
                 instance, mistakes_input or [], stucks_input or []
             )
             instance.total_mistake = tot_mistakes
             instance.total_stuck   = tot_stucks
+            instance.save(update_fields=['total_mistake', 'total_stuck'])
+
+        elif 'error_details' in initial and initial['error_details'] == []:
+            instance.error_details.all().delete()
+            instance.total_mistake = 0
+            instance.total_stuck   = 0
             instance.save(update_fields=['total_mistake', 'total_stuck'])
 
         return instance
