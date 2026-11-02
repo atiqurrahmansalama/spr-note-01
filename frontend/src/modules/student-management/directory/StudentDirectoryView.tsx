@@ -50,9 +50,9 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
   const [pageSize, setPageSize] = useState<number>(() => {
     try {
       const saved = localStorage.getItem("spr_students_page_size");
-      return saved ? Number(saved) : 25;
+      return saved ? Number(saved) : 10;
     } catch {
-      return 25;
+      return 10;
     }
   });
 

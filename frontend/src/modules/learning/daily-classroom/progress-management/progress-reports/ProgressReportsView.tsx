@@ -16,6 +16,7 @@ import {
   FilterIcon,
   CheckCircleIcon,
   AlertTriangleIcon,
+  CloseIcon,
 } from "@/components/ui/Icons";
 import ActionMenu, { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { ConfirmModal } from "@/components/ui/Modal";
@@ -534,8 +535,25 @@ export default function ProgressReportsView({
           {extraRightControls}
         </div>
 
-        {/* Right: Reusable Segmented Switch (Record Reports vs By Student) + 3-Dots Menu */}
+        {/* Right: Unsynced Filter Chip + Segmented Switch (Record Reports vs By Student) + 3-Dots Menu */}
         <div className="flex items-center justify-end gap-2 shrink-0">
+          {filterUnsyncedOnly && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 dark:text-amber-400 text-xs font-semibold shadow-2xs animate-fade-in shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+              <span>
+                {t("unsyncedOnly", "Unsynced Only")} ({filteredReports.length})
+              </span>
+              <button
+                type="button"
+                onClick={() => setFilterUnsyncedOnly(false)}
+                className="ml-0.5 p-0.5 rounded-md hover:bg-amber-500/20 text-amber-500 hover:text-amber-300 transition cursor-pointer"
+                title={t("clearFilter", "Clear Unsynced Filter")}
+              >
+                <CloseIcon className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+
           <SegmentedSwitch<"RECORD_REPORTS" | "STUDENT_VIEW">
             value={viewMode}
             onChange={handleViewModeChange}
@@ -816,37 +834,7 @@ export default function ProgressReportsView({
         />
       )}
 
-      {/* 2a. Unsynced Filter Active Status Banner */}
-      {filterUnsyncedOnly && (
-        <div className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 dark:text-amber-400 text-xs shadow-2xs animate-fade-in">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-            <span className="font-semibold truncate">
-              {t("filteringUnsyncedOnly", "Filtering by Unsynced Reports Only")} ({filteredReports.length} {t("records", "records")})
-            </span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {pendingSyncCount > 0 && !offline && (
-              <button
-                type="button"
-                onClick={handleSyncOfflineReports}
-                disabled={loading || isSyncing}
-                className="px-2.5 py-1 rounded-lg bg-amber-500 text-black font-bold text-xs hover:bg-amber-400 transition cursor-pointer flex items-center gap-1 shadow-2xs"
-              >
-                <RefreshIcon className={`w-3 h-3 ${isSyncing ? "animate-spin" : ""}`} />
-                <span>{isSyncing ? t("syncing", "Syncing...") : t("syncNow", "Sync Now")}</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setFilterUnsyncedOnly(false)}
-              className="px-2.5 py-1 rounded-lg theme-bg-elevated hover:theme-bg-surface border theme-border font-medium text-xs theme-text-primary transition cursor-pointer"
-            >
-              {t("showAll", "Show All")}
-            </button>
-          </div>
-        </div>
-      )}
+
 
       {/* 2b. Sync Errors Alert Banner (Persistently displayed until all records sync cleanly) */}
       {showSyncErrorsPanel && derivedSyncErrors.length > 0 && (

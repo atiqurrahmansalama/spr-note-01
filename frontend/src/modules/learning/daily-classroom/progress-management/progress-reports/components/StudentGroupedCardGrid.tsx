@@ -63,7 +63,7 @@ export default function StudentGroupedCardGrid({
 
   const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(24);
+  const [pageSize, setPageSize] = useState<number>(10);
 
   // Consolidate & enrich student grouped rows via custom hook
   const enrichedStudentRows = useStudentGroupedData(
@@ -552,7 +552,7 @@ export default function StudentGroupedCardGrid({
             setPageSize(newSize);
             setCurrentPage(1);
           }}
-          pageSizeOptions={[12, 24, 48, 96]}
+          pageSizeOptions={[10, 20, 50, 100]}
           itemLabel="students"
         />
       )}

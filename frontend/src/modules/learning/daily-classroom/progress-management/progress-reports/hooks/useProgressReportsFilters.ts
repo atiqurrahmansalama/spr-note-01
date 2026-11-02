@@ -176,24 +176,96 @@ export function useProgressReportsFilters({
       }
 
       // Teacher Filter & Multi-Teacher Access Control
+      let targetTeacherFilter = selectedTeacherFilter;
       if (!canViewAllTeachers && currentUser) {
-        const uId = String(currentUser.id || "");
-        const uName = String(currentUser.name || currentUser.full_name || currentUser.user_name || "").toLowerCase();
-        const repTeacherId = String(rep.teacher_id || (typeof rep.teacher === "object" ? rep.teacher?.id : rep.teacher) || "");
-        const repTeacherName = String(rep.teacher_name || (typeof rep.teacher === "object" ? rep.teacher?.name : "") || "").toLowerCase();
+        targetTeacherFilter = String(currentUser.id || currentUser.user_id || "");
+      }
 
-        const matchesUser = (uId && repTeacherId === uId) ||
-                            (uName && (repTeacherName === uName || repTeacherName.includes(uName)));
-        if (!matchesUser) {
-          return false;
+      if (targetTeacherFilter && targetTeacherFilter !== "ALL") {
+        const target = String(targetTeacherFilter).trim();
+        const targetLower = target.toLowerCase();
+
+        // 1. Resolve matching staff / teacher object(s) from academicData
+        const staffList = (academicData?.staff || academicData?.teachers || []) as any[];
+        const matchedStaffMembers = staffList.filter((s: any) => {
+          if (!s) return false;
+          if (String(s.user) === target || String(s.user_id) === target) return true;
+          if (String(s.id) === target) return true;
+          if (s.employee_id && String(s.employee_id) === target) return true;
+          const sName = (s.name || s.name_en || s.user_name || s.full_name || "").toLowerCase().trim();
+          return sName && (sName === targetLower || sName.includes(targetLower) || targetLower.includes(sName));
+        });
+
+        // Build comprehensive valid target IDs set
+        const validTargetIds = new Set<string>();
+        validTargetIds.add(target);
+        matchedStaffMembers.forEach((s) => {
+          if (s.id !== undefined && s.id !== null) validTargetIds.add(String(s.id));
+          if (s.user !== undefined && s.user !== null) validTargetIds.add(String(s.user));
+          if (s.user_id !== undefined && s.user_id !== null) validTargetIds.add(String(s.user_id));
+          if (s.employee_id) validTargetIds.add(String(s.employee_id));
+        });
+
+        // Also if currentUser is the target
+        if (currentUser && (String(currentUser.id) === target || String(currentUser.user_id) === target)) {
+          validTargetIds.add(String(currentUser.id));
+          if (currentUser.staff_id) validTargetIds.add(String(currentUser.staff_id));
+          if (currentUser.user_id) validTargetIds.add(String(currentUser.user_id));
         }
-      } else if (selectedTeacherFilter && selectedTeacherFilter !== "ALL") {
-        const repTeacherId = String(rep.teacher_id || (typeof rep.teacher === "object" ? rep.teacher?.id : rep.teacher) || "");
-        const repTeacherName = String(rep.teacher_name || (typeof rep.teacher === "object" ? rep.teacher?.name : "") || "").toLowerCase();
-        const target = String(selectedTeacherFilter).toLowerCase();
-        const matchesId = repTeacherId && repTeacherId === String(selectedTeacherFilter);
-        const matchesName = repTeacherName && (repTeacherName === target || repTeacherName.includes(target));
-        if (!matchesId && !matchesName) {
+
+        // Build comprehensive valid target lowercase names set
+        const validTargetNames = new Set<string>();
+        if (isNaN(Number(target)) && target.length >= 2) {
+          validTargetNames.add(targetLower);
+        }
+        matchedStaffMembers.forEach((s) => {
+          const names = [s.name, s.name_en, s.user_name, s.full_name, s.bangla_name];
+          names.forEach((n) => {
+            if (n && typeof n === "string" && n.trim().length >= 2) {
+              validTargetNames.add(n.trim().toLowerCase());
+            }
+          });
+        });
+        if (currentUser && (String(currentUser.id) === target || String(currentUser.user_id) === target)) {
+          const uNames = [currentUser.name, currentUser.full_name, currentUser.user_name];
+          uNames.forEach((n) => {
+            if (n && typeof n === "string" && n.trim().length >= 2) {
+              validTargetNames.add(n.trim().toLowerCase());
+            }
+          });
+        }
+
+        // 2. Extract all identifiers and names from report
+        const repIds = [
+          rep.teacher_id,
+          rep.teacher_user_id,
+          rep.teacher_staff_id,
+          rep.created_by_id,
+          typeof rep.teacher === "number" ? String(rep.teacher) : (typeof rep.teacher === "string" && /^\d+$/.test(rep.teacher.trim()) ? rep.teacher.trim() : null),
+          typeof rep.teacher === "object" ? String(rep.teacher?.id || rep.teacher?.user || "") : null,
+          typeof rep.created_by === "object" ? String(rep.created_by?.id || "") : (rep.created_by ? String(rep.created_by) : null),
+        ].filter(Boolean).map(String);
+
+        const repNames = [
+          rep.teacher_name,
+          typeof rep.teacher === "string" && isNaN(Number(rep.teacher)) ? rep.teacher : null,
+          typeof rep.teacher === "object" ? (rep.teacher?.name || rep.teacher?.name_en || rep.teacher?.user_name || rep.teacher?.full_name) : null,
+          typeof rep.created_by === "object" ? (rep.created_by?.name || rep.created_by?.full_name || rep.created_by?.username) : null,
+        ].filter(Boolean).map((n) => String(n).trim().toLowerCase());
+
+        // 3. Check ID match
+        const hasIdMatch = repIds.some((id) => validTargetIds.has(id));
+
+        // 4. Check Name match
+        const hasNameMatch = repNames.some((rName) => {
+          if (!rName || rName === "—" || rName === "staff teacher") return false;
+          return Array.from(validTargetNames).some((tName) => {
+            if (!tName || tName === "—" || tName === "staff teacher") return false;
+            return rName === tName || (rName.length >= 3 && tName.length >= 3 && (rName.includes(tName) || tName.includes(rName)));
+          });
+        });
+
+        if (!hasIdMatch && !hasNameMatch) {
           return false;
         }
       }
@@ -216,6 +288,7 @@ export function useProgressReportsFilters({
     canViewAllTeachers,
     currentUser,
     filterUnsyncedOnly,
+    academicData,
   ]);
 
   // Grouped by Student calculation for STUDENT_VIEW

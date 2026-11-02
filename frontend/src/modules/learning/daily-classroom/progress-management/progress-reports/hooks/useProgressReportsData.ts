@@ -406,23 +406,46 @@ export function useProgressReportsData({
         resolvedTeacherName = rep.teacher.name || rep.teacher.name_en || rep.teacher.full_name || rep.teacher.user_name || "";
       }
 
-      // 5d. Match by teacher_id / numeric teacher from academicData staff or teachers list
+      // 5d. Match by teacher_id / numeric teacher / created_by from academicData staff or teachers list
       const rawTeacherId =
         rep.teacher_id ||
         (typeof rep.teacher === "number" || (typeof rep.teacher === "string" && /^\d+$/.test(rep.teacher.trim()))
           ? Number(rep.teacher)
           : null);
+      const rawCreatorId =
+        typeof rep.created_by === "object"
+          ? rep.created_by?.id || rep.created_by?.pk
+          : (rep.created_by && !isNaN(Number(rep.created_by)) ? Number(rep.created_by) : null);
 
-      if (!resolvedTeacherName && rawTeacherId) {
-        const staffList = academicData?.staff || academicData?.teachers || [];
-        const matchedStaff = staffList.find(
+      const staffList = (academicData?.staff || academicData?.teachers || []) as any[];
+      let matchedStaff = null;
+      if (rawTeacherId) {
+        matchedStaff = staffList.find(
           (s: any) =>
             String(s.id) === String(rawTeacherId) ||
             String(s.user) === String(rawTeacherId) ||
             String(s.user_id) === String(rawTeacherId) ||
             String(s.employee_id) === String(rawTeacherId)
         );
-        if (matchedStaff) {
+      }
+      if (!matchedStaff && rawCreatorId) {
+        matchedStaff = staffList.find(
+          (s: any) =>
+            String(s.id) === String(rawCreatorId) ||
+            String(s.user) === String(rawCreatorId) ||
+            String(s.user_id) === String(rawCreatorId)
+        );
+      }
+      if (!matchedStaff && resolvedTeacherName && resolvedTeacherName !== "Staff Teacher") {
+        const lowerName = resolvedTeacherName.toLowerCase().trim();
+        matchedStaff = staffList.find((s: any) => {
+          const sName = (s.name || s.name_en || s.user_name || s.full_name || "").toLowerCase().trim();
+          return sName && (sName === lowerName || sName.includes(lowerName) || lowerName.includes(sName));
+        });
+      }
+
+      if (matchedStaff) {
+        if (!resolvedTeacherName || resolvedTeacherName === "Staff Teacher") {
           resolvedTeacherName =
             matchedStaff.name ||
             matchedStaff.name_en ||
@@ -441,18 +464,6 @@ export function useProgressReportsData({
             rep.created_by.first_name ||
             rep.created_by.username ||
             "";
-        } else {
-          const staffList = academicData?.staff || academicData?.teachers || [];
-          const matchedCreator = staffList.find(
-            (s: any) => String(s.id) === String(rep.created_by) || String(s.user) === String(rep.created_by)
-          );
-          if (matchedCreator) {
-            resolvedTeacherName =
-              matchedCreator.name ||
-              matchedCreator.name_en ||
-              matchedCreator.user_name ||
-              "";
-          }
         }
       }
 
@@ -485,6 +496,18 @@ export function useProgressReportsData({
       if (!resolvedTeacherName || resolvedTeacherName === "—") {
         resolvedTeacherName = "Staff Teacher";
       }
+
+      const canonicalTeacherId = String(
+        matchedStaff?.user ||
+        matchedStaff?.user_id ||
+        matchedStaff?.id ||
+        rawTeacherId ||
+        rawCreatorId ||
+        ""
+      );
+      const canonicalStaffId = String(matchedStaff?.id || "");
+      const canonicalUserId = String(matchedStaff?.user || matchedStaff?.user_id || rawCreatorId || "");
+      const canonicalCreatedById = String(rawCreatorId || (typeof rep.created_by === "object" ? rep.created_by?.id : rep.created_by || "") || "");
 
       return {
         ...rep,
@@ -531,8 +554,11 @@ export function useProgressReportsData({
         stuck_details: rep.stuck_details || rep.stucks || (Array.isArray(rep.error_details) ? rep.error_details.filter((e: any) => e.type === "Stuck") : []),
         error_details: rep.error_details || [],
         teacher: resolvedTeacherName,
-        teacher_id: rawTeacherId ? String(rawTeacherId) : "",
+        teacher_id: canonicalTeacherId,
         teacher_name: resolvedTeacherName,
+        teacher_user_id: canonicalUserId,
+        teacher_staff_id: canonicalStaffId,
+        created_by_id: canonicalCreatedById,
       };
     },
     [academicData?.students, academicData?.classes, academicData?.sections, academicData?.departments, academicData?.staff, academicData?.teachers]

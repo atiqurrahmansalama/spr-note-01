@@ -31,7 +31,7 @@ export interface PaginationProps {
 export default function Pagination({
   currentPage = 1,
   totalItems = 0,
-  pageSize = 25,
+  pageSize = 10,
   onPageChange,
   onPageSizeChange,
   pageSizeOptions = [10, 25, 50, 100],

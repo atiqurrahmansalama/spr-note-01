@@ -58,7 +58,7 @@ export default function RecordReportsCardGrid({
   const { resolveStudentMeta } = useStudentMetaResolver();
 
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(24);
+  const [pageSize, setPageSize] = useState<number>(10);
   const [expandedComments, setExpandedComments] = useState<Set<string | number>>(new Set());
 
   // Reset pagination on list size changes
@@ -478,7 +478,7 @@ export default function RecordReportsCardGrid({
             setPageSize(newSize);
             setCurrentPage(1);
           }}
-          pageSizeOptions={[12, 24, 48, 96]}
+          pageSizeOptions={[10, 20, 50, 100]}
           itemLabel="reports"
         />
       )}

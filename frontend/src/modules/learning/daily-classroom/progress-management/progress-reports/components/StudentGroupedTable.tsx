@@ -48,7 +48,7 @@ export default function StudentGroupedTable({
 
   const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(25);
+  const [pageSize, setPageSize] = useState<number>(10);
   const [sortConfig, setSortConfig] = useState<{
     key: string | null;
     direction: "asc" | "desc" | null;
