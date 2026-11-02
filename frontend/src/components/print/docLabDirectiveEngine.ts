@@ -57,10 +57,17 @@ function parseKeyValuePairs(directiveStr: string): TokenDirectiveOptions {
 
   // Clean and normalize directive string (remove soft/hard hyphens at line ends and internal line breaks)
   const cleanDirective = directiveStr
+    .replace(/&quot;/gi, '"')
+    .replace(/&#34;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&#39;/gi, "'")
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/&amp;/gi, '&')
     .replace(/&nbsp;/gi, ' ')
+    .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000\uFEFF]/g, ' ')
+    .replace(/[“”„‟«»]/g, '"')
+    .replace(/[‘’‚‛]/g, "'")
     .replace(/-\s*[\r\n]+\s*/g, '')
     .replace(/[\r\n\t]+/g, ' ')
     .replace(/\bd\s*i\s*r\s*e\s*c\s*t\s*i\s*o\s*n\s*:/gi, 'direction:')
@@ -74,13 +81,14 @@ function parseKeyValuePairs(directiveStr: string): TokenDirectiveOptions {
     .replace(/\b([a-zA-Z0-9_-]+)\s*:\s*/g, '$1: ')
     .trim();
 
-  // Match key: 'value' or key: value
+  // Match key: 'value' or key: "value" or key: value
   const regex = /([a-zA-Z0-9_-]+)\s*:\s*(?:'([^']*)'|"([^"]*)"|([^,>]+))/g;
   let match: RegExpExecArray | null;
 
   while ((match = regex.exec(cleanDirective)) !== null) {
     const rawKey = match[1].trim().toLowerCase();
-    const rawVal = (match[2] !== undefined ? match[2] : match[3] !== undefined ? match[3] : match[4] || '').trim();
+    let rawVal = (match[2] !== undefined ? match[2] : match[3] !== undefined ? match[3] : match[4] || '').trim();
+    rawVal = rawVal.replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '').trim();
 
     switch (rawKey) {
       case 'direction':
@@ -215,7 +223,7 @@ function parseKeyValuePairs(directiveStr: string): TokenDirectiveOptions {
       case 'default':
       case 'fallback':
       case 'empty': {
-        options.fallback = rawVal.replace(/^['"]|['"]$/g, '');
+        options.fallback = rawVal.replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '').trim();
         break;
       }
       case 'skipdata':
@@ -223,14 +231,14 @@ function parseKeyValuePairs(directiveStr: string): TokenDirectiveOptions {
       case 'skip':
       case 'ignore':
       case 'exclude': {
-        options.skipData = rawVal;
+        options.skipData = rawVal.replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '').replace(/\s+/g, ' ').trim();
         break;
       }
       case 'removeline':
       case 'remove_line':
       case 'removelines':
       case 'deleteline': {
-        options.removeLine = rawVal;
+        options.removeLine = rawVal.replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '').trim();
         break;
       }
       default: {
@@ -241,6 +249,107 @@ function parseKeyValuePairs(directiveStr: string): TokenDirectiveOptions {
   }
 
   return options;
+}
+
+/**
+ * Auto-repairs mangled token strings that have acquired injected HTML attributes, tags,
+ * style rules, or corrupt entity wrappers from WYSIWYG editors (TipTap / Word / ProseMirror).
+ * Preserves the base token key and extracts all directives (skipData, removeLine, indent,
+ * direction, separator, order, prefix, limit, fallback) without data loss.
+ */
+export function healMangledToken(raw: string): string {
+  if (!raw) return '';
+
+  let s = raw
+    .replace(/&quot;/gi, '"')
+    .replace(/&#34;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000\uFEFF]/g, ' ')
+    .replace(/[“”„‟«»]/g, '"')
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/<\/?(?:span|strong|b|em|i|u|font|a|small|mark|sub|sup|div|p|br)[^>]*>/gi, '')
+    .trim();
+
+  // Extract base key
+  const baseKeyMatch = s.match(/^([a-zA-Z0-9_\-\.]+)/);
+  if (!baseKeyMatch) return s;
+  const baseKey = baseKeyMatch[1];
+
+  const directiveKeywordPattern = /(?:direction|dir|layout|orient|orientation|separator|sep|delimiter|delim|order|flow|sort|prefix|list|gap|spacing|limit|count|max|from|to|fromline|toline|slicefrom|sliceto|all|force|indent|indentation|pad|padding|default|fallback|empty|skipdata|skip|skip_data|ignore|exclude|removeline|remove_line|removelines|deleteline)\s*:/i;
+
+  let directiveStr = '';
+
+  // 1. Check if there is a pipe followed by directives
+  const pipeIdx = s.lastIndexOf('|');
+  if (pipeIdx !== -1) {
+    const candidate = s.slice(pipeIdx + 1).replace(/[>}]*$/, '').trim();
+    if (directiveKeywordPattern.test(candidate)) {
+      directiveStr = candidate;
+    }
+  }
+
+  // 2. Check if inside < ... >
+  if (!directiveStr) {
+    const angleMatch = s.match(/<([^>]+)>/);
+    if (angleMatch && directiveKeywordPattern.test(angleMatch[1])) {
+      directiveStr = angleMatch[1].replace(/^[|<]+/, '').trim();
+    }
+  }
+
+  // 3. Fallback: Scan full string for individual known directives
+  if (!directiveStr) {
+    const parts: string[] = [];
+    const skipMatch = s.match(/\b(?:skipdata|skip_data|skip|exclude)\s*:\s*(?:"([^"]*)"|'([^']*)'|([^,>|"]+))/i);
+    if (skipMatch) {
+      const v = (skipMatch[1] ?? skipMatch[2] ?? skipMatch[3] ?? '').trim().replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '');
+      parts.push(`skipData: "${v}"`);
+    }
+    const removeMatch = s.match(/\b(?:removeline|remove_line|deleteline)\s*:\s*(?:"([^"]*)"|'([^']*)'|([^,>|"]+))/i);
+    if (removeMatch) {
+      const v = (removeMatch[1] ?? removeMatch[2] ?? removeMatch[3] ?? '').trim().replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '');
+      parts.push(`removeLine: ${v}`);
+    }
+    const indentMatch = s.match(/\bindent\s*:\s*(\d+(?:,\s*from:\s*\d+)?(?:,\s*to:\s*\d+)?)/i);
+    if (indentMatch) {
+      parts.push(`indent: ${indentMatch[1]}`);
+    }
+    const dirMatch = s.match(/\bdirection\s*:\s*([a-zA-Z]+)/i);
+    if (dirMatch) {
+      parts.push(`direction: ${dirMatch[1]}`);
+    }
+    const defMatch = s.match(/\b(?:default|fallback)\s*:\s*(?:"([^"]*)"|'([^']*)'|([^,>|"]+))/i);
+    if (defMatch) {
+      const v = (defMatch[1] ?? defMatch[2] ?? defMatch[3] ?? '').trim().replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '');
+      parts.push(`default: "${v}"`);
+    }
+    if (parts.length > 0) {
+      directiveStr = parts.join(', ');
+    }
+  }
+
+  // Clean any remaining leaked HTML attributes from the directive string
+  if (directiveStr) {
+    directiveStr = directiveStr
+      .replace(/\s*["']?\s*(?:data-[a-z0-9_\-]+|style|class|scrollbar-color)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)[^}]*/gi, '')
+      .replace(/[>"']+$/, '')
+      .trim();
+  }
+
+  // Default indents for legacy known keys if no directives were present
+  if (!directiveStr) {
+    if (baseKey === 'juz-page' || baseKey === 'juz_page') {
+      directiveStr = 'indent: 11';
+    } else if (baseKey === 'detail-mis' || baseKey === 'detail_mis' || baseKey === 'detail-stuck' || baseKey === 'detail_stuck') {
+      directiveStr = 'indent: 5';
+    }
+  }
+
+  return directiveStr ? `${baseKey} | ${directiveStr}` : baseKey;
 }
 
 /**
@@ -260,12 +369,19 @@ export function parseTokenDirective(tokenContent: string): ParsedTokenDirective 
     };
   }
 
-  // Normalize internal whitespace, linebreaks, and decode HTML entities
+  // Normalize internal whitespace, linebreaks, and decode HTML entities and quotes
   let normalized = tokenContent
+    .replace(/&quot;/gi, '"')
+    .replace(/&#34;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&#39;/gi, "'")
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/&amp;/gi, '&')
     .replace(/&nbsp;/gi, ' ')
+    .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000\uFEFF]/g, ' ')
+    .replace(/[“”„‟«»]/g, '"')
+    .replace(/[‘’‚‛]/g, "'")
     .replace(/-\s*[\r\n]+\s*/g, '')
     .replace(/[\r\n\t]+/g, ' ')
     .replace(/\s+/g, ' ')
@@ -273,41 +389,9 @@ export function parseTokenDirective(tokenContent: string): ParsedTokenDirective 
 
   // 0. Auto-heal mangled online token strings containing injected HTML attributes or tags
   // e.g. 'detail-mis " data-token="" data-token-key="" ... ">| indent: 5' or 'detail-mis" style="color: ...">'
+  // or 'section " data-token="section" ... ">| skipData: "MI Ousseynou", removeLine: self'
   if (/(?:data-token|style\s*=|class\s*=|data-category|scrollbar-color|data-token-key|data-display|data-label)/i.test(normalized)) {
-    const baseKeyMatch = normalized.match(/^([a-zA-Z0-9_\-\.]+)/);
-    const indentMatch = normalized.match(/\bindent\s*:\s*(\d+(?:,\s*from:\s*\d+)?(?:,\s*to:\s*\d+)?)/i);
-    const directionMatch = normalized.match(/\b(direction|dir|order|flow|separator|sep|prefix|limit|from|to)\s*:\s*([^,>|"]+)/gi);
-
-    // Check if there is trailing directive syntax after quotes/tags e.g. >| indent: 5 or | indent: 5
-    const trailingMatch = normalized.match(/[>"']\s*(?:\||>|&gt;)?\s*([^"'>]+)$/);
-
-    const recoveredParts: string[] = [];
-    if (trailingMatch && trailingMatch[1].trim()) {
-      const part = trailingMatch[1].replace(/^[|>]+/, '').trim();
-      if (part) recoveredParts.push(part);
-    }
-    if (indentMatch && !recoveredParts.some((p) => p.toLowerCase().includes('indent'))) {
-      recoveredParts.push(`indent: ${indentMatch[1]}`);
-    }
-    if (directionMatch) {
-      directionMatch.forEach((dm) => {
-        if (!recoveredParts.some((p) => p.toLowerCase().includes(dm.toLowerCase()))) {
-          recoveredParts.push(dm);
-        }
-      });
-    }
-
-    if (baseKeyMatch) {
-      const cleanKey = baseKeyMatch[1];
-      if (recoveredParts.length === 0) {
-        if (cleanKey === 'juz-page' || cleanKey === 'juz_page') {
-          recoveredParts.push('indent: 11');
-        } else if (cleanKey === 'detail-mis' || cleanKey === 'detail_mis' || cleanKey === 'detail-stuck' || cleanKey === 'detail_stuck') {
-          recoveredParts.push('indent: 5');
-        }
-      }
-      normalized = cleanKey + (recoveredParts.length > 0 ? ` | ${recoveredParts.join(' | ')}` : '');
-    }
+    normalized = healMangledToken(normalized);
   }
 
   // 1. Check for legacy `<...>` directive syntax: {{key <direction: vertical, order: desc>}} or {{key <| indent: 5>}} or {{key < | indent: 11>}}
@@ -462,6 +546,80 @@ export function parseRemoveLineSpec(spec: string): RemoveLineRule {
 }
 
 /**
+ * Canonical string extraction from any ERP data value (string, number, boolean, array, object).
+ * Seamlessly resolves object structures (e.g. section object `{ id: 1, name: "MI Ousseynou" }`).
+ */
+export function extractDirectiveStringValue(val: any): string {
+  if (val === undefined || val === null) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (Array.isArray(val)) {
+    return val.map(extractDirectiveStringValue).filter(Boolean).join(', ');
+  }
+  if (typeof val === 'object') {
+    return (
+      val.section_name ??
+      val.name ??
+      val.label ??
+      val.title ??
+      val.value ??
+      val.name_en ??
+      val.name_bn ??
+      val.section ??
+      ''
+    );
+  }
+  return String(val);
+}
+
+/**
+ * Normalizes strings for comparable equality:
+ * - Decodes HTML entities (&quot;, &apos;, &nbsp;)
+ * - Normalizes Unicode curly/smart quotes to standard ASCII quotes
+ * - Normalizes Unicode non-breaking & zero-width spaces to regular space
+ * - Strips HTML tags and collapses whitespace
+ */
+export function normalizeDirectiveComparable(str: string): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/&quot;/gi, '"')
+    .replace(/&#34;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&#39;/gi, "'")
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000\uFEFF]/g, ' ')
+    .replace(/[“”„‟«»]/g, '"')
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/<[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Evaluates whether an item/token value matches a `skipData` condition.
+ * Single Source of Truth across multi-value line splitting, document-level block removal,
+ * and DOCX/PDF TemplateMergeEngine paragraph evaluation.
+ */
+export function checkDirectiveSkipMatch(val: any, skipDataTarget?: string): boolean {
+  const normTarget = normalizeDirectiveComparable(skipDataTarget || 'empty')
+    .replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '')
+    .trim();
+  const cleanVal = normalizeDirectiveComparable(extractDirectiveStringValue(val));
+
+  if (['empty', 'blank', 'null', '""', "''", ''].includes(normTarget)) {
+    return cleanVal === '' || val === undefined || val === null;
+  }
+  if (normTarget === '*' || normTarget === 'all' || normTarget === 'any' || normTarget === 'self') {
+    return true;
+  }
+  if (cleanVal === '' && normTarget !== '') {
+    return false;
+  }
+  return cleanVal === normTarget || (cleanVal.length > 0 && normTarget.length > 0 && cleanVal.includes(normTarget));
+}
+
+/**
  * Scans an array of data lines / multi-value items.
  * If an item matches skipTarget, it skips that item and removes adjacent lines as configured.
  */
@@ -472,15 +630,11 @@ export function applySkipDataAndRemoveLines(
 ): string[] {
   if (!lines || lines.length === 0 || !skipTarget) return lines;
 
-  const target = skipTarget.trim().toLowerCase();
-  if (!target) return lines;
-
   const { beforeCount, afterCount } = parseRemoveLineSpec(removeLineSpec || '');
   const dropIndices = new Set<number>();
 
   lines.forEach((line, idx) => {
-    const cleanText = line.replace(/<[^>]*>/g, '').trim().toLowerCase();
-    const isMatch = cleanText === target || cleanText.includes(target);
+    const isMatch = checkDirectiveSkipMatch(line, skipTarget);
 
     if (isMatch) {
       dropIndices.add(idx);
@@ -569,19 +723,7 @@ export function applyDocumentSkipAndRemoveLines(
 
     if (hasSkip || hasRemoveLine) {
       const val = getVal(directive.baseKey);
-      const target = (directive.options.skipData || 'empty').trim().toLowerCase();
-      const cleanVal = val !== undefined && val !== null ? String(val).replace(/<[^>]*>/g, '').trim().toLowerCase() : '';
-
-      let isMatch = false;
-      if (['empty', 'blank', 'null', '""', "''"].includes(target)) {
-        isMatch = cleanVal === '' || val === undefined || val === null;
-      } else if (target === '*' || target === 'all' || target === 'any') {
-        isMatch = true;
-      } else if (target === 'self' || target === 'this' || target === 'line') {
-        isMatch = true;
-      } else if (val !== undefined && val !== null) {
-        isMatch = cleanVal === target || (cleanVal.length > 0 && cleanVal.includes(target));
-      }
+      const isMatch = checkDirectiveSkipMatch(val, directive.options.skipData);
 
       if (isMatch) {
         const { beforeCount, afterCount } = parseRemoveLineSpec(directive.options.removeLine || 'self');
@@ -994,10 +1136,12 @@ export function serializeDirectiveOptions(options: TokenDirectiveOptions): strin
     parts.push(`limit: ${options.limit}`);
   }
   if (options.skipData) {
-    parts.push(`skipData: "${options.skipData}"`);
+    const cleanSkip = String(options.skipData).replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '').trim();
+    parts.push(`skipData: "${cleanSkip}"`);
   }
   if (options.removeLine) {
-    parts.push(`removeLine: ${options.removeLine}`);
+    const cleanRemove = String(options.removeLine).replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '').trim();
+    parts.push(`removeLine: ${cleanRemove}`);
   }
   const fallbackVal = options.fallback !== undefined ? options.fallback : (options as any).default;
   if (fallbackVal !== undefined && fallbackVal !== null) {

@@ -3,6 +3,7 @@ import {
   formatMultiValueData,
   applySkipDataAndRemoveLines,
   applyDocumentSkipAndRemoveLines,
+  healMangledToken,
 } from './docLabDirectiveEngine';
 import {
   UNIVERSAL_SYNONYM_GROUPS,
@@ -55,24 +56,10 @@ export function normalizeIndentDirectives(html: string): string {
   // 0. Auto-repair mangled tokens containing injected HTML attributes (e.g. {{key " data-token=... >| indent: 5}} or {{key" data-token=... >}})
   res = res.replace(
     /\{\{\s*([a-zA-Z0-9_\-\.]+)(?:[^\s|}][^"']*)?["'\s]+(?:data-token|data-key|data-token-key|data-display|data-label|data-category|data-source|style|class|scrollbar-color)[^}]*\}\}/gi,
-    (match, rawKey) => {
-      const cleanKey = rawKey.trim();
-      // Recover specific embedded indent directives if present
-      const indentMatch = match.match(/\bindent\s*:\s*(\d+(?:,\s*from:\s*\d+)?(?:,\s*to:\s*\d+)?)/i);
-      if (indentMatch) {
-        return `{{${cleanKey} | indent: ${indentMatch[1]}}}`;
-      }
-      const dirMatch = match.match(/\bdirection\s*:\s*([a-z]+)/i);
-      if (dirMatch) {
-        return `{{${cleanKey} | direction: ${dirMatch[1]}}}`;
-      }
-      if (cleanKey === 'juz-page' || cleanKey === 'juz_page') {
-        return `{{${cleanKey} | indent: 11}}`;
-      }
-      if (cleanKey === 'detail-mis' || cleanKey === 'detail_mis' || cleanKey === 'detail-stuck' || cleanKey === 'detail_stuck') {
-        return `{{${cleanKey} | indent: 5}}`;
-      }
-      return `{{${cleanKey}}}`;
+    (match) => {
+      const inner = match.slice(2, -2).trim();
+      const healed = healMangledToken(inner);
+      return `{{${healed}}}`;
     }
   );
 
@@ -196,20 +183,8 @@ export function sanitizeDocxPlaceholders(html: string): string {
 
     // If inner contains injected HTML tag attributes without opening tag (e.g. `key " data-token="" ... >| indent: 5`)
     if (stripped.includes('data-token') || stripped.includes('data-key') || stripped.includes('style=') || stripped.includes('class=')) {
-      const cleanKeyMatch = stripped.match(/^([a-zA-Z0-9_\-\.]+)/);
-      const indentMatch = stripped.match(/\bindent\s*:\s*(\d+(?:,\s*from:\s*\d+)?(?:,\s*to:\s*\d+)?)/i);
-      const dirMatch = stripped.match(/\bdirection\s*:\s*([a-z]+)/i);
-
-      if (cleanKeyMatch) {
-        const cleanKey = cleanKeyMatch[1];
-        if (indentMatch) {
-          return `{{${cleanKey} | indent: ${indentMatch[1]}}}`;
-        }
-        if (dirMatch) {
-          return `{{${cleanKey} | direction: ${dirMatch[1]}}}`;
-        }
-        return `{{${cleanKey}}}`;
-      }
+      const healed = healMangledToken(stripped);
+      return `{{${healed}}}`;
     }
 
     // Normalize linebreaks and broken words inside placeholder
@@ -529,10 +504,10 @@ export function resolveTokenValue(
     }
   } else if (Array.isArray(value)) {
     processed = value
-      .map((it) => (it && typeof it === 'object' ? (it.name || it.title || it.subjectName || JSON.stringify(it)) : String(it)))
+      .map((it) => (it && typeof it === 'object' ? (it.name || it.title || it.subjectName || it.section_name || JSON.stringify(it)) : String(it)))
       .join(', ');
   } else if (typeof value === 'object' && value !== null) {
-    processed = JSON.stringify(value);
+    processed = value.section_name || value.name || value.label || value.title || value.value || JSON.stringify(value);
   } else {
     processed = String(value);
   }

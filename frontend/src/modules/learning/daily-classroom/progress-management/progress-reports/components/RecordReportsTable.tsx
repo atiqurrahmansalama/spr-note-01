@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import DataTable from "@/components/ui/DataTable";
 import Pagination from "@/components/ui/Pagination";
 import { RecordReportsTableProps, ReportItem } from "../types";
@@ -40,7 +40,7 @@ export default function RecordReportsTable({
 }: RecordReportsTableProps) {
   const { t } = useTranslation("progressReports");
   const activeReportsList = reports || reportsList || [];
-  const [expandedIds, setExpandedIds] = useState<Set<number | string>>(new Set());
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(25);
   const [sortConfig, setSortConfig] = useState<{
@@ -58,16 +58,19 @@ export default function RecordReportsTable({
     setCurrentPage(1);
   }, [activeReportsList.length]);
 
-  // Single-expand toggle
+  // Accordion toggle: at most 1 report row expanded at a time
   const handleToggleExpand = useCallback((id: number | string) => {
-    setExpandedIds((prev) => (prev.has(id) ? new Set() : new Set([id])));
+    const key = String(id);
+    setExpandedIds((prev) => (prev.has(key) ? new Set() : new Set([key])));
   }, []);
 
-  // Sync with external isAllExpanded if provided
+  // Sync with external isAllExpanded only when prop value actually transitions
+  const prevIsAllExpandedRef = useRef<boolean | undefined>(propIsAllExpanded);
   useEffect(() => {
-    if (propIsAllExpanded !== undefined) {
+    if (propIsAllExpanded !== undefined && prevIsAllExpandedRef.current !== propIsAllExpanded) {
+      prevIsAllExpandedRef.current = propIsAllExpanded;
       if (propIsAllExpanded) {
-        const allIds = activeReportsList.map((r) => r.id ?? r.report_unique_id ?? "").filter(Boolean);
+        const allIds = activeReportsList.map((r) => String(r.id ?? r.report_unique_id ?? "")).filter(Boolean);
         setExpandedIds(new Set(allIds));
       } else {
         setExpandedIds(new Set());
@@ -83,7 +86,7 @@ export default function RecordReportsTable({
       if (expandedIds.size === activeReportsList.length && activeReportsList.length > 0) {
         setExpandedIds(new Set());
       } else {
-        const allIds = activeReportsList.map((r) => r.id ?? r.report_unique_id ?? "").filter(Boolean);
+        const allIds = activeReportsList.map((r) => String(r.id ?? r.report_unique_id ?? "")).filter(Boolean);
         setExpandedIds(new Set(allIds));
       }
     }
@@ -174,7 +177,7 @@ export default function RecordReportsTable({
           });
           onBatchSelect(nextSet);
         }}
-        keyExtractor={(rep) => rep.id ?? rep.report_unique_id ?? ""}
+        keyExtractor={(rep) => String(rep.id ?? rep.report_unique_id ?? "")}
         idField="id"
         expandOnRowClick={true}
         expandedRowIds={expandedIds}
@@ -210,7 +213,7 @@ export default function RecordReportsTable({
         cellPaddingClass="py-2.5 px-3 sm:px-4 text-xs"
         tableClassName="w-full min-w-[1160px] table-fixed"
         rowClassName={(rep) => {
-          const repKey = rep.id ?? rep.report_unique_id ?? "";
+          const repKey = String(rep.id ?? rep.report_unique_id ?? "");
           return expandedIds.has(repKey) ? "[&>td]:!border-b-0" : "";
         }}
         transparent={false}

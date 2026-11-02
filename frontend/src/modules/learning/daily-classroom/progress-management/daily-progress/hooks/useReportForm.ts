@@ -1747,6 +1747,10 @@ export function useReportForm() {
           edited_at: editedAt,
           edit_time: editedAt,
           is_edited: true,
+          is_local_edited: true,
+          sync_status: "PENDING" as const,
+          sync_error: null,
+          last_sync_error_at: null,
           date: selectedDate || getClassroomTodayDate(),
           report_date: selectedDate || getClassroomTodayDate(),
           selectedDate,
@@ -1846,13 +1850,17 @@ export function useReportForm() {
                   total_mistakes: calculatedMistakesCount,
                   total_stucks: calculatedStucksCount,
                   sync_status: "SYNCED" as const,
+                  sync_error: null,
+                  last_sync_error_at: null,
                   is_edited: true,
+                  is_local_edited: false,
                   edited_at: editedAt,
                 };
                 saveReportLocally(
                   mergedReport,
                   { skipGrace: true, syncStatus: "SYNCED" }
                 );
+                dailyProgressRepository.saveOptimistic(mergedReport, "UPDATE", `/reports/${mergedReport.server_id || mergedReport.id}/`).catch(() => {});
                 saveStatusStore.set("database", "Database Synced");
                 window.dispatchEvent(
                   new CustomEvent("spr_report_saved", { detail: { source: "database", data: mergedReport } })

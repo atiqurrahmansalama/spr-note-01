@@ -85,14 +85,15 @@ export const transformFormToApiPayload = (reportData) => {
         : sPage;
 
       portions.push({
-        ...p,
         start_juz: sJuz,
         end_juz: eJuz,
         start_page: sPage,
         end_page: ePage,
         start_ayah: p.start_ayah || 1,
         end_ayah: p.end_ayah || 30,
-        juz: sJuz,
+        start_surah_number: p.start_surah_number || undefined,
+        end_surah_number: p.end_surah_number || undefined,
+        ranges: p.ranges,
       });
     });
   } else if (Array.isArray(juzPageData) && juzPageData.length > 0) {
@@ -111,7 +112,6 @@ export const transformFormToApiPayload = (reportData) => {
             end_juz: juzNum,
             end_page: isNaN(ePage) ? sPage : ePage,
             end_ayah: 30,
-            juz: juzNum,
             ranges: [{ start: sPage, end: isNaN(ePage) ? sPage : ePage }],
           });
         }
@@ -132,11 +132,11 @@ export const transformFormToApiPayload = (reportData) => {
         ? parseInt(err.page, 10)
         : 1;
       error_details.push({
-        ...err,
         type: err.type || "Mistake",
         juz: jVal,
         page: pVal,
         ayah: err.ayah || 1,
+        surah_number: err.surah_number || undefined,
       });
     });
   } else {

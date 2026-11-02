@@ -58,6 +58,7 @@ import {
   formatMultiValueData,
   applySkipDataAndRemoveLines,
   applyDocumentSkipAndRemoveLines,
+  checkDirectiveSkipMatch,
   parseRemoveLineSpec,
   TokenDirectiveOptions,
 } from '../../docLabDirectiveEngine';
@@ -387,17 +388,7 @@ export class TemplateMergeEngine {
               lookup.get(rawKey.toLowerCase().replace(/[^a-z0-9]/g, '')) ??
               ErpDataProvider.getValue(context, rawKey);
 
-            const target = (directive.options.skipData || 'empty').trim().toLowerCase();
-            const cleanVal = val !== undefined && val !== null ? String(val).replace(/<[^>]*>/g, '').trim().toLowerCase() : '';
-
-            let isMatch = false;
-            if (['empty', 'blank', 'null', '""', "''"].includes(target)) {
-              isMatch = cleanVal === '' || val === undefined || val === null;
-            } else if (target === '*' || target === 'all' || target === 'any' || target === 'self') {
-              isMatch = true;
-            } else if (val !== undefined && val !== null) {
-              isMatch = cleanVal === target || (cleanVal.length > 0 && cleanVal.includes(target));
-            }
+            const isMatch = checkDirectiveSkipMatch(val, directive.options.skipData);
 
             if (isMatch) {
               skipThisParagraph = true;

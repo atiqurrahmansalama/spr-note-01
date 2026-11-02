@@ -537,14 +537,14 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
 
         if progress_mode != 'BOOK' and portions:
             for idx, p in enumerate(portions):
+                if p.get('start_juz') is None and p.get('juz') is not None:
+                    p['start_juz'] = p.get('juz')
+                if p.get('end_juz') is None and p.get('start_juz') is not None:
+                    p['end_juz'] = p.get('start_juz')
                 if p.get('start_juz') is None:
-                    raise serializers.ValidationError({
-                        'portions': f"Recitation portion #{idx + 1} must include a valid Juz number (1â€“30)."
-                    })
+                    p['start_juz'] = 1
                 if p.get('end_juz') is None:
-                    raise serializers.ValidationError({
-                        'portions': f"Recitation portion #{idx + 1} must include a valid end Juz number (1â€“30)."
-                    })
+                    p['end_juz'] = p.get('start_juz') or 1
 
         error_details = attrs.get('error_details', [])
         if progress_mode != 'BOOK' and error_details:
@@ -556,21 +556,30 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         return super().validate(attrs)
 
     def _create_normalized_errors(self, report, error_details_data):
-        """Create ReportErrorDetail rows from new v2 payload."""
+        """Create ReportErrorDetail rows from new v2 payload with strictly sanitized fields."""
         mistakes, stucks = 0, 0
         for raw_item in error_details_data:
-            item = dict(raw_item)
-            item.pop('id', None)
-            item.pop('ayahs', None)
-            err_type = item.get('type') or 'Mistake'
+            if not isinstance(raw_item, dict):
+                continue
+            err_type = raw_item.get('type') or 'Mistake'
             if err_type not in ('Mistake', 'Stuck'):
                 err_type = 'Mistake'
-            item['type'] = err_type
-            item['page'] = self._safe_int(item.get('page'), 1)
-            item['ayah'] = self._safe_int(item.get('ayah'), 1)
-            if item.get('juz') is not None:
-                item['juz'] = self._safe_int(item.get('juz'), 1)
-            ed = ReportErrorDetail.objects.create(report=report, **item)
+            page_val = self._safe_int(raw_item.get('page'), 1)
+            ayah_val = self._safe_int(raw_item.get('ayah'), 1)
+            juz_val = self._safe_int(raw_item.get('juz')) if raw_item.get('juz') is not None else None
+            surah_val = self._safe_int(raw_item.get('surah_number')) if raw_item.get('surah_number') is not None else None
+
+            valid_kwargs = {
+                'report': report,
+                'type': err_type,
+                'page': page_val,
+                'ayah': ayah_val,
+                'juz': juz_val,
+            }
+            if surah_val is not None:
+                valid_kwargs['surah_number'] = surah_val
+
+            ed = ReportErrorDetail.objects.create(**valid_kwargs)
             if ed.type == 'Mistake':
                 mistakes += 1
             else:
@@ -578,21 +587,42 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         return mistakes, stucks
 
     def _create_portions(self, report, portions_data):
+        """Create ReportPortion rows with strictly sanitized fields."""
         for raw_item in portions_data:
-            item = dict(raw_item)
-            item.pop('id', None)
-            item.pop('ranges', None)
-            start_p = self._safe_int(item.get('start_page'), 1)
-            end_p = self._safe_int(item.get('end_page'), start_p)
-            item['start_page'] = start_p
-            item['end_page'] = end_p
-            item['start_ayah'] = self._safe_int(item.get('start_ayah'), 1)
-            item['end_ayah'] = self._safe_int(item.get('end_ayah'), 30)
-            if item.get('start_juz') is not None:
-                item['start_juz'] = self._safe_int(item.get('start_juz'), 1)
-            if item.get('end_juz') is not None:
-                item['end_juz'] = self._safe_int(item.get('end_juz'), item.get('start_juz') or 1)
-            ReportPortion.objects.create(report=report, **item)
+            if not isinstance(raw_item, dict):
+                continue
+            start_p = self._safe_int(raw_item.get('start_page'), 1)
+            end_p = self._safe_int(raw_item.get('end_page'), start_p)
+            start_a = self._safe_int(raw_item.get('start_ayah'), 1)
+            end_a = self._safe_int(raw_item.get('end_ayah'), 30)
+
+            start_j = None
+            if raw_item.get('start_juz') is not None:
+                start_j = self._safe_int(raw_item.get('start_juz'), 1)
+            elif raw_item.get('juz') is not None:
+                start_j = self._safe_int(raw_item.get('juz'), 1)
+
+            end_j = None
+            if raw_item.get('end_juz') is not None:
+                end_j = self._safe_int(raw_item.get('end_juz'), start_j or 1)
+            elif start_j is not None:
+                end_j = start_j
+
+            valid_kwargs = {
+                'report': report,
+                'start_page': start_p,
+                'end_page': end_p,
+                'start_ayah': start_a,
+                'end_ayah': end_a,
+                'start_juz': start_j,
+                'end_juz': end_j,
+            }
+            if raw_item.get('start_surah_number') is not None:
+                valid_kwargs['start_surah_number'] = self._safe_int(raw_item.get('start_surah_number'), 1)
+            if raw_item.get('end_surah_number') is not None:
+                valid_kwargs['end_surah_number'] = self._safe_int(raw_item.get('end_surah_number'), 1)
+
+            ReportPortion.objects.create(**valid_kwargs)
 
     # â”€â”€ CREATE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 

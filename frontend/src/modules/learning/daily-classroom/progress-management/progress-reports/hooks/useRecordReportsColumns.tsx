@@ -152,7 +152,7 @@ export function useRecordReportsColumns({
       headerClassName: "text-center",
       cellClassName: "text-center",
       render: (rep: ReportItem) => {
-        const repKey = rep.id ?? rep.report_unique_id ?? "";
+        const repKey = String(rep.id ?? rep.report_unique_id ?? "");
         const isExpanded = expandedIds.has(repKey);
         const isCurrentSelected = rep.id ? selectedIds.has(rep.id) : false;
 
@@ -183,7 +183,10 @@ export function useRecordReportsColumns({
           <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
-              onClick={() => handleToggleExpand(repKey)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleExpand(repKey);
+              }}
               className="p-1.5 rounded-lg theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition cursor-pointer"
               title={isExpanded ? t("collapseDetails", "Collapse Details") : t("expandDetails", "Expand Details")}
             >

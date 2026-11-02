@@ -535,5 +535,56 @@ export async function runSkipDataRemoveLineDirectivesUnitTests(): Promise<{
     assert(mustacheUpdateRes.replaceCharsAfter === 0, 'replaceCharsAfter is 0 so }} world is preserved');
   }
 
+  // 15. Intermittent Token Directive Failure Resilience (Curly Quotes, HTML Entities, Leaked Attributes, Objects)
+  {
+    // 15a. Smart / curly quotes normalization in parseTokenDirective
+    const curlyToken = 'section | skipData: “MI Ousseynou”, removeLine: self';
+    const parsedCurly = parseTokenDirective(curlyToken);
+    assert(parsedCurly.baseKey === 'section', 'Curly quotes token extracts baseKey');
+    assert(parsedCurly.options.skipData === 'MI Ousseynou', 'Curly quotes are normalized into clean unquoted string');
+    assert(parsedCurly.options.removeLine === 'self', 'removeLine preserved with curly quotes');
+
+    // 15b. Single curly quotes normalization
+    const singleCurlyToken = "section | skipData: ‘MI Ousseynou’, removeLine: self";
+    const parsedSingleCurly = parseTokenDirective(singleCurlyToken);
+    assert(parsedSingleCurly.options.skipData === 'MI Ousseynou', 'Single curly quotes are normalized cleanly');
+
+    // 15c. HTML Entity Quotes (&quot;)
+    const entityToken = 'section | skipData: &quot;MI Ousseynou&quot;, removeLine: self';
+    const parsedEntity = parseTokenDirective(entityToken);
+    assert(parsedEntity.options.skipData === 'MI Ousseynou', 'HTML &quot; entities are decoded into clean value');
+
+    // 15d. Auto-healing leaked HTML attributes without dropping skipData / removeLine
+    const leakedToken = 'section " data-token="section" style="color: blue">| skipData: "MI Ousseynou", removeLine: self';
+    const parsedLeaked = parseTokenDirective(leakedToken);
+    assert(parsedLeaked.baseKey === 'section', 'Leaked attributes token preserves baseKey');
+    assert(parsedLeaked.options.skipData === 'MI Ousseynou', 'Leaked attributes auto-heal preserves skipData');
+    assert(parsedLeaked.options.removeLine === 'self', 'Leaked attributes auto-heal preserves removeLine');
+
+    // 15e. Document skip with curly quotes in template matching plain data
+    const tmplCurly = '<p>A</p><p>Sec: {{section | skipData: “MI Ousseynou”, removeLine: self}}</p><p>B</p>';
+    const mergedCurly = mergeTemplateWithData(tmplCurly, { section: 'MI Ousseynou' });
+    assert(!mergedCurly.includes('Sec:'), 'Curly quotes directive removes matching line in document merge');
+    assert(mergedCurly.includes('<p>A</p>') && mergedCurly.includes('<p>B</p>'), 'Adjacent lines preserved');
+
+    // 15f. Document skip matching object dataset values (e.g. { id: 1, name: 'MI Ousseynou' })
+    const tmplObj = '<p>A</p><p>Sec: {{section | skipData: "MI Ousseynou", removeLine: self}}</p><p>B</p>';
+    const mergedObj = mergeTemplateWithData(tmplObj, { section: { id: 1, name: 'MI Ousseynou' } });
+    assert(!mergedObj.includes('Sec:'), 'Object data values (name) match skipData and remove line');
+
+    // 15g. Document skip matching object dataset values with section_name
+    const mergedObjSec = mergeTemplateWithData(tmplObj, { section: { id: 1, section_name: 'MI Ousseynou' } });
+    assert(!mergedObjSec.includes('Sec:'), 'Object data values (section_name) match skipData and remove line');
+
+    // 15h. Document skip with non-breaking spaces (\u00A0)
+    const mergedNbsp = mergeTemplateWithData(tmplObj, { section: 'MI\u00A0Ousseynou' });
+    assert(!mergedNbsp.includes('Sec:'), 'Non-breaking space in data matches skipData and removes line');
+
+    // 15i. Non-matching data preserves line and renders value
+    const mergedDiff = mergeTemplateWithData(tmplObj, { section: 'MI Tawfiq' });
+    assert(mergedDiff.includes('Sec:'), 'Non-matching data preserves line');
+    assert(mergedDiff.includes('MI Tawfiq'), 'Non-matching data renders section value cleanly');
+  }
+
   return { passed, failed, suiteName };
 }

@@ -14,6 +14,43 @@ export interface UseProgressReportsDataOptions {
   showToast: (msg: string, type?: "info" | "success" | "warning" | "error") => void;
 }
 
+/**
+ * Canonical Deduplication Utility for Progress Reports
+ * Guarantees zero duplicate entities across id, server_id, and report_unique_id aliases.
+ */
+export function deduplicateReports<T extends { id?: any; server_id?: any; report_unique_id?: any }>(reports: T[]): T[] {
+  if (!Array.isArray(reports) || reports.length === 0) return [];
+  const result: T[] = [];
+  const seenKeys = new Set<string>();
+
+  for (const r of reports) {
+    if (!r) continue;
+    const uniq = r.report_unique_id ? String(r.report_unique_id).trim().toLowerCase() : "";
+    const srv = r.server_id !== undefined && r.server_id !== null ? String(r.server_id).trim().toLowerCase() : "";
+    const idStr = r.id !== undefined && r.id !== null ? String(r.id).trim().toLowerCase() : "";
+
+    const isSeen =
+      (uniq && seenKeys.has(uniq)) ||
+      (srv && (seenKeys.has(`srv_${srv}`) || seenKeys.has(srv))) ||
+      (idStr && (seenKeys.has(`id_${idStr}`) || seenKeys.has(idStr)));
+
+    if (!isSeen) {
+      if (uniq) seenKeys.add(uniq);
+      if (srv) {
+        seenKeys.add(`srv_${srv}`);
+        seenKeys.add(srv);
+      }
+      if (idStr) {
+        seenKeys.add(`id_${idStr}`);
+        seenKeys.add(idStr);
+      }
+      result.push(r);
+    }
+  }
+
+  return result;
+}
+
 export function useProgressReportsData({
   activeTenantId,
   academicData,
@@ -506,7 +543,8 @@ export function useProgressReportsData({
     async (isSilent = false) => {
       let localReps: any[] = [];
       const tenantScopedStorageKey = `spr_reports_local_${activeTenantId || "default"}_v1`;
-      const localMap = new Map<string, any>();
+      const canonicalLocalReports = new Map<string, any>();
+      const localLookupIndex = new Map<string, any>();
 
       const ingestLocal = (list: any[]) => {
         if (!Array.isArray(list)) return;
@@ -516,7 +554,7 @@ export function useProgressReportsData({
           const idKey = r.id !== undefined && r.id !== null ? String(r.id).trim() : "";
           const serverKey = r.server_id ? String(r.server_id).trim() : "";
 
-          const canonicalKey = uniqKey || (serverKey ? `srv_${serverKey}` : idKey);
+          const canonicalKey = uniqKey || (serverKey ? `srv_${serverKey}` : (idKey ? `id_${idKey}` : ""));
           if (!canonicalKey) return;
 
           const lowerKeys = [uniqKey.toLowerCase(), idKey.toLowerCase(), serverKey.toLowerCase()].filter(Boolean);
@@ -524,7 +562,12 @@ export function useProgressReportsData({
             return;
           }
 
-          const existing = localMap.get(canonicalKey);
+          const existing =
+            canonicalLocalReports.get(canonicalKey) ||
+            (uniqKey ? localLookupIndex.get(uniqKey.toLowerCase()) : null) ||
+            (serverKey ? localLookupIndex.get(`srv_${serverKey.toLowerCase()}`) : null) ||
+            (idKey ? localLookupIndex.get(`id_${idKey.toLowerCase()}`) : null);
+
           let itemToStore = r;
           if (!existing) {
             itemToStore = r;
@@ -534,28 +577,36 @@ export function useProgressReportsData({
             const existingTime = new Date(existing.updated_at || existing.client_updated_at || 0).getTime();
             const currentTime = new Date(r.updated_at || r.client_updated_at || 0).getTime();
 
-            if ((!existingHasServer && currentHasServer) || currentTime >= existingTime) {
+            // If existing has uncommitted local edits, protect them from being overwritten by stale cache
+            if (existing.is_local_edited && !r.is_local_edited && currentTime <= existingTime) {
+              itemToStore = { ...r, ...existing };
+            } else if ((!existingHasServer && currentHasServer) || currentTime > existingTime) {
               itemToStore = { ...existing, ...r };
             } else {
               itemToStore = { ...r, ...existing };
             }
           }
 
-          localMap.set(canonicalKey, itemToStore);
+          // Canonical entity stored once
+          canonicalLocalReports.set(canonicalKey, itemToStore);
+
+          // Fast multi-key lookup index without duplicating entity values
           if (uniqKey) {
-            localMap.set(uniqKey, itemToStore);
-            localMap.set(uniqKey.toLowerCase(), itemToStore);
-            localMap.set(uniqKey.toUpperCase(), itemToStore);
+            localLookupIndex.set(uniqKey, itemToStore);
+            localLookupIndex.set(uniqKey.toLowerCase(), itemToStore);
+            localLookupIndex.set(uniqKey.toUpperCase(), itemToStore);
           }
           if (idKey) {
-            localMap.set(idKey, itemToStore);
-            localMap.set(idKey.toLowerCase(), itemToStore);
-            localMap.set(`srv_${idKey}`, itemToStore);
+            localLookupIndex.set(idKey, itemToStore);
+            localLookupIndex.set(idKey.toLowerCase(), itemToStore);
+            localLookupIndex.set(`id_${idKey.toLowerCase()}`, itemToStore);
+            localLookupIndex.set(`srv_${idKey}`, itemToStore);
           }
           if (serverKey) {
-            localMap.set(serverKey, itemToStore);
-            localMap.set(serverKey.toLowerCase(), itemToStore);
-            localMap.set(`srv_${serverKey}`, itemToStore);
+            localLookupIndex.set(serverKey, itemToStore);
+            localLookupIndex.set(serverKey.toLowerCase(), itemToStore);
+            localLookupIndex.set(`srv_${serverKey.toLowerCase()}`, itemToStore);
+            localLookupIndex.set(`srv_${serverKey}`, itemToStore);
           }
         });
       };
@@ -571,7 +622,7 @@ export function useProgressReportsData({
         ingestLocal(JSON.parse(localStorage.getItem("spr_reports_local_v1") || "[]"));
       } catch {}
 
-      localReps = Array.from(localMap.values());
+      localReps = deduplicateReports(Array.from(canonicalLocalReports.values()));
       if (localReps.length > 0) {
         setReportsList(localReps.map(normalizeReport));
         setLoading(false); // Cache hit! Zero loading delay
@@ -587,7 +638,7 @@ export function useProgressReportsData({
           ingestLocal(defaultIdbReps);
         }
 
-        localReps = Array.from(localMap.values());
+        localReps = deduplicateReports(Array.from(canonicalLocalReports.values()));
         if (localReps.length > 0) {
           setReportsList(localReps.map(normalizeReport));
           setLoading(false);
@@ -652,9 +703,9 @@ export function useProgressReportsData({
             const srv = apiRep.server_id ? String(apiRep.server_id).trim() : "";
             const idStr = apiRep.id !== undefined && apiRep.id !== null ? String(apiRep.id).trim() : "";
             return (
-              (uniq && localMap.get(uniq)) ||
-              (srv && (localMap.get(`srv_${srv}`) || localMap.get(srv))) ||
-              (idStr && (localMap.get(`srv_${idStr}`) || localMap.get(idStr))) ||
+              (uniq && (localLookupIndex.get(uniq) || localLookupIndex.get(uniq.toLowerCase()))) ||
+              (srv && (localLookupIndex.get(`srv_${srv}`) || localLookupIndex.get(srv) || localLookupIndex.get(`srv_${srv.toLowerCase()}`))) ||
+              (idStr && (localLookupIndex.get(`srv_${idStr}`) || localLookupIndex.get(idStr) || localLookupIndex.get(`id_${idStr.toLowerCase()}`))) ||
               null
             );
           };
@@ -667,7 +718,12 @@ export function useProgressReportsData({
               const localUpdated = localMatch.client_updated_at ? new Date(localMatch.client_updated_at).getTime() : 0;
               const serverUpdated = apiRep.updated_at || apiRep.created_at ? new Date(apiRep.updated_at || apiRep.created_at).getTime() : 0;
 
-              const isEditedLocal = Boolean(localMatch.is_edited);
+              // Only true uncommitted client edits override server state
+              const isEditedLocal = Boolean(
+                localMatch.is_local_edited ||
+                (localMatch.client_updated_at && localUpdated > serverUpdated + 2000)
+              );
+
               if (isLocalUnsynced || isEditedLocal || localUpdated >= serverUpdated) {
                 return {
                   ...apiRep,
@@ -691,11 +747,17 @@ export function useProgressReportsData({
               }
               return {
                 ...apiRep,
+                sync_status: "SYNCED",
+                sync_error: null,
                 is_edited: Boolean(apiRep.is_edited || localMatch.is_edited),
                 edited_at: (apiRep.is_edited ? apiRep.edited_at : localMatch.edited_at) || null,
               };
             }
-            return apiRep;
+            return {
+              ...apiRep,
+              sync_status: "SYNCED",
+              sync_error: null,
+            };
           });
 
           let pendingQueue = new Set<string>();
@@ -739,7 +801,7 @@ export function useProgressReportsData({
               })
             );
 
-          const finalMerged = [...merged, ...localOnly];
+          const finalMerged = deduplicateReports([...merged, ...localOnly]);
           setReportsList(finalMerged);
           localStorage.setItem(tenantScopedStorageKey, JSON.stringify(finalMerged));
           localStorage.setItem("spr_reports_local_v1", JSON.stringify(finalMerged));
@@ -863,10 +925,16 @@ export function useProgressReportsData({
   const pendingSyncCount = reportsList.filter(isReportUnsynced).length;
 
   const handleSyncOfflineReports = async () => {
+    const unsyncedList = reportsList.filter(isReportUnsynced);
+    if (unsyncedList.length === 0) {
+      showToast("All local reports are already in sync with Database", "info");
+      return;
+    }
+
     setIsSyncing(true);
     setSyncErrors(null);
     try {
-      const res = await triggerCloudSync({ force: true, reports: reportsList });
+      const res = await triggerCloudSync({ force: true, reports: unsyncedList });
       if (res && res.errors && res.errors.length > 0) {
         setSyncErrors(res.errors);
         if (res.syncedCount && res.syncedCount > 0) {
@@ -918,14 +986,15 @@ export function useProgressReportsData({
   };
 
   const handleSyncSelectedReports = async (selectedReports: ReportItem[]) => {
-    if (selectedReports.length === 0) {
-      showToast("No reports selected for syncing", "warning");
+    const unsyncedTargets = selectedReports.filter(isReportUnsynced);
+    if (unsyncedTargets.length === 0) {
+      showToast("Selected report(s) are already in sync with Database", "info");
       return;
     }
     setIsSyncing(true);
     setSyncErrors(null);
     try {
-      const res = await triggerCloudSync({ force: true, reports: selectedReports });
+      const res = await triggerCloudSync({ force: true, reports: unsyncedTargets });
       if (res && res.errors && res.errors.length > 0) {
         setSyncErrors(res.errors);
         if (res.syncedCount && res.syncedCount > 0) {
