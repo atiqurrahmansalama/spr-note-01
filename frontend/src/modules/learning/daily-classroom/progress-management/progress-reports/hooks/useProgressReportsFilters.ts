@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { ReportItem, StudentGroupedItem } from "../types";
+import { isReportUnsynced } from "@/utils/syncEngine";
 import { calendarSettings } from "@/utils/localStore";
 import { getTodayInTimezone, getClassroomEffectiveTimezone } from "@/constants/calendarConstants";
 
@@ -86,6 +87,7 @@ export function useProgressReportsFilters({
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<number | string>>(new Set());
+  const [filterUnsyncedOnly, setFilterUnsyncedOnly] = useState<boolean>(false);
 
   // Table rows expand/collapse all state
   const [isAllExpanded, setIsAllExpanded] = useState<boolean>(false);
@@ -196,7 +198,8 @@ export function useProgressReportsFilters({
         }
       }
 
-      return passesSearch && passesStudent && passesGroup && passesSession && passesDateRange;
+      const passesUnsynced = !filterUnsyncedOnly || isReportUnsynced(rep);
+      return passesSearch && passesStudent && passesGroup && passesSession && passesDateRange && passesUnsynced;
     });
   }, [
     reportsList,
@@ -212,6 +215,7 @@ export function useProgressReportsFilters({
     selectedSecFilter,
     canViewAllTeachers,
     currentUser,
+    filterUnsyncedOnly,
   ]);
 
   // Grouped by Student calculation for STUDENT_VIEW
@@ -318,6 +322,7 @@ export function useProgressReportsFilters({
     setInternalDeptId("");
     setInternalClassId("");
     setInternalSectionId("");
+    setFilterUnsyncedOnly(false);
     if (filterProps?.onClassChange) filterProps.onClassChange("");
     if (filterProps?.onSectionChange) filterProps.onSectionChange("");
     if (filterProps?.onDepartmentChange) filterProps.onDepartmentChange("");
@@ -353,6 +358,8 @@ export function useProgressReportsFilters({
     selectedDeptFilter,
     selectedClsFilter,
     selectedSecFilter,
+    filterUnsyncedOnly,
+    setFilterUnsyncedOnly,
     filteredReports,
     studentGroupedData,
     toggleSelectAll,

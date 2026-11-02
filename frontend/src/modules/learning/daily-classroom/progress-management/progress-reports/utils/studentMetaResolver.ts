@@ -318,10 +318,6 @@ export function getPortions(report: ReportItem | null | undefined): ReportPortio
  */
 export function getTotalPages(report: ReportItem | null | undefined): number {
   if (!report) return 0;
-  const rawTotal = (report as any).total_page ?? (report as any).totalPages ?? (report as any).total_pages ?? (report as any).pages;
-  if (rawTotal !== undefined && rawTotal !== null && Number(rawTotal) > 0) {
-    return Number(rawTotal);
-  }
   const portions = getPortions(report);
   if (portions.length > 0) {
     let pages = 0;
@@ -334,6 +330,10 @@ export function getTotalPages(report: ReportItem | null | undefined): number {
       });
     });
     if (pages > 0) return pages;
+  }
+  const rawTotal = (report as any).total_page ?? (report as any).totalPages ?? (report as any).total_pages ?? (report as any).pages;
+  if (rawTotal !== undefined && rawTotal !== null && Number(rawTotal) > 0) {
+    return Number(rawTotal);
   }
   return 0;
 }

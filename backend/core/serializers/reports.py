@@ -373,9 +373,9 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
                         now_time = timezone.now().time()
                         parsed_dt = datetime.combine(parsed_dt.date(), now_time)
                     mutable_data['date'] = timezone.make_aware(parsed_dt) if timezone.is_naive(parsed_dt) else parsed_dt
-                else:
+                elif not self.instance:
                     mutable_data['date'] = timezone.now()
-        else:
+        elif not self.instance:
             mutable_data['date'] = timezone.now()
 
         if 'session_name' not in mutable_data and 'session' in mutable_data:
@@ -558,7 +558,18 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
     def _create_normalized_errors(self, report, error_details_data):
         """Create ReportErrorDetail rows from new v2 payload."""
         mistakes, stucks = 0, 0
-        for item in error_details_data:
+        for raw_item in error_details_data:
+            item = dict(raw_item)
+            item.pop('id', None)
+            item.pop('ayahs', None)
+            err_type = item.get('type') or 'Mistake'
+            if err_type not in ('Mistake', 'Stuck'):
+                err_type = 'Mistake'
+            item['type'] = err_type
+            item['page'] = self._safe_int(item.get('page'), 1)
+            item['ayah'] = self._safe_int(item.get('ayah'), 1)
+            if item.get('juz') is not None:
+                item['juz'] = self._safe_int(item.get('juz'), 1)
             ed = ReportErrorDetail.objects.create(report=report, **item)
             if ed.type == 'Mistake':
                 mistakes += 1
@@ -567,7 +578,20 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         return mistakes, stucks
 
     def _create_portions(self, report, portions_data):
-        for item in portions_data:
+        for raw_item in portions_data:
+            item = dict(raw_item)
+            item.pop('id', None)
+            item.pop('ranges', None)
+            start_p = self._safe_int(item.get('start_page'), 1)
+            end_p = self._safe_int(item.get('end_page'), start_p)
+            item['start_page'] = start_p
+            item['end_page'] = end_p
+            item['start_ayah'] = self._safe_int(item.get('start_ayah'), 1)
+            item['end_ayah'] = self._safe_int(item.get('end_ayah'), 30)
+            if item.get('start_juz') is not None:
+                item['start_juz'] = self._safe_int(item.get('start_juz'), 1)
+            if item.get('end_juz') is not None:
+                item['end_juz'] = self._safe_int(item.get('end_juz'), item.get('start_juz') or 1)
             ReportPortion.objects.create(report=report, **item)
 
     # â”€â”€ CREATE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -578,7 +602,7 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         error_details_data = validated_data.pop('error_details', [])
 
         initial = self.initial_data or {}
-        client_uid = initial.get('report_unique_id')
+        client_uid = initial.get('report_unique_id') or validated_data.get('report_unique_id')
         if client_uid:
             existing = StudentDailyReport.objects.filter(report_unique_id=client_uid).first()
             if existing:
@@ -591,6 +615,33 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         stucks_input   = initial.get('stuck_details')   or initial.get('stucks')   or []
 
         student_obj = validated_data.get('student')
+        if not student_obj:
+            student_name_input = validated_data.get('student_name') or initial.get('student_name') or initial.get('student')
+            if student_name_input and isinstance(student_name_input, str):
+                name_clean = student_name_input.strip()
+                student_obj = Student.objects.filter(name_en__iexact=name_clean).first()
+                if not student_obj:
+                    student_obj = Student.objects.filter(name_en__icontains=name_clean).first()
+                if not student_obj:
+                    req = self.context.get('request')
+                    user = getattr(req, 'user', None) if req else None
+                    institution = getattr(user, 'institution', None) if user else None
+                    max_roll = (Student.objects.filter(institution=institution).aggregate(Max('roll_number'))['roll_number__max'] or 0) if institution else (Student.objects.aggregate(Max('roll_number'))['roll_number__max'] or 0)
+                    student_obj = Student.objects.create(
+                        name_en=name_clean,
+                        name=name_clean,
+                        institution=institution,
+                        roll_number=max_roll + 1,
+                        created_by=user if (user and user.is_authenticated) else None,
+                    )
+            if student_obj:
+                validated_data['student'] = student_obj
+                if not validated_data.get('student_name'):
+                    validated_data['student_name'] = student_obj.name_en or student_obj.name or 'Student'
+            else:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({'student': "A valid student is required to create a daily progress report."})
+
         if student_obj and not validated_data.get('student_name'):
             validated_data['student_name'] = student_obj.name_en or student_obj.name or 'Student'
 
@@ -599,6 +650,13 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
 
         if portions_data:
             self._create_portions(report, portions_data)
+            tot_p = sum(
+                max(0, (p.get('end_page') or p.get('start_page') or 1) - (p.get('start_page') or 1) + 1)
+                for p in portions_data
+            )
+            if tot_p > 0:
+                report.total_page = tot_p
+                report.save(update_fields=['total_page'])
 
         if error_details_data:
             tot_mistakes, tot_stucks = self._create_normalized_errors(report, error_details_data)
@@ -656,18 +714,31 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
             status_obj.delete_time = None
         status_obj.save()
 
-        if portions_data:
+        if portions_data is not None:
             instance.portions.all().delete()
-            self._create_portions(instance, portions_data)
+            if portions_data:
+                self._create_portions(instance, portions_data)
+                if 'total_page' not in validated_data:
+                    tot_p = sum(
+                        max(0, (p.get('end_page') or p.get('start_page') or 1) - (p.get('start_page') or 1) + 1)
+                        for p in portions_data
+                    )
+                    if tot_p > 0:
+                        instance.total_page = tot_p
+                        instance.save(update_fields=['total_page'])
 
-        if error_details_data:
+        if error_details_data is not None:
             instance.error_details.all().delete()
-            tot_mistakes, tot_stucks = self._create_normalized_errors(instance, error_details_data)
-            instance.total_mistake = tot_mistakes
-            instance.total_stuck   = tot_stucks
+            if error_details_data:
+                tot_mistakes, tot_stucks = self._create_normalized_errors(instance, error_details_data)
+                instance.total_mistake = tot_mistakes
+                instance.total_stuck   = tot_stucks
+            else:
+                instance.total_mistake = 0
+                instance.total_stuck   = 0
             instance.save(update_fields=['total_mistake', 'total_stuck'])
 
-        elif mistakes_input or stucks_input:
+        elif mistakes_input is not None or stucks_input is not None:
             instance.error_details.all().delete()
             tot_mistakes, tot_stucks = self._parse_legacy_errors(
                 instance, mistakes_input or [], stucks_input or []
@@ -691,6 +762,18 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
                     instance.total_stuck = tot_s
                     instance.save(update_fields=['total_mistake', 'total_stuck'])
 
+        if 'juz_and_pages' in initial and initial['juz_and_pages'] is not None:
+            instance.juz_and_pages = initial['juz_and_pages']
+            instance.save(update_fields=['juz_and_pages'])
+
+        if 'student_name' in initial and initial['student_name']:
+            instance.student_name = initial['student_name']
+            instance.save(update_fields=['student_name'])
+        elif getattr(instance, 'student', None):
+            instance.student_name = instance.student.name_en or getattr(instance.student, 'name', '') or 'Student'
+            instance.save(update_fields=['student_name'])
+
+        instance.refresh_from_db()
         return instance
 
 

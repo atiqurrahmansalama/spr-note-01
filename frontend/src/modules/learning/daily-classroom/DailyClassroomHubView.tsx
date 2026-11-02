@@ -516,6 +516,21 @@ export default function DailyClassroomHubView({
     return () => window.removeEventListener('spr_edit_report', handleEditReportEvent);
   }, [isProgressHub, navigate, selectedDate]);
 
+  useEffect(() => {
+    const handleSwitchTabEvent = (e: any) => {
+      const targetTab = e?.detail?.tab;
+      if (targetTab) {
+        handleTabChange(targetTab);
+        if (e?.detail?.date) {
+          const normDate = normalizeToISODate(e.detail.date);
+          if (normDate) setSelectedDate(normDate);
+        }
+      }
+    };
+    window.addEventListener('spr_switch_classroom_tab', handleSwitchTabEvent);
+    return () => window.removeEventListener('spr_switch_classroom_tab', handleSwitchTabEvent);
+  }, [handleTabChange]);
+
   // ── Drawer Registrations ──────────────────────────────────────────────────────
   useDrawerRegistration(
     'lesson_plan',

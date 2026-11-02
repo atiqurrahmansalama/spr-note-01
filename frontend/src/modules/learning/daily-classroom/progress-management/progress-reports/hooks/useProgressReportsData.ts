@@ -525,8 +525,9 @@ export function useProgressReportsData({
           }
 
           const existing = localMap.get(canonicalKey);
+          let itemToStore = r;
           if (!existing) {
-            localMap.set(canonicalKey, r);
+            itemToStore = r;
           } else {
             const existingHasServer = !isNaN(Number(existing.id)) || Boolean(existing.server_id);
             const currentHasServer = !isNaN(Number(r.id)) || Boolean(r.server_id);
@@ -534,8 +535,27 @@ export function useProgressReportsData({
             const currentTime = new Date(r.updated_at || r.client_updated_at || 0).getTime();
 
             if ((!existingHasServer && currentHasServer) || currentTime >= existingTime) {
-              localMap.set(canonicalKey, { ...existing, ...r });
+              itemToStore = { ...existing, ...r };
+            } else {
+              itemToStore = { ...r, ...existing };
             }
+          }
+
+          localMap.set(canonicalKey, itemToStore);
+          if (uniqKey) {
+            localMap.set(uniqKey, itemToStore);
+            localMap.set(uniqKey.toLowerCase(), itemToStore);
+            localMap.set(uniqKey.toUpperCase(), itemToStore);
+          }
+          if (idKey) {
+            localMap.set(idKey, itemToStore);
+            localMap.set(idKey.toLowerCase(), itemToStore);
+            localMap.set(`srv_${idKey}`, itemToStore);
+          }
+          if (serverKey) {
+            localMap.set(serverKey, itemToStore);
+            localMap.set(serverKey.toLowerCase(), itemToStore);
+            localMap.set(`srv_${serverKey}`, itemToStore);
           }
         });
       };
@@ -648,13 +668,22 @@ export function useProgressReportsData({
               const serverUpdated = apiRep.updated_at || apiRep.created_at ? new Date(apiRep.updated_at || apiRep.created_at).getTime() : 0;
 
               const isEditedLocal = Boolean(localMatch.is_edited);
-              if (isLocalUnsynced || isEditedLocal || localUpdated > serverUpdated) {
+              if (isLocalUnsynced || isEditedLocal || localUpdated >= serverUpdated) {
                 return {
                   ...apiRep,
                   ...localMatch,
                   id: apiRep.id || localMatch.id,
                   server_id: apiRep.id || localMatch.server_id,
                   report_unique_id: apiRep.report_unique_id || localMatch.report_unique_id,
+                  totalPages: localMatch.totalPages !== undefined ? localMatch.totalPages : apiRep.totalPages,
+                  total_page: localMatch.total_page !== undefined ? localMatch.total_page : apiRep.total_page,
+                  juz_and_pages: localMatch.juz_and_pages || apiRep.juz_and_pages,
+                  portions: (localMatch.portions && localMatch.portions.length > 0) ? localMatch.portions : apiRep.portions,
+                  mistakes: localMatch.mistakes !== undefined ? localMatch.mistakes : apiRep.mistakes,
+                  stucks: localMatch.stucks !== undefined ? localMatch.stucks : apiRep.stucks,
+                  mistake_details: localMatch.mistake_details !== undefined ? localMatch.mistake_details : apiRep.mistake_details,
+                  stuck_details: localMatch.stuck_details !== undefined ? localMatch.stuck_details : apiRep.stuck_details,
+                  error_details: localMatch.error_details !== undefined ? localMatch.error_details : apiRep.error_details,
                   is_edited: isEditedLocal || Boolean(apiRep.is_edited),
                   edited_at: isEditedLocal ? localMatch.edited_at || null : apiRep.is_edited ? apiRep.edited_at || null : null,
                   sync_status: isLocalUnsynced ? "PENDING" : "SYNCED",

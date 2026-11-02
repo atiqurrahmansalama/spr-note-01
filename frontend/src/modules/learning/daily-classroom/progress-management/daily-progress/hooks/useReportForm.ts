@@ -35,6 +35,12 @@ import {
 } from "@/modules/learning/daily-classroom/utils/dailyClassroomUtils";
 import type { JuzRowData, DetailRowData, DailyProgressDraft } from "../types";
 import { calculateTotalMistakes, calculateTotalStucks } from "../progressCalculations";
+import {
+  getTotalPages,
+  getMistakesCount,
+  getStucksCount,
+  getPortions,
+} from "../../progress-reports/utils/studentMetaResolver";
 
 export interface AcademicValidationContext {
   departmentId?: string | number | null;
@@ -659,9 +665,14 @@ export function useReportForm() {
     setSelectedTeacherId(repTeacherId || defaultTeacherId);
     setSelectedTeacherName(repTeacherName || defaultTeacherName);
 
-    if (Array.isArray(rep.juz_and_pages) && rep.juz_and_pages.length > 0) {
+    const quranPagesSource =
+      Array.isArray(rep.juz_and_pages) && rep.juz_and_pages.length > 0
+        ? rep.juz_and_pages
+        : getPortions(rep);
+
+    if (quranPagesSource.length > 0) {
       setJuzPageData(
-        rep.juz_and_pages.map((jp: any) => ({
+        quranPagesSource.map((jp: any) => ({
           id: crypto.randomUUID(),
           juz: String(jp.juz || ""),
           ranges: Array.isArray(jp.ranges)
@@ -677,15 +688,23 @@ export function useReportForm() {
       setJuzPageData([{ id: crypto.randomUUID(), juz: "", ranges: [{ id: crypto.randomUUID(), start: "", end: "" }] }]);
     }
 
-    const mistakesList = rep.mistake_details || rep.mistakes || [];
-    if (Array.isArray(mistakesList) && mistakesList.length > 0) {
+    const mistakesList =
+      Array.isArray(rep.mistake_details) && rep.mistake_details.length > 0
+        ? rep.mistake_details
+        : Array.isArray(rep.mistakes) && rep.mistakes.length > 0
+        ? rep.mistakes
+        : Array.isArray(rep.error_details)
+        ? rep.error_details.filter((e: any) => e.type === "Mistake")
+        : [];
+
+    if (mistakesList.length > 0) {
       setMistakeData(
         mistakesList.map((m: any) => ({
           id: crypto.randomUUID(),
           juz: String(m.juz || ""),
           page: String(m.page || ""),
-          ayahs: Array.isArray(m.ayahs)
-            ? m.ayahs.map((a: any) => ({ id: crypto.randomUUID(), value: String(a.value || a || "") }))
+          ayahs: Array.isArray(m.ayahs) && m.ayahs.length > 0
+            ? m.ayahs.map((a: any) => ({ id: crypto.randomUUID(), value: String(a.value || a.ayah || a || "") }))
             : m.ayah
             ? [{ id: crypto.randomUUID(), value: String(m.ayah) }]
             : [{ id: crypto.randomUUID(), value: "" }],
@@ -695,15 +714,23 @@ export function useReportForm() {
       setMistakeData([{ id: crypto.randomUUID(), juz: "", page: "", ayahs: [{ id: crypto.randomUUID(), value: "" }] }]);
     }
 
-    const stucksList = rep.stuck_details || rep.stucks || [];
-    if (Array.isArray(stucksList) && stucksList.length > 0) {
+    const stucksList =
+      Array.isArray(rep.stuck_details) && rep.stuck_details.length > 0
+        ? rep.stuck_details
+        : Array.isArray(rep.stucks) && rep.stucks.length > 0
+        ? rep.stucks
+        : Array.isArray(rep.error_details)
+        ? rep.error_details.filter((e: any) => e.type === "Stuck")
+        : [];
+
+    if (stucksList.length > 0) {
       setStuckData(
         stucksList.map((s: any) => ({
           id: crypto.randomUUID(),
           juz: String(s.juz || ""),
           page: String(s.page || ""),
-          ayahs: Array.isArray(s.ayahs)
-            ? s.ayahs.map((a: any) => ({ id: crypto.randomUUID(), value: String(a.value || a || "") }))
+          ayahs: Array.isArray(s.ayahs) && s.ayahs.length > 0
+            ? s.ayahs.map((a: any) => ({ id: crypto.randomUUID(), value: String(a.value || a.ayah || a || "") }))
             : s.ayah
             ? [{ id: crypto.randomUUID(), value: String(s.ayah) }]
             : [{ id: crypto.randomUUID(), value: "" }],
@@ -1518,10 +1545,16 @@ export function useReportForm() {
   };
 
   const cancelEditMode = () => {
+    const returnTab = editingReport?._returnToTab;
     if (editingReport?.id && editingReport.isGracePeriod) {
       scheduleGracePeriodSync(editingReport.id, 10 * 60 * 1000);
     }
     resetForm();
+    if (returnTab) {
+      window.dispatchEvent(
+        new CustomEvent("spr_switch_classroom_tab", { detail: { tab: returnTab } })
+      );
+    }
     showToast("Edit cancelled. Form cleared.", "info");
   };
 
@@ -1545,6 +1578,63 @@ export function useReportForm() {
         (s) => (s.page && String(s.page).trim()) || ((s.ayahs || []).some((a) => a.value && String(a.value).trim()))
       );
       const activePages = juzPageData;
+
+      const updatedPortions = (activePages || []).flatMap((row: any) => {
+        const rawJuz = row.juz !== undefined && row.juz !== null ? String(row.juz).trim() : "";
+        const juzNum = rawJuz && !isNaN(parseInt(rawJuz, 10)) ? parseInt(rawJuz, 10) : null;
+        return (row.ranges || [])
+          .filter((r: any) => r.start || r.page_start)
+          .map((r: any) => {
+            const s = parseInt(r.start || r.page_start, 10);
+            const e = parseInt(r.end || r.page_end || r.start || r.page_start, 10);
+            return {
+              start_juz: juzNum,
+              end_juz: juzNum,
+              juz: juzNum,
+              start_page: s,
+              end_page: isNaN(e) ? s : e,
+              start_ayah: 1,
+              end_ayah: 30,
+              ranges: [{ start: s, end: isNaN(e) ? s : e }],
+            };
+          });
+      });
+
+      const updatedMistakeDetails = cleanActiveMistakes.map((m: any) => ({
+        id: m.id || crypto.randomUUID(),
+        type: "Mistake",
+        juz: m.juz !== undefined && m.juz !== null ? String(m.juz) : "",
+        page: String(m.page || ""),
+        ayah: (m.ayahs || []).map((a: any) => (typeof a === "object" ? a.value || a.ayah : a)).filter(Boolean).join(", "),
+        ayahs: Array.isArray(m.ayahs) ? m.ayahs : [],
+      }));
+
+      const updatedStuckDetails = cleanActiveStucks.map((s: any) => ({
+        id: s.id || crypto.randomUUID(),
+        type: "Stuck",
+        juz: s.juz !== undefined && s.juz !== null ? String(s.juz) : "",
+        page: String(s.page || ""),
+        ayah: (s.ayahs || []).map((a: any) => (typeof a === "object" ? a.value || a.ayah : a)).filter(Boolean).join(", "),
+        ayahs: Array.isArray(s.ayahs) ? s.ayahs : [],
+      }));
+
+      const updatedErrorDetails = [
+        ...updatedMistakeDetails.map((m: any) => ({ ...m, type: "Mistake" })),
+        ...updatedStuckDetails.map((s: any) => ({ ...s, type: "Stuck" })),
+      ];
+
+      // Authoritative Single Source of Truth aggregations (Rule 10 Compliance)
+      const calculatedTotalPages = getTotalPages({ juz_and_pages: activePages, portions: updatedPortions }) || 1;
+      const calculatedMistakesCount = getMistakesCount({
+        mistakes: cleanActiveMistakes,
+        mistake_details: updatedMistakeDetails,
+        error_details: updatedErrorDetails,
+      });
+      const calculatedStucksCount = getStucksCount({
+        stucks: cleanActiveStucks,
+        stuck_details: updatedStuckDetails,
+        error_details: updatedErrorDetails,
+      });
 
       const editedAt = new Date().toISOString();
       const isEditing = Boolean(editingReport);
@@ -1602,14 +1692,23 @@ export function useReportForm() {
         lesson_covered: (lessonTitle || "").trim(),
         lessonTitle: (lessonTitle || "").trim(),
         lesson: (lessonTitle || "").trim(),
+        date: selectedDate || getClassroomTodayDate(),
         report_date: selectedDate || getClassroomTodayDate(),
         subject_course: (bookTitle.trim() || groupName || ""),
         juz_and_pages: activePages,
+        portions: updatedPortions,
+        total_page: calculatedTotalPages,
+        totalPages: calculatedTotalPages,
+        total_pages: calculatedTotalPages,
         mistakes: cleanActiveMistakes,
         stucks: cleanActiveStucks,
-        total_mistake: totalMistakes,
-        total_stuck: totalStuck,
-        total_mistakes: totalMistakes,
+        mistake_details: updatedMistakeDetails,
+        stuck_details: updatedStuckDetails,
+        error_details: updatedErrorDetails,
+        total_mistake: calculatedMistakesCount,
+        total_stuck: calculatedStucksCount,
+        total_mistakes: calculatedMistakesCount,
+        total_stucks: calculatedStucksCount,
         comment: comment,
         overall_status: "Completed",
         status: "Completed",
@@ -1645,6 +1744,27 @@ export function useReportForm() {
           server_id: resolvedServerId || undefined,
           report_unique_id: existingRep?.report_unique_id || repUniqueId,
           client_updated_at: editedAt,
+          edited_at: editedAt,
+          edit_time: editedAt,
+          is_edited: true,
+          date: selectedDate || getClassroomTodayDate(),
+          report_date: selectedDate || getClassroomTodayDate(),
+          selectedDate,
+          total_page: calculatedTotalPages,
+          totalPages: calculatedTotalPages,
+          total_pages: calculatedTotalPages,
+          portions: updatedPortions,
+          mistakes: cleanActiveMistakes,
+          stucks: cleanActiveStucks,
+          mistake_details: updatedMistakeDetails,
+          stuck_details: updatedStuckDetails,
+          error_details: updatedErrorDetails,
+          total_mistake: calculatedMistakesCount,
+          total_stuck: calculatedStucksCount,
+          total_mistakes: calculatedMistakesCount,
+          total_stucks: calculatedStucksCount,
+          totalMistakes: calculatedMistakesCount,
+          totalStuck: calculatedStucksCount,
           teacher: resolvedTeacherId || existingRep?.teacher,
           teacher_id: resolvedTeacherId || existingRep?.teacher_id,
           teacher_name: finalTeacherName,
@@ -1676,15 +1796,7 @@ export function useReportForm() {
           subject_course: (bookTitle.trim() || groupName || ""),
           selectedSession: selectedSession.trim(),
           session_name: selectedSession.trim(),
-          selectedDate,
           juz_and_pages: activePages,
-          mistakes: cleanActiveMistakes,
-          stucks: cleanActiveStucks,
-          total_mistake: totalMistakes,
-          total_stuck: totalStuck,
-          total_mistakes: totalMistakes,
-          totalMistakes,
-          totalStuck,
           juzPageData: activePages,
           bookPageData: progressMode === "BOOK" ? activePages : [],
           mistakeData: cleanActiveMistakes,
@@ -1713,14 +1825,29 @@ export function useReportForm() {
               if (apiResult && (apiResult.success || apiResult.data)) {
                 const resData = apiResult.data || apiResult;
                 const mergedReport = {
-                  ...updatedRecord,
                   ...resData,
-                  mistakes: updatedRecord.mistakes || resData.mistakes || resData.mistake_details,
-                  stucks: updatedRecord.stucks || resData.stucks || resData.stuck_details,
-                  mistakeData: updatedRecord.mistakeData || resData.mistake_details || resData.mistakes,
-                  stuckData: updatedRecord.stuckData || resData.stuck_details || resData.stucks,
-                  server_id: resolvedServerId || resData.id,
+                  ...updatedRecord,
+                  id: updatedRecord.id,
+                  server_id: resolvedServerId || resData.id || updatedRecord.server_id,
+                  report_unique_id: updatedRecord.report_unique_id || resData.report_unique_id,
+                  date: updatedRecord.date,
+                  report_date: updatedRecord.report_date,
+                  total_page: calculatedTotalPages,
+                  totalPages: calculatedTotalPages,
+                  total_pages: calculatedTotalPages,
+                  portions: updatedPortions.length > 0 ? updatedPortions : (resData.portions || []),
+                  mistakes: updatedRecord.mistakes,
+                  stucks: updatedRecord.stucks,
+                  mistake_details: updatedMistakeDetails,
+                  stuck_details: updatedStuckDetails,
+                  error_details: updatedErrorDetails,
+                  total_mistake: calculatedMistakesCount,
+                  total_stuck: calculatedStucksCount,
+                  total_mistakes: calculatedMistakesCount,
+                  total_stucks: calculatedStucksCount,
                   sync_status: "SYNCED" as const,
+                  is_edited: true,
+                  edited_at: editedAt,
                 };
                 saveReportLocally(
                   mergedReport,
@@ -1766,6 +1893,13 @@ export function useReportForm() {
       } else {
         const localSavedReport = saveReportLocally({
           ...payload,
+          total_page: calculatedTotalPages,
+          totalPages: calculatedTotalPages,
+          total_pages: calculatedTotalPages,
+          portions: updatedPortions,
+          mistake_details: updatedMistakeDetails,
+          stuck_details: updatedStuckDetails,
+          error_details: updatedErrorDetails,
           teacher: resolvedTeacherId,
           teacher_id: resolvedTeacherId,
           teacher_name: finalTeacherName,
@@ -1819,11 +1953,12 @@ export function useReportForm() {
           juz_and_pages: activePages,
           mistakes: cleanActiveMistakes,
           stucks: cleanActiveStucks,
-          total_mistake: totalMistakes,
-          total_stuck: totalStuck,
-          total_mistakes: totalMistakes,
-          totalMistakes,
-          totalStuck,
+          total_mistake: calculatedMistakesCount,
+          total_stuck: calculatedStucksCount,
+          total_mistakes: calculatedMistakesCount,
+          total_stucks: calculatedStucksCount,
+          totalMistakes: calculatedMistakesCount,
+          totalStuck: calculatedStucksCount,
           juzPageData: activePages,
           bookPageData: progressMode === "BOOK" ? activePages : [],
           mistakeData: cleanActiveMistakes,
@@ -1888,14 +2023,25 @@ export function useReportForm() {
         }
       }
 
+      const returnTab = isEditing ? editingReport?._returnToTab : null;
       if (!options?.keepFormOpen) {
         resetForm();
-        // Auto-focus student input so teacher can immediately type the next student's name
-        setTimeout(() => {
-          const el = document.getElementById("daily-progress-student-input") as HTMLInputElement;
-          el?.focus();
-          el?.select?.();
-        }, 60);
+        if (returnTab) {
+          setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent("spr_switch_classroom_tab", {
+                detail: { tab: returnTab, date: selectedDate },
+              })
+            );
+          }, 120);
+        } else {
+          // Auto-focus student input so teacher can immediately type the next student's name
+          setTimeout(() => {
+            const el = document.getElementById("daily-progress-student-input") as HTMLInputElement;
+            el?.focus();
+            el?.select?.();
+          }, 60);
+        }
       }
 
       return {

@@ -1,6 +1,11 @@
 import { auth as authStore } from "../utils/localStore";
 import { fetchWithAuth } from "../utils/authService";
 import { API_BASE_URL } from "../config/api";
+import {
+  getTotalPages,
+  getMistakesCount,
+  getStucksCount,
+} from "../modules/learning/daily-classroom/progress-management/progress-reports/utils/studentMetaResolver";
 
 const fetchApi = async (path, options = {}) => {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
@@ -200,8 +205,10 @@ export const transformFormToApiPayload = (reportData) => {
     });
   }
 
-  // Calculate total pages recited
-  const total_page = portions.reduce((sum, p) => sum + (p.end_page - p.start_page + 1), 0) || Number(reportData?.total_page) || 1;
+  // Authoritative Single Source of Truth calculation (Rule 10 Compliance)
+  const total_page = getTotalPages({ portions, juz_and_pages: juzPageData, total_page: reportData?.total_page }) || 1;
+  const total_mistake = getMistakesCount({ error_details, mistakes: mistakeData });
+  const total_stuck = getStucksCount({ error_details, stucks: stuckData });
 
   const payload = {
     student_name: studentName || "N/A",
@@ -210,6 +217,7 @@ export const transformFormToApiPayload = (reportData) => {
     score: typeof score === "number" ? score : 100,
     status: status || "Completed",
     comment: comment || "",
+    date: selectedDate || new Date().toISOString(),
     report_date: selectedDate || new Date().toISOString(),
     portions,
     error_details,
@@ -225,8 +233,8 @@ export const transformFormToApiPayload = (reportData) => {
     stucks: stuckData,
     mistake_details: error_details.filter((e) => e.type === "Mistake"),
     stuck_details: error_details.filter((e) => e.type === "Stuck"),
-    total_mistake: error_details.filter((e) => e.type === "Mistake").length,
-    total_stuck: error_details.filter((e) => e.type === "Stuck").length,
+    total_mistake,
+    total_stuck,
   };
 
   // Only pass numeric student foreign key ID; string IDs like 'stu_...' would cause DRF type validation error

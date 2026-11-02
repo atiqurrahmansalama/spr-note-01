@@ -12,7 +12,12 @@ import {
   Squares2X2Icon,
   TrendingUpIcon,
   ChevronIcon,
+  DotsVerticalIcon,
+  FilterIcon,
+  CheckCircleIcon,
+  AlertTriangleIcon,
 } from "@/components/ui/Icons";
+import ActionMenu, { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { ConfirmModal } from "@/components/ui/Modal";
 import { useTranslation } from "@/i18n";
 import CustomSelect from "@/components/ui/CustomSelect";
@@ -121,6 +126,8 @@ export default function ProgressReportsView({
     selectedDeptFilter,
     selectedClsFilter,
     selectedSecFilter,
+    filterUnsyncedOnly,
+    setFilterUnsyncedOnly,
     filteredReports,
     studentGroupedData,
     toggleSelectAll,
@@ -136,6 +143,97 @@ export default function ProgressReportsView({
     currentUser,
     showToast,
   });
+
+  const [showSyncErrorsPanel, setShowSyncErrorsPanel] = useState<boolean>(true);
+
+  // Authoritative Derived Sync Errors: keeps track of any failed sync reports persistently
+  const derivedSyncErrors = useMemo(() => {
+    if (syncErrors && syncErrors.length > 0) return syncErrors;
+    const failedFromList = reportsList.filter(
+      (r) => (r.sync_status === "FAILED" || (r.sync_error && isReportUnsynced(r)))
+    );
+    if (failedFromList.length === 0) return [];
+    return failedFromList.map((r) => ({
+      id: r.id || r.report_unique_id,
+      report_unique_id: r.report_unique_id,
+      student_name: r.student_name || "Record",
+      reason: r.sync_error || "An unexpected internal server error occurred (HTTP 500)",
+      status: 500,
+    }));
+  }, [syncErrors, reportsList]);
+
+  // Dropdown Menu items for the 3-dots action menu next to Record Reports / By Student
+  const viewSettingsMenuItems = useMemo<ActionMenuItem[]>(() => {
+    const items: ActionMenuItem[] = [
+      {
+        id: "filter_unsynced",
+        label: filterUnsyncedOnly
+          ? t("showAllReports", "Show All Reports")
+          : t("showUnsyncedOnly", "Show Unsynced Only"),
+        icon: filterUnsyncedOnly ? CheckCircleIcon : FilterIcon,
+        badge: pendingSyncCount > 0 ? pendingSyncCount : undefined,
+        badgeClassName: filterUnsyncedOnly
+          ? "!bg-amber-500 !text-black font-bold"
+          : "!theme-bg-amber/20 !text-amber-500 font-bold",
+        onClick: () => {
+          setFilterUnsyncedOnly((prev) => !prev);
+          if (!filterUnsyncedOnly) {
+            showToast(
+              pendingSyncCount > 0
+                ? `Filtering ${pendingSyncCount} unsynced report(s)`
+                : "No unsynced reports found",
+              "info"
+            );
+          } else {
+            showToast("Showing all reports", "info");
+          }
+        },
+      },
+    ];
+
+    if (pendingSyncCount > 0 && !offline) {
+      items.push({
+        id: "sync_all_db",
+        label: isSyncing
+          ? t("syncing", "Syncing to DB...")
+          : t("syncAllToDb", "Sync All to Database"),
+        icon: isSyncing ? RefreshIcon : CloudIcon,
+        iconClassName: isSyncing ? "animate-spin text-amber-400" : "text-amber-400",
+        disabled: loading || isSyncing,
+        badge: pendingSyncCount,
+        badgeClassName: "!bg-amber-500/20 !text-amber-500 font-bold",
+        onClick: () => handleSyncOfflineReports(),
+      });
+    }
+
+    if (derivedSyncErrors.length > 0) {
+      items.push({
+        id: "view_sync_errors",
+        label: showSyncErrorsPanel
+          ? t("hideSyncIssues", "Hide Sync Issues")
+          : t("viewSyncIssues", "View Sync Issues ({{count}})", { count: derivedSyncErrors.length }),
+        icon: AlertTriangleIcon,
+        iconClassName: "text-rose-400",
+        badge: derivedSyncErrors.length,
+        badgeClassName: "!bg-rose-500/20 !text-rose-400 font-bold",
+        onClick: () => setShowSyncErrorsPanel((prev) => !prev),
+      });
+    }
+
+    return items;
+  }, [
+    filterUnsyncedOnly,
+    pendingSyncCount,
+    offline,
+    isSyncing,
+    loading,
+    derivedSyncErrors.length,
+    showSyncErrorsPanel,
+    t,
+    setFilterUnsyncedOnly,
+    showToast,
+    handleSyncOfflineReports,
+  ]);
 
   // View modes resolution: "RECORD_REPORTS" | "STUDENT_VIEW" synced with URL
   const getResolvedViewMode = useCallback((): "RECORD_REPORTS" | "STUDENT_VIEW" => {
@@ -305,10 +403,11 @@ export default function ProgressReportsView({
     const normalizedDate = normalizeToISODate(rawDate);
     const query = normalizedDate ? `?date=${encodeURIComponent(normalizedDate)}` : "";
 
+    const editPayload = { ...rep, _returnToTab: "PROGRESS_ASSESSMENT" };
     localStorage.setItem("spr_daily_progress_mode", isBook ? "BOOK" : "QURAN");
-    localStorage.setItem("spr_editing_report", JSON.stringify(rep));
+    localStorage.setItem("spr_editing_report", JSON.stringify(editPayload));
     window.dispatchEvent(new CustomEvent("spr_daily_progress_mode_change", { detail: isBook ? "BOOK" : "QURAN" }));
-    window.dispatchEvent(new CustomEvent("spr_edit_report", { detail: rep }));
+    window.dispatchEvent(new CustomEvent("spr_edit_report", { detail: editPayload }));
     if (!isEmbedded) {
       navigate(`/studies/daily-progress/${targetMode}${query}`);
     }
@@ -435,12 +534,21 @@ export default function ProgressReportsView({
           {extraRightControls}
         </div>
 
-        {/* Right: Reusable Segmented Switch (Record Reports vs By Student) */}
-        <div className="flex items-center justify-end shrink-0">
+        {/* Right: Reusable Segmented Switch (Record Reports vs By Student) + 3-Dots Menu */}
+        <div className="flex items-center justify-end gap-2 shrink-0">
           <SegmentedSwitch<"RECORD_REPORTS" | "STUDENT_VIEW">
             value={viewMode}
             onChange={handleViewModeChange}
             options={reportViewOptions}
+          />
+          <ActionMenu
+            align="right"
+            variant="surface"
+            size="sm"
+            showChevron={false}
+            icon={DotsVerticalIcon}
+            buttonClassName="h-9 w-9 p-0 rounded-xl"
+            items={viewSettingsMenuItems}
           />
         </div>
       </div>
@@ -708,15 +816,50 @@ export default function ProgressReportsView({
         />
       )}
 
-      {/* 2a. Sync Errors Alert Banner */}
-      {syncErrors && syncErrors.length > 0 && (
+      {/* 2a. Unsynced Filter Active Status Banner */}
+      {filterUnsyncedOnly && (
+        <div className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 dark:text-amber-400 text-xs shadow-2xs animate-fade-in">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            <span className="font-semibold truncate">
+              {t("filteringUnsyncedOnly", "Filtering by Unsynced Reports Only")} ({filteredReports.length} {t("records", "records")})
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {pendingSyncCount > 0 && !offline && (
+              <button
+                type="button"
+                onClick={handleSyncOfflineReports}
+                disabled={loading || isSyncing}
+                className="px-2.5 py-1 rounded-lg bg-amber-500 text-black font-bold text-xs hover:bg-amber-400 transition cursor-pointer flex items-center gap-1 shadow-2xs"
+              >
+                <RefreshIcon className={`w-3 h-3 ${isSyncing ? "animate-spin" : ""}`} />
+                <span>{isSyncing ? t("syncing", "Syncing...") : t("syncNow", "Sync Now")}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setFilterUnsyncedOnly(false)}
+              className="px-2.5 py-1 rounded-lg theme-bg-elevated hover:theme-bg-surface border theme-border font-medium text-xs theme-text-primary transition cursor-pointer"
+            >
+              {t("showAll", "Show All")}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2b. Sync Errors Alert Banner (Persistently displayed until all records sync cleanly) */}
+      {showSyncErrorsPanel && derivedSyncErrors.length > 0 && (
         <SyncErrorsAlertBanner
-          syncErrors={syncErrors}
+          syncErrors={derivedSyncErrors}
           reportsList={reportsList}
           isSyncing={isSyncing}
           loading={loading}
           onRetrySync={handleSyncOfflineReports}
-          onDismiss={() => setSyncErrors(null)}
+          onDismiss={() => {
+            setSyncErrors(null);
+            setShowSyncErrorsPanel(false);
+          }}
           onEditReport={handleEditReport}
           onDeleteReport={handleDeleteReport}
         />

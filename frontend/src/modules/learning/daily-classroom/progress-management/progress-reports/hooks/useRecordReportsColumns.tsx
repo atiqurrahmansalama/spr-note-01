@@ -131,14 +131,16 @@ export function useRecordReportsColumns({
       align: "left",
       width: "180px",
       minWidth: "180px",
-      sortValue: (rep: ReportItem) => getMistakesCount(rep) + getStucksCount(rep),
-      render: (rep: ReportItem) => (
-        <MistakesStucksBadge
-          totalMistakes={getMistakesCount(rep)}
-          totalStucks={getStucksCount(rep)}
-          t={t}
-        />
-      ),
+      sortValue: (rep: ReportItem) => {
+        const m = rep.mistakesCount !== undefined ? rep.mistakesCount : getMistakesCount(rep);
+        const s = rep.stucksCount !== undefined ? rep.stucksCount : getStucksCount(rep);
+        return m + s;
+      },
+      render: (rep: ReportItem) => {
+        const m = rep.mistakesCount !== undefined ? rep.mistakesCount : getMistakesCount(rep);
+        const s = rep.stucksCount !== undefined ? rep.stucksCount : getStucksCount(rep);
+        return <MistakesStucksBadge totalMistakes={m} totalStucks={s} t={t} />;
+      },
     },
     {
       key: "actions",

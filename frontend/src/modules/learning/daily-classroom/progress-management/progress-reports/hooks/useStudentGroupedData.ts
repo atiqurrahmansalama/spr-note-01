@@ -51,15 +51,15 @@ export function useStudentGroupedData(
 
       const totalReports = stu.reports.length;
       const totalPages = stu.reports.reduce(
-        (sum, r) => sum + getTotalPages(r),
+        (sum, r) => sum + (r.totalPages !== undefined ? r.totalPages : getTotalPages(r)),
         0
       );
       const totalMistakes = stu.reports.reduce(
-        (sum, r) => sum + getMistakesCount(r),
+        (sum, r) => sum + (r.mistakesCount !== undefined ? r.mistakesCount : getMistakesCount(r)),
         0
       );
       const totalStucks = stu.reports.reduce(
-        (sum, r) => sum + getStucksCount(r),
+        (sum, r) => sum + (r.stucksCount !== undefined ? r.stucksCount : getStucksCount(r)),
         0
       );
       const hasPendingSync = stu.reports.some(isReportUnsynced);

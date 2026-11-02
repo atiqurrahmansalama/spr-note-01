@@ -26,6 +26,7 @@ def custom_exception_handler(exc: Exception, context: Dict[str, Any]) -> Respons
     is_debug = os.getenv("DEBUG", "False").lower() in ("true", "1")
 
     from django.core.exceptions import ObjectDoesNotExist
+    from django.db import IntegrityError, DatabaseError
 
     if response is not None:
         logger.warning(
@@ -39,6 +40,35 @@ def custom_exception_handler(exc: Exception, context: Dict[str, Any]) -> Respons
             "details": response.data,
         }
         response["X-Request-ID"] = request_id
+    elif isinstance(exc, (IntegrityError, DatabaseError)):
+        logger.error(
+            f"Database Constraint/Integrity Error in [{view_name}] [{request_id}]: {exc}",
+            exc_info=True
+        )
+        exc_str = str(exc)
+        clean_msg = "Database constraint violation occurred."
+        if "violates not-null constraint" in exc_str:
+            col = exc_str.split('column "')[-1].split('"')[0] if 'column "' in exc_str else "required field"
+            clean_msg = f"Missing required database field '{col}'."
+        elif "duplicate key value" in exc_str or "UNIQUE constraint failed" in exc_str:
+            clean_msg = "A record with this identifier already exists in the database."
+        elif "violates foreign key constraint" in exc_str:
+            clean_msg = "Referenced entity does not exist in the database."
+        elif is_debug and exc_str:
+            clean_msg = f"Database error: {exc_str}"
+
+        response = Response(
+            {
+                "success": False,
+                "status_code": status.HTTP_400_BAD_REQUEST,
+                "error_type": exc.__class__.__name__,
+                "request_id": request_id,
+                "message": clean_msg,
+                "details": {"detail": clean_msg},
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+            headers={"X-Request-ID": request_id}
+        )
     elif isinstance(exc, ObjectDoesNotExist) and (
         view_name in ("TokenRefreshView", "TokenVerifyView", "TokenObtainPairView")
         or (request and getattr(request, "path", "").startswith(("/api/token/", "/token/")))
@@ -80,4 +110,4 @@ def custom_exception_handler(exc: Exception, context: Dict[str, Any]) -> Respons
         )
         response["X-Request-ID"] = request_id
 
-    return response
+    return response

@@ -144,7 +144,10 @@ export const getLocalReports = () => {
         const existingHasNumeric = typeof existing.id === "number" || (!isNaN(Number(existing.id)) && !String(existing.id).includes("-"));
         const chosenId = hasNumericId ? r.id : (existingHasNumeric ? existing.id : (r.id || existing.id));
         const chosenServerId = r.server_id || existing.server_id;
-        const isSynced = r.sync_status === "SYNCED" || existing.sync_status === "SYNCED";
+        const isFailed = r.sync_status === "FAILED" || existing.sync_status === "FAILED";
+        const isPending = r.sync_status === "PENDING" || existing.sync_status === "PENDING";
+        const isGrace = r.sync_status === "GRACE_PERIOD" || existing.sync_status === "GRACE_PERIOD";
+        const isSynced = !isFailed && !isPending && !isGrace && (r.sync_status === "SYNCED" || existing.sync_status === "SYNCED");
 
         reportMap.set(k, {
           ...existing,
@@ -152,7 +155,9 @@ export const getLocalReports = () => {
           id: chosenId,
           server_id: chosenServerId,
           report_unique_id: r.report_unique_id || existing.report_unique_id,
-          sync_status: isSynced ? "SYNCED" : (r.sync_status || existing.sync_status),
+          sync_status: isSynced ? "SYNCED" : (isFailed ? "FAILED" : isPending ? "PENDING" : isGrace ? "GRACE_PERIOD" : (r.sync_status || existing.sync_status || "PENDING")),
+          sync_error: r.sync_error || existing.sync_error || null,
+          is_edited: Boolean(r.is_edited || existing.is_edited),
           client_updated_at: r.client_updated_at || existing.client_updated_at,
         });
       }
@@ -193,13 +198,43 @@ export const getLocalReports = () => {
  */
 export const isReportUnsynced = (r) => {
   if (!r) return false;
-  // If explicitly marked SYNCED, it is synced
-  if (r.sync_status === "SYNCED") return false;
 
-  // If explicitly marked PENDING, GRACE_PERIOD, or FAILED, it IS unsynced regardless of server_id
-  if (r.sync_status === "PENDING" || r.sync_status === "GRACE_PERIOD" || r.sync_status === "FAILED") {
+  const status = String(r.sync_status || "").toUpperCase();
+
+  // 1. Explicit pending/failed/grace states are unsynced
+  if (status === "PENDING" || status === "GRACE_PERIOD" || status === "FAILED" || status === "ERROR") {
     return true;
   }
+
+  // 2. Active sync errors mean sync did not succeed
+  if (r.sync_error && String(r.sync_error).trim() !== "") {
+    return true;
+  }
+
+  // 3. Local uncommitted edits mean cloud does not have latest state
+  if (r.is_edited === true && status !== "SYNCED") {
+    return true;
+  }
+
+  // 4. Check presence in pending queue
+  try {
+    const rawQueue = localStorage.getItem(PENDING_SYNC_KEY);
+    if (rawQueue) {
+      const q = JSON.parse(rawQueue);
+      if (Array.isArray(q)) {
+        const idStr = String(r.id || "");
+        const uniqStr = String(r.report_unique_id || "");
+        const srvStr = String(r.server_id || "");
+        if (
+          (idStr && q.includes(idStr)) ||
+          (uniqStr && q.includes(uniqStr)) ||
+          (srvStr && q.includes(srvStr))
+        ) {
+          return true;
+        }
+      }
+    }
+  } catch {}
 
   const hasNumericId =
     (typeof r.id === "number" && !isNaN(r.id)) ||
@@ -208,9 +243,13 @@ export const isReportUnsynced = (r) => {
     (typeof r.server_id === "number" && !isNaN(r.server_id)) ||
     (typeof r.server_id === "string" && /^\d+$/.test(r.server_id.trim()));
 
-  // If it has no server ID and no numeric database ID, it was created offline and is unsynced
+  // 5. Offline-created reports without a server DB id
   if (!hasNumericId && !hasNumericServerId) {
     return true;
+  }
+
+  if (status === "SYNCED") {
+    return false;
   }
 
   return false;
