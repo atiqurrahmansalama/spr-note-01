@@ -179,7 +179,7 @@ export default function StudentGroupedTable({
   }
 
   return (
-    <div className="w-full select-none space-y-3">
+    <div className="w-full min-w-0 select-none space-y-3 text-left">
       {/* Top Quick Actions Bar (Hidden when Analytics is expanded) */}
       {!hideBatchToolbar && (
         <TableBatchToolbar
@@ -194,8 +194,9 @@ export default function StudentGroupedTable({
       )}
 
       {/* Main Hierarchical Parent Table (Horizontal scroll with preserved standard columns) */}
-      <div className="w-full overflow-x-auto scrollbar-thin">
       <DataTable
+        wrapperClassName="w-full min-w-0 text-left"
+        tableClassName="w-full min-w-[1240px] text-left"
         columns={columns}
         data={paginatedStudents}
         sortable={true}
@@ -271,7 +272,6 @@ export default function StudentGroupedTable({
         )}
         transparent={false}
       />
-      </div>
 
       {totalItems > 0 && (
         <Pagination

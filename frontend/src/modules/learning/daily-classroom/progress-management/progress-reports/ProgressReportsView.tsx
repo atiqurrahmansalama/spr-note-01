@@ -558,7 +558,7 @@ export default function ProgressReportsView({
   return (
     <div
       ref={containerRef}
-      className={`w-full ${isEmbedded ? "" : "max-w-6xl mx-auto"} space-y-4 theme-text-primary flex flex-col items-center justify-start ${
+      className={`w-full ${isEmbedded ? "" : "max-w-6xl mx-auto"} space-y-4 theme-text-primary flex flex-col items-stretch justify-start text-left ${
         isEmbedded ? "py-1 px-0" : "py-4 px-3 sm:px-6"
       } ${className}`}
     >
