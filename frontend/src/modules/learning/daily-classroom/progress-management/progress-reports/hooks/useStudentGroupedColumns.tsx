@@ -33,8 +33,8 @@ export function useStudentGroupedColumns({
       header: t("studentAndId", "Student & ID"),
       sortable: true,
       align: "left",
-      width: "240px",
-      minWidth: "240px",
+      width: "155px",
+      minWidth: "155px",
       headerClassName: "!pl-0",
       cellClassName: "!pl-0",
       sortValue: (stu: EnrichedStudentRow) => stu.student_name,
@@ -52,8 +52,8 @@ export function useStudentGroupedColumns({
       header: t("deptClass", "Dept · Class"),
       sortable: true,
       align: "left",
-      width: "220px",
-      minWidth: "220px",
+      width: "165px",
+      minWidth: "165px",
       sortValue: (stu: EnrichedStudentRow) => `${stu.meta.className} ${stu.meta.deptCode}`,
       render: (stu: EnrichedStudentRow) => (
         <AcademicClassDeptCell
@@ -65,11 +65,11 @@ export function useStudentGroupedColumns({
     },
     {
       key: "section",
-      header: t("sec", "Sec"),
+      header: t("section", "Section"),
       sortable: true,
       align: "left",
-      width: "180px",
-      minWidth: "180px",
+      width: "155px",
+      minWidth: "155px",
       sortValue: (stu: EnrichedStudentRow) => stu.meta.sectionName,
       render: (stu: EnrichedStudentRow) => {
         const hasSec = Boolean(stu.meta.sectionName && stu.meta.sectionName.trim() !== "");
@@ -88,8 +88,8 @@ export function useStudentGroupedColumns({
       header: t("totalReports", "Total Reports"),
       sortable: true,
       align: "left",
-      width: "180px",
-      minWidth: "180px",
+      width: "155px",
+      minWidth: "155px",
       sortValue: (stu: EnrichedStudentRow) => stu.totalReports,
       render: (stu: EnrichedStudentRow) => (
         <span className="text-xs font-bold font-mono theme-accent block">
@@ -102,8 +102,8 @@ export function useStudentGroupedColumns({
       header: t("totalPages", "Total Pages"),
       sortable: true,
       align: "left",
-      width: "220px",
-      minWidth: "220px",
+      width: "185px",
+      minWidth: "185px",
       sortValue: (stu: EnrichedStudentRow) => stu.totalPages,
       render: (stu: EnrichedStudentRow) => (
         <span className="text-xs font-bold font-mono theme-text-primary block">
@@ -116,8 +116,8 @@ export function useStudentGroupedColumns({
       header: t("mistakesAndStucks", "Mistakes & Stucks"),
       sortable: true,
       align: "left",
-      width: "180px",
-      minWidth: "180px",
+      width: "105px",
+      minWidth: "105px",
       sortValue: (stu: EnrichedStudentRow) => stu.totalMistakes + stu.totalStucks,
       render: (stu: EnrichedStudentRow) => (
         <MistakesStucksBadge
@@ -131,9 +131,10 @@ export function useStudentGroupedColumns({
       key: "actions",
       header: t("actions", "Actions"),
       align: "center",
-      width: "72px",
-      minWidth: "72px",
-      maxWidth: "72px",
+      width: "60px",
+      minWidth: "60px",
+      maxWidth: "60px",
+      maxWidth: "68px",
       render: (stu: EnrichedStudentRow) => {
         const isExpanded = expandedStudents.has(stu.student_key);
         const stuReportIds = stu.reports.map((r) => r.id ?? r.report_unique_id ?? "").filter(Boolean);

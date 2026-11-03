@@ -119,89 +119,90 @@ export const transformFormToApiPayload = (reportData) => {
     });
   }
 
-  // 2. Transform Mistake & Stuck data into `error_details` array
+  // 2. Transform Mistake & Stuck data into strictly normalized `error_details` array
   const error_details = [];
   const sessionJuz = portions[0]?.start_juz || null;
 
-  if (Array.isArray(reportData?.error_details) && reportData.error_details.length > 0) {
-    reportData.error_details.forEach((err) => {
-      const jVal = err.juz !== null && err.juz !== undefined && !isNaN(parseInt(err.juz, 10))
-        ? parseInt(err.juz, 10)
-        : sessionJuz;
-      const pVal = err.page !== null && err.page !== undefined && !isNaN(parseInt(err.page, 10))
-        ? parseInt(err.page, 10)
-        : 1;
-      error_details.push({
-        type: err.type || "Mistake",
-        juz: jVal,
-        page: pVal,
-        ayah: err.ayah || 1,
-        surah_number: err.surah_number || undefined,
+  const sanitizeAyahInt = (val) => {
+    if (val === null || val === undefined) return 1;
+    if (typeof val === "number" && !isNaN(val) && val > 0) return Math.floor(val);
+    const cleaned = String(val).replace(/\D+/g, "");
+    const parsed = parseInt(cleaned, 10);
+    return !isNaN(parsed) && parsed > 0 ? parsed : 1;
+  };
+
+  const processErrorItem = (item, defaultType = "Mistake") => {
+    if (!item) return;
+    const type = item.type === "Stuck" ? "Stuck" : (item.type || defaultType);
+    const rawJuz = item.juz !== undefined && item.juz !== null ? String(item.juz).trim() : "";
+    const juz = rawJuz && !isNaN(parseInt(rawJuz, 10))
+      ? parseInt(rawJuz, 10)
+      : (isBookMode ? null : sessionJuz);
+    const rawPage = item.page !== undefined && item.page !== null ? String(item.page).trim() : "";
+    const page = rawPage && !isNaN(parseInt(rawPage, 10)) ? parseInt(rawPage, 10) : 1;
+    const surah = item.surah_number && !isNaN(parseInt(item.surah_number, 10)) ? parseInt(item.surah_number, 10) : undefined;
+
+    let foundAyah = false;
+    if (Array.isArray(item.ayahs) && item.ayahs.length > 0) {
+      item.ayahs.forEach((a) => {
+        const rawVal = typeof a === "object" ? (a.value ?? a.ayah) : a;
+        if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== "") {
+          const aNum = sanitizeAyahInt(rawVal);
+          if (aNum > 0) {
+            foundAyah = true;
+            error_details.push({
+              type,
+              juz,
+              page,
+              ayah: aNum,
+              ...(surah ? { surah_number: surah } : {}),
+            });
+          }
+        }
       });
-    });
+    }
+
+    if (!foundAyah) {
+      const rawAyahStr = String(item.ayah ?? item.line ?? "").trim();
+      const nums = rawAyahStr.match(/\d+/g);
+      if (nums && nums.length > 0) {
+        nums.forEach((n) => {
+          const aNum = parseInt(n, 10);
+          if (!isNaN(aNum) && aNum > 0) {
+            error_details.push({
+              type,
+              juz,
+              page,
+              ayah: aNum,
+              ...(surah ? { surah_number: surah } : {}),
+            });
+          }
+        });
+      } else {
+        error_details.push({
+          type,
+          juz,
+          page,
+          ayah: 1,
+          ...(surah ? { surah_number: surah } : {}),
+        });
+      }
+    }
+  };
+
+  if (Array.isArray(reportData?.error_details) && reportData.error_details.length > 0) {
+    reportData.error_details.forEach((err) => processErrorItem(err, err.type || "Mistake"));
   } else {
     // Mistakes
     mistakeData.forEach((row) => {
       if (!row.page || String(row.page).trim() === "") return;
-      const pNum = parseInt(row.page, 10);
-      const rawJuz = row.juz !== undefined && row.juz !== null ? String(row.juz).trim() : "";
-      const jNum = rawJuz && !isNaN(parseInt(rawJuz, 10)) ? parseInt(rawJuz, 10) : sessionJuz;
-
-      let foundAyah = false;
-      (row.ayahs || []).forEach((a) => {
-        const aVal = typeof a === "object" ? parseInt(a.value || a.ayah, 10) : parseInt(a, 10);
-        if (!isNaN(aVal) && aVal > 0) {
-          foundAyah = true;
-          error_details.push({
-            type: "Mistake",
-            juz: isBookMode ? null : (jNum || 1),
-            page: pNum,
-            ayah: aVal,
-          });
-        }
-      });
-
-      if (!foundAyah) {
-        const rawSingleAyah = parseInt(row.ayah || row.line, 10);
-        error_details.push({
-          type: "Mistake",
-          juz: isBookMode ? null : (jNum || 1),
-          page: pNum,
-          ayah: !isNaN(rawSingleAyah) && rawSingleAyah > 0 ? rawSingleAyah : 1,
-        });
-      }
+      processErrorItem(row, "Mistake");
     });
 
     // Stucks
     stuckData.forEach((row) => {
       if (!row.page || String(row.page).trim() === "") return;
-      const pNum = parseInt(row.page, 10);
-      const rawJuz = row.juz !== undefined && row.juz !== null ? String(row.juz).trim() : "";
-      const jNum = rawJuz && !isNaN(parseInt(rawJuz, 10)) ? parseInt(rawJuz, 10) : sessionJuz;
-
-      let foundAyah = false;
-      (row.ayahs || []).forEach((a) => {
-        const aVal = typeof a === "object" ? parseInt(a.value || a.ayah, 10) : parseInt(a, 10);
-        if (!isNaN(aVal) && aVal > 0) {
-          foundAyah = true;
-          error_details.push({
-            type: "Stuck",
-            juz: isBookMode ? null : (jNum || 1),
-            page: pNum,
-            ayah: aVal,
-          });
-        }
-      });
-
-      if (!foundAyah) {
-        const rawSingleAyah = parseInt(row.ayah || row.line, 10);
-        error_details.push({
-          type: "Stuck",
-          juz: isBookMode ? null : (jNum || 1),
-          page: pNum,
-          ayah: !isNaN(rawSingleAyah) && rawSingleAyah > 0 ? rawSingleAyah : 1,
-        });
-      }
+      processErrorItem(row, "Stuck");
     });
   }
 

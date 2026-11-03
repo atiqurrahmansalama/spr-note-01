@@ -61,16 +61,16 @@ export function StudentSessionTimeline({
       width: "48px",
       minWidth: "48px",
       maxWidth: "48px",
-      headerClassName: "!w-12 !min-w-[48px] !max-w-[48px] !p-0 !border-0 !border-t-0 !border-b-0 !bg-transparent pointer-events-none select-none",
-      cellClassName: "!w-12 !min-w-[48px] !max-w-[48px] !p-0 !border-0 !border-b-0 !bg-transparent pointer-events-none select-none align-top",
+      headerClassName: "!w-12 !min-w-[48px] !max-w-[48px] !p-0 !border-0 !border-t-0 !border-b-0 !border-l-0 !border-r-0 !bg-transparent pointer-events-none select-none",
+      cellClassName: "!w-12 !min-w-[48px] !max-w-[48px] !p-0 !border-0 !border-t-0 !border-b-0 !border-l-0 !border-r-0 !bg-transparent pointer-events-none select-none align-top",
       render: () => null,
     },
     {
       key: "date_time",
       header: t("dateTime", "Date & Time"),
       align: "left",
-      width: "240px",
-      minWidth: "240px",
+      width: "155px",
+      minWidth: "155px",
       headerClassName: "!pl-0 theme-bg-sub/40 border-t border-b theme-border",
       cellClassName: "!pl-0 align-top",
       render: (rep: ReportItem) => {
@@ -90,6 +90,14 @@ export function StudentSessionTimeline({
                   <span>{t("pending", "Pending")}</span>
                 </span>
               )}
+              {Boolean(rep.is_edited && (rep.edited_at || rep.edit_time)) && (
+                <span
+                  className="text-[10px] font-semibold theme-accent select-none"
+                  title="Edited report"
+                >
+                  Edited
+                </span>
+              )}
             </div>
             <span className="text-[11px] theme-text-secondary block break-words opacity-85">
               {rep.formattedGenerateTime || rep.formattedTime || rep.time || "—"}
@@ -102,8 +110,8 @@ export function StudentSessionTimeline({
       key: "session_portions",
       header: portionHeaderTitle,
       align: "left",
-      width: "220px",
-      minWidth: "220px",
+      width: "165px",
+      minWidth: "165px",
       headerClassName: "theme-bg-sub/40 border-t border-b theme-border",
       cellClassName: "align-top",
       render: (rep: ReportItem) => <ReportPortionsCell report={rep} />,
@@ -113,8 +121,9 @@ export function StudentSessionTimeline({
       header: t("mistakeDetails", "Mistake Details"),
       headerClassName: "text-rose-400 theme-bg-sub/40 border-t border-b theme-border",
       align: "left",
-      width: "180px",
-      minWidth: "180px",
+      width: "155px",
+      minWidth: "155px",
+      headerClassName: "text-rose-400 theme-bg-sub/40 border-t border-b theme-border",
       cellClassName: "align-top",
       render: (rep: ReportItem) => <ReportMistakesCell report={rep} />,
     },
@@ -123,8 +132,8 @@ export function StudentSessionTimeline({
       header: t("stuckDetails", "Stuck Details"),
       headerClassName: "text-amber-400 theme-bg-sub/40 border-t border-b theme-border",
       align: "left",
-      width: "180px",
-      minWidth: "180px",
+      width: "155px",
+      minWidth: "155px",
       cellClassName: "align-top",
       render: (rep: ReportItem) => <ReportStucksCell report={rep} />,
     },
@@ -133,8 +142,8 @@ export function StudentSessionTimeline({
       header: t("commentsReporter", "Comments & Reporter"),
       headerClassName: "theme-bg-sub/40 border-t border-b theme-border",
       align: "left",
-      width: "220px",
-      minWidth: "220px",
+      width: "185px",
+      minWidth: "185px",
       cellClassName: "align-top",
       render: (rep: ReportItem) => (
         <ReportCommentsCell
@@ -148,8 +157,8 @@ export function StudentSessionTimeline({
       header: t("actions", "Actions"),
       headerClassName: "border-t border-b theme-border text-left theme-bg-sub/40",
       align: "left",
-      width: "180px",
-      minWidth: "180px",
+      width: "105px",
+      minWidth: "105px",
       cellClassName: "align-top",
       sticky: false,
       render: (rep: ReportItem) => {
@@ -185,11 +194,11 @@ export function StudentSessionTimeline({
     {
       key: "spacer_right",
       header: "",
-      width: "72px",
-      minWidth: "72px",
-      maxWidth: "72px",
-      headerClassName: "!w-[72px] !min-w-[72px] !max-w-[72px] !p-0 !border-0 !border-t-0 !border-b-0 !bg-transparent pointer-events-none select-none",
-      cellClassName: "!w-[72px] !min-w-[72px] !max-w-[72px] !p-0 !border-0 !border-b-0 !bg-transparent pointer-events-none select-none align-top",
+      width: "60px",
+      minWidth: "60px",
+      maxWidth: "60px",
+      headerClassName: "!w-[60px] !min-w-[60px] !max-w-[60px] !p-0 !border-0 !border-t-0 !border-b-0 !border-l-0 !border-r-0 !bg-transparent pointer-events-none select-none",
+      cellClassName: "!w-[60px] !min-w-[60px] !max-w-[60px] !p-0 !border-0 !border-t-0 !border-b-0 !border-l-0 !border-r-0 !bg-transparent pointer-events-none select-none align-top",
       render: () => null,
     },
   ], [
@@ -197,10 +206,12 @@ export function StudentSessionTimeline({
     studentName,
     onEdit,
     onDelete,
+    onSync,
     onCopyText,
     onExportCSV,
     onExportJSON,
     onPrintPDF,
+    portionHeaderTitle,
   ]);
 
   return (
@@ -220,11 +231,15 @@ export function StudentSessionTimeline({
         theadClassName="!bg-transparent !border-b-0"
         headerPaddingClass="py-1.5 px-3 sm:px-4 text-[10px] font-bold uppercase tracking-wider"
         cellPaddingClass="py-2 px-3 sm:px-4 text-xs align-top"
-        rowClassName={(_item, idx) =>
-          `align-top ${idx === reports.length - 1 ? "[&>td]:!border-b-0" : "border-b theme-border"}`
-        }
+        rowClassName={(_item, idx) => {
+          const isLast = idx === reports.length - 1;
+          if (isLast) {
+            return "align-top [&>td]:!border-b [&>td]:!border-[var(--accent-main)] [&>td]:theme-border-accent";
+          }
+          return "align-top [&>td:first-child]:!border-0 [&>td:first-child]:!border-b-0 [&>td:first-child]:!border-t-0 [&>td:last-child]:!border-0 [&>td:last-child]:!border-b-0 [&>td:last-child]:!border-t-0";
+        }}
         wrapperClassName="border-0 shadow-none bg-transparent rounded-none w-full"
-        tableClassName="w-full min-w-[1340px] table-fixed bg-transparent border-collapse [&_td]:align-top"
+        tableClassName="w-full min-w-full sm:min-w-[1028px] table-fixed bg-transparent border-separate border-spacing-0 [&_td]:align-top text-left"
       />
     </div>
   );

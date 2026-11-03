@@ -263,7 +263,13 @@ export function ReportPortionsCell({
 /**
  * Shared Report Mistakes Cell
  */
-export function ReportMistakesCell({ report }: { report: ReportItem }) {
+export function ReportMistakesCell({
+  report,
+  scrollable = false,
+}: {
+  report: ReportItem;
+  scrollable?: boolean;
+}) {
   const isBook = isBookReport(report);
   const mistakes = getMistakes(report).filter(
     (m) => (m.page && String(m.page).trim()) || (m.ayah && String(m.ayah).trim())
@@ -274,7 +280,7 @@ export function ReportMistakesCell({ report }: { report: ReportItem }) {
   }
 
   return (
-    <div className="space-y-1 text-xs font-mono max-h-24 overflow-y-auto pr-1">
+    <div className={`space-y-1 text-xs font-mono ${scrollable ? "max-h-24 overflow-y-auto pr-1" : ""}`}>
       {mistakes.map((m, idx) => {
         const parts: string[] = [];
         if (!isBook && m.juz && String(m.juz).trim() !== "") {
@@ -306,7 +312,13 @@ export function ReportMistakesCell({ report }: { report: ReportItem }) {
 /**
  * Shared Report Stucks Cell
  */
-export function ReportStucksCell({ report }: { report: ReportItem }) {
+export function ReportStucksCell({
+  report,
+  scrollable = false,
+}: {
+  report: ReportItem;
+  scrollable?: boolean;
+}) {
   const isBook = isBookReport(report);
   const stucks = getStucks(report).filter(
     (s) => (s.page && String(s.page).trim()) || (s.ayah && String(s.ayah).trim())
@@ -317,7 +329,7 @@ export function ReportStucksCell({ report }: { report: ReportItem }) {
   }
 
   return (
-    <div className="space-y-1 text-xs font-mono max-h-24 overflow-y-auto pr-1">
+    <div className={`space-y-1 text-xs font-mono ${scrollable ? "max-h-24 overflow-y-auto pr-1" : ""}`}>
       {stucks.map((s, idx) => {
         const parts: string[] = [];
         if (!isBook && s.juz && String(s.juz).trim() !== "") {
@@ -400,22 +412,17 @@ export function MistakesStucksBadge({
   totalStucks: number;
   t: (key: string, fallback: string) => string;
 }) {
-  const isClean = totalMistakes === 0 && totalStucks === 0;
-  if (isClean) {
-    return <span className="text-xs font-mono theme-text-secondary opacity-60">0</span>;
-  }
-
   return (
-    <div className="space-y-0.5 text-left font-mono">
+    <div className="space-y-0.5 text-left font-mono select-none">
       <div className="flex items-center gap-1.5 text-[11px]">
         <span className="theme-text-secondary">{t("mistakes", "Mistakes")}:</span>
-        <span className={`font-bold ${totalMistakes > 0 ? "text-rose-400" : "theme-text-secondary"}`}>
+        <span className={`font-bold ${totalMistakes > 0 ? "text-rose-400" : "theme-text-secondary opacity-80"}`}>
           {totalMistakes}
         </span>
       </div>
       <div className="flex items-center gap-1.5 text-[11px]">
         <span className="theme-text-secondary">{t("stucks", "Stucks")}:</span>
-        <span className={`font-bold ${totalStucks > 0 ? "text-amber-400" : "theme-text-secondary"}`}>
+        <span className={`font-bold ${totalStucks > 0 ? "text-amber-400" : "theme-text-secondary opacity-80"}`}>
           {totalStucks}
         </span>
       </div>

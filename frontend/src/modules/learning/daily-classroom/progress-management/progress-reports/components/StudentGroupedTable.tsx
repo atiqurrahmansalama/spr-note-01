@@ -193,10 +193,9 @@ export default function StudentGroupedTable({
         />
       )}
 
-      {/* Main Hierarchical Parent Table (Horizontal scroll with preserved standard columns) */}
+      {/* Main Hierarchical Parent Table */}
       <DataTable
         wrapperClassName="w-full min-w-0 text-left"
-        tableClassName="w-full min-w-[1240px] text-left"
         columns={columns}
         data={paginatedStudents}
         sortable={true}
@@ -243,10 +242,11 @@ export default function StudentGroupedTable({
         selectionCellClassName="!w-12 !min-w-[48px] !max-w-[48px] !p-0 text-center"
         headerPaddingClass="py-2.5 px-3 sm:px-4 text-xs font-bold uppercase tracking-wider"
         cellPaddingClass="py-2.5 px-3 sm:px-4 text-xs"
-        tableClassName="w-full min-w-[1340px] table-fixed"
+        tableClassName="w-full min-w-full sm:min-w-[1028px] table-fixed text-left"
         rowClassName={(stu: EnrichedStudentRow) =>
           expandedStudents.has(stu.student_key) ? "[&>td]:!border-b-0" : ""
         }
+        expandedDividerClassName="hidden"
         onRowContextMenu={(e, stu) => {
           if (onStudentContextMenu) {
             onStudentContextMenu(e, {

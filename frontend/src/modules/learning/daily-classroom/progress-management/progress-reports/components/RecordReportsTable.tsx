@@ -205,13 +205,13 @@ export default function RecordReportsTable({
         )}
         expandedFooterColSpan={columns.length - 1}
         expandedFooterClassName="!pl-0 !pr-0 pt-2 pb-3 border-b theme-border"
-        expandedFooterSpacerClassName="!w-[72px] !min-w-[72px] !max-w-[72px] p-0 border-b theme-border pointer-events-none select-none"
+        expandedFooterSpacerClassName="!w-[68px] !min-w-[68px] !max-w-[68px] p-0 border-b theme-border pointer-events-none select-none"
         expandedDividerClassName="hidden"
         selectionHeaderClassName="!w-12 !min-w-[48px] !max-w-[48px] !p-0 text-center"
         selectionCellClassName="!w-12 !min-w-[48px] !max-w-[48px] !p-0 text-center"
         headerPaddingClass="py-2.5 px-3 sm:px-4 text-xs font-bold uppercase tracking-wider"
         cellPaddingClass="py-2.5 px-3 sm:px-4 text-xs"
-        tableClassName="w-full min-w-[1160px] table-fixed text-left"
+        tableClassName="w-full min-w-full sm:min-w-[940px] text-left"
         rowClassName={(rep) => {
           const repKey = String(rep.id ?? rep.report_unique_id ?? "");
           return expandedIds.has(repKey) ? "[&>td]:!border-b-0" : "";

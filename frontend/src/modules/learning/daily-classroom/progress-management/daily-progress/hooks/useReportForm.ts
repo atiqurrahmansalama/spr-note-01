@@ -1618,9 +1618,66 @@ export function useReportForm() {
         ayahs: Array.isArray(s.ayahs) ? s.ayahs : [],
       }));
 
+      const buildNormalizedErrors = (list: any[], type: "Mistake" | "Stuck") => {
+        const result: any[] = [];
+        list.forEach((item: any) => {
+          const rawJuz = item.juz !== undefined && item.juz !== null ? String(item.juz).trim() : "";
+          const juz = rawJuz && !isNaN(parseInt(rawJuz, 10)) ? parseInt(rawJuz, 10) : null;
+          const rawPage = item.page !== undefined && item.page !== null ? String(item.page).trim() : "";
+          const page = rawPage && !isNaN(parseInt(rawPage, 10)) ? parseInt(rawPage, 10) : 1;
+
+          let found = false;
+          if (Array.isArray(item.ayahs) && item.ayahs.length > 0) {
+            item.ayahs.forEach((a: any) => {
+              const val = typeof a === "object" ? (a.value ?? a.ayah) : a;
+              const cleanStr = String(val ?? "").replace(/\D+/g, "");
+              const aNum = parseInt(cleanStr, 10);
+              if (!isNaN(aNum) && aNum > 0) {
+                found = true;
+                result.push({
+                  id: crypto.randomUUID(),
+                  type,
+                  juz,
+                  page,
+                  ayah: aNum,
+                });
+              }
+            });
+          }
+
+          if (!found) {
+            const rawAyahStr = String(item.ayah ?? item.line ?? "1");
+            const nums = rawAyahStr.match(/\d+/g);
+            if (nums && nums.length > 0) {
+              nums.forEach((n: string) => {
+                const aNum = parseInt(n, 10);
+                if (!isNaN(aNum) && aNum > 0) {
+                  result.push({
+                    id: crypto.randomUUID(),
+                    type,
+                    juz,
+                    page,
+                    ayah: aNum,
+                  });
+                }
+              });
+            } else {
+              result.push({
+                id: crypto.randomUUID(),
+                type,
+                juz,
+                page,
+                ayah: 1,
+              });
+            }
+          }
+        });
+        return result;
+      };
+
       const updatedErrorDetails = [
-        ...updatedMistakeDetails.map((m: any) => ({ ...m, type: "Mistake" })),
-        ...updatedStuckDetails.map((s: any) => ({ ...s, type: "Stuck" })),
+        ...buildNormalizedErrors(cleanActiveMistakes, "Mistake"),
+        ...buildNormalizedErrors(cleanActiveStucks, "Stuck"),
       ];
 
       // Authoritative Single Source of Truth aggregations (Rule 10 Compliance)

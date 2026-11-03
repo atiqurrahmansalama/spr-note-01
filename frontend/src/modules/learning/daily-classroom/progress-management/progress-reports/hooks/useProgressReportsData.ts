@@ -827,7 +827,15 @@ export function useProgressReportsData({
               })
             );
 
-          const finalMerged = deduplicateReports([...merged, ...localOnly]);
+          const finalMerged = deduplicateReports([...merged, ...localOnly]).sort((a: any, b: any) => {
+            const tA = new Date(a.date || a.client_updated_at || a.created_at || 0).getTime();
+            const tB = new Date(b.date || b.client_updated_at || b.created_at || 0).getTime();
+            if (!isNaN(tA) && !isNaN(tB) && tA !== tB) return tB - tA;
+            const idA = Number(a.server_id || a.id);
+            const idB = Number(b.server_id || b.id);
+            if (!isNaN(idA) && !isNaN(idB) && idA !== idB) return idB - idA;
+            return 0;
+          });
           setReportsList(finalMerged);
           localStorage.setItem(tenantScopedStorageKey, JSON.stringify(finalMerged));
           localStorage.setItem("spr_reports_local_v1", JSON.stringify(finalMerged));
@@ -878,15 +886,29 @@ export function useProgressReportsData({
             return (uniq && rUniq === uniq) || (idStr && rId === idStr) || (serverStr && rServer === serverStr);
           });
 
+          let nextList: ReportItem[];
           if (existingIdx > -1) {
-            const updated = [...prev];
-            updated[existingIdx] = { ...updated[existingIdx], ...normalized };
-            return updated;
+            nextList = [...prev];
+            nextList[existingIdx] = { ...nextList[existingIdx], ...normalized };
+          } else {
+            nextList = [normalized, ...prev];
           }
-          return [normalized, ...prev];
+
+          // Stable chronological sort so newly added rows never bounce or shift up/down
+          return nextList.sort((a, b) => {
+            const tA = new Date(a.date || a.client_updated_at || a.created_at || 0).getTime();
+            const tB = new Date(b.date || b.client_updated_at || b.created_at || 0).getTime();
+            if (!isNaN(tA) && !isNaN(tB) && tA !== tB) return tB - tA;
+            const idA = Number(a.server_id || a.id);
+            const idB = Number(b.server_id || b.id);
+            if (!isNaN(idA) && !isNaN(idB) && idA !== idB) return idB - idA;
+            return 0;
+          });
         });
       }
-      loadReports(true);
+      if (e?.detail?.source !== "local") {
+        loadReports(true);
+      }
     };
     const handleReportDeleted = (e: any) => {
       if (e?.detail?.source === "progress_reports_view") return;

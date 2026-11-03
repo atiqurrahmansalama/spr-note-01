@@ -55,8 +55,8 @@ export function useRecordReportsColumns({
       header: t("studentAndId", "Student & ID"),
       sortable: true,
       align: "left",
-      width: "240px",
-      minWidth: "240px",
+      width: "190px",
+      minWidth: "170px",
       headerClassName: "!pl-0",
       cellClassName: "!pl-0",
       sortValue: (rep: ReportItem) => resolveStudentMeta(rep).name,
@@ -79,7 +79,7 @@ export function useRecordReportsColumns({
       sortable: true,
       align: "left",
       width: "220px",
-      minWidth: "220px",
+      minWidth: "210px",
       sortValue: (rep: ReportItem) => resolveStudentMeta(rep).className,
       render: (rep: ReportItem) => {
         const meta = resolveStudentMeta(rep);
@@ -98,9 +98,16 @@ export function useRecordReportsColumns({
       header: t("dateTime", "Date & Time"),
       sortable: true,
       align: "left",
-      width: "180px",
-      minWidth: "180px",
-      sortValue: (rep: ReportItem) => rep.isoDateOnly || rep.report_date || rep.date || "",
+      width: "200px",
+      minWidth: "190px",
+      sortValue: (rep: ReportItem) => {
+        const raw = rep.date || rep.report_date || rep.client_updated_at || rep.created_at || rep.isoDateOnly || "";
+        if (raw) {
+          const tVal = new Date(raw).getTime();
+          if (!isNaN(tVal) && tVal > 0) return tVal;
+        }
+        return 0;
+      },
       render: (rep: ReportItem) => (
         <ReportDateTimeCell
           date={rep.formattedReportDate || rep.formattedDate || "—"}
@@ -113,8 +120,8 @@ export function useRecordReportsColumns({
       header: t("sessionAndPages", "Session & Pages"),
       sortable: true,
       align: "left",
-      width: "220px",
-      minWidth: "220px",
+      width: "155px",
+      minWidth: "145px",
       sortValue: (rep: ReportItem) => rep.session_name || "",
       render: (rep: ReportItem) => (
         <ReportSessionPagesCell
@@ -129,8 +136,8 @@ export function useRecordReportsColumns({
       header: t("mistakesAndStucks", "Mistakes & Stucks"),
       sortable: true,
       align: "left",
-      width: "180px",
-      minWidth: "180px",
+      width: "145px",
+      minWidth: "135px",
       sortValue: (rep: ReportItem) => {
         const m = rep.mistakesCount !== undefined ? rep.mistakesCount : getMistakesCount(rep);
         const s = rep.stucksCount !== undefined ? rep.stucksCount : getStucksCount(rep);
@@ -146,9 +153,9 @@ export function useRecordReportsColumns({
       key: "actions",
       header: t("actions", "Actions"),
       align: "center",
-      width: "72px",
-      minWidth: "72px",
-      maxWidth: "72px",
+      width: "68px",
+      minWidth: "68px",
+      maxWidth: "68px",
       headerClassName: "text-center",
       cellClassName: "text-center",
       render: (rep: ReportItem) => {

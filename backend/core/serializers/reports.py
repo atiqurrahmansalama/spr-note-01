@@ -60,6 +60,8 @@ class ReportPortionSerializer(serializers.ModelSerializer):
 
 
 class ReportErrorDetailSerializer(serializers.ModelSerializer):
+    ayah = serializers.IntegerField(required=False, default=1)
+
     class Meta:
         model = ReportErrorDetail
         fields = ['id', 'type', 'juz', 'page', 'surah_number', 'ayah']
@@ -69,6 +71,23 @@ class ReportErrorDetailSerializer(serializers.ModelSerializer):
             'surah_number': {'required': False, 'allow_null': True},
             'ayah':         {'required': False},
         }
+
+    def to_internal_value(self, data):
+        # Defensive copy to allow mutation
+        data = data.copy() if hasattr(data, 'copy') else dict(data)
+        raw_ayah = data.get('ayah')
+        if raw_ayah is not None:
+            if isinstance(raw_ayah, str):
+                import re
+                nums = re.findall(r'\d+', raw_ayah)
+                data['ayah'] = int(nums[0]) if nums else 1
+            elif isinstance(raw_ayah, (int, float)):
+                data['ayah'] = int(raw_ayah)
+            else:
+                data['ayah'] = 1
+        else:
+            data['ayah'] = 1
+        return super().to_internal_value(data)
 
 
 class ReportStatusSerializer(serializers.ModelSerializer):
@@ -471,6 +490,39 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
                         raise ValidationError(
                             {'student': f"Could not find or create student '{name_clean}'. Please add the student first."}
                         )
+
+        # Expand any multi-ayah or comma-separated error_details items into separate normalized entries
+        raw_errors = mutable_data.get('error_details')
+        if isinstance(raw_errors, list):
+            import re
+            expanded_errors = []
+            for item in raw_errors:
+                if not isinstance(item, dict):
+                    continue
+                item_copy = dict(item)
+                raw_ayah = item.get('ayah')
+                raw_ayahs = item.get('ayahs')
+                if isinstance(raw_ayahs, list) and raw_ayahs:
+                    for a in raw_ayahs:
+                        val = a.get('value') or a.get('ayah') if isinstance(a, dict) else a
+                        nums = re.findall(r'\d+', str(val or ''))
+                        if nums:
+                            child = dict(item_copy)
+                            child['ayah'] = int(nums[0])
+                            expanded_errors.append(child)
+                elif isinstance(raw_ayah, str) and (',' in raw_ayah or ' ' in raw_ayah.strip()):
+                    nums = re.findall(r'\d+', raw_ayah)
+                    if nums:
+                        for n in nums:
+                            child = dict(item_copy)
+                            child['ayah'] = int(n)
+                            expanded_errors.append(child)
+                    else:
+                        item_copy['ayah'] = 1
+                        expanded_errors.append(item_copy)
+                else:
+                    expanded_errors.append(item_copy)
+            mutable_data['error_details'] = expanded_errors
 
         return super().to_internal_value(mutable_data)
 
