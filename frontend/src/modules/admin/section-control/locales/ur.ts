@@ -63,6 +63,7 @@ export const ur = {
     parentModule: 'پیرنٹ ماڈیول',
     unsaved: 'غیر محفوظ شدہ',
     disabledByParent: 'پیرنٹ کے ذریعے غیر فعال',
+    disabledByParentClickToEnable: 'پیرنٹ کے ذریعے غیر فعال (پیرنٹ کے ساتھ فعال کرنے کے لیے کلک کریں)',
     globalDefault: 'عمومی ڈیفالٹ',
     roleOverride: 'کردار اوور رائیڈ',
     academyOverride: 'اکیڈمی اوور رائیڈ',

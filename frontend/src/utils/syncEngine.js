@@ -77,6 +77,8 @@ export const saveReportLocally = (reportData, options = {}) => {
     sync_error: (isPendingOrGrace || isSynced) ? null : (reportData.sync_error || null),
     last_sync_error_at: (isPendingOrGrace || isSynced) ? null : (reportData.last_sync_error_at || null),
     is_local_edited: isSynced ? false : Boolean(reportData.is_local_edited || options.isLocalEdited),
+    is_edited: Boolean(reportData.is_edited),
+    edited_at: reportData.is_edited ? (reportData.edited_at || reportData.edit_time || null) : null,
   };
 
   const existingIndex = reports.findIndex((r) => {
@@ -105,6 +107,8 @@ export const saveReportLocally = (reportData, options = {}) => {
       sync_error: (isPendingOrGrace || isSynced) ? null : (updatedReport.sync_error || null),
       last_sync_error_at: (isPendingOrGrace || isSynced) ? null : (updatedReport.last_sync_error_at || null),
       is_local_edited: isSynced ? false : Boolean(updatedReport.is_local_edited),
+      is_edited: Boolean(updatedReport.is_edited),
+      edited_at: updatedReport.is_edited ? (updatedReport.edited_at || updatedReport.edit_time || null) : null,
     };
   } else {
     reports.unshift(updatedReport);
@@ -177,7 +181,8 @@ export const getLocalReports = () => {
           sync_status: newer.sync_status || older.sync_status || "PENDING",
           sync_error: (isPendingOrGrace || isSynced) ? null : (newer.sync_error || null),
           last_sync_error_at: (isPendingOrGrace || isSynced) ? null : (newer.last_sync_error_at || null),
-          is_edited: Boolean(newer.is_edited || older.is_edited),
+          is_edited: newer.is_edited !== undefined ? Boolean(newer.is_edited) : Boolean(older.is_edited),
+          edited_at: (newer.is_edited ? (newer.edited_at || newer.edit_time) : (older.is_edited ? (older.edited_at || older.edit_time) : null)) || null,
           is_local_edited: isSynced ? false : Boolean(newer.is_local_edited || older.is_local_edited),
           client_updated_at: newer.client_updated_at || older.client_updated_at,
         });

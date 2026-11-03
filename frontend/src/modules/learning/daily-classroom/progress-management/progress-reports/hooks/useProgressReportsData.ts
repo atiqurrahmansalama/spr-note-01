@@ -6,7 +6,7 @@ import { formatDate } from "@/utils/reportGenerator";
 import { dailyProgressRepository, offlineDB } from "@/offline";
 import { auth as authStore } from "@/utils/localStore";
 import { ReportItem, SyncErrorItem } from "../types";
-import { getMistakesCount, getStucksCount, getTotalPages } from "../utils/studentMetaResolver";
+import { getMistakesCount, getStucksCount, getTotalPages, isReportEdited } from "../utils/studentMetaResolver";
 
 export interface UseProgressReportsDataOptions {
   activeTenantId?: string | null;
@@ -153,7 +153,7 @@ export function useProgressReportsData({
       // 3. Calculated Total Pages (Authoritative Single Source of Truth)
       const totalPagesValue = getTotalPages(rep);
 
-      const hasEditedFlag = Boolean(rep.is_edited);
+      const hasEditedFlag = isReportEdited(rep);
       const editedAtTime = hasEditedFlag ? (rep.edited_at || rep.edit_time || null) : null;
 
       // Mistakes & Stucks Count (Authoritative Single Source of Truth)
@@ -745,10 +745,7 @@ export function useProgressReportsData({
               const serverUpdated = apiRep.updated_at || apiRep.created_at ? new Date(apiRep.updated_at || apiRep.created_at).getTime() : 0;
 
               // Only true uncommitted client edits override server state
-              const isEditedLocal = Boolean(
-                localMatch.is_local_edited ||
-                (localMatch.client_updated_at && localUpdated > serverUpdated + 2000)
-              );
+              const isEditedLocal = Boolean(localMatch.is_local_edited);
 
               if (isLocalUnsynced || isEditedLocal || localUpdated >= serverUpdated) {
                 return {
@@ -766,8 +763,8 @@ export function useProgressReportsData({
                   mistake_details: localMatch.mistake_details !== undefined ? localMatch.mistake_details : apiRep.mistake_details,
                   stuck_details: localMatch.stuck_details !== undefined ? localMatch.stuck_details : apiRep.stuck_details,
                   error_details: localMatch.error_details !== undefined ? localMatch.error_details : apiRep.error_details,
-                  is_edited: isEditedLocal || Boolean(apiRep.is_edited),
-                  edited_at: isEditedLocal ? localMatch.edited_at || null : apiRep.is_edited ? apiRep.edited_at || null : null,
+                  is_edited: isEditedLocal ? true : isReportEdited(apiRep),
+                  edited_at: isEditedLocal ? (localMatch.edited_at || localMatch.edit_time || null) : (isReportEdited(apiRep) ? (apiRep.edited_at || apiRep.edit_time || null) : null),
                   sync_status: isLocalUnsynced ? "PENDING" : "SYNCED",
                 };
               }
@@ -775,8 +772,8 @@ export function useProgressReportsData({
                 ...apiRep,
                 sync_status: "SYNCED",
                 sync_error: null,
-                is_edited: Boolean(apiRep.is_edited || localMatch.is_edited),
-                edited_at: (apiRep.is_edited ? apiRep.edited_at : localMatch.edited_at) || null,
+                is_edited: isReportEdited(apiRep) || isEditedLocal,
+                edited_at: (isEditedLocal ? localMatch.edited_at : (isReportEdited(apiRep) ? (apiRep.edited_at || apiRep.edit_time) : null)) || null,
               };
             }
             return {

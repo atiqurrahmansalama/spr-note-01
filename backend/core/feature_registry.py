@@ -419,16 +419,6 @@ FEATURE_REGISTRY = [
         "default_enabled": True,
         "sort_order": 582,
     },
-    {
-        "key": "progress_tab_analytics",
-        "label": "Analytics",
-        "category": "ACADEMIC",
-        "description": "Student growth analytics, retention curves, learning pacing graphs, and subject progress comparisons",
-        "is_parent": False,
-        "parent_key": "progress_management",
-        "default_enabled": True,
-        "sort_order": 59,
-    },
 
     # =========================================================================
     # 4. EXAMINATION & RESULTS (PARENT & SUBORDINATE MODULES)

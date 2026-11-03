@@ -63,6 +63,7 @@ export const bn = {
     parentModule: 'প্যারেন্ট মডিউল',
     unsaved: 'অসংরক্ষিত',
     disabledByParent: 'প্যারেন্ট দ্বারা নিষ্ক্রিয়',
+    disabledByParentClickToEnable: 'প্যারেন্ট দ্বারা নিষ্ক্রিয় (প্যারেন্টসহ চালু করতে ক্লিক করুন)',
     globalDefault: 'গ্লোবাল ডিফল্ট',
     roleOverride: 'ভূমিকা ওভাররাইড',
     academyOverride: 'একাডেমি ওভাররাইড',

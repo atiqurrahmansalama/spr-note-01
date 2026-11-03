@@ -397,7 +397,7 @@ export default function DailyClassroomFilterControls({
       primaryRow={primaryRow}
       secondaryRow={secondaryRow}
       scopeItems={scopeItems}
-      scopeLabel="Selected Scope:"
+      scopeLabel={""}
     >
       {({ moreButton, isExpanded, hasVisibleScope }) => (
         <>

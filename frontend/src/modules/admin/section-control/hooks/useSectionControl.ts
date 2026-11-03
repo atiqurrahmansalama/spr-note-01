@@ -408,27 +408,126 @@ export function useSectionControl() {
     return map;
   }, [categories]);
 
-  // Handle Toggle Switch Change with automatic baseline revert detection
+  // Tree topology mapping for hierarchical bidirectional cascade
+  const treeTopology = useMemo(() => {
+    const parentToChildren = new Map<string, string[]>();
+    const childToParent = new Map<string, string>();
+    const allKeys = new Set<string>();
+
+    const traverse = (items: SectionItem[] = [], parentKey: string | null = null) => {
+      for (const item of items) {
+        if (!item || !item.section_key) continue;
+        const key = item.section_key;
+        allKeys.add(key);
+
+        const effectiveParentKey = item.parent_key || parentKey;
+        if (effectiveParentKey) {
+          childToParent.set(key, effectiveParentKey);
+          const siblings = parentToChildren.get(effectiveParentKey) || [];
+          if (!siblings.includes(key)) {
+            siblings.push(key);
+            parentToChildren.set(effectiveParentKey, siblings);
+          }
+        }
+
+        if (item.children && item.children.length > 0) {
+          traverse(item.children, key);
+        }
+      }
+    };
+
+    for (const cat of categories) {
+      if (cat && cat.sections) {
+        traverse(cat.sections, null);
+      }
+    }
+
+    // Build recursive descendants map
+    const descendantMap = new Map<string, string[]>();
+    const getDescendants = (key: string): string[] => {
+      if (descendantMap.has(key)) return descendantMap.get(key)!;
+      const directChildren = parentToChildren.get(key) || [];
+      const all: string[] = [...directChildren];
+      for (const childKey of directChildren) {
+        all.push(...getDescendants(childKey));
+      }
+      descendantMap.set(key, all);
+      return all;
+    };
+
+    for (const key of allKeys) {
+      getDescendants(key);
+    }
+
+    return { parentToChildren, childToParent, descendantMap, allKeys };
+  }, [categories]);
+
+  // Handle Toggle Switch Change with bidirectional parent-child sync and baseline revert detection
   const handleToggle = useCallback(
     (sectionKey: string, currentEffectiveVal: boolean) => {
       setModifiedFlags((prev) => {
         const nextVal = !currentEffectiveVal;
-        const baselineVal = baselineStateMap[sectionKey];
-
-        // If toggling returns the switch to its pristine database state, remove from modifiedFlags
-        if (baselineVal !== undefined && nextVal === baselineVal) {
-          const next = { ...prev };
-          delete next[sectionKey];
-          return next;
-        }
-
-        return {
-          ...prev,
+        const pendingUpdates: Record<string, boolean> = {
           [sectionKey]: nextVal,
         };
+
+        // 1. Top-Down: If sectionKey is a parent, cascade the state change to all its recursive descendants
+        const descendants = treeTopology.descendantMap.get(sectionKey) || [];
+        for (const desc of descendants) {
+          pendingUpdates[desc] = nextVal;
+        }
+
+        // Helper to resolve the tentative value of any key in this evaluation pass
+        const getTentativeVal = (key: string): boolean => {
+          if (pendingUpdates[key] !== undefined) {
+            return pendingUpdates[key];
+          }
+          if (prev[key] !== undefined) {
+            return prev[key];
+          }
+          return Boolean(baselineStateMap[key]);
+        };
+
+        // 2. Bottom-Up: Propagate upward through parent hierarchy
+        // If all children become OFF -> parent automatically turns OFF
+        // If all children become ON -> parent automatically turns ON
+        // If any child is turned ON -> parent must be turned ON so child isn't disabled by parent
+        let currentKey = sectionKey;
+        while (treeTopology.childToParent.has(currentKey)) {
+          const parentKey = treeTopology.childToParent.get(currentKey)!;
+          const directChildren = treeTopology.parentToChildren.get(parentKey) || [];
+
+          if (directChildren.length > 0) {
+            const allChildrenFalse = directChildren.every((child) => getTentativeVal(child) === false);
+            const allChildrenTrue = directChildren.every((child) => getTentativeVal(child) === true);
+
+            if (allChildrenFalse) {
+              pendingUpdates[parentKey] = false;
+            } else if (allChildrenTrue) {
+              pendingUpdates[parentKey] = true;
+            } else if (getTentativeVal(currentKey) === true) {
+              pendingUpdates[parentKey] = true;
+            }
+          }
+
+          currentKey = parentKey;
+        }
+
+        // 3. Reconcile all pendingUpdates with pristine baselineStateMap
+        const nextModified = { ...prev };
+        for (const [k, val] of Object.entries(pendingUpdates)) {
+          const baselineVal = baselineStateMap[k];
+          if (baselineVal !== undefined && val === baselineVal) {
+            delete nextModified[k];
+          } else {
+            nextModified[k] = val;
+          }
+        }
+
+        return nextModified;
       });
     },
-    [baselineStateMap]
+    [baselineStateMap, treeTopology]
   );
 
   // Broadcast Helper to notify all browser windows/tabs

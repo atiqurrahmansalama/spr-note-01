@@ -3,7 +3,7 @@ import { EditIcon, TrashIcon } from "@/components/ui/Icons";
 import { ExpandedCell } from "@/components/ui/DataTable";
 import { auth as authStore } from "@/utils/localStore";
 import { ReportCardDetailProps } from "../types";
-import { getPortions, getMistakes, getStucks } from "../utils/studentMetaResolver";
+import { getPortions, getMistakes, getStucks, isReportEdited } from "../utils/studentMetaResolver";
 
 export default function ReportCardDetail({
   report,
@@ -31,7 +31,7 @@ export default function ReportCardDetail({
 
   const hasMistakes = validMistakes.length > 0;
   const hasStucks = validStucks.length > 0;
-  const isEdited = Boolean(report.is_edited && (report.edited_at || report.edit_time));
+  const isEdited = isReportEdited(report);
 
   // Footer Variant: Renders the full-width original footer info & actions
   if (variant === "footer") {

@@ -61,7 +61,6 @@ export const HARD_DEFAULTS: Record<string, boolean> = {
   progress_tab_reports: true,
   progress_reports_analytics: true,
   progress_reports_view_all_teachers: true,
-  progress_tab_analytics: true,
 
   // 4. Examination & Results
   nav_examinations: true,

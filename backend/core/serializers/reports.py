@@ -690,6 +690,10 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
             if existing:
                 validated_data['portions'] = portions_data
                 validated_data['error_details'] = error_details_data
+                # Preserve existing report status when doing idempotent ingestion
+                if 'is_edited' not in initial:
+                    status_obj = getattr(existing, 'status_info', None)
+                    initial['is_edited'] = status_obj.is_edited if status_obj else False
                 return self.update(existing, validated_data)
             validated_data['report_unique_id'] = str(client_uid).strip()
 
@@ -779,6 +783,13 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
         mistakes_input = initial.get('mistake_details') or initial.get('mistakes') or None
         stucks_input   = initial.get('stuck_details')   or initial.get('stucks')   or None
 
+        # Determine if this update is an intentional edit
+        client_is_edited = None
+        if 'is_edited' in initial:
+            client_is_edited = bool(initial.get('is_edited'))
+        elif 'is_local_edited' in initial:
+            client_is_edited = bool(initial.get('is_local_edited'))
+
         # Pop status fields if passed directly
         validated_data.pop('is_edited', None)
         validated_data.pop('edited_at', None)
@@ -789,8 +800,23 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
 
         # Update ReportStatus
         status_obj, _ = ReportStatus.objects.get_or_create(report=instance)
-        status_obj.is_edited = True
-        status_obj.edit_time = timezone.now()
+        if client_is_edited is not None:
+            status_obj.is_edited = client_is_edited
+            if client_is_edited:
+                if not status_obj.edit_time:
+                    status_obj.edit_time = timezone.now()
+            else:
+                status_obj.edit_time = None
+        else:
+            # When is_edited is omitted:
+            # Check if this record is brand new (e.g. within 30 seconds of creation).
+            # If newly created, do not set is_edited=True during routine cloud sync.
+            time_diff = (timezone.now() - instance.created_at).total_seconds() if instance.created_at else 0
+            if time_diff > 30 and (portions_data is not None or error_details_data is not None or len(validated_data) > 0):
+                status_obj.is_edited = True
+                if not status_obj.edit_time:
+                    status_obj.edit_time = timezone.now()
+
         if status_obj.is_deleted:
             status_obj.is_deleted = False
             status_obj.delete_time = None

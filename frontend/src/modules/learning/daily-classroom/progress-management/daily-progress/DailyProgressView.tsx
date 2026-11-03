@@ -536,6 +536,7 @@ export default function DailyProgressView({
               sectionId={selectedSectionId}
               onStudentSelect={handleStudentSelect}
               actionLabel={isFeatureEnabled("progress_action_add_student") ? "+ Add Student" : null}
+              actionTo={isFeatureEnabled("progress_action_add_student") ? undefined : null}
             />
           )
         }

@@ -335,7 +335,7 @@ export default function AutocompleteDropdown({
           <div className="flex items-center gap-2">
             {headerAction ? (
               headerAction
-            ) : resolvedActionTo ? (
+            ) : resolvedActionTo && actionLabel !== null ? (
               <Link
                 to={resolvedActionTo}
                 className="text-xs font-semibold theme-accent hover:underline hover:opacity-80 transition-all flex items-center gap-1 cursor-pointer"
@@ -343,7 +343,7 @@ export default function AutocompleteDropdown({
               >
                 <span>{actionLabel || manageLabel || '+ Add'}</span>
               </Link>
-            ) : onActionClick || actionLabel ? (
+            ) : (onActionClick || actionLabel) && actionLabel !== null ? (
               <button
                 type="button"
                 onClick={onActionClick || handleSaveClick}

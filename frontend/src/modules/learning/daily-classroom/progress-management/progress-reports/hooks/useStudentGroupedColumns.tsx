@@ -134,7 +134,6 @@ export function useStudentGroupedColumns({
       width: "60px",
       minWidth: "60px",
       maxWidth: "60px",
-      maxWidth: "68px",
       render: (stu: EnrichedStudentRow) => {
         const isExpanded = expandedStudents.has(stu.student_key);
         const stuReportIds = stu.reports.map((r) => r.id ?? r.report_unique_id ?? "").filter(Boolean);

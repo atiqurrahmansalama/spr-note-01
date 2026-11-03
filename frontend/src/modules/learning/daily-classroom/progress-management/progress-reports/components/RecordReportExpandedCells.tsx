@@ -5,7 +5,7 @@ import { EditIcon, TrashIcon } from "@/components/ui/Icons";
 import { auth as authStore } from "@/utils/localStore";
 import { ReportItem } from "../types";
 import { getReportMenuItems } from "./ReportContextMenu";
-import { isBookReport } from "../utils/studentMetaResolver";
+import { isBookReport, isReportEdited } from "../utils/studentMetaResolver";
 import {
   ReportPortionsCell,
   ReportMistakesCell,
@@ -128,7 +128,7 @@ export function RecordReportExpandedFooter({
   onEdit,
   onDelete,
 }: RecordReportExpandedFooterProps) {
-  const isEdited = Boolean(report.is_edited && (report.edited_at || report.edit_time));
+  const isEdited = isReportEdited(report);
 
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2.5 -mt-2 border-t theme-border text-[11px] font-mono theme-text-secondary select-none">

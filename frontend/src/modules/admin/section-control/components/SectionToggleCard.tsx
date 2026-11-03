@@ -74,42 +74,39 @@ export const SectionToggleCard: React.FC<SectionToggleCardProps> = ({
   const isExpandableParent = Boolean(hasChildren && onToggleExpand);
 
   const handleCardClick = () => {
-    if (!isInteractive) return;
     if (isExpandableParent) {
       onToggleExpand?.();
     } else {
-      onToggle(section.section_key, isEnabled);
+      onToggle(section.section_key, isEffectivelyEnabled);
     }
   };
 
   const handleSwitchToggle = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
-    if (isInteractive) {
-      onToggle(section.section_key, isEnabled);
-    }
+    onToggle(section.section_key, isEffectivelyEnabled);
   };
 
   return (
     <div
       onClick={handleCardClick}
       title={
-        !isInteractive
-          ? t('badges.disabledByParent', 'Disabled by Parent')
-          : isExpandableParent
+        isExpandableParent
           ? isExpanded
             ? t('actions.collapse', 'Collapse sub-modules')
             : t('actions.expand', 'Expand sub-modules')
+          : isChild && !parentActive
+          ? t('badges.disabledByParentClickToEnable', 'Disabled by parent (Click to enable with parent)')
           : isEffectivelyEnabled
           ? t('actions.disable', 'Click to disable')
           : t('actions.enable', 'Click to enable')
       }
-      className={`group rounded-xl transition-all duration-150 select-none flex items-center justify-between gap-3 sm:gap-4 px-3.5 py-2.5 sm:px-4 sm:py-3 ${
-        !isInteractive
-          ? 'theme-bg-sub/20 opacity-40 pointer-events-none'
+      className={`group rounded-xl transition-all duration-150 select-none flex items-center justify-between gap-3 sm:gap-4 px-3.5 py-2.5 sm:px-4 sm:py-3 cursor-pointer ${
+        isChild && !parentActive
+          ? 'theme-bg-sub/20 opacity-65 hover:opacity-95 hover:theme-bg-sub/40'
           : isEffectivelyEnabled
-          ? 'theme-bg-surface hover:theme-bg-elevated shadow-2xs cursor-pointer'
-          : 'theme-bg-sub/35 opacity-75 hover:opacity-100 hover:theme-bg-sub/60 cursor-pointer'
-      } ${hasLocalMod && isInteractive ? 'ring-1.5 ring-[var(--accent-main)]/60' : ''}`}
+          ? 'theme-bg-surface hover:theme-bg-elevated shadow-2xs'
+          : 'theme-bg-sub/35 opacity-75 hover:opacity-100 hover:theme-bg-sub/60'
+      } ${hasLocalMod ? 'ring-1.5 ring-[var(--accent-main)]/60' : ''}`}
     >
       {/* Left & Center: Streamlined Content (Click expands/collapses for parent rows) */}
       <div className="min-w-0 flex-1 space-y-1">
@@ -135,7 +132,7 @@ export const SectionToggleCard: React.FC<SectionToggleCardProps> = ({
             {section.title}
           </span>
 
-          {!isInteractive ? (
+          {isChild && !parentActive ? (
             <span className="theme-danger-badge text-[9px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0">
               {t('badges.disabledByParent', 'Disabled by Parent')}
             </span>
@@ -159,8 +156,8 @@ export const SectionToggleCard: React.FC<SectionToggleCardProps> = ({
         className="shrink-0 flex items-center pl-2 sm:pl-3"
         onClick={handleSwitchToggle}
         title={
-          !isInteractive
-            ? t('badges.disabledByParent', 'Disabled by Parent')
+          isChild && !parentActive
+            ? t('badges.disabledByParentClickToEnable', 'Disabled by parent (Click to enable with parent)')
             : isEffectivelyEnabled
             ? t('actions.disable', 'Click to disable')
             : t('actions.enable', 'Click to enable')
@@ -170,7 +167,7 @@ export const SectionToggleCard: React.FC<SectionToggleCardProps> = ({
           role="switch"
           aria-checked={isEffectivelyEnabled}
           aria-label={section.title}
-          tabIndex={isInteractive ? 0 : -1}
+          tabIndex={0}
           onKeyDown={(e) => {
             if (e.key === ' ' || e.key === 'Enter') {
               e.preventDefault();

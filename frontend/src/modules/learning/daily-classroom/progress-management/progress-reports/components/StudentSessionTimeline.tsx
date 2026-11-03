@@ -11,7 +11,7 @@ import {
 } from "./sharedReportCells";
 import { useTranslation } from "@/i18n";
 import { isReportUnsynced } from "@/utils/syncEngine";
-import { isBookReport } from "../utils/studentMetaResolver";
+import { isBookReport, isReportEdited } from "../utils/studentMetaResolver";
 import "../locales";
 
 export interface StudentSessionTimelineProps {
@@ -90,7 +90,7 @@ export function StudentSessionTimeline({
                   <span>{t("pending", "Pending")}</span>
                 </span>
               )}
-              {Boolean(rep.is_edited && (rep.edited_at || rep.edit_time)) && (
+              {isReportEdited(rep) && (
                 <span
                   className="text-[10px] font-semibold theme-accent select-none"
                   title="Edited report"
@@ -123,7 +123,6 @@ export function StudentSessionTimeline({
       align: "left",
       width: "155px",
       minWidth: "155px",
-      headerClassName: "text-rose-400 theme-bg-sub/40 border-t border-b theme-border",
       cellClassName: "align-top",
       render: (rep: ReportItem) => <ReportMistakesCell report={rep} />,
     },

@@ -21,6 +21,7 @@ import useDailyClassroomFilters from './hooks/useDailyClassroomFilters';
 import { getClassroomTodayDate } from '@/constants/calendarConstants';
 import { doesLessonMatchClass, normalizeToISODate } from './utils/dailyClassroomUtils';
 import { HubTabSkeletonLoader, DrawerFallbackSkeleton } from './components';
+import AccessDeniedView from '@/components/common/AccessDeniedView';
 
 // ── Lazy-Loaded Feature Views & Drawers for Instant Sub-50ms Mounts ──────────
 const LessonDeliveryManagementView = lazy(
@@ -133,7 +134,20 @@ export default function DailyClassroomHubView({
     return false;
   }, [hubType, path, defaultTab]);
 
-  const rawTabs = isProgressHub ? PROGRESS_MANAGEMENT_TABS : LESSON_MANAGEMENT_TABS;
+  const isQuranAllowed = isSectionEnabled('progress_mode_quran');
+  const isBookAllowed = isSectionEnabled('progress_mode_book');
+
+  const rawTabs = useMemo(() => {
+    if (!isProgressHub) return LESSON_MANAGEMENT_TABS;
+    const dailyProgressPath = !isQuranAllowed && isBookAllowed
+      ? '/studies/daily-progress/book'
+      : '/studies/daily-progress/quran';
+    return [
+      { id: 'PROGRESS', label: 'Daily Progress', icon: TrendingUpIcon, path: dailyProgressPath, featureKey: 'progress_tab_daily_progress' },
+      { id: 'PROGRESS_ASSESSMENT', label: 'Progress Reports', icon: ChecklistIcon, path: '/studies/progress-reports/records', featureKey: 'progress_tab_reports' },
+    ];
+  }, [isProgressHub, isQuranAllowed, isBookAllowed]);
+
   const activeTabs = useMemo(() => {
     return rawTabs.filter((tab) => !tab.featureKey || isSectionEnabled(tab.featureKey));
   }, [rawTabs, isSectionEnabled]);
@@ -219,18 +233,21 @@ export default function DailyClassroomHubView({
   }, [activeTabs, activeTab]);
 
   // ── Progress Mode Feature Flags ───────────────────────────────────────────
-  const isQuranAllowed = isSectionEnabled('progress_mode_quran');
-  const isBookAllowed = isSectionEnabled('progress_mode_book');
+  // Note: isQuranAllowed and isBookAllowed are derived above for rawTabs
 
   // ── Progress Mode State (Quran vs Book/Subject) ───────────────────────────
   const [progressMode, setProgressMode] = useState<'QURAN' | 'BOOK'>(() => {
-    if (isQuranAllowed && !isBookAllowed) return 'QURAN';
+    if (isQuranAllowed && !isBookAllowed) return 'BOOK'; // If Quran disabled, force BOOK
     if (!isQuranAllowed && isBookAllowed) return 'BOOK';
+    if (isQuranAllowed && !isBookAllowed) return 'QURAN';
     if (path.includes('/daily-progress/book')) return 'BOOK';
-    if (path.includes('/daily-progress/quran')) return 'QURAN';
+    if (path.includes('/daily-progress/quran') && isQuranAllowed) return 'QURAN';
     if (defaultMode) return defaultMode;
     try {
-      return (localStorage.getItem('spr_daily_progress_mode') as 'QURAN' | 'BOOK') || 'QURAN';
+      const saved = (localStorage.getItem('spr_daily_progress_mode') as 'QURAN' | 'BOOK');
+      if (saved === 'QURAN' && !isQuranAllowed && isBookAllowed) return 'BOOK';
+      if (saved === 'BOOK' && !isBookAllowed && isQuranAllowed) return 'QURAN';
+      return saved || 'QURAN';
     } catch {
       return 'QURAN';
     }
@@ -241,22 +258,40 @@ export default function DailyClassroomHubView({
     if (isQuranAllowed && !isBookAllowed && progressMode !== 'QURAN') {
       setProgressMode('QURAN');
       try { localStorage.setItem('spr_daily_progress_mode', 'QURAN'); } catch {}
+      if (path.includes('/daily-progress/book')) {
+        navigate('/studies/daily-progress/quran', { replace: true });
+      }
     } else if (!isQuranAllowed && isBookAllowed && progressMode !== 'BOOK') {
       setProgressMode('BOOK');
       try { localStorage.setItem('spr_daily_progress_mode', 'BOOK'); } catch {}
+      if (path.includes('/daily-progress/quran')) {
+        navigate('/studies/daily-progress/book', { replace: true });
+      }
     }
-  }, [isQuranAllowed, isBookAllowed, progressMode]);
+  }, [isQuranAllowed, isBookAllowed, progressMode, path, navigate]);
 
   // Sync mode on URL path changes
   useEffect(() => {
     if (path.includes('/daily-progress/book')) {
-      setProgressMode('BOOK');
-      try { localStorage.setItem('spr_daily_progress_mode', 'BOOK'); } catch {}
+      if (isBookAllowed) {
+        setProgressMode('BOOK');
+        try { localStorage.setItem('spr_daily_progress_mode', 'BOOK'); } catch {}
+      } else if (isQuranAllowed) {
+        setProgressMode('QURAN');
+        try { localStorage.setItem('spr_daily_progress_mode', 'QURAN'); } catch {}
+        navigate('/studies/daily-progress/quran', { replace: true });
+      }
     } else if (path.includes('/daily-progress/quran')) {
-      setProgressMode('QURAN');
-      try { localStorage.setItem('spr_daily_progress_mode', 'QURAN'); } catch {}
+      if (isQuranAllowed) {
+        setProgressMode('QURAN');
+        try { localStorage.setItem('spr_daily_progress_mode', 'QURAN'); } catch {}
+      } else if (isBookAllowed) {
+        setProgressMode('BOOK');
+        try { localStorage.setItem('spr_daily_progress_mode', 'BOOK'); } catch {}
+        navigate('/studies/daily-progress/book', { replace: true });
+      }
     }
-  }, [path]);
+  }, [path, isQuranAllowed, isBookAllowed, navigate]);
 
   const handleProgressModeChange = useCallback((mode: 'QURAN' | 'BOOK') => {
     setProgressMode(mode);

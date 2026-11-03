@@ -63,6 +63,7 @@ export const ar = {
     parentModule: 'الوحدة الرئيسية',
     unsaved: 'غير محفوظ',
     disabledByParent: 'معطل بواسطة الوحدة الرئيسية',
+    disabledByParentClickToEnable: 'معطل بواسطة الوحدة الرئيسية (انقر للتمكين مع الوحدة الأصل)',
     globalDefault: 'افتراضي عام',
     roleOverride: 'تجاوز الدور',
     academyOverride: 'تجاوز الأكاديمية',

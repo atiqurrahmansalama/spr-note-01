@@ -38,12 +38,12 @@ export function SessionInputSection({
   const { isFeatureEnabled } = useFeatureControl();
   const canAddSession = isFeatureEnabled('progress_action_add_session');
 
-  const effectiveActionLabel = actionLabel !== undefined
-    ? actionLabel
-    : (canAddSession ? "+ Add Session" : undefined);
-  const effectiveActionTo = actionTo !== undefined
-    ? actionTo
-    : (canAddSession ? "/admin-tools?tab=report-sessions" : undefined);
+  const effectiveActionLabel = canAddSession
+    ? (actionLabel !== undefined ? actionLabel : "+ Add Session")
+    : null;
+  const effectiveActionTo = canAddSession
+    ? (actionTo !== undefined ? actionTo : "/admin-tools?tab=report-sessions")
+    : null;
 
   const sessionOptions: AutocompleteOption[] = useMemo(() => {
     return sessionList.map((s) => ({

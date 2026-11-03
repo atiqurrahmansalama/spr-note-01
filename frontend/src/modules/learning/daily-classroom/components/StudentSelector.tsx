@@ -402,8 +402,8 @@ export default function StudentSelector({
         placeholder={placeholder}
         label={label}
         actionLabel={canAddStudent ? actionLabel : null}
-        actionTo={actionTo !== undefined ? actionTo : defaultGetActionUrl}
-        actionTitle={actionTitle}
+        actionTo={canAddStudent ? (actionTo !== undefined ? actionTo : defaultGetActionUrl) : null}
+        actionTitle={canAddStudent ? actionTitle : undefined}
         size={size}
         showAllOptionsOnFocus={showAllOptionsOnFocus}
         disabled={disabled}

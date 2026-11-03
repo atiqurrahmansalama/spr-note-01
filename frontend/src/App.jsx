@@ -159,51 +159,51 @@ export default function App() {
                 <Route path="/dashboard" element={<DashboardHubView />} />
                 <Route path="/report-builder" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/student-reports" element={<Navigate to="/studies/progress-reports" replace />} />
-                <Route path="/students" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
-                <Route path="/staff/roster" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><TeacherStaffRosterView /></FeatureGuard>} />
-                <Route path="/staff/teacher-attendance" element={<FeatureGuard sectionKey="teacher_class_attendance" fallback={<Navigate to="/dashboard" replace />}><TeacherAttendanceView /></FeatureGuard>} />
-                <Route path="/staff/attendance" element={<FeatureGuard sectionKey="staff_daily_attendance" fallback={<Navigate to="/dashboard" replace />}><StaffDailyAttendanceView /></FeatureGuard>} />
+                <Route path="/students" element={<FeatureGuard sectionKey="student_roster"><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
+                <Route path="/staff/roster" element={<FeatureGuard sectionKey="staff_roster"><TeacherStaffRosterView /></FeatureGuard>} />
+                <Route path="/staff/teacher-attendance" element={<FeatureGuard sectionKey="teacher_class_attendance"><TeacherAttendanceView /></FeatureGuard>} />
+                <Route path="/staff/attendance" element={<FeatureGuard sectionKey="staff_daily_attendance"><StaffDailyAttendanceView /></FeatureGuard>} />
                 <Route path="/staff/daily-attendance" element={<Navigate to="/staff/attendance" replace />} />
-                <Route path="/staff/onboarding" element={<FeatureGuard sectionKey="staff_onboarding" fallback={<Navigate to="/dashboard" replace />}><StaffOnboardingView /></FeatureGuard>} />
+                <Route path="/staff/onboarding" element={<FeatureGuard sectionKey="staff_onboarding"><StaffOnboardingView /></FeatureGuard>} />
                 <Route path="/staff-onboarding" element={<Navigate to="/staff/onboarding" replace />} />
                 <Route path="/staff" element={<Navigate to="/staff/roster" replace />} />
-                <Route path="/staff/:id" element={<FeatureGuard sectionKey="staff_roster" fallback={<Navigate to="/dashboard" replace />}><StaffProfileDetailView /></FeatureGuard>} />
-                <Route path="/print-studio" element={<FeatureGuard sectionKey="nav_print_studio" fallback={<Navigate to="/dashboard" replace />}><Suspense fallback={<RouteLoadingFallback title="Loading DocLab Studio..." subtitle="Preparing workspace and layout engine..." />}><PrintStudioHubView /></Suspense></FeatureGuard>} />
+                <Route path="/staff/:id" element={<FeatureGuard sectionKey="staff_roster"><StaffProfileDetailView /></FeatureGuard>} />
+                <Route path="/print-studio" element={<FeatureGuard sectionKey="nav_print_studio"><Suspense fallback={<RouteLoadingFallback title="Loading DocLab Studio..." subtitle="Preparing workspace and layout engine..." />}><PrintStudioHubView /></Suspense></FeatureGuard>} />
                 
                 {/* Student Attendance Multi-Dimensional Routes */}
                 <Route path="/attendance/students/roll-call" element={<Navigate to="/attendance/students/monthly-matrix" replace />} />
-                <Route path="/attendance/students/adhoc" element={<FeatureGuard sectionKey="student_adhoc_headcount" fallback={<Navigate to="/dashboard" replace />}><AdHocHeadcountView /></FeatureGuard>} />
-                <Route path="/attendance/students/monthly-matrix" element={<FeatureGuard sectionKey="monthly_attendance_matrix" fallback={<Navigate to="/dashboard" replace />}><ClassAttendanceView /></FeatureGuard>} />
-                <Route path="/attendance/students/residential" element={<FeatureGuard sectionKey="residential_attendance" fallback={<Navigate to="/dashboard" replace />}><ResidentialAttendanceView /></FeatureGuard>} />
+                <Route path="/attendance/students/adhoc" element={<FeatureGuard sectionKey="student_adhoc_headcount"><AdHocHeadcountView /></FeatureGuard>} />
+                <Route path="/attendance/students/monthly-matrix" element={<FeatureGuard sectionKey="monthly_attendance_matrix"><ClassAttendanceView /></FeatureGuard>} />
+                <Route path="/attendance/students/residential" element={<FeatureGuard sectionKey="residential_attendance"><ResidentialAttendanceView /></FeatureGuard>} />
                 <Route path="/attendance/student" element={<Navigate to="/attendance/students/monthly-matrix" replace />} />
-                <Route path="/attendance/monthly-register" element={<FeatureGuard sectionKey="monthly_attendance_matrix" fallback={<Navigate to="/dashboard" replace />}><ClassAttendanceView /></FeatureGuard>} />
+                <Route path="/attendance/monthly-register" element={<FeatureGuard sectionKey="monthly_attendance_matrix"><ClassAttendanceView /></FeatureGuard>} />
 
                 {/* Attendance Settings Route */}
-                <Route path="/attendance/settings" element={<FeatureGuard sectionKey="attendance_policies_slots" fallback={<Navigate to="/dashboard" replace />}><AttendanceSettingsView /></FeatureGuard>} />
-                <Route path="/student-management/departments" element={<FeatureGuard sectionKey="student_departments" fallback={<Navigate to="/dashboard" replace />}><DepartmentManagementView /></FeatureGuard>} />
-                <Route path="/student-management/classes" element={<FeatureGuard sectionKey="student_classes" fallback={<Navigate to="/dashboard" replace />}><ClassManagementView /></FeatureGuard>} />
-                <Route path="/student-management/groups" element={<FeatureGuard sectionKey="student_groups" fallback={<Navigate to="/dashboard" replace />}><GroupManagementView /></FeatureGuard>} />
-                <Route path="/groups-students" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentDirectoryView /></FeatureGuard>} />
-                <Route path="/student-roster" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
-                <Route path="/group-roster" element={<FeatureGuard sectionKey="student_groups" fallback={<Navigate to="/dashboard" replace />}><GroupManagementView /></FeatureGuard>} />
+                <Route path="/attendance/settings" element={<FeatureGuard sectionKey="attendance_policies_slots"><AttendanceSettingsView /></FeatureGuard>} />
+                <Route path="/student-management/departments" element={<FeatureGuard sectionKey="student_departments"><DepartmentManagementView /></FeatureGuard>} />
+                <Route path="/student-management/classes" element={<FeatureGuard sectionKey="student_classes"><ClassManagementView /></FeatureGuard>} />
+                <Route path="/student-management/groups" element={<FeatureGuard sectionKey="student_groups"><GroupManagementView /></FeatureGuard>} />
+                <Route path="/groups-students" element={<FeatureGuard sectionKey="student_roster"><StudentDirectoryView /></FeatureGuard>} />
+                <Route path="/student-roster" element={<FeatureGuard sectionKey="student_roster"><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
+                <Route path="/group-roster" element={<FeatureGuard sectionKey="student_groups"><GroupManagementView /></FeatureGuard>} />
                 <Route path="/short-admission" element={<Navigate to="/admission" replace />} />
                 <Route path="/admission/short" element={<Navigate to="/admission" replace />} />
-                <Route path="/admission" element={<FeatureGuard sectionKey={["student_admission", "student_quick_admission", "student_roster"]} fallback={<Navigate to="/dashboard" replace />}><StudentAdmissionView /></FeatureGuard>} />
-                <Route path="/students/:id/profile" element={<FeatureGuard sectionKey="student_roster" fallback={<Navigate to="/dashboard" replace />}><StudentProfileHubView /></FeatureGuard>} />
-                <Route path="/sessions-comments" element={<FeatureGuard sectionKey="report_sessions_comments" fallback={<Navigate to="/dashboard" replace />}><SessionManager /></FeatureGuard>} />
-                <Route path="/user-management" element={<FeatureGuard sectionKey="app_user_management" fallback={<Navigate to="/dashboard" replace />}><UserManagementModule /></FeatureGuard>} />
-                <Route path="/role-management" element={<FeatureGuard sectionKey="app_role_management" fallback={<Navigate to="/dashboard" replace />}><RoleManagementView showHeaderCard={true} /></FeatureGuard>} />
-                <Route path="/activity-analytics" element={<FeatureGuard sectionKey="app_activity_analytics" fallback={<Navigate to="/dashboard" replace />}><ActivityAnalyticsView /></FeatureGuard>} />
-                <Route path="/trash-restoration" element={<FeatureGuard sectionKey="nav_trash" fallback={<Navigate to="/dashboard" replace />}><TrashRestorationView /></FeatureGuard>} />
-                <Route path="/profile-settings" element={<FeatureGuard sectionKey="settings_profile" fallback={<Navigate to="/dashboard" replace />}><ProfileSettingsView /></FeatureGuard>} />
+                <Route path="/admission" element={<FeatureGuard sectionKey={["student_admission", "student_quick_admission", "student_roster"]}><StudentAdmissionView /></FeatureGuard>} />
+                <Route path="/students/:id/profile" element={<FeatureGuard sectionKey="student_roster"><StudentProfileHubView /></FeatureGuard>} />
+                <Route path="/sessions-comments" element={<FeatureGuard sectionKey="report_sessions_comments"><SessionManager /></FeatureGuard>} />
+                <Route path="/user-management" element={<FeatureGuard sectionKey="app_user_management"><UserManagementModule /></FeatureGuard>} />
+                <Route path="/role-management" element={<FeatureGuard sectionKey="app_role_management"><RoleManagementView showHeaderCard={true} /></FeatureGuard>} />
+                <Route path="/activity-analytics" element={<FeatureGuard sectionKey="app_activity_analytics"><ActivityAnalyticsView /></FeatureGuard>} />
+                <Route path="/trash-restoration" element={<FeatureGuard sectionKey="nav_trash"><TrashRestorationView /></FeatureGuard>} />
+                <Route path="/profile-settings" element={<FeatureGuard sectionKey="settings_profile"><ProfileSettingsView /></FeatureGuard>} />
                 
                 {/* Academy Multi-Branch, Section & Period Routes */}
                 <Route path="/academy/campus-profile" element={<CampusProfileHubView />} />
                 <Route path="/campus-profile" element={<CampusProfileHubView />} />
                 <Route path="/academy/classes-groups" element={<ClassesGroupsHubView />} />
                 <Route path="/classes-groups" element={<ClassesGroupsHubView />} />
-                <Route path="/academy/branches" element={<FeatureGuard sectionKey="academic_branches" fallback={<Navigate to="/dashboard" replace />}><BranchManagementView /></FeatureGuard>} />
-                <Route path="/academy/periods" element={<FeatureGuard sectionKey="class_period_slots" fallback={<Navigate to="/dashboard" replace />}><RoutineCurriculumHubView /></FeatureGuard>} />
+                <Route path="/academy/branches" element={<FeatureGuard sectionKey="academic_branches"><BranchManagementView /></FeatureGuard>} />
+                <Route path="/academy/periods" element={<FeatureGuard sectionKey="class_period_slots"><RoutineCurriculumHubView /></FeatureGuard>} />
                 <Route path="/academy/calendar-events" element={<CalendarEventsHubView />} />
                 <Route path="/academy/calendar-schedule" element={<CalendarEventsHubView />} />
                 <Route path="/academy/working-hours" element={<CalendarEventsHubView />} />
@@ -227,13 +227,13 @@ export default function App() {
                 <Route path="/homework-tasks" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="HOMEWORK" />} />
 
                 {/* Academic Studies — Progress Management Routes */}
-                <Route path="/studies/progress-management" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS" />} />
+                <Route path="/studies/progress-management" element={<FeatureGuard sectionKey="progress_management"><DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS" /></FeatureGuard>} />
                 <Route path="/studies/daily-progress" element={<Navigate to="/studies/daily-progress/quran" replace />} />
-                <Route path="/studies/daily-progress/quran" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS" defaultMode="QURAN" />} />
-                <Route path="/studies/daily-progress/book" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS" defaultMode="BOOK" />} />
+                <Route path="/studies/daily-progress/quran" element={<FeatureGuard sectionKey={["progress_management", "progress_tab_daily_progress"]}><DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS" defaultMode="QURAN" /></FeatureGuard>} />
+                <Route path="/studies/daily-progress/book" element={<FeatureGuard sectionKey={["progress_management", "progress_tab_daily_progress"]}><DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS" defaultMode="BOOK" /></FeatureGuard>} />
                 <Route path="/studies/progress-reports" element={<Navigate to="/studies/progress-reports/records" replace />} />
-                <Route path="/studies/progress-reports/records" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS_ASSESSMENT" defaultReportView="RECORD_REPORTS" />} />
-                <Route path="/studies/progress-reports/by-student" element={<DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS_ASSESSMENT" defaultReportView="STUDENT_VIEW" />} />
+                <Route path="/studies/progress-reports/records" element={<FeatureGuard sectionKey={["progress_management", "progress_tab_reports"]}><DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS_ASSESSMENT" defaultReportView="RECORD_REPORTS" /></FeatureGuard>} />
+                <Route path="/studies/progress-reports/by-student" element={<FeatureGuard sectionKey={["progress_management", "progress_tab_reports"]}><DailyClassroomHubView hubType="PROGRESS_MANAGEMENT" defaultTab="PROGRESS_ASSESSMENT" defaultReportView="STUDENT_VIEW" /></FeatureGuard>} />
                 <Route path="/studies/progress-analytics" element={<Navigate to="/studies/progress-reports/records?analytics=true" replace />} />
                 <Route path="/studies/progress-assessments" element={<Navigate to="/studies/progress-reports/records" replace />} />
                 <Route path="/studies/progress-management/daily-progress" element={<Navigate to="/studies/daily-progress/quran" replace />} />
@@ -290,28 +290,28 @@ export default function App() {
                 <Route path="/transcripts" element={<ExaminationsHubView defaultTab="TRANSCRIPTS" />} />
                 <Route path="/grading-rules" element={<Navigate to="/admin-tools?section=grading-policies" replace />} />
 
-                <Route path="/academy/classes" element={<FeatureGuard sectionKey="student_classes" fallback={<Navigate to="/dashboard" replace />}><ClassManagementView /></FeatureGuard>} />
-                <Route path="/academy/groups" element={<FeatureGuard sectionKey="student_groups" fallback={<Navigate to="/dashboard" replace />}><GroupManagementView /></FeatureGuard>} />
-                <Route path="/academy/departments" element={<FeatureGuard sectionKey="student_departments" fallback={<Navigate to="/dashboard" replace />}><DepartmentManagementView /></FeatureGuard>} />
+                <Route path="/academy/classes" element={<FeatureGuard sectionKey="student_classes"><ClassManagementView /></FeatureGuard>} />
+                <Route path="/academy/groups" element={<FeatureGuard sectionKey="student_groups"><GroupManagementView /></FeatureGuard>} />
+                <Route path="/academy/departments" element={<FeatureGuard sectionKey="student_departments"><DepartmentManagementView /></FeatureGuard>} />
                 <Route path="/academy/profile" element={<AcademyProfileView />} />
                 <Route path="/academy-profile" element={<AcademyProfileView />} />
                 <Route path="/settings/institution" element={<AcademyProfileView />} />
                 <Route path="/institution-profile" element={<AcademyProfileView />} />
-                <Route path="/security-sessions" element={<FeatureGuard sectionKey="settings_security" fallback={<Navigate to="/dashboard" replace />}><SecuritySessionsView /></FeatureGuard>} />
+                <Route path="/security-sessions" element={<FeatureGuard sectionKey="settings_security"><SecuritySessionsView /></FeatureGuard>} />
                 <Route path="/personalize" element={<PersonalizeSettingsHubView />} />
                 <Route path="/appearance" element={<PersonalizeSettingsHubView />} />
                 <Route path="/date-time" element={<PersonalizeSettingsHubView />} />
-                <Route path="/classroom-config" element={<FeatureGuard sectionKey="report_copy_settings" fallback={<Navigate to="/dashboard" replace />}><ClassroomConfigurationView /></FeatureGuard>} />
-                <Route path="/classroom-settings" element={<FeatureGuard sectionKey="report_copy_settings" fallback={<Navigate to="/dashboard" replace />}><ClassroomConfigurationView /></FeatureGuard>} />
-                <Route path="/copy-report" element={<FeatureGuard sectionKey="report_copy_settings" fallback={<Navigate to="/dashboard" replace />}><ClassroomConfigurationView /></FeatureGuard>} />
-                <Route path="/report-settings" element={<FeatureGuard sectionKey="report_copy_settings" fallback={<Navigate to="/dashboard" replace />}><ClassroomConfigurationView /></FeatureGuard>} />
-                <Route path="/data-backup" element={<FeatureGuard sectionKey="settings_backup" fallback={<Navigate to="/dashboard" replace />}><DataBackupView /></FeatureGuard>} />
-                <Route path="/shortcuts" element={<FeatureGuard sectionKey="nav_shortcuts" fallback={<Navigate to="/dashboard" replace />}><ShortcutsGuide /></FeatureGuard>} />
-                <Route path="/guide" element={<FeatureGuard sectionKey="nav_app_guide" fallback={<Navigate to="/dashboard" replace />}><AppGuideView /></FeatureGuard>} />
-                <Route path="/about" element={<FeatureGuard sectionKey="nav_about" fallback={<Navigate to="/dashboard" replace />}><AboutAppView /></FeatureGuard>} />
-                <Route path="/section-control" element={<FeatureGuard sectionKey="app_section_control" fallback={<Navigate to="/dashboard" replace />}><SectionControlView /></FeatureGuard>} />
-                <Route path="/app-management/institutions" element={<FeatureGuard sectionKey="app_institutions" fallback={<Navigate to="/dashboard" replace />}><InstitutionListView /></FeatureGuard>} />
-                <Route path="/institutions" element={<FeatureGuard sectionKey="app_institutions" fallback={<Navigate to="/dashboard" replace />}><InstitutionListView /></FeatureGuard>} />
+                <Route path="/classroom-config" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomConfigurationView /></FeatureGuard>} />
+                <Route path="/classroom-settings" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomConfigurationView /></FeatureGuard>} />
+                <Route path="/copy-report" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomConfigurationView /></FeatureGuard>} />
+                <Route path="/report-settings" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomConfigurationView /></FeatureGuard>} />
+                <Route path="/data-backup" element={<FeatureGuard sectionKey="settings_backup"><DataBackupView /></FeatureGuard>} />
+                <Route path="/shortcuts" element={<FeatureGuard sectionKey="nav_shortcuts"><ShortcutsGuide /></FeatureGuard>} />
+                <Route path="/guide" element={<FeatureGuard sectionKey="nav_app_guide"><AppGuideView /></FeatureGuard>} />
+                <Route path="/about" element={<FeatureGuard sectionKey="nav_about"><AboutAppView /></FeatureGuard>} />
+                <Route path="/section-control" element={<FeatureGuard sectionKey="app_section_control"><SectionControlView /></FeatureGuard>} />
+                <Route path="/app-management/institutions" element={<FeatureGuard sectionKey="app_institutions"><InstitutionListView /></FeatureGuard>} />
+                <Route path="/institutions" element={<FeatureGuard sectionKey="app_institutions"><InstitutionListView /></FeatureGuard>} />
                 <Route path="/admin-tools" element={<DeveloperToolsHubView />} />
                 <Route path="/admin-tools/:sectionId" element={<DeveloperToolsHubView />} />
                 <Route path="/developer-tools" element={<DeveloperToolsHubView />} />
@@ -324,8 +324,8 @@ export default function App() {
                 <Route path="/version-control" element={<ReleaseManagementView />} />
                 <Route path="/releases" element={<ReleaseManagementView />} />
                 {/* Enterprise Finance, Accounts, Billing & Payroll Hub Routes */}
-                <Route path="/finance" element={<FeatureGuard sectionKey="nav_finance" fallback={<Navigate to="/dashboard" replace />}><FinanceHubView /></FeatureGuard>} />
-                <Route path="/finance/:tab" element={<FeatureGuard sectionKey="nav_finance" fallback={<Navigate to="/dashboard" replace />}><FinanceHubView /></FeatureGuard>} />
+                <Route path="/finance" element={<FeatureGuard sectionKey="nav_finance"><FinanceHubView /></FeatureGuard>} />
+                <Route path="/finance/:tab" element={<FeatureGuard sectionKey="nav_finance"><FinanceHubView /></FeatureGuard>} />
                 <Route path="/student-billing" element={<FeatureGuard sectionKey="finance_student_billing" fallback={<Navigate to="/finance" replace />}><FinanceHubView /></FeatureGuard>} />
                 <Route path="/staff-payroll" element={<FeatureGuard sectionKey="finance_staff_payroll" fallback={<Navigate to="/finance" replace />}><FinanceHubView /></FeatureGuard>} />
                 <Route path="/general-ledger" element={<FeatureGuard sectionKey="finance_general_ledger" fallback={<Navigate to="/finance" replace />}><FinanceHubView /></FeatureGuard>} />

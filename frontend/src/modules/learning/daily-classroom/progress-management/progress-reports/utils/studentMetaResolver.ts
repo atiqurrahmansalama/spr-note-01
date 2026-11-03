@@ -554,3 +554,44 @@ export function getLessonTitle(report: ReportItem | null | undefined): string {
   ).trim();
 }
 
+/**
+ * Authoritative Single Source of Truth to determine if a report was genuinely edited.
+ * Rule 10 Compliance.
+ */
+export function isReportEdited(report: ReportItem | null | undefined): boolean {
+  if (!report) return false;
+
+  // 1. Explicit local edit flag from an active user editing session
+  if (report.is_local_edited) return true;
+
+  // 2. If is_edited is false or undefined, it was not edited
+  if (!report.is_edited) return false;
+
+  const editTime = report.edited_at || report.edit_time;
+  if (!editTime) return false;
+
+  // 3. Batch synchronization contamination heuristic:
+  // Historical automated sync scripts stamped reports in bulk without user interaction.
+  const editStr = String(editTime);
+  if (editStr.includes("2026-11-02 19:52") || editStr.includes("2026-10-31 13:50")) {
+    return false;
+  }
+
+  // 4. Time difference check: an authentic edit occurs after initial creation
+  const createTime = report.created_at || (report as any).date_time || report.date;
+  if (createTime) {
+    const editMs = new Date(editTime).getTime();
+    const createMs = new Date(createTime).getTime();
+    if (!isNaN(editMs) && !isNaN(createMs)) {
+      // If edit timestamp is within 10 seconds of creation timestamp,
+      // it was initial cloud sync/upsert, NOT subsequently edited by a user.
+      if (Math.abs(editMs - createMs) < 10000) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+

@@ -63,6 +63,7 @@ export const en = {
     parentModule: 'Parent Module',
     unsaved: 'Unsaved',
     disabledByParent: 'Disabled by Parent',
+    disabledByParentClickToEnable: 'Disabled by parent (Click to enable with parent)',
     globalDefault: 'Global Default',
     roleOverride: 'Role Override',
     academyOverride: 'Academy Override',

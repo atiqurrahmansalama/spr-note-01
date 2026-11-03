@@ -22,6 +22,7 @@ import {
   isBookReport,
   getBookTitle,
   getLessonTitle,
+  isReportEdited,
 } from "../utils/studentMetaResolver";
 import { isReportUnsynced } from "@/utils/syncEngine";
 import { getReportMenuItems } from "./ReportContextMenu";
@@ -188,7 +189,7 @@ export default function RecordReportsCardGrid({
           const bookTitle = isBook ? getBookTitle(report) : "";
           const lessonTitle = isBook ? getLessonTitle(report) : "";
           const isCommentExpanded = expandedComments.has(reportKey);
-          const isEdited = Boolean(report.is_edited && (report.edited_at || report.edit_time));
+          const isEdited = isReportEdited(report);
 
           const actionMenuItems = getReportMenuItems({
             report,

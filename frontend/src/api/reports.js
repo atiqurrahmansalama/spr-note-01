@@ -254,6 +254,19 @@ export const transformFormToApiPayload = (reportData) => {
     payload.report_unique_id = reportData.report_unique_id;
   }
 
+  // Explicitly forward edit flags if this is an authentic edit submission
+  if (reportData.is_edited !== undefined) {
+    payload.is_edited = Boolean(reportData.is_edited);
+    if (reportData.is_edited) {
+      payload.edited_at = reportData.edited_at || reportData.edit_time || new Date().toISOString();
+      payload.edit_time = payload.edited_at;
+    }
+  } else if (reportData.is_local_edited) {
+    payload.is_edited = true;
+    payload.edited_at = reportData.edited_at || reportData.edit_time || new Date().toISOString();
+    payload.edit_time = payload.edited_at;
+  }
+
   return payload;
 };
 
