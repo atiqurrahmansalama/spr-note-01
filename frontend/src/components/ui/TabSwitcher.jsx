@@ -11,6 +11,7 @@ import { useHorizontalScroll } from '../../hooks';
  * @param {Function} onChange
  * @param {React.ReactNode} rightContent
  * @param {string} className
+ * @param {boolean} keepRightContentInline - When true, keeps rightContent on the exact same row as tabs on mobile/small screens.
  */
 /** @type {any} */
 export default function TabSwitcher({
@@ -20,6 +21,7 @@ export default function TabSwitcher({
   onTabChange = null,
   rightContent = null,
   className = '',
+  keepRightContentInline = false,
 }) {
   const tabsContainerRef = useHorizontalScroll();
   const handleTabSelect = onChange || onTabChange;
@@ -44,12 +46,20 @@ export default function TabSwitcher({
 
   return (
     <div
-      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 sm:border-b theme-border w-full min-w-0 ${className}`}
+      className={
+        keepRightContentInline
+          ? `flex flex-row items-center justify-between gap-2 sm:gap-4 border-b theme-border w-full min-w-0 ${className}`
+          : `flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 sm:border-b theme-border w-full min-w-0 ${className}`
+      }
     >
       {/* Tabs List with Wheel & Drag Scrolling */}
       <div
         ref={tabsContainerRef}
-        className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 max-w-full cursor-grab active:cursor-grabbing pt-1 sm:pt-1.5 border-b sm:border-b-0 theme-border"
+        className={
+          keepRightContentInline
+            ? "flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 max-w-full cursor-grab active:cursor-grabbing pt-1 sm:pt-1.5"
+            : "flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 max-w-full cursor-grab active:cursor-grabbing pt-1 sm:pt-1.5 border-b sm:border-b-0 theme-border"
+        }
       >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -93,7 +103,13 @@ export default function TabSwitcher({
 
       {/* Right-aligned Slot (Action button, search box, filters, etc.) */}
       {rightContent && (
-        <div className="flex items-center justify-end gap-2 shrink-0 pb-1.5 sm:pb-0 w-full sm:w-auto overflow-x-auto scrollbar-none">
+        <div
+          className={
+            keepRightContentInline
+              ? "flex items-center justify-end gap-1.5 sm:gap-2 shrink-0 pb-1 sm:pb-0 w-auto overflow-x-auto scrollbar-none"
+              : "flex items-center justify-end gap-2 shrink-0 pb-1.5 sm:pb-0 w-full sm:w-auto overflow-x-auto scrollbar-none"
+          }
+        >
           {rightContent}
         </div>
       )}

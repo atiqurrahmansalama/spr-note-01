@@ -1,6 +1,7 @@
 import React from "react";
 import { ClassIcon } from "../../../../components/ui/Icons";
 import DataMigrationModal from "../../../../components/common/DataMigrationModal";
+import { ClassMigrationModalProps } from "../types";
 
 export default function ClassMigrationModal({
   isOpen,
@@ -8,7 +9,7 @@ export default function ClassMigrationModal({
   deletingClass,
   availableClasses = [],
   onSuccess,
-}) {
+}: ClassMigrationModalProps) {
   return (
     <DataMigrationModal
       isOpen={isOpen}
@@ -18,9 +19,10 @@ export default function ClassMigrationModal({
       deletingItem={deletingClass}
       availableItems={availableClasses}
       entityIcon={ClassIcon}
-      apiEndpoint={deletingClass ? `/api/v1/academy/classes/${deletingClass.id}/migrate_and_delete/` : undefined}
+      apiEndpoint={deletingClass ? `/api/v1/classes/${deletingClass.id}/delete-with-migration/` : undefined}
       payloadKey="target_class_id"
       onSuccess={onSuccess}
     />
   );
 }
+

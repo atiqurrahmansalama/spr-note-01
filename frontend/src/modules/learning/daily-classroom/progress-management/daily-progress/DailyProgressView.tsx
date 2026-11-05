@@ -553,7 +553,7 @@ export default function DailyProgressView({
 
       {/* Fallback Mode Switcher (Visible only in standalone page without Hub tab bar when both modes allowed) */}
       {!filterProps && isQuranAllowed && isBookAllowed && (
-        <div className="flex flex-wrap items-center justify-between gap-2.5 px-1 py-0.5">
+        <div className="flex flex-row items-center justify-between gap-2 px-1 py-0.5">
           <div className="flex items-center gap-2 text-xs theme-text-secondary font-medium">
             <span className="uppercase tracking-wider text-[11px] font-bold">Progress Mode:</span>
             <span className="theme-text-primary font-semibold">

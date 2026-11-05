@@ -11,12 +11,13 @@ import CustomInput from "../../../../components/ui/CustomInput";
 import { ClassSelect, SectionSelect, TeacherSelect } from "../../../../components/selectors";
 import { DrawerContainer, DrawerSection, DrawerFooter } from "../../../../components/layout";
 import { useFormAutoSave } from "../../../../hooks";
+import {
+  GroupFormProps,
+  AcademicClass,
+  TeacherUser,
+  GroupFormData,
+} from "../types";
 
-/**
- * GroupForm Component
- * Enterprise right sidebar drawer form for creating and editing Study Groups / Circles.
- * Adheres to zero hardcoded styling, container query responsiveness, and streamlined section layouts.
- */
 export default function GroupForm({
   editingGroup = null,
   classes = [],
@@ -25,11 +26,11 @@ export default function GroupForm({
   defaultSectionId = "",
   onSaved,
   onCancel,
-}) {
+}: GroupFormProps) {
   const { showToast } = useToast();
   const isEdit = Boolean(editingGroup?.id);
 
-  const initialValues = useMemo(() => {
+  const initialValues = useMemo<GroupFormData>(() => {
     if (editingGroup) {
       return {
         name: editingGroup.name || "",
@@ -50,10 +51,10 @@ export default function GroupForm({
     };
   }, [editingGroup, defaultClassId, defaultSectionId, classes]);
 
-  const [formData, setFormData] = useState(initialValues);
+  const [formData, setFormData] = useState<GroupFormData>(initialValues);
 
   // Auto-Save / Draft Persistence
-  const storageKey = isEdit ? `group_edit_${editingGroup.id}` : `group_create_${formData.student_class || 'default'}`;
+  const storageKey = isEdit ? `group_edit_${editingGroup?.id}` : `group_create_${formData.student_class || 'default'}`;
   const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
     formData,
     setFormData,
@@ -61,10 +62,10 @@ export default function GroupForm({
     enabled: true,
   });
 
-  const [classList, setClassList] = useState(classes);
-  const [teacherList, setTeacherList] = useState(teachers);
-  const [loadingLookups, setLoadingLookups] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [classList, setClassList] = useState<AcademicClass[]>(classes);
+  const [teacherList, setTeacherList] = useState<TeacherUser[]>(teachers);
+  const [loadingLookups, setLoadingLookups] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
   useEffect(() => {
     setFormData(initialValues);
@@ -83,13 +84,13 @@ export default function GroupForm({
 
         if (cRes.status === "fulfilled" && cRes.value && cRes.value.ok) {
           const d = await cRes.value.json();
-          const list = Array.isArray(d) ? d : d.results || [];
+          const list: AcademicClass[] = Array.isArray(d) ? d : d.results || [];
           setClassList(list.filter((c) => !c.is_deleted));
         }
         if (tRes.status === "fulfilled" && tRes.value && tRes.value.ok) {
           const d = await tRes.value.json();
-          const list = Array.isArray(d) ? d : d.results || [];
-          setTeacherList(list.filter((u) => u.is_active && !u.is_deactivated));
+          const list: TeacherUser[] = Array.isArray(d) ? d : d.results || [];
+          setTeacherList(list.filter((u: any) => u.is_active && !u.is_deactivated));
         }
       } catch {
         // Fallback gracefully
@@ -100,7 +101,7 @@ export default function GroupForm({
     loadData();
   }, [classes.length, teachers.length]);
 
-  const handleClassChange = (newClassId) => {
+  const handleClassChange = (newClassId: string) => {
     setFormData((prev) => ({
       ...prev,
       student_class: newClassId,
@@ -110,13 +111,15 @@ export default function GroupForm({
   };
 
   const isDirty = useMemo(() => {
-    return Object.keys(initialValues).some((key) => formData[key] !== initialValues[key]);
+    return (Object.keys(initialValues) as (keyof GroupFormData)[]).some(
+      (key) => formData[key] !== initialValues[key]
+    );
   }, [formData, initialValues]);
 
   const isValid = Boolean(formData.name.trim() && formData.student_class);
   const canSave = isDirty && isValid && !submitting;
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!formData.student_class) {
       showToast("Please select a target Academic Class.", "warning");
@@ -134,11 +137,11 @@ export default function GroupForm({
         student_class: formData.student_class,
         section: formData.section || null,
         mentor_teacher: formData.mentor_teacher || null,
-        order_rank: parseInt(formData.order_rank, 10) || 1,
+        order_rank: parseInt(String(formData.order_rank), 10) || 1,
         is_active: formData.is_active,
       };
 
-      const url = isEdit ? `/api/v1/groups/${editingGroup.id}/` : "/api/v1/groups/";
+      const url = isEdit && editingGroup ? `/api/v1/groups/${editingGroup.id}/` : "/api/v1/groups/";
       const method = isEdit ? "PATCH" : "POST";
 
       const res = await fetchWithAuth(url, {
@@ -189,7 +192,7 @@ export default function GroupForm({
               <SectionSelect
                 label="Target Section"
                 value={formData.section}
-                onChange={(val) => setFormData({ ...formData, section: val })}
+                onChange={(val: string) => setFormData({ ...formData, section: val })}
                 classId={formData.student_class}
                 allowAll={false}
                 placeholder="All Sections (Optional)..."
@@ -206,7 +209,7 @@ export default function GroupForm({
               required
               placeholder="e.g. Group A, Circle Alpha, Nazera Group"
               value={formData.name}
-              onChange={(val) => setFormData({ ...formData, name: val })}
+              onChange={(val: string) => setFormData({ ...formData, name: val })}
             />
           </div>
         </DrawerSection>
@@ -217,7 +220,7 @@ export default function GroupForm({
             <TeacherSelect
               label="Assigned Mentor"
               value={formData.mentor_teacher}
-              onChange={(val) => setFormData({ ...formData, mentor_teacher: val })}
+              onChange={(val: string) => setFormData({ ...formData, mentor_teacher: val })}
               teachers={teacherList}
               allowAll={true}
               allLabel="Unassigned"

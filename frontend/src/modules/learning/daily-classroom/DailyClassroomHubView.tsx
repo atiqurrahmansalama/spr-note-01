@@ -1000,6 +1000,7 @@ export default function DailyClassroomHubView({
         activeTab={activeTab}
         onChange={handleTabChange}
         actionsPlacement="tabs"
+        keepTabsActionsInline={isProgressHub && activeTab === 'PROGRESS'}
         actions={
           !isProgressHub && activeTab === 'LESSON' ? (
             <CustomButton

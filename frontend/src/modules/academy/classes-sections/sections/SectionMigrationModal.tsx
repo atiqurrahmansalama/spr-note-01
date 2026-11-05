@@ -1,6 +1,7 @@
 import React from "react";
 import { SectionIcon } from "../../../../components/ui/Icons";
 import DataMigrationModal from "../../../../components/common/DataMigrationModal";
+import { SectionMigrationModalProps } from "../types";
 
 export default function SectionMigrationModal({
   isOpen,
@@ -8,7 +9,7 @@ export default function SectionMigrationModal({
   deletingSection,
   availableSections = [],
   onSuccess,
-}) {
+}: SectionMigrationModalProps) {
   return (
     <DataMigrationModal
       isOpen={isOpen}
@@ -24,3 +25,4 @@ export default function SectionMigrationModal({
     />
   );
 }
+

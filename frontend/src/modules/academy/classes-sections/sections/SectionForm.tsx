@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useToast } from '../../../../context/ToastContext';
-import { useTenant } from '../../../../context/TenantContext';
 import { createSection, updateSection } from '../../../../api/academy';
 import { fetchWithAuth } from '../../../../utils/authService';
 import {
@@ -8,18 +7,18 @@ import {
   SectionIcon,
   GroupIcon,
 } from '../../../../components/ui/Icons';
-import CustomSelect from '../../../../components/ui/CustomSelect';
 import CustomInput from '../../../../components/ui/CustomInput';
 import { TeacherSelect, ClassSelect } from '../../../../components/selectors';
 import CustomCheckbox from '../../../../components/ui/CustomCheckbox';
 import { DrawerContainer, DrawerSection, DrawerFooter } from '../../../../components/layout';
 import { useFormAutoSave } from '../../../../hooks';
+import {
+  SectionFormProps,
+  AcademicClass,
+  TeacherUser,
+  SectionFormData,
+} from '../types';
 
-/**
- * SectionForm Component
- * Enterprise right sidebar drawer form for creating and editing Academic Class Sections.
- * Adheres to zero hardcoded styling, container query responsiveness, and streamlined section layouts.
- */
 export default function SectionForm({
   section = null,
   classes = [],
@@ -27,11 +26,11 @@ export default function SectionForm({
   defaultClassId = null,
   onSaved,
   onCancel,
-}) {
+}: SectionFormProps) {
   const { showToast } = useToast();
   const isEdit = Boolean(section?.id);
 
-  const initialValues = useMemo(() => {
+  const initialValues = useMemo<SectionFormData>(() => {
     if (section) {
       const knownGrpCount = Number(section.group_count) || 0;
       return {
@@ -53,10 +52,10 @@ export default function SectionForm({
     };
   }, [section, defaultClassId, classes]);
 
-  const [formData, setFormData] = useState(initialValues);
+  const [formData, setFormData] = useState<SectionFormData>(initialValues);
 
   // Auto-Save / Draft Persistence
-  const storageKey = isEdit ? `section_edit_${section.id}` : `section_create_${formData.student_class || 'default'}`;
+  const storageKey = isEdit ? `section_edit_${section?.id}` : `section_create_${formData.student_class || 'default'}`;
   const { status: autoSaveStatus, lastSavedAt, clearDraft } = useFormAutoSave({
     formData,
     setFormData,
@@ -64,11 +63,11 @@ export default function SectionForm({
     enabled: true,
   });
 
-  const [classList, setClassList] = useState(classes);
-  const [teacherList, setTeacherList] = useState(teachers);
-  const [activeGroupCount, setActiveGroupCount] = useState(section?.group_count || 0);
-  const [loadingLookups, setLoadingLookups] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [classList, setClassList] = useState<AcademicClass[]>(classes);
+  const [teacherList, setTeacherList] = useState<TeacherUser[]>(teachers);
+  const [activeGroupCount, setActiveGroupCount] = useState<number>(section?.group_count || 0);
+  const [loadingLookups, setLoadingLookups] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
   useEffect(() => {
     setFormData(initialValues);
@@ -105,13 +104,13 @@ export default function SectionForm({
 
         if (cRes.status === 'fulfilled' && cRes.value && cRes.value.ok) {
           const d = await cRes.value.json();
-          const list = Array.isArray(d) ? d : d.results || [];
+          const list: AcademicClass[] = Array.isArray(d) ? d : d.results || [];
           setClassList(list.filter((c) => !c.is_deleted));
         }
         if (tRes.status === 'fulfilled' && tRes.value && tRes.value.ok) {
           const d = await tRes.value.json();
-          const list = Array.isArray(d) ? d : d.results || [];
-          setTeacherList(list.filter((u) => u.is_active && !u.is_deactivated));
+          const list: TeacherUser[] = Array.isArray(d) ? d : d.results || [];
+          setTeacherList(list.filter((u: any) => u.is_active && !u.is_deactivated));
         }
       } catch {
         // Fallback gracefully
@@ -122,7 +121,7 @@ export default function SectionForm({
     loadData();
   }, [classes.length, teachers.length]);
 
-  const handleGroupToggle = (checked) => {
+  const handleGroupToggle = (checked: boolean) => {
     if (!checked && activeGroupCount > 0) {
       showToast(
         `Cannot disable groups because this section currently has ${activeGroupCount} active group(s). Delete or reassign groups first.`,
@@ -135,13 +134,15 @@ export default function SectionForm({
 
   // Dirty check
   const isDirty = useMemo(() => {
-    return Object.keys(initialValues).some((key) => formData[key] !== initialValues[key]);
+    return (Object.keys(initialValues) as (keyof SectionFormData)[]).some(
+      (key) => formData[key] !== initialValues[key]
+    );
   }, [formData, initialValues]);
 
   const isValid = Boolean(formData.student_class && formData.section_name.trim());
   const canSave = isDirty && isValid && !submitting;
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!formData.student_class) {
       showToast('Please select a target Academic Class.', 'warning');
@@ -158,14 +159,14 @@ export default function SectionForm({
       section_name: formData.section_name.trim(),
       section_type: 'GENERAL_SECTION',
       room_number: formData.room_number.trim(),
-      max_capacity: parseInt(formData.max_capacity, 10) || 40,
+      max_capacity: parseInt(String(formData.max_capacity), 10) || 40,
       class_teacher: formData.class_teacher || null,
       has_groups: Boolean(activeGroupCount > 0 ? true : formData.has_groups),
       is_active: section?.is_active ?? true,
     };
 
     try {
-      if (isEdit) {
+      if (isEdit && section) {
         await updateSection(section.id, payload);
         showToast('Section updated successfully.', 'success');
       } else {
@@ -175,7 +176,7 @@ export default function SectionForm({
       window.dispatchEvent(new CustomEvent('spr_section_updated'));
       clearDraft();
       onSaved?.();
-    } catch (err) {
+    } catch (err: any) {
       const msg = err.response?.data?.has_groups?.[0] || err.message || 'Failed to save section.';
       showToast(msg, 'error');
     } finally {
@@ -206,7 +207,7 @@ export default function SectionForm({
               <ClassSelect
                 label="Target Class"
                 value={formData.student_class}
-                onChange={(val) => setFormData({ ...formData, student_class: val })}
+                onChange={(val: string) => setFormData({ ...formData, student_class: val })}
                 classes={eligibleClassList}
                 allowAll={false}
                 placeholder="Select Class (Required)..."
@@ -221,7 +222,7 @@ export default function SectionForm({
                 required
                 placeholder="e.g. Section A"
                 value={formData.section_name}
-                onChange={(val) => setFormData({ ...formData, section_name: val })}
+                onChange={(val: string) => setFormData({ ...formData, section_name: val })}
               />
             </div>
           </div>
@@ -233,7 +234,7 @@ export default function SectionForm({
                 optional
                 placeholder="e.g. Room 204"
                 value={formData.room_number}
-                onChange={(val) => setFormData({ ...formData, room_number: val })}
+                onChange={(val: string) => setFormData({ ...formData, room_number: val })}
               />
             </div>
 
@@ -245,7 +246,7 @@ export default function SectionForm({
                 min={1}
                 max={2000}
                 value={formData.max_capacity}
-                onChange={(val) =>
+                onChange={(val: string) =>
                   setFormData({
                     ...formData,
                     max_capacity: parseInt(val, 10) || 1,
@@ -259,7 +260,7 @@ export default function SectionForm({
             <TeacherSelect
               label="Section In-Charge"
               value={formData.class_teacher}
-              onChange={(val) => setFormData({ ...formData, class_teacher: val })}
+              onChange={(val: string) => setFormData({ ...formData, class_teacher: val })}
               teachers={teacherList}
               allLabel="Unassigned"
               placeholder="Select Section In-Charge..."
@@ -314,3 +315,4 @@ export default function SectionForm({
     </DrawerContainer>
   );
 }
+

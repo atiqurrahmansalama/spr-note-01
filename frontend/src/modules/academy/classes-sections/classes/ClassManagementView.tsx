@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fetchWithAuth } from "../../../../utils/authService";
 import { useToast } from "../../../../context/ToastContext";
+import { useFeatureControl } from "../../../../context/FeatureControlContext";
 import {
   ClassIcon,
   GroupIcon,
@@ -20,33 +21,40 @@ import { useTenant } from "../../../../context/TenantContext";
 import ClassForm from "./ClassForm";
 import ClassMigrationModal from "./ClassMigrationModal";
 import DeleteImpactModal from "../../../../components/common/DeleteImpactModal";
+import { AcademicClass, ClassManagementViewProps } from "../types";
 
 export default function ClassManagementView({
   hideHeader = false,
   hideMetrics = false,
   isEmbedded = false,
-}) {
+  isSuperAdmin = false,
+  showSectionsTab = true,
+  showGroupsTab = true,
+}: ClassManagementViewProps) {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const { openDrawer, closeDrawer } = useRightSidebar();
   const { activeTenantId } = useTenant();
+  const { isSectionEnabled } = useFeatureControl();
   const [searchParams] = useSearchParams();
+
+  const canMigrateDelete = isSectionEnabled("classes_action_migrate_delete");
 
   const queryDept = searchParams.get("department") || "ALL";
 
-  const [classes, setClasses] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [classes, setClasses] = useState<AcademicClass[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   // View Mode
-  const [viewMode, setViewMode] = useState(() => {
+  const [viewMode, setViewMode] = useState<"table" | "grid">(() => {
     try {
-      return localStorage.getItem("spr_classes_view_mode") || "table";
+      return (localStorage.getItem("spr_classes_view_mode") as "table" | "grid") || "table";
     } catch {
       return "table";
     }
   });
 
-  const handleViewModeChange = (mode) => {
+  const handleViewModeChange = (mode: "table" | "grid") => {
     setViewMode(mode);
     try {
       localStorage.setItem("spr_classes_view_mode", mode);
@@ -54,19 +62,19 @@ export default function ClassManagementView({
   };
 
   // Modals
-  const [deletingClass, setDeletingClass] = useState(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [deletingClass, setDeletingClass] = useState<AcademicClass | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
+  const [isMigrationModalOpen, setIsMigrationModalOpen] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   const loadClasses = useCallback(async () => {
     try {
       setLoading(true);
-      const tenantParam = activeTenantId && activeTenantId !== 'ALL' ? `&institution=${activeTenantId}` : '';
+      const tenantParam = activeTenantId && activeTenantId !== "ALL" ? `&institution=${activeTenantId}` : "";
       const res = await fetchWithAuth(`/api/v1/classes/?page_size=500&all=true${tenantParam}`);
       if (res.ok) {
         const data = await res.json();
-        const list = Array.isArray(data) ? data : data.results || [];
+        const list: AcademicClass[] = Array.isArray(data) ? data : data.results || [];
         setClasses(list.filter((c) => !c.is_deleted));
       }
     } catch {
@@ -131,11 +139,11 @@ export default function ClassManagementView({
     [classes, loadClasses, closeDrawer]
   );
 
-  const handleOpenEdit = (cls) => {
+  const handleOpenEdit = (cls: AcademicClass) => {
     openDrawer("class", { mode: "edit", id: cls.id });
   };
 
-  const handleDeletePrompt = (cls) => {
+  const handleDeletePrompt = (cls: AcademicClass) => {
     setDeletingClass(cls);
     setIsDeleteModalOpen(true);
   };
@@ -164,7 +172,7 @@ export default function ClassManagementView({
     }
   };
 
-  const getActionMenuItems = (cls) => [
+  const getActionMenuItems = (cls: AcademicClass) => [
     {
       label: "Edit Class",
       icon: EditIcon,
@@ -173,21 +181,26 @@ export default function ClassManagementView({
     {
       label: "View Sections",
       icon: SectionIcon,
-      hidden: cls.has_sections === false,
+      hidden: cls.has_sections === false || (!isSuperAdmin && !showSectionsTab),
       onClick: () => navigate(`/academy/classes-groups?tab=sections&class=${cls.id}`),
     },
     {
       label: "View Groups",
       icon: GroupIcon,
+      hidden: (cls.has_groups === false && cls.has_sections === false) || (!isSuperAdmin && !showGroupsTab),
       onClick: () => navigate(`/academy/classes-groups?tab=groups&student_class=${cls.id}`),
     },
-    { divider: true },
-    {
-      label: "Delete Class",
-      icon: TrashIcon,
-      danger: true,
-      onClick: () => handleDeletePrompt(cls),
-    },
+    ...(canMigrateDelete
+      ? [
+          { divider: true },
+          {
+            label: "Delete Class",
+            icon: TrashIcon,
+            danger: true,
+            onClick: () => handleDeletePrompt(cls),
+          },
+        ]
+      : []),
   ];
 
   // Table Columns
@@ -198,7 +211,7 @@ export default function ClassManagementView({
       align: "center",
       headerClassName: "w-14 text-center font-mono text-xs",
       cellClassName: "w-14 text-center font-mono text-xs",
-      render: (_, rowIdx) => (
+      render: (_: any, rowIdx: number) => (
         <span className="font-mono text-xs font-bold theme-text-secondary">
           {rowIdx + 1}
         </span>
@@ -209,7 +222,7 @@ export default function ClassManagementView({
       header: "Class Name & Code",
       headerClassName: "min-w-[200px] sm:min-w-[240px]",
       cellClassName: "min-w-[200px] sm:min-w-[240px]",
-      render: (cls) => (
+      render: (cls: AcademicClass) => (
         <div className="space-y-0.5 py-1">
           <span className="font-bold text-sm theme-text-primary block">{cls.name}</span>
           {cls.code && (
@@ -225,9 +238,9 @@ export default function ClassManagementView({
       header: "Department",
       headerClassName: "min-w-[140px] sm:min-w-[180px]",
       cellClassName: "min-w-[140px] sm:min-w-[180px]",
-      render: (cls) => (
+      render: (cls: AcademicClass) => (
         <span className="text-xs font-semibold theme-text-primary">
-          {cls.department_name || cls.department_type || "General"}
+          {cls.department_name || (cls as any).department_type || "General"}
         </span>
       ),
     },
@@ -236,7 +249,7 @@ export default function ClassManagementView({
       header: "Class Teacher",
       headerClassName: "min-w-[160px] sm:min-w-[200px]",
       cellClassName: "min-w-[160px] sm:min-w-[200px]",
-      render: (cls) => (
+      render: (cls: AcademicClass) => (
         <div className="flex items-center gap-1.5 text-xs theme-text-secondary py-1">
           <TeacherIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
           <span className={`font-semibold ${cls.class_teacher_name ? "theme-text-primary" : "theme-text-muted italic"}`}>
@@ -251,9 +264,9 @@ export default function ClassManagementView({
       align: "center",
       headerClassName: "w-24 text-center",
       cellClassName: "w-24 text-center",
-      render: (cls) => (
+      render: (cls: AcademicClass) => (
         <span className="text-xs font-bold font-mono theme-accent px-2.5 py-0.5 rounded-lg theme-bg-accent-soft/40 border theme-border inline-block">
-          {cls.student_count || 0}
+          {(cls as any).student_count || cls.total_students || 0}
         </span>
       ),
     },
@@ -263,9 +276,9 @@ export default function ClassManagementView({
       align: "center",
       headerClassName: "w-24 text-center",
       cellClassName: "w-24 text-center",
-      render: (cls) => (
+      render: (cls: AcademicClass) => (
         <span className="text-xs font-bold font-mono theme-text-primary px-2.5 py-0.5 rounded-lg theme-bg-sub border theme-border inline-block">
-          {cls.section_count || 0}
+          {(cls as any).section_count || cls.sections_count || 0}
         </span>
       ),
     },
@@ -275,9 +288,9 @@ export default function ClassManagementView({
       align: "center",
       headerClassName: "w-24 text-center",
       cellClassName: "w-24 text-center",
-      render: (cls) => (
+      render: (cls: AcademicClass) => (
         <span className="text-xs font-bold font-mono theme-text-primary px-2.5 py-0.5 rounded-lg theme-bg-sub border theme-border inline-block">
-          {cls.group_count || 0}
+          {(cls as any).group_count || cls.groups_count || 0}
         </span>
       ),
     },
@@ -287,7 +300,7 @@ export default function ClassManagementView({
       align: "right",
       headerClassName: "w-16 text-right",
       cellClassName: "w-16 text-right",
-      render: (cls) => (
+      render: (cls: AcademicClass) => (
         <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
           <ActionMenu items={getActionMenuItems(cls)} align="right" />
         </div>
@@ -296,7 +309,7 @@ export default function ClassManagementView({
   ];
 
   // Card Renderer
-  const renderClassCard = (cls) => (
+  const renderClassCard = (cls: AcademicClass) => (
     <div
       key={cls.id}
       onClick={() => handleOpenEdit(cls)}
@@ -316,7 +329,7 @@ export default function ClassManagementView({
               )}
             </div>
             <p className="text-xs font-medium theme-text-secondary mt-1">
-              {cls.department_name || cls.department_type || "General"}
+              {cls.department_name || (cls as any).department_type || "General"}
             </p>
           </div>
 
@@ -332,15 +345,15 @@ export default function ClassManagementView({
 
         <div className="grid grid-cols-3 gap-1.5 p-2.5 rounded-xl theme-bg-sub border theme-border text-center">
           <div>
-            <span className="block text-sm font-bold theme-accent font-mono">{cls.student_count || 0}</span>
+            <span className="block text-sm font-bold theme-accent font-mono">{(cls as any).student_count || cls.total_students || 0}</span>
             <span className="text-[9px] theme-text-secondary uppercase tracking-wider font-semibold">Students</span>
           </div>
           <div className="border-l theme-border">
-            <span className="block text-sm font-bold theme-text-primary font-mono">{cls.section_count || 0}</span>
+            <span className="block text-sm font-bold theme-text-primary font-mono">{(cls as any).section_count || cls.sections_count || 0}</span>
             <span className="text-[9px] theme-text-secondary uppercase tracking-wider font-semibold">Sections</span>
           </div>
           <div className="border-l theme-border">
-            <span className="block text-sm font-bold theme-text-primary font-mono">{cls.group_count || 0}</span>
+            <span className="block text-sm font-bold theme-text-primary font-mono">{(cls as any).group_count || cls.groups_count || 0}</span>
             <span className="text-[9px] theme-text-secondary uppercase tracking-wider font-semibold">Groups</span>
           </div>
         </div>
@@ -387,13 +400,13 @@ export default function ClassManagementView({
           data={displayedClasses}
           loading={loading}
           loadingMessage="Loading academic classes..."
-          keyExtractor={(c, idx) => c.id || `class_${idx}`}
+          keyExtractor={(c: AcademicClass, idx: number) => c.id || `class_${idx}`}
           cellPaddingClass="py-3.5 px-4 sm:px-5"
           headerCellClassName="py-3 px-4 sm:px-5 text-xs uppercase tracking-wider font-bold"
           emptyIcon={ClassIcon}
           emptyTitle="No Classes Found"
           emptySubMessage="Get started by creating your first academic class or grade."
-          onRowClick={(cls) => handleOpenEdit(cls)}
+          onRowClick={(cls: AcademicClass) => handleOpenEdit(cls)}
         />
       ) : (
         <DataCardGrid
@@ -420,9 +433,9 @@ export default function ClassManagementView({
           itemName={deletingClass.name}
           itemType="class"
           impactData={{
-            direct_students: deletingClass.student_count || 0,
-            sections: deletingClass.section_count || 0,
-            groups: deletingClass.group_count || 0,
+            direct_students: (deletingClass as any).student_count || deletingClass.total_students || 0,
+            sections: (deletingClass as any).section_count || deletingClass.sections_count || 0,
+            groups: (deletingClass as any).group_count || deletingClass.groups_count || 0,
           }}
           onDirectDelete={performDirectDelete}
           onMigrateOpen={() => {
@@ -452,3 +465,4 @@ export default function ClassManagementView({
     </div>
   );
 }
+

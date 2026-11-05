@@ -200,8 +200,8 @@ export default function App() {
                 {/* Academy Multi-Branch, Section & Period Routes */}
                 <Route path="/academy/campus-profile" element={<CampusProfileHubView />} />
                 <Route path="/campus-profile" element={<CampusProfileHubView />} />
-                <Route path="/academy/classes-groups" element={<ClassesGroupsHubView />} />
-                <Route path="/classes-groups" element={<ClassesGroupsHubView />} />
+                <Route path="/academy/classes-groups" element={<FeatureGuard sectionKey="student_classes"><ClassesGroupsHubView /></FeatureGuard>} />
+                <Route path="/classes-groups" element={<FeatureGuard sectionKey="student_classes"><ClassesGroupsHubView /></FeatureGuard>} />
                 <Route path="/academy/branches" element={<FeatureGuard sectionKey="academic_branches"><BranchManagementView /></FeatureGuard>} />
                 <Route path="/academy/periods" element={<FeatureGuard sectionKey="class_period_slots"><RoutineCurriculumHubView /></FeatureGuard>} />
                 <Route path="/academy/calendar-events" element={<CalendarEventsHubView />} />

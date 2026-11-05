@@ -38,6 +38,8 @@ export interface CollapsiblePageHeaderProps {
   tabsRightContent?: React.ReactNode;
   /** Additional styling for TabSwitcher */
   tabSwitcherClassName?: string;
+  /** Keep actions / right content on the same line as tabs even on mobile/small screens */
+  keepTabsActionsInline?: boolean;
   /** LocalStorage key for persisting collapsed state */
   storageKey?: string;
   /** Initial expanded state (uncontrolled mode, defaults to true) */
@@ -86,6 +88,7 @@ export default function CollapsiblePageHeader({
   onChange,
   tabsRightContent,
   tabSwitcherClassName = "",
+  keepTabsActionsInline = false,
   storageKey,
   defaultExpanded = true,
   expanded: controlledExpanded,
@@ -271,6 +274,7 @@ export default function CollapsiblePageHeader({
           activeTab={activeTab}
           onChange={handleTabSelect}
           rightContent={effectiveTabsRightContent}
+          keepRightContentInline={keepTabsActionsInline}
           className={tabSwitcherClassName}
         />
       )}

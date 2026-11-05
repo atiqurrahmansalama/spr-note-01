@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { fetchWithAuth } from "../../../../utils/authService";
 import { useToast } from "../../../../context/ToastContext";
+import { useFeatureControl } from "../../../../context/FeatureControlContext";
 import {
   GroupIcon,
   ClassIcon,
@@ -22,39 +23,49 @@ import { useTenant } from "../../../../context/TenantContext";
 import GroupForm from "./GroupForm";
 import GroupMigrationModal from "./GroupMigrationModal";
 import DeleteImpactModal from "../../../../components/common/DeleteImpactModal";
+import {
+  AcademicGroup,
+  AcademicClass,
+  AcademicSection,
+  TeacherUser,
+  GroupManagementViewProps,
+} from "../types";
 
 export default function GroupManagementView({
   hideHeader = false,
   hideMetrics = false,
   isEmbedded = false,
-}) {
+}: GroupManagementViewProps) {
   const { showToast } = useToast();
   const { openDrawer, closeDrawer } = useRightSidebar();
   const { activeTenantId } = useTenant();
+  const { isSectionEnabled } = useFeatureControl();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const canMigrateDelete = isSectionEnabled("groups_action_migrate_delete");
 
   const initialClassFilter = searchParams.get("student_class") || searchParams.get("class") || "ALL";
   const initialSectionFilter = searchParams.get("section") || "ALL";
 
-  const [groups, setGroups] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [sections, setSections] = useState([]);
-  const [teachers, setTeachers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [groups, setGroups] = useState<AcademicGroup[]>([]);
+  const [classes, setClasses] = useState<AcademicClass[]>([]);
+  const [sections, setSections] = useState<AcademicSection[]>([]);
+  const [teachers, setTeachers] = useState<TeacherUser[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   // Filters & View Mode
-  const [searchQuery, setSearchQuery] = useState("");
-  const [classFilter, setClassFilter] = useState(initialClassFilter);
-  const [sectionFilter, setSectionFilter] = useState(initialSectionFilter);
-  const [viewMode, setViewMode] = useState(() => {
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [classFilter, setClassFilter] = useState<string>(initialClassFilter);
+  const [sectionFilter, setSectionFilter] = useState<string>(initialSectionFilter);
+  const [viewMode, setViewMode] = useState<"table" | "grid">(() => {
     try {
-      return localStorage.getItem("spr_groups_view_mode") || "table";
+      return (localStorage.getItem("spr_groups_view_mode") as "table" | "grid") || "table";
     } catch {
       return "table";
     }
   });
 
-  const handleViewModeChange = (mode) => {
+  const handleViewModeChange = (mode: "table" | "grid") => {
     setViewMode(mode);
     try {
       localStorage.setItem("spr_groups_view_mode", mode);
@@ -62,10 +73,10 @@ export default function GroupManagementView({
   };
 
   // Modals
-  const [deletingGroup, setDeletingGroup] = useState(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [deletingGroup, setDeletingGroup] = useState<AcademicGroup | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
+  const [isMigrationModalOpen, setIsMigrationModalOpen] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   useEffect(() => {
     if (initialClassFilter !== classFilter) {
@@ -74,16 +85,16 @@ export default function GroupManagementView({
     if (initialSectionFilter !== sectionFilter) {
       setSectionFilter(initialSectionFilter);
     }
-  }, [initialClassFilter, initialSectionFilter]);
+  }, [initialClassFilter, initialSectionFilter, classFilter, sectionFilter]);
 
   const loadGroups = useCallback(async () => {
     try {
       setLoading(true);
-      const tenantParam = activeTenantId && activeTenantId !== 'ALL' ? `&institution=${activeTenantId}` : '';
+      const tenantParam = activeTenantId && activeTenantId !== "ALL" ? `&institution=${activeTenantId}` : "";
       const res = await fetchWithAuth(`/api/v1/groups/?page_size=500&all=true${tenantParam}`);
       if (res.ok) {
         const data = await res.json();
-        const list = Array.isArray(data) ? data : data.results || [];
+        const list: AcademicGroup[] = Array.isArray(data) ? data : data.results || [];
         setGroups(list.filter((g) => !g.is_deleted));
       }
     } catch {
@@ -95,7 +106,7 @@ export default function GroupManagementView({
 
   const loadLookups = useCallback(async () => {
     try {
-      const tenantParam = activeTenantId && activeTenantId !== 'ALL' ? `&institution=${activeTenantId}` : '';
+      const tenantParam = activeTenantId && activeTenantId !== "ALL" ? `&institution=${activeTenantId}` : "";
       const [classRes, secRes, teacherRes] = await Promise.allSettled([
         fetchWithAuth(`/api/v1/classes/?page_size=500&all=true${tenantParam}`),
         fetchWithAuth(`/api/v1/academy/sections/?page_size=500&all=true${tenantParam}`),
@@ -104,20 +115,20 @@ export default function GroupManagementView({
 
       if (classRes.status === "fulfilled" && classRes.value.ok) {
         const d = await classRes.value.json();
-        const list = Array.isArray(d) ? d : d.results || [];
+        const list: AcademicClass[] = Array.isArray(d) ? d : d.results || [];
         setClasses(list.filter((c) => !c.is_deleted));
       }
 
       if (secRes.status === "fulfilled" && secRes.value.ok) {
         const d = await secRes.value.json();
-        const list = Array.isArray(d) ? d : d.results || [];
+        const list: AcademicSection[] = Array.isArray(d) ? d : d.results || [];
         setSections(list.filter((s) => !s.is_deleted));
       }
 
       if (teacherRes.status === "fulfilled" && teacherRes.value.ok) {
         const d = await teacherRes.value.json();
-        const list = Array.isArray(d) ? d : d.results || [];
-        setTeachers(list.filter((u) => u.is_active && !u.is_deactivated));
+        const list: TeacherUser[] = Array.isArray(d) ? d : d.results || [];
+        setTeachers(list.filter((u: any) => u.is_active && !u.is_deactivated));
       }
     } catch {}
   }, [activeTenantId]);
@@ -163,6 +174,7 @@ export default function GroupManagementView({
             key={groupId ? `edit-grp-${groupId}` : "add-grp"}
             editingGroup={foundGroup}
             classes={classes}
+            teachers={teachers}
             defaultClassId={classFilter !== "ALL" ? classFilter : ""}
             defaultSectionId={sectionFilter !== "ALL" ? sectionFilter : ""}
             onSaved={() => {
@@ -174,14 +186,14 @@ export default function GroupManagementView({
         ),
       };
     },
-    [groups, classes, classFilter, sectionFilter, loadGroups, closeDrawer]
+    [groups, classes, teachers, classFilter, sectionFilter, loadGroups, closeDrawer]
   );
 
-  const handleOpenEdit = (grp) => {
+  const handleOpenEdit = (grp: AcademicGroup) => {
     openDrawer("group", { mode: "edit", id: grp.id });
   };
 
-  const handleDeletePrompt = (group) => {
+  const handleDeletePrompt = (group: AcademicGroup) => {
     setDeletingGroup(group);
     setIsDeleteModalOpen(true);
   };
@@ -210,7 +222,7 @@ export default function GroupManagementView({
     }
   };
 
-  const handleFilterChange = (setter, key) => (val) => {
+  const handleFilterChange = (setter: (val: string) => void, key: string) => (val: string) => {
     setter(val);
     const newParams = new URLSearchParams(searchParams);
     if (val === "ALL" || !val) {
@@ -227,9 +239,9 @@ export default function GroupManagementView({
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchName = grp.name?.toLowerCase().includes(q);
-      const matchClass = grp.student_class_name?.toLowerCase().includes(q);
-      const matchSection = grp.section_name?.toLowerCase().includes(q);
-      const matchMentor = grp.mentor_teacher_name?.toLowerCase().includes(q);
+      const matchClass = (grp as any).student_class_name?.toLowerCase().includes(q);
+      const matchSection = (grp as any).section_name?.toLowerCase().includes(q);
+      const matchMentor = (grp as any).mentor_teacher_name?.toLowerCase().includes(q);
       if (!matchName && !matchClass && !matchSection && !matchMentor) return false;
     }
 
@@ -244,22 +256,26 @@ export default function GroupManagementView({
     return true;
   });
 
-  const getActionMenuItems = (grp) => [
+  const getActionMenuItems = (grp: AcademicGroup) => [
     {
       label: "Edit Group",
       icon: EditIcon,
       onClick: () => handleOpenEdit(grp),
     },
-    { divider: true },
-    {
-      label: "Delete Group",
-      icon: TrashIcon,
-      danger: true,
-      onClick: () => handleDeletePrompt(grp),
-    },
+    ...(canMigrateDelete
+      ? [
+          { divider: true },
+          {
+            label: "Delete Group",
+            icon: TrashIcon,
+            danger: true,
+            onClick: () => handleDeletePrompt(grp),
+          },
+        ]
+      : []),
   ];
 
-  // Table Columns (Rank column removed)
+  // Table Columns
   const tableColumns = [
     {
       key: "index",
@@ -267,7 +283,7 @@ export default function GroupManagementView({
       align: "center",
       headerClassName: "w-14 text-center font-mono text-xs",
       cellClassName: "w-14 text-center font-mono text-xs",
-      render: (_, rowIdx) => (
+      render: (_: any, rowIdx: number) => (
         <span className="font-mono text-xs font-bold theme-text-secondary">
           {rowIdx + 1}
         </span>
@@ -278,7 +294,7 @@ export default function GroupManagementView({
       header: "Group Name",
       headerClassName: "min-w-[160px] sm:min-w-[200px]",
       cellClassName: "min-w-[160px] sm:min-w-[200px]",
-      render: (grp) => (
+      render: (grp: AcademicGroup) => (
         <span className="font-bold text-sm theme-text-primary block py-1">
           {grp.name}
         </span>
@@ -289,9 +305,9 @@ export default function GroupManagementView({
       header: "Class",
       headerClassName: "min-w-[140px] sm:min-w-[180px]",
       cellClassName: "min-w-[140px] sm:min-w-[180px]",
-      render: (grp) => (
+      render: (grp: AcademicGroup) => (
         <span className="text-xs font-semibold theme-text-primary">
-          {grp.student_class_name || "Academic Class"}
+          {(grp as any).student_class_name || "Academic Class"}
         </span>
       ),
     },
@@ -300,9 +316,9 @@ export default function GroupManagementView({
       header: "Section",
       headerClassName: "min-w-[140px] sm:min-w-[180px]",
       cellClassName: "min-w-[140px] sm:min-w-[180px]",
-      render: (grp) => (
+      render: (grp: AcademicGroup) => (
         <span className="text-xs font-semibold theme-text-secondary">
-          {grp.section_name || "Direct Class Level"}
+          {(grp as any).section_name || "Direct Class Level"}
         </span>
       ),
     },
@@ -311,11 +327,11 @@ export default function GroupManagementView({
       header: "Assigned Mentor",
       headerClassName: "min-w-[160px] sm:min-w-[200px]",
       cellClassName: "min-w-[160px] sm:min-w-[200px]",
-      render: (grp) => (
+      render: (grp: AcademicGroup) => (
         <div className="flex items-center gap-1.5 text-xs theme-text-secondary py-1">
           <TeacherIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
-          <span className={`font-semibold ${grp.mentor_teacher_name ? "theme-text-primary" : "theme-text-muted italic"}`}>
-            {grp.mentor_teacher_name || "Unassigned"}
+          <span className={`font-semibold ${(grp as any).mentor_teacher_name ? "theme-text-primary" : "theme-text-muted italic"}`}>
+            {(grp as any).mentor_teacher_name || "Unassigned"}
           </span>
         </div>
       ),
@@ -326,9 +342,9 @@ export default function GroupManagementView({
       align: "center",
       headerClassName: "w-24 text-center",
       cellClassName: "w-24 text-center",
-      render: (grp) => (
+      render: (grp: AcademicGroup) => (
         <span className="text-xs font-bold font-mono theme-accent px-2.5 py-0.5 rounded-lg theme-bg-accent-soft/40 border theme-border inline-block">
-          {grp.student_count || 0}
+          {(grp as any).student_count || grp.total_students || 0}
         </span>
       ),
     },
@@ -338,7 +354,7 @@ export default function GroupManagementView({
       align: "right",
       headerClassName: "w-16 text-right",
       cellClassName: "w-16 text-right",
-      render: (grp) => (
+      render: (grp: AcademicGroup) => (
         <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
           <ActionMenu items={getActionMenuItems(grp)} align="right" />
         </div>
@@ -347,7 +363,7 @@ export default function GroupManagementView({
   ];
 
   // Card Renderer
-  const renderGroupCard = (grp) => (
+  const renderGroupCard = (grp: AcademicGroup) => (
     <div
       key={grp.id}
       onClick={() => handleOpenEdit(grp)}
@@ -360,8 +376,8 @@ export default function GroupManagementView({
               {grp.name}
             </h3>
             <p className="text-xs font-medium theme-text-secondary mt-1 truncate">
-              {grp.student_class_name || "Class"}
-              {grp.section_name ? ` • ${grp.section_name}` : ""}
+              {(grp as any).student_class_name || "Class"}
+              {(grp as any).section_name ? ` • ${(grp as any).section_name}` : ""}
             </p>
           </div>
 
@@ -372,7 +388,7 @@ export default function GroupManagementView({
 
         <div className="text-xs theme-text-secondary flex items-center justify-between">
           <span>Mentor:</span>
-          <span className="font-semibold theme-text-primary">{grp.mentor_teacher_name || "Unassigned"}</span>
+          <span className="font-semibold theme-text-primary">{(grp as any).mentor_teacher_name || "Unassigned"}</span>
         </div>
       </div>
     </div>
@@ -390,7 +406,7 @@ export default function GroupManagementView({
               type="search"
               size="md"
               value={searchQuery}
-              onChange={(val) => setSearchQuery(val)}
+              onChange={(val: string) => setSearchQuery(val)}
               placeholder="Search groups, mentor..."
               clearable={true}
             />
@@ -456,7 +472,7 @@ export default function GroupManagementView({
           data={filteredGroups}
           loading={loading}
           loadingMessage="Loading study groups..."
-          keyExtractor={(g, idx) => g.id || `grp_${idx}`}
+          keyExtractor={(g: AcademicGroup, idx: number) => g.id || `grp_${idx}`}
           cellPaddingClass="py-3.5 px-4 sm:px-5"
           headerCellClassName="py-3 px-4 sm:px-5 text-xs uppercase tracking-wider font-bold"
           emptyIcon={GroupIcon}
@@ -466,7 +482,7 @@ export default function GroupManagementView({
               ? "No groups match the applied search or filter criteria."
               : "Get started by creating your first study group or circle."
           }
-          onRowClick={(grp) => handleOpenEdit(grp)}
+          onRowClick={(grp: AcademicGroup) => handleOpenEdit(grp)}
         />
       ) : (
         <DataCardGrid
@@ -497,7 +513,7 @@ export default function GroupManagementView({
           itemName={deletingGroup.name}
           itemType="group"
           impactData={{
-            direct_students: deletingGroup.student_count || 0,
+            direct_students: (deletingGroup as any).student_count || deletingGroup.total_students || 0,
           }}
           onDirectDelete={performDirectDelete}
           onMigrateOpen={() => {
@@ -527,3 +543,4 @@ export default function GroupManagementView({
     </div>
   );
 }
+
