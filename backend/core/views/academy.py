@@ -305,18 +305,31 @@ class StudentClassViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='metrics')
     def metrics(self, request):
-        tenant_id = get_scoped_tenant_id(request)
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
         filter_kwargs = {'is_deleted': False}
         if tenant_id:
             filter_kwargs['institution_id'] = tenant_id
+        elif not (request.user.is_superuser or getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            filter_kwargs['institution_id'] = None
 
-        total_classes = StudentClass.objects.filter(**filter_kwargs).count()
-        total_enrolled = Student.objects.filter(student_class__isnull=False, **filter_kwargs).count()
+        active_classes = StudentClass.objects.filter(**filter_kwargs)
+        total_classes = active_classes.count()
+        total_enrolled = Student.objects.filter(student_class__in=active_classes, is_deleted=False).count()
         avg_students = round(total_enrolled / total_classes, 1) if total_classes > 0 else 0.0
+
+        dept_kwargs = {'is_deleted': False}
+        if tenant_id:
+            dept_kwargs['institution_id'] = tenant_id
+        elif not (request.user.is_superuser or getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            dept_kwargs['institution_id'] = None
+        from core.models.academy import AcademicDepartment
+        total_departments = AcademicDepartment.objects.filter(**dept_kwargs).count()
+
         return Response({
             "total_classes": total_classes,
             "total_enrolled_students": total_enrolled,
-            "avg_students_per_class": avg_students
+            "avg_students_per_class": avg_students,
+            "total_departments": total_departments
         }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='delete-with-migration')
@@ -392,21 +405,27 @@ class StudentGroupViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='metrics')
     def metrics(self, request):
-        tenant_id = get_scoped_tenant_id(request)
+        tenant_id = get_scoped_tenant_id(request) or getattr(request.user, 'institution_id', None)
         filter_kwargs = {'is_deleted': False}
         if tenant_id:
             filter_kwargs['institution_id'] = tenant_id
+        elif not (request.user.is_superuser or getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN'):
+            filter_kwargs['institution_id'] = None
 
         active_groups = StudentGroup.objects.filter(**filter_kwargs)
         total_groups = active_groups.count()
-        total_assigned = Student.objects.filter(student_group__isnull=False, **filter_kwargs).count()
+        total_assigned = Student.objects.filter(student_group__in=active_groups, is_deleted=False).count()
         total_capacity = sum(g.capacity for g in active_groups if g.capacity > 0)
         available_seats = max(0, total_capacity - total_assigned)
+        total_classes = active_groups.filter(student_class__isnull=False).values('student_class').distinct().count()
+        active_mentors = active_groups.filter(mentor_teacher__isnull=False).values('mentor_teacher').distinct().count()
         return Response({
             "total_groups": total_groups,
             "total_assigned_students": total_assigned,
             "total_capacity": total_capacity,
-            "available_seats": available_seats
+            "available_seats": available_seats,
+            "total_classes": total_classes,
+            "active_mentors": active_mentors
         }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='delete-with-migration')

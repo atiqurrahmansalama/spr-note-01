@@ -40,6 +40,8 @@ User = get_user_model()
 class ClassSectionSerializer(serializers.ModelSerializer):
     student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
     student_class_code = serializers.CharField(source='student_class.code', read_only=True, default='')
+    department = serializers.CharField(source='student_class.department_id', read_only=True, default=None)
+    department_name = serializers.CharField(source='student_class.department.name', read_only=True, default='')
     branch_name = serializers.CharField(source='branch.branch_name', read_only=True, default='')
     branch_code = serializers.CharField(source='branch.branch_code', read_only=True, default='')
     class_teacher_name = serializers.CharField(source='class_teacher.user.name', read_only=True, default='')
@@ -53,6 +55,7 @@ class ClassSectionSerializer(serializers.ModelSerializer):
         model = ClassSection
         fields = [
             'id', 'student_class', 'student_class_name', 'student_class_code',
+            'department', 'department_name',
             'branch', 'branch_name', 'branch_code',
             'section_name', 'section_type', 'room_number', 'max_capacity',
             'class_teacher', 'class_teacher_name', 'class_teacher_phone', 'class_teacher_avatar',
@@ -63,6 +66,7 @@ class ClassSectionSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'created_at', 'updated_at',
             'student_class_name', 'student_class_code',
+            'department', 'department_name',
             'branch_name', 'branch_code',
             'class_teacher_name', 'class_teacher_phone', 'class_teacher_avatar',
             'enrolled_students', 'capacity_percentage', 'group_count'
@@ -289,6 +293,8 @@ class StudentGroupSerializer(serializers.ModelSerializer):
     student_class = serializers.PrimaryKeyRelatedField(queryset=StudentClass.objects.all(), required=True, allow_null=False)
     student_class_name = serializers.CharField(source='student_class.name', read_only=True, default='')
     student_class_code = serializers.CharField(source='student_class.code', read_only=True, default='')
+    department = serializers.CharField(source='student_class.department_id', read_only=True, default=None)
+    department_name = serializers.CharField(source='student_class.department.name', read_only=True, default='')
     section = serializers.PrimaryKeyRelatedField(queryset=ClassSection.objects.all(), required=False, allow_null=True)
     section_name = serializers.CharField(source='section.section_name', read_only=True, default='')
     section_type = serializers.CharField(source='section.section_type', read_only=True, default='')
@@ -304,6 +310,7 @@ class StudentGroupSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'institution', 'institution_name', 'name',
             'student_class', 'student_class_name', 'student_class_code',
+            'department', 'department_name',
             'section', 'section_name', 'section_type',
             'department_type', 'mentor_teacher', 'mentor_teacher_name', 'mentor_teacher_phone',
             'capacity', 'is_active', 'is_deleted', 'student_count', 'available_seats',
@@ -312,6 +319,7 @@ class StudentGroupSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'created_at', 'updated_at', 'institution_name',
             'student_class_name', 'student_class_code',
+            'department', 'department_name',
             'section_name', 'section_type',
             'student_count', 'available_seats', 'capacity_percentage'
         ]

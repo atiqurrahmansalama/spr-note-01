@@ -1,134 +1,141 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../../../i18n';
-import KpiMetricsWidget from '../components/widgets/KpiMetricsWidget';
-import QuickActionsWidget from '../components/widgets/QuickActionsWidget';
-import UpcomingEventsWidget from '../components/widgets/UpcomingEventsWidget';
+import DashboardGridEngine from '../components/DashboardGridEngine';
 import { useDashboardData } from '../hooks/useDashboardData';
-import type { DashboardMetric, DashboardQuickAction, CalendarEventItem } from '../types';
-import { 
-  HomeIcon, 
-  DutyIcon, 
-  GateIcon, 
-  LeaveIcon, 
+import { getSavedLayout, saveLayout } from '../widgetRegistry';
+import type { DashboardLayoutItem, DashboardMetric, DashboardQuickAction } from '../types';
+import { useTenant } from '../../../context/TenantContext';
+import {
+  BanknotesIcon,
+  AdmissionIcon,
   BuildingOfficeIcon,
-  GroupsIcon,
+  AttendanceIcon,
+  DocumentTextIcon,
 } from '../../../components/ui/Icons';
 
-export default function StaffOperatorDashboardView() {
+export interface StaffOperatorDashboardViewProps {
+  isEditMode?: boolean;
+  onOpenWidgetCatalog?: () => void;
+}
+
+export default function StaffOperatorDashboardView({
+  isEditMode = false,
+  onOpenWidgetCatalog,
+}: StaffOperatorDashboardViewProps) {
   const { t, formatNumber } = useTranslation('dashboard');
   const navigate = useNavigate();
-  const { 
-    totalBeds, 
-    allocatedBeds, 
-    dormitoryOccupancyRate, 
-    totalStaff 
+  const { activeTenantId } = useTenant();
+  const {
+    pulseData,
+    pendingAdmissionsCount,
+    upcomingEvents,
   } = useDashboardData();
 
-  const vacantBeds = Math.max(0, totalBeds - allocatedBeds);
+  const [layoutItems, setLayoutItems] = React.useState<DashboardLayoutItem[]>(() =>
+    getSavedLayout(activeTenantId || 'default', 'STAFF')
+  );
+
+  const handleUpdateLayout = (newItems: DashboardLayoutItem[]) => {
+    setLayoutItems(newItems);
+    saveLayout(activeTenantId || 'default', 'STAFF', newItems);
+  };
 
   const metrics: DashboardMetric[] = [
     {
-      id: 'bed_occupancy',
-      label: t('bedOccupancy', 'Dormitory Occupancy'),
-      value: `${formatNumber(dormitoryOccupancyRate)}%`,
-      subLabel: `${formatNumber(allocatedBeds)} of ${formatNumber(totalBeds)} beds allocated`,
-      trend: { value: `${formatNumber(vacantBeds)} beds vacant`, isPositive: true },
-      icon: HomeIcon,
-      color: 'accent',
-      onClick: () => navigate('/academy/residential-quarters'),
-    },
-    {
-      id: 'gate_passes',
-      label: t('gatePasses', 'Gate Passes Today'),
-      value: 16,
-      subLabel: '14 returned, 2 active',
-      trend: { value: 'Normal flow', isPositive: true },
-      icon: GateIcon,
+      id: 'staff_counter_collection',
+      label: "Today's Fee Collection",
+      value: '৳ 48,500',
+      subLabel: '14 transactions completed',
+      trend: { value: 'Counter Active', isPositive: true },
+      icon: BanknotesIcon,
       color: 'emerald',
-      onClick: () => navigate('/shortcuts'),
+      onClick: () => navigate('/finance/ledger'),
     },
     {
-      id: 'staff_on_duty',
-      label: 'Staff On Duty Today',
-      value: totalStaff > 0 ? Math.round(totalStaff * 0.75) : 18,
-      subLabel: 'Shift 1 & Shift 2 active',
-      trend: { value: 'Full roster', isPositive: true },
-      icon: DutyIcon,
-      color: 'purple',
-      onClick: () => navigate('/staff/attendance'),
-    },
-    {
-      id: 'pending_leaves',
-      label: 'Pending Leave Requests',
-      value: 3,
-      subLabel: '2 students, 1 staff',
-      trend: { value: 'Awaiting approval', isPositive: false },
-      icon: LeaveIcon,
+      id: 'staff_admissions',
+      label: 'Pending Admissions',
+      value: pendingAdmissionsCount,
+      subLabel: 'Awaiting birth certificate verification',
+      trend: { value: 'Urgent', isPositive: false },
+      icon: AdmissionIcon,
       color: 'amber',
-      onClick: () => navigate('/staff/roster'),
+      onClick: () => navigate('/student-management/admission?tab=applications'),
+    },
+    {
+      id: 'staff_dorm_beds',
+      label: 'Allocated Hostel Beds',
+      value: '164 / 180',
+      subLabel: '16 vacancies remaining',
+      trend: { value: '91% Full', isPositive: true },
+      icon: BuildingOfficeIcon,
+      color: 'purple',
+      onClick: () => navigate('/academy/residential'),
+    },
+    {
+      id: 'staff_attendance',
+      label: 'Staff Presence Today',
+      value: '23 / 24',
+      subLabel: '96% staff attendance',
+      trend: { value: '1 on leave', isPositive: true },
+      icon: AttendanceIcon,
+      color: 'accent',
+      onClick: () => navigate('/staff/attendance'),
     },
   ];
 
   const quickActions: DashboardQuickAction[] = [
     {
-      id: 'residential',
-      title: 'Residential Quarters',
-      description: 'Bed allocations & dorms',
-      icon: HomeIcon,
-      color: 'accent',
-      path: '/academy/residential-quarters',
-      onClick: () => navigate('/academy/residential-quarters'),
-    },
-    {
-      id: 'staff_duty',
-      title: t('dutySchedule', 'Daily Staff Duty'),
-      description: 'Roster & shift management',
-      icon: DutyIcon,
-      color: 'purple',
-      path: '/staff/attendance',
-      onClick: () => navigate('/staff/attendance'),
-    },
-    {
-      id: 'staff_roster',
-      title: 'Staff Directory',
-      description: 'Employee profiles & records',
-      icon: GroupsIcon,
+      id: 'fee_counter',
+      title: 'Quick Cash Fee Receipt',
+      description: 'Issue student monthly tuition receipt with barcode',
+      icon: BanknotesIcon,
       color: 'emerald',
-      path: '/staff/roster',
-      onClick: () => navigate('/staff/roster'),
+      path: '/finance/ledger',
     },
     {
-      id: 'campus_structure',
-      title: 'Campus Structure',
-      description: 'Buildings & facilities',
-      icon: BuildingOfficeIcon,
-      color: 'sky',
-      path: '/academy/campus-profile',
-      onClick: () => navigate('/academy/campus-profile'),
+      id: 'new_admission',
+      title: 'Fast Track Admission Entry',
+      description: 'Register incoming applicant and Guardian contact',
+      icon: AdmissionIcon,
+      color: 'accent',
+      path: '/student-management/admission',
+    },
+    {
+      id: 'id_card_studio',
+      title: 'ID Cards & Certificate Print',
+      description: 'Batch export student smart cards & badges',
+      icon: DocumentTextIcon,
+      color: 'purple',
+      path: '/print-studio',
     },
   ];
 
-  const dutyEvents: CalendarEventItem[] = [
-    { id: '1', title: 'Main Gate Supervision (Evening Shift)', date: '2026-09-14', type: 'EVENT', impact: 'Ustadh Rayhan' },
-    { id: '2', title: 'Dormitory Headcount Inspection', date: '2026-09-14', type: 'MEETING', impact: 'Warden Team' },
-    { id: '3', title: 'Campus Facility Maintenance Check', date: '2026-09-18', type: 'EVENT', impact: 'Operations Dept' },
-  ];
+  const widgetPropsMap = {
+    kpi_metrics: {
+      metrics,
+      cols: 4,
+    },
+    attendance_pulse: {
+      data: pulseData,
+      title: 'Campus Attendance Pulse',
+    },
+    upcoming_events: {
+      items: upcomingEvents,
+    },
+    quick_actions: {
+      actions: quickActions,
+    },
+  };
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* 1. Staff & Operations KPI Row */}
-      <KpiMetricsWidget metrics={metrics} />
-
-      {/* 2. Operations Quick Action Hub */}
-      <QuickActionsWidget actions={quickActions} />
-
-      {/* 3. Daily Facility & Duty Schedules */}
-      <UpcomingEventsWidget 
-        events={dutyEvents} 
-        title="Today's Operational Duties & Shifts" 
-        onViewCalendar={() => navigate('/academy/calendar-events')} 
-      />
-    </div>
+    <DashboardGridEngine
+      items={layoutItems}
+      role="STAFF"
+      isEditMode={isEditMode}
+      onUpdateItems={handleUpdateLayout}
+      onOpenWidgetCatalog={onOpenWidgetCatalog}
+      widgetPropsMap={widgetPropsMap}
+    />
   );
 }

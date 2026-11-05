@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type DashboardRole = 'SUPER_ADMIN' | 'ADMIN' | 'TEACHER' | 'STAFF' | 'GUARDIAN';
+export type DashboardRole = 'SUPER_ADMIN' | 'ADMIN' | 'TEACHER' | 'STAFF' | 'STUDENT' | 'GUARDIAN';
 
 export interface DashboardMetric {
   id: string;
@@ -68,4 +68,94 @@ export interface CalendarEventItem {
   type: 'HOLIDAY' | 'EXAM' | 'MEETING' | 'EVENT';
   impact?: string;
   daysRemaining?: number;
+}
+
+export interface ProgressItem {
+  id: string;
+  label: string;
+  percentage: number;
+  subLabel?: string;
+  color?: 'emerald' | 'amber' | 'purple' | 'accent' | 'sky';
+}
+
+export interface HifzProgressData {
+  studentName?: string;
+  currentJuz: number;
+  completedJuz: number;
+  currentSurah: string;
+  currentAyah: number;
+  sabaq: string;
+  sabaqStatus: 'EXCELLENT' | 'GOOD' | 'NEEDS_PRACTICE';
+  sabqi: string;
+  dawr: string;
+  dailyMistakes: number;
+  dailyStucks: number;
+  lastExamScore?: number;
+}
+
+export interface FinanceOverviewData {
+  todayCollection: number;
+  monthlyTotal: number;
+  pendingDues: number;
+  collectionRate: number;
+  recentTransactions: Array<{
+    id: string;
+    studentName: string;
+    studentClass: string;
+    amount: number;
+    method: string;
+    time: string;
+  }>;
+}
+
+export interface AdmissionPipelineData {
+  totalApplications: number;
+  underReview: number;
+  interviewScheduled: number;
+  approved: number;
+  enrolled: number;
+}
+
+export interface ResidentialOccupancyData {
+  totalBeds: number;
+  occupiedBeds: number;
+  occupancyRate: number;
+  presentTonight: number;
+  onLeave: number;
+}
+
+export interface NoticeItem {
+  id: string;
+  title: string;
+  category: 'ACADEMIC' | 'EXAM' | 'ADMIN' | 'HOLIDAY';
+  date: string;
+  priority: 'HIGH' | 'NORMAL' | 'LOW';
+  content: string;
+}
+
+export type WidgetCategory =
+  | 'METRICS'
+  | 'ACADEMIC'
+  | 'ATTENDANCE'
+  | 'FINANCE'
+  | 'OPERATIONS'
+  | 'COMMUNICATION'
+  | 'SYSTEM';
+
+export interface WidgetDefinition {
+  id: string;
+  title: string;
+  description: string;
+  category: WidgetCategory;
+  allowedRoles: DashboardRole[];
+  defaultColSpan: 1 | 2 | 3;
+  requiredFeatureKey?: string;
+  component: React.ComponentType<any>;
+}
+
+export interface DashboardLayoutItem {
+  widgetId: string;
+  order: number;
+  colSpan: 1 | 2 | 3;
+  isVisible: boolean;
 }

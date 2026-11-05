@@ -10,6 +10,9 @@ import {
   GroupsIcon, 
   BuildingOfficeIcon,
   ShieldCheckIcon,
+  AdjustmentsHorizontalIcon,
+  CheckCircleIcon,
+  UserIcon,
 } from '../../../components/ui/Icons';
 
 export interface DashboardHeaderProps {
@@ -20,6 +23,8 @@ export interface DashboardHeaderProps {
   isSuperAdmin: boolean;
   academicYearName?: string;
   onQuickAction?: () => void;
+  isEditMode?: boolean;
+  onToggleEditMode?: () => void;
 }
 
 const ROLE_OPTIONS: Array<{
@@ -34,7 +39,8 @@ const ROLE_OPTIONS: Array<{
   { id: 'ADMIN', labelKey: 'principalTag', defaultLabel: 'Principal / Admin', tagKey: 'principalTag', defaultTag: 'Institutional Head', Icon: BuildingOfficeIcon },
   { id: 'TEACHER', labelKey: 'teacherTag', defaultLabel: 'Teacher / Ustadh', tagKey: 'teacherTag', defaultTag: 'Classroom & Lessons', Icon: TeacherIcon },
   { id: 'STAFF', labelKey: 'staffTag', defaultLabel: 'Staff & Operations', tagKey: 'staffTag', defaultTag: 'Operations & Hostels', Icon: GroupsIcon },
-  { id: 'GUARDIAN', labelKey: 'guardianTag', defaultLabel: 'Guardian / Student', tagKey: 'guardianTag', defaultTag: 'Parent / Student Portal', Icon: AcademicCapIcon },
+  { id: 'STUDENT', labelKey: 'studentTag', defaultLabel: 'Student Portal', tagKey: 'studentTag', defaultTag: 'Student Self-Desk', Icon: AcademicCapIcon },
+  { id: 'GUARDIAN', labelKey: 'guardianTag', defaultLabel: 'Parent / Guardian', tagKey: 'guardianTag', defaultTag: 'Parent Portal', Icon: UserIcon },
 ];
 
 export default function DashboardHeader({
@@ -45,6 +51,8 @@ export default function DashboardHeader({
   isSuperAdmin,
   academicYearName = '2026-2027',
   onQuickAction,
+  isEditMode = false,
+  onToggleEditMode,
 }: DashboardHeaderProps) {
   const { t, formatDate } = useTranslation('dashboard');
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
@@ -96,8 +104,34 @@ export default function DashboardHeader({
         </p>
       </div>
 
-      {/* Right Controls: Date Badge & Super Admin Role Switcher */}
+      {/* Right Controls: Date Badge, Customize Toggle & Super Admin Role Switcher */}
       <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+        {/* Customize Layout Toggle Button */}
+        {onToggleEditMode && (
+          <button
+            type="button"
+            onClick={onToggleEditMode}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs ${
+              isEditMode
+                ? 'theme-bg-accent theme-accent-text border-transparent ring-2 ring-[var(--accent-main)]/30'
+                : 'theme-bg-surface hover:theme-bg-sub theme-text-primary border theme-border'
+            }`}
+            title={isEditMode ? 'Exit Customization Mode' : 'Customize & Drag Dashboard Widgets'}
+          >
+            {isEditMode ? (
+              <>
+                <CheckCircleIcon className="w-3.5 h-3.5" />
+                <span>{t('exitCustomize', 'Done Customizing')}</span>
+              </>
+            ) : (
+              <>
+                <AdjustmentsHorizontalIcon className="w-3.5 h-3.5 theme-accent" />
+                <span>{t('customizeDashboard', 'Customize')}</span>
+              </>
+            )}
+          </button>
+        )}
+
         {/* Today's Date Badge */}
         <div className="px-3 py-1.5 rounded-xl theme-bg-surface border theme-border shadow-xs flex items-center gap-2 theme-text-secondary text-xs font-medium">
           <CalendarIcon className="w-3.5 h-3.5 opacity-70" />

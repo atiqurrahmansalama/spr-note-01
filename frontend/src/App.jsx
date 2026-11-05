@@ -181,11 +181,11 @@ export default function App() {
                 {/* Attendance Settings Route */}
                 <Route path="/attendance/settings" element={<FeatureGuard sectionKey="attendance_policies_slots"><AttendanceSettingsView /></FeatureGuard>} />
                 <Route path="/student-management/departments" element={<FeatureGuard sectionKey="student_departments"><DepartmentManagementView /></FeatureGuard>} />
-                <Route path="/student-management/classes" element={<FeatureGuard sectionKey="student_classes"><ClassManagementView /></FeatureGuard>} />
-                <Route path="/student-management/groups" element={<FeatureGuard sectionKey="student_groups"><GroupManagementView /></FeatureGuard>} />
+                <Route path="/student-management/classes" element={<Navigate to="/academy/classes-groups?tab=classes" replace />} />
+                <Route path="/student-management/groups" element={<Navigate to="/academy/classes-groups?tab=groups" replace />} />
                 <Route path="/groups-students" element={<FeatureGuard sectionKey="student_roster"><StudentDirectoryView /></FeatureGuard>} />
                 <Route path="/student-roster" element={<FeatureGuard sectionKey="student_roster"><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
-                <Route path="/group-roster" element={<FeatureGuard sectionKey="student_groups"><GroupManagementView /></FeatureGuard>} />
+                <Route path="/group-roster" element={<Navigate to="/academy/classes-groups?tab=groups" replace />} />
                 <Route path="/short-admission" element={<Navigate to="/admission" replace />} />
                 <Route path="/admission/short" element={<Navigate to="/admission" replace />} />
                 <Route path="/admission" element={<FeatureGuard sectionKey={["student_admission", "student_quick_admission", "student_roster"]}><StudentAdmissionView /></FeatureGuard>} />
@@ -200,8 +200,14 @@ export default function App() {
                 {/* Academy Multi-Branch, Section & Period Routes */}
                 <Route path="/academy/campus-profile" element={<CampusProfileHubView />} />
                 <Route path="/campus-profile" element={<CampusProfileHubView />} />
-                <Route path="/academy/classes-groups" element={<FeatureGuard sectionKey="student_classes"><ClassesGroupsHubView /></FeatureGuard>} />
-                <Route path="/classes-groups" element={<FeatureGuard sectionKey="student_classes"><ClassesGroupsHubView /></FeatureGuard>} />
+                <Route path="/academy/classes-groups" element={<ClassesGroupsHubView />} />
+                <Route path="/classes-groups" element={<ClassesGroupsHubView />} />
+                <Route path="/academy/classes-sections" element={<ClassesGroupsHubView />} />
+                <Route path="/classes-sections" element={<ClassesGroupsHubView />} />
+                <Route path="/academy/classes" element={<ClassesGroupsHubView />} />
+                <Route path="/classes" element={<ClassesGroupsHubView />} />
+                <Route path="/academy/sections" element={<ClassesGroupsHubView />} />
+                <Route path="/academy/groups" element={<ClassesGroupsHubView />} />
                 <Route path="/academy/branches" element={<FeatureGuard sectionKey="academic_branches"><BranchManagementView /></FeatureGuard>} />
                 <Route path="/academy/periods" element={<FeatureGuard sectionKey="class_period_slots"><RoutineCurriculumHubView /></FeatureGuard>} />
                 <Route path="/academy/calendar-events" element={<CalendarEventsHubView />} />
@@ -290,8 +296,6 @@ export default function App() {
                 <Route path="/transcripts" element={<ExaminationsHubView defaultTab="TRANSCRIPTS" />} />
                 <Route path="/grading-rules" element={<Navigate to="/admin-tools?section=grading-policies" replace />} />
 
-                <Route path="/academy/classes" element={<FeatureGuard sectionKey="student_classes"><ClassManagementView /></FeatureGuard>} />
-                <Route path="/academy/groups" element={<FeatureGuard sectionKey="student_groups"><GroupManagementView /></FeatureGuard>} />
                 <Route path="/academy/departments" element={<FeatureGuard sectionKey="student_departments"><DepartmentManagementView /></FeatureGuard>} />
                 <Route path="/academy/profile" element={<AcademyProfileView />} />
                 <Route path="/academy-profile" element={<AcademyProfileView />} />

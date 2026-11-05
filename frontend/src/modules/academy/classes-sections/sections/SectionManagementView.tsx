@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchWithAuth } from '../../../../utils/authService';
 import { useToast } from '../../../../context/ToastContext';
@@ -12,23 +12,26 @@ import {
   GroupIcon,
   TableIcon,
   Squares2X2Icon,
+  PlusIcon,
 } from '../../../../components/ui/Icons';
 import ActionMenu from '../../../../components/ui/ActionMenu';
-import CustomInput from '../../../../components/ui/CustomInput';
-import { ClassSelect } from '../../../../components/selectors';
 import DataTable from '../../../../components/ui/DataTable';
 import DataCardGrid from '../../../../components/ui/DataCardGrid';
+import EmptyState from '../../../../components/ui/EmptyState';
 import { useRightSidebar, useDrawerRegistration } from '../../../../context/RightSidebarContext';
 import { useTenant } from '../../../../context/TenantContext';
 import SectionForm from './SectionForm';
 import SectionMigrationModal from './SectionMigrationModal';
 import DeleteImpactModal from '../../../../components/common/DeleteImpactModal';
-import { getSections, deleteSection, getBranches } from '../../../../api/academy';
-import { getBranchDisplayName } from '../../../../utils/localStore';
+import ClassesSectionsToolbar from '../components/ClassesSectionsToolbar';
+import { PageContainer } from '../../../../components/layout';
+import { getSections, deleteSection, getBranches, getDepartments } from '../../../../api/academy';
+import { getBranchDisplayName } from '../../../../stores/academicStore';
 import {
   AcademicSection,
   AcademicClass,
   AcademicBranch,
+  AcademicDepartment,
   TeacherUser,
   SectionManagementViewProps,
 } from '../types';
@@ -45,28 +48,33 @@ export default function SectionManagementView({
   const { isSectionEnabled } = useFeatureControl();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const canMigrateDelete = isSectionEnabled('sections_action_migrate_delete');
+  const canMigrateDelete = isSectionEnabled('sections_action_migrate_delete') !== false;
+  const canAddSection = isSectionEnabled('sections_action_add_section') !== false;
 
+  const queryDept = searchParams.get('department') || 'ALL';
   const queryClass = searchParams.get('class') || searchParams.get('student_class') || 'ALL';
 
   const [sections, setSections] = useState<AcademicSection[]>([]);
   const [classes, setClasses] = useState<AcademicClass[]>([]);
+  const [departments, setDepartments] = useState<AcademicDepartment[]>([]);
   const [branches, setBranches] = useState<AcademicBranch[]>([]);
   const [teachers, setTeachers] = useState<TeacherUser[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Filters & View Mode
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [deptFilter, setDeptFilter] = useState<string>(queryDept);
   const [classFilter, setClassFilter] = useState<string>(queryClass);
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
+  const [viewMode, setViewMode] = useState<'table' | 'card'>(() => {
     try {
-      return (localStorage.getItem('spr_sections_view_mode') as 'table' | 'grid') || 'table';
+      const saved = localStorage.getItem('spr_sections_view_mode');
+      return saved === 'card' || saved === 'grid' ? 'card' : 'table';
     } catch {
       return 'table';
     }
   });
 
-  const handleViewModeChange = (mode: 'table' | 'grid') => {
+  const handleViewModeChange = (mode: 'table' | 'card') => {
     setViewMode(mode);
     try {
       localStorage.setItem('spr_sections_view_mode', mode);
@@ -80,20 +88,29 @@ export default function SectionManagementView({
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   useEffect(() => {
+    if (queryDept !== deptFilter) {
+      setDeptFilter(queryDept);
+    }
+  }, [queryDept, deptFilter]);
+
+  useEffect(() => {
     if (queryClass !== classFilter) {
       setClassFilter(queryClass);
     }
   }, [queryClass, classFilter]);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent && sections.length === 0) {
+        setLoading(true);
+      }
       const tenantParam = activeTenantId && activeTenantId !== 'ALL' ? `&institution=${activeTenantId}` : '';
-      const [secRes, classRes, branchRes, teacherRes] = await Promise.allSettled([
+      const [secRes, classRes, branchRes, teacherRes, deptRes] = await Promise.allSettled([
         getSections({ page_size: 500, all: true, ...(activeTenantId && activeTenantId !== 'ALL' ? { institution: activeTenantId } : {}) }),
         fetchWithAuth(`/api/v1/classes/?page_size=500&all=true${tenantParam}`),
         getBranches(),
-        fetchWithAuth('/api/v1/users/'),
+        fetchWithAuth(`/api/v1/staff/?page_size=500${tenantParam}`),
+        getDepartments({ page_size: 500, all: true, ...(activeTenantId && activeTenantId !== 'ALL' ? { institution: activeTenantId } : {}) }),
       ]);
 
       if (secRes.status === 'fulfilled' && secRes.value) {
@@ -106,6 +123,12 @@ export default function SectionManagementView({
         const d = await classRes.value.json();
         const list: AcademicClass[] = Array.isArray(d) ? d : d.results || [];
         setClasses(list.filter((c) => !c.is_deleted));
+      }
+
+      if (deptRes.status === 'fulfilled' && deptRes.value) {
+        const d = deptRes.value;
+        const list = Array.isArray(d) ? d : (d as any).results || [];
+        setDepartments(list.filter((dp: any) => !dp.is_deleted));
       }
 
       if (branchRes.status === 'fulfilled' && branchRes.value) {
@@ -123,17 +146,17 @@ export default function SectionManagementView({
     } finally {
       setLoading(false);
     }
-  }, [showToast, activeTenantId]);
+  }, [showToast, activeTenantId, sections.length]);
 
   useEffect(() => {
     loadData();
 
     const handleTenantChanged = () => {
-      loadData();
+      loadData(false);
     };
 
     const handleSectionUpdated = () => {
-      loadData();
+      loadData(true);
     };
 
     window.addEventListener('spr_tenant_changed', handleTenantChanged);
@@ -175,6 +198,10 @@ export default function SectionManagementView({
     [sections, classes, branches, teachers, classFilter, loadData, closeDrawer]
   );
 
+  const handleAdd = () => {
+    openDrawer('section', { mode: 'add' });
+  };
+
   const handleEdit = (section: AcademicSection) => {
     openDrawer('section', { mode: 'edit', id: section.id });
   };
@@ -201,6 +228,39 @@ export default function SectionManagementView({
     }
   };
 
+  const classMap = useMemo(() => {
+    const map = new Map<string | number, AcademicClass>();
+    classes.forEach((c) => map.set(c.id, c));
+    return map;
+  }, [classes]);
+
+  const eligibleClasses = useMemo(() => {
+    if (deptFilter === 'ALL' || !deptFilter) return classes;
+    return classes.filter(
+      (c) => String(c.department || (c as any).department_id) === String(deptFilter)
+    );
+  }, [classes, deptFilter]);
+
+  const handleDeptFilterChange = (val: string) => {
+    setDeptFilter(val);
+    const newParams = new URLSearchParams(searchParams);
+    if (val === 'ALL' || !val) {
+      newParams.delete('department');
+    } else {
+      newParams.set('department', val);
+    }
+    // If current classFilter does not belong to the selected department, reset class filter
+    if (classFilter !== 'ALL' && val !== 'ALL') {
+      const cls = classMap.get(classFilter);
+      if (cls && String(cls.department || (cls as any).department_id) !== String(val)) {
+        setClassFilter('ALL');
+        newParams.delete('class');
+        newParams.delete('student_class');
+      }
+    }
+    setSearchParams(newParams);
+  };
+
   const handleFilterChange = (setter: (val: string) => void, key: string) => (val: string) => {
     setter(val);
     const newParams = new URLSearchParams(searchParams);
@@ -213,14 +273,23 @@ export default function SectionManagementView({
     setSearchParams(newParams);
   };
 
-  // Filtered dataset by search query & class filter
+  // Filtered dataset by search query, department filter & class filter
   const filteredSections = sections.filter((sec) => {
+    if (!sec) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchName = (sec.section_name || sec.name)?.toLowerCase().includes(q);
       const matchClass = (sec as any).student_class_name?.toLowerCase().includes(q);
       const matchTeacher = (sec as any).class_teacher_name?.toLowerCase().includes(q);
       if (!matchName && !matchClass && !matchTeacher) return false;
+    }
+
+    if (deptFilter !== 'ALL') {
+      const parentClass = classMap.get(sec.student_class);
+      const secDept = sec.department || (sec as any).department_id || parentClass?.department || (parentClass as any)?.department_id;
+      if (String(secDept) !== String(deptFilter)) {
+        return false;
+      }
     }
 
     if (classFilter !== 'ALL' && String(sec.student_class) !== String(classFilter)) {
@@ -312,7 +381,7 @@ export default function SectionManagementView({
       headerClassName: 'w-24 text-center',
       cellClassName: 'w-24 text-center',
       render: (sec: AcademicSection) => (
-        <span className="text-xs font-bold font-mono theme-text-primary px-2.5 py-0.5 rounded-lg theme-bg-sub border theme-border inline-block">
+        <span className="text-xs font-semibold font-mono theme-text-secondary">
           {sec.group_count || 0}
         </span>
       ),
@@ -380,63 +449,64 @@ export default function SectionManagementView({
   );
 
   return (
-    <div className="flex flex-col w-full space-y-3.5">
-      {/* ─── Top Filter & View Toolbar Card ─── */}
-      <div className="p-2.5 sm:p-3 rounded-2xl theme-bg-surface border theme-border shadow-xs flex flex-col sm:flex-row sm:items-end justify-between gap-2.5 sm:gap-3 w-full min-w-0">
-        {/* Left Side: Search Bar + Class Filter */}
-        <div className="flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-2.5 flex-1 min-w-0">
-          <div className="w-full sm:w-56 md:w-64 lg:w-72 shrink-0">
-            <CustomInput
-              label="Search Sections"
-              type="search"
-              size="md"
-              value={searchQuery}
-              onChange={(val: string) => setSearchQuery(val)}
-              placeholder="Search sections, teacher..."
-              clearable={true}
-            />
-          </div>
+    <PageContainer
+      isEmbedded={isEmbedded}
+      maxWidth="7xl"
+      animate={!isEmbedded}
+      className="space-y-3.5"
+    >
+      {/* ─── Reusable Responsive Filter & View Toolbar ─── */}
+      <ClassesSectionsToolbar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search sections by name, room, teacher..."
+        viewMode={viewMode}
+        onViewModeChange={handleViewModeChange}
+        departmentFilter={{
+          value: deptFilter,
+          onChange: handleDeptFilterChange,
+          departments,
+        }}
+        classFilter={{
+          value: classFilter,
+          onChange: handleFilterChange(setClassFilter, 'class'),
+          classes: eligibleClasses,
+        }}
+        totalCount={filteredSections.length}
+        entityName="Sections"
+      />
 
-          <div className="w-full sm:w-52 md:w-56 shrink-0">
-            <ClassSelect
-              label="Filter by Class"
-              placeholder="All Classes"
-              classes={classes}
-              value={classFilter}
-              onChange={handleFilterChange(setClassFilter, 'class')}
-              allowAll={true}
-              allLabel="All Classes"
-              size="md"
-              icon={ClassIcon}
-            />
-          </div>
-        </div>
-
-        {/* Right Side: View Switcher Button */}
-        <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 w-full sm:w-auto pt-1 sm:pt-0 border-t sm:border-t-0 theme-border sm:border-transparent pb-0.5">
-          <button
-            type="button"
-            onClick={() => handleViewModeChange(viewMode === 'grid' ? 'table' : 'grid')}
-            className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
-            title={viewMode === 'grid' ? 'Switch to Table View' : 'Switch to Cards View'}
-          >
-            {viewMode === 'grid' ? (
-              <>
-                <TableIcon className="w-3.5 h-3.5 theme-accent" />
-                <span>Table View</span>
-              </>
-            ) : (
-              <>
-                <Squares2X2Icon className="w-3.5 h-3.5 theme-accent" />
-                <span>Cards View</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Main View Content (Table or Cards Grid) */}
-      {viewMode === 'table' ? (
+      {/* Main View Content (Table or Cards Grid with EmptyState fallback) */}
+      {!loading && filteredSections.length === 0 ? (
+        <EmptyState
+          icon={SectionIcon}
+          iconVariant="sub"
+          title={searchQuery || classFilter !== 'ALL' || deptFilter !== 'ALL' ? 'No Matching Sections' : 'No Sections Found'}
+          description={
+            searchQuery || classFilter !== 'ALL' || deptFilter !== 'ALL'
+              ? 'No sections match the applied search or filter criteria.'
+              : 'Sections allow dividing large classes into structured cohorts or rooms.'
+          }
+          action={
+            searchQuery || classFilter !== 'ALL' || deptFilter !== 'ALL'
+              ? {
+                  label: 'Clear Filters',
+                  onClick: () => {
+                    setSearchQuery('');
+                    handleDeptFilterChange('ALL');
+                    handleFilterChange(setClassFilter, 'class')('ALL');
+                  },
+                }
+              : canAddSection
+              ? {
+                  label: 'Add Section',
+                  icon: PlusIcon,
+                  onClick: () => handleAdd(),
+                }
+              : undefined
+          }
+        />
+      ) : viewMode === 'table' ? (
         <DataTable
           columns={tableColumns}
           data={filteredSections}
@@ -448,7 +518,7 @@ export default function SectionManagementView({
           emptyIcon={SectionIcon}
           emptyTitle="No Sections Found"
           emptySubMessage={
-            searchQuery || classFilter !== 'ALL'
+            searchQuery || classFilter !== 'ALL' || deptFilter !== 'ALL'
               ? 'No sections match the applied search or filter criteria.'
               : 'Get started by creating your first class section division.'
           }
@@ -463,7 +533,7 @@ export default function SectionManagementView({
           emptyIcon={SectionIcon}
           emptyTitle="No Sections Found"
           emptySubMessage={
-            searchQuery || classFilter !== 'ALL'
+            searchQuery || classFilter !== 'ALL' || deptFilter !== 'ALL'
               ? 'No sections match the applied search or filter criteria.'
               : 'Get started by creating your first class section division.'
           }
@@ -486,6 +556,7 @@ export default function SectionManagementView({
             direct_students: (deletingSection as any).enrolled_students || deletingSection.total_students || 0,
             groups: deletingSection.group_count || 0,
           }}
+          onConfirm={performDirectDelete}
           onDirectDelete={performDirectDelete}
           onMigrateOpen={() => {
             setIsDeleteModalOpen(false);
@@ -511,7 +582,7 @@ export default function SectionManagementView({
           }}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 

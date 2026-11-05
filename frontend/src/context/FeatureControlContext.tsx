@@ -3,7 +3,7 @@ import { fetchWithAuth } from "../utils/authService";
 import { useAuth } from "./AuthContext";
 
 // ─── Cache key for per-user evaluated config ────────────────────────────────
-const getCacheKey = (userId: string | number | null) => `spr_evaluated_config_${userId || "anon"}_v4`;
+const getCacheKey = (userId: string | number | null) => `spr_evaluated_config_${userId || "anon"}_v5`;
 
 export const HARD_DEFAULTS: Record<string, boolean> = {
   headerDate: true,

@@ -1,0 +1,14 @@
+export { default as KpiMetricsWidget } from './KpiMetricsWidget';
+export { default as AttendancePulseWidget } from './AttendancePulseWidget';
+export { default as AcademicProgressWidget } from './AcademicProgressWidget';
+export { default as TimetableScheduleWidget } from './TimetableScheduleWidget';
+export { default as QuickActionsWidget } from './QuickActionsWidget';
+export { default as RecentActivityFeedWidget } from './RecentActivityFeedWidget';
+export { default as SystemGatewaysWidget } from './SystemGatewaysWidget';
+export { default as UpcomingEventsWidget } from './UpcomingEventsWidget';
+export { default as HifzQuranProgressWidget } from './HifzQuranProgressWidget';
+export { default as FinanceCollectionWidget } from './FinanceCollectionWidget';
+export { default as AdmissionPipelineWidget } from './AdmissionPipelineWidget';
+export { default as ResidentialOccupancyWidget } from './ResidentialOccupancyWidget';
+export { default as NoticeBoardWidget } from './NoticeBoardWidget';
+

@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
-import { CloseIcon, ChevronLeftIcon } from './Icons';
+import React, { useEffect, useRef, useState } from 'react';
+import { CloseIcon, ArrowLeftIcon, DashboardIcon, HistoryIcon } from './Icons';
 import PanelResizer from './PanelResizer';
 import IconButton from './IconButton';
+import { resolveRouteMeta } from '../layout/routeMeta';
 
 /**
  * Standard Width Presets for Right Sidebar Drawer (in pixels)
@@ -99,16 +100,81 @@ export default function RightSidebarPanel({
   const touchStartYRef = useRef<number | null>(null);
   const touchStartTimeRef = useRef<number | null>(null);
 
+  // Resolve active parent route title for history menu
+  const parentRouteMeta = typeof window !== 'undefined'
+    ? resolveRouteMeta(window.location.pathname, window.location.search)
+    : null;
+  const parentRouteTitle = parentRouteMeta?.title || 'Parent View';
+
+  // Long-press Back Navigation History Menu state
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const backBtnRef = useRef<HTMLDivElement>(null);
+  const longPressTimerRef = useRef<any>(null);
+  const isLongPressRef = useRef(false);
+
+  const startPressTimer = () => {
+    isLongPressRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      setIsHistoryOpen(true);
+    }, 400);
+  };
+
+  const cancelPressTimer = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleBackButtonClick = (e: React.MouseEvent) => {
+    if (isLongPressRef.current) {
+      isLongPressRef.current = false;
+      return;
+    }
+    if (onBack) {
+      onBack();
+    } else if (onClose) {
+      onClose();
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsHistoryOpen(true);
+  };
+
+  // Close history menu on outside click or ESC
+  useEffect(() => {
+    if (!isHistoryOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (backBtnRef.current && !backBtnRef.current.contains(e.target as Node)) {
+        setIsHistoryOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsHistoryOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleEsc);
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleEsc);
+    };
+  }, [isHistoryOpen]);
+
   // ESC key listener to close drawer
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && onClose) {
+      if (e.key === 'Escape' && onClose && !isHistoryOpen) {
         onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, isHistoryOpen]);
 
   // Mobile Swipe-to-Back touch gesture handling (Swipe Left-to-Right to dismiss / go back)
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -166,20 +232,119 @@ export default function RightSidebarPanel({
         />
       )}
 
-      {/* ─── Top Header Bar (Height-equalized with Left Screen Block Header) ─── */}
+      {/* ─── Top Header Bar (Matching Left Screen Block Header navigation pattern) ─── */}
       <div className="theme-bg-surface border-b theme-border px-3 @sm:px-5 py-2 @sm:py-2.5 flex items-center justify-between shrink-0 shadow-md gap-2 h-[48px] @sm:h-[52px]">
-        {/* Left: Clean Icon Back Button + Icon + Title + Breadcrumbs */}
+        {/* Left: Clean Icon Back Button (with Long-Press History Menu) + Current Title only */}
         <div className="flex items-center gap-2 @sm:gap-2.5 min-w-0 flex-1">
-          {/* Back Button (Always present to return cleanly to parent view) */}
+          {/* Back Button with Long-Press history support */}
           {(onBack || onClose) && (
-            <IconButton
-              icon={ChevronLeftIcon}
-              size="sm"
-              variant="ghost"
-              onClick={onBack || onClose}
-              title="Back to parent page"
-              ariaLabel="Back to parent page"
-            />
+            <div ref={backBtnRef} className="relative shrink-0">
+              <IconButton
+                icon={ArrowLeftIcon}
+                size="sm"
+                variant="ghost"
+                onClick={handleBackButtonClick}
+                onMouseDown={startPressTimer}
+                onMouseUp={cancelPressTimer}
+                onMouseLeave={cancelPressTimer}
+                onTouchStart={startPressTimer}
+                onTouchEnd={() => {
+                  cancelPressTimer();
+                  if (!isLongPressRef.current) {
+                    if (onBack) onBack();
+                    else if (onClose) onClose();
+                  }
+                }}
+                onContextMenu={handleContextMenu}
+                title="Back (Press & hold for history)"
+                ariaLabel="Back to previous page"
+              />
+
+              {/* Long-Press History Menu */}
+              {isHistoryOpen && (
+                <div
+                  className="absolute left-0 top-full mt-1.5 z-50 min-w-[220px] max-w-[280px] rounded-2xl theme-bg-surface border theme-border shadow-2xl p-1.5 animate-fade-in select-none"
+                  role="menu"
+                  aria-label="Navigation History"
+                >
+                  <div className="px-3 py-1.5 border-b theme-border text-[10px] font-mono uppercase tracking-wider theme-text-secondary flex items-center justify-between">
+                    <span>Navigation History</span>
+                    <HistoryIcon className="w-3 h-3 opacity-60" />
+                  </div>
+
+                  <div className="py-1 space-y-0.5">
+                    {/* 1. Parent Page (Current View) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsHistoryOpen(false);
+                        if (onClose) onClose();
+                      }}
+                      className="w-full px-2.5 py-2 text-left rounded-xl hover:theme-bg-sub/60 transition flex items-center gap-2.5 cursor-pointer group"
+                    >
+                      <div className="w-6 h-6 rounded-lg theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0 border border-[var(--accent-main)]/20">
+                        <ArrowLeftIcon className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <span className="block text-xs font-bold theme-text-primary truncate group-hover:theme-accent transition-colors">
+                          {parentRouteTitle}
+                        </span>
+                        <span className="block text-[10px] theme-text-secondary truncate">
+                          Return to parent view
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* 2. Optional Sub-step Back */}
+                    {onBack && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsHistoryOpen(false);
+                          onBack();
+                        }}
+                        className="w-full px-2.5 py-2 text-left rounded-xl hover:theme-bg-sub/60 transition flex items-center gap-2.5 cursor-pointer group"
+                      >
+                        <div className="w-6 h-6 rounded-lg theme-bg-sub flex items-center justify-center shrink-0 border theme-border">
+                          <HistoryIcon className="w-3.5 h-3.5 theme-text-secondary" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="block text-xs font-bold theme-text-primary truncate">
+                            Previous Step
+                          </span>
+                          <span className="block text-[10px] theme-text-secondary truncate">
+                            Back one step
+                          </span>
+                        </div>
+                      </button>
+                    )}
+
+                    {/* 3. System Dashboard */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsHistoryOpen(false);
+                        if (onClose) onClose();
+                        window.dispatchEvent(new CustomEvent('spr_navigate_dashboard'));
+                      }}
+                      className="w-full px-2.5 py-2 text-left rounded-xl hover:theme-bg-sub/60 transition flex items-center gap-2.5 cursor-pointer group border-t theme-border pt-1.5 mt-0.5"
+                    >
+                      <div className="w-6 h-6 rounded-lg theme-bg-sub flex items-center justify-center shrink-0 border theme-border">
+                        <DashboardIcon className="w-3.5 h-3.5 theme-text-secondary" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <span className="block text-xs font-bold theme-text-primary truncate">
+                          Dashboard
+                        </span>
+                        <span className="block text-[10px] theme-text-secondary truncate">
+                          Main system overview
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {Icon && (
@@ -188,22 +353,11 @@ export default function RightSidebarPanel({
             </div>
           )}
 
-          <div className="flex flex-col min-w-0 truncate">
-            <div className="flex items-center gap-1.5 min-w-0 truncate">
-              {category && (
-                <span className="text-[11px] @sm:text-xs font-mono font-bold uppercase tracking-wider theme-text-secondary shrink-0">
-                  {category} /
-                </span>
-              )}
-              <span className="text-sm font-bold theme-text-primary truncate">
-                {title}
-              </span>
-            </div>
-            {subtitle && (
-              <span className="text-[10.5px] theme-text-secondary truncate leading-tight">
-                {subtitle}
-              </span>
-            )}
+          {/* Current Page Name Only (No category, No subtitle) */}
+          <div className="flex items-center gap-1.5 min-w-0 truncate">
+            <span className="text-xs @sm:text-sm font-bold theme-text-primary truncate">
+              {title}
+            </span>
           </div>
         </div>
 

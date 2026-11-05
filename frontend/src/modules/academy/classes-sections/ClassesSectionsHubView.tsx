@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import {
   ClassIcon,
   SectionIcon,
@@ -11,10 +11,10 @@ import {
   TeacherIcon,
   SparklesIcon,
 } from '../../../components/ui/Icons';
-import PageHeader from '../../../components/ui/PageHeader';
 import TabSwitcher from '../../../components/ui/TabSwitcher';
 import CustomButton from '../../../components/ui/CustomButton';
 import MetricsGrid from '../../../components/ui/MetricsGrid';
+import ErrorBoundary from '../../../components/ui/ErrorBoundary';
 import { PageContainer } from '../../../components/layout';
 import { fetchWithAuth } from '../../../utils/authService';
 import { useRightSidebar } from '../../../context/RightSidebarContext';
@@ -33,7 +33,17 @@ export default function ClassesSectionsHubView() {
   const { isSectionEnabled } = useFeatureControl();
   const { activeTenantId, isMultiTenantAdmin } = useTenant();
   const { user } = useAuth();
-  const rawTab = searchParams.get('tab');
+  const location = useLocation();
+  const urlTab = searchParams.get('tab');
+  const pathTab =
+    location.pathname === '/academy/sections' || location.pathname === '/sections'
+      ? 'sections'
+      : location.pathname === '/academy/groups' || location.pathname === '/groups'
+      ? 'groups'
+      : null;
+  const isSectionDrawer = searchParams.get('drawer') === 'section';
+  const isGroupDrawer = searchParams.get('drawer') === 'group';
+  const rawTab = urlTab || pathTab || (isSectionDrawer ? 'sections' : isGroupDrawer ? 'groups' : 'classes');
 
   // Super Admin detection across roles, superuser flag, or tenant admin status
   const isSuperAdmin = Boolean(
@@ -137,7 +147,7 @@ export default function ClassesSectionsHubView() {
           total_classes: d.total_classes ?? 0,
           total_enrolled_students: d.total_enrolled_students ?? 0,
           avg_students_per_class: d.avg_students_per_class ?? 0,
-          total_departments: totalDepts,
+          total_departments: d.total_departments ?? totalDepts,
         };
         setClassMetrics(nextClassMetrics);
       }
@@ -173,8 +183,8 @@ export default function ClassesSectionsHubView() {
       if (groupRes.status === 'fulfilled' && groupRes.value.ok) {
         const gd = await groupRes.value.json();
         grpCount = gd.total_groups ?? 0;
-        let mentorsCount = 0;
-        if (groupsListRes.status === 'fulfilled' && groupsListRes.value.ok) {
+        let mentorsCount = gd.active_mentors ?? 0;
+        if (!mentorsCount && groupsListRes.status === 'fulfilled' && groupsListRes.value.ok) {
           const gl = await groupsListRes.value.json();
           const items = Array.isArray(gl) ? gl : gl.results || [];
           mentorsCount = items.filter((i: any) => i.mentor_teacher_name).length;
@@ -231,52 +241,47 @@ export default function ClassesSectionsHubView() {
     };
   }, [loadAllMetrics]);
 
-  // Determine whether 'Classes', 'Sections' and 'Groups' tabs should be shown
-  const isSectionDrawer = searchParams.get('drawer') === 'section';
-  const isGroupDrawer = searchParams.get('drawer') === 'group';
+  // Candidate tabs for Classes, Sections, Groups
+  const candidateTabs = useMemo(() => [
+    { id: 'classes', label: 'Classes', icon: ClassIcon, featureKey: 'classes_tab_classes' },
+    { id: 'sections', label: 'Sections', icon: SectionIcon, featureKey: 'classes_tab_sections' },
+    { id: 'groups', label: 'Groups', icon: GroupIcon, featureKey: 'classes_tab_groups' },
+  ], []);
 
-  const isClassesFeatureEnabled = isSectionEnabled('classes_tab_classes');
-  const isSectionsFeatureEnabled = isSectionEnabled('classes_tab_sections');
-  const isGroupsFeatureEnabled = isSectionEnabled('classes_tab_groups');
+  // Filter tabs if explicitly disabled in Feature & Module Control
+  const TABS = useMemo(() => {
+    const list = candidateTabs.filter((tab) => isSectionEnabled(tab.featureKey) !== false);
+    return list.length > 0 ? list : candidateTabs;
+  }, [candidateTabs, isSectionEnabled]);
 
-  const canAddClass = isSectionEnabled('classes_action_add_class');
-  const canAddSection = isSectionEnabled('sections_action_add_section');
-  const canAddGroup = isSectionEnabled('groups_action_add_group');
+  const defaultTab = TABS[0]?.id || 'classes';
 
-  const hasSectionsData = (sectionMetrics.total_sections ?? 0) > 0;
-  const hasGroupsData = (groupMetrics.total_groups ?? 0) > 0;
-
-  // Super Admin always has access to all feature-enabled tabs regardless of whether data exists or not.
-  // Regular users only see Sections and Groups tabs if there is actual data.
-  const showSectionsTab = isSectionsFeatureEnabled && (isSuperAdmin || hasSectionsData);
-  const showGroupsTab = isGroupsFeatureEnabled && (isSuperAdmin || hasGroupsData);
-
-  // Fallback if current tab query parameter is hidden
-  useEffect(() => {
-    if (!showSectionsTab && rawTab === 'sections') {
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.set('tab', isClassesFeatureEnabled ? 'classes' : (showGroupsTab ? 'groups' : 'classes'));
-      setSearchParams(nextParams, { replace: true });
-    } else if (!showGroupsTab && rawTab === 'groups') {
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.set('tab', isClassesFeatureEnabled ? 'classes' : (showSectionsTab ? 'sections' : 'classes'));
-      setSearchParams(nextParams, { replace: true });
-    }
-  }, [showSectionsTab, showGroupsTab, isClassesFeatureEnabled, rawTab, searchParams, setSearchParams]);
-
+  // Canonical Single Source of Truth: Active tab derived directly from URL searchParams
   const activeTab = useMemo(() => {
-    if ((rawTab === 'sections' || isSectionDrawer) && showSectionsTab) return 'sections';
-    if ((rawTab === 'groups' || isGroupDrawer) && showGroupsTab) return 'groups';
-    if (isClassesFeatureEnabled) return 'classes';
-    if (showSectionsTab) return 'sections';
-    if (showGroupsTab) return 'groups';
-    return 'classes';
-  }, [rawTab, isSectionDrawer, isGroupDrawer, showSectionsTab, showGroupsTab, isClassesFeatureEnabled]);
+    if (rawTab && TABS.some((t) => t.id === rawTab)) return rawTab;
+    return defaultTab;
+  }, [rawTab, TABS, defaultTab]);
+
+  // Track visited tabs to preserve mounted instances across tab switches (zero flicker)
+  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>(() => ({
+    [activeTab]: true,
+  }));
+
+  // Re-synchronize visited tabs whenever activeTab changes
+  useEffect(() => {
+    setVisitedTabs((prev) => (prev[activeTab] ? prev : { ...prev, [activeTab]: true }));
+  }, [activeTab]);
 
   const handleTabChange = (tabId: string) => {
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set('tab', tabId);
-    setSearchParams(nextParams);
+    if (tabId === activeTab) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', tabId);
+        return next;
+      },
+      { replace: true }
+    );
   };
 
   const handlePrimaryAction = () => {
@@ -290,52 +295,16 @@ export default function ClassesSectionsHubView() {
   };
 
   const isPrimaryActionAllowed = useMemo(() => {
-    if (activeTab === 'sections') return canAddSection;
-    if (activeTab === 'groups') return canAddGroup;
-    return canAddClass;
-  }, [activeTab, canAddSection, canAddGroup, canAddClass]);
-
-  const TABS = useMemo(() => {
-    const tabsList: { id: string; label: string; icon: any }[] = [];
-
-    if (isClassesFeatureEnabled) {
-      tabsList.push({
-        id: 'classes',
-        label: 'Classes',
-        icon: ClassIcon,
-      });
-    }
-
-    if (showSectionsTab) {
-      tabsList.push({
-        id: 'sections',
-        label: 'Sections',
-        icon: SectionIcon,
-      });
-    }
-
-    if (showGroupsTab) {
-      tabsList.push({
-        id: 'groups',
-        label: 'Groups',
-        icon: GroupIcon,
-      });
-    }
-
-    return tabsList.length > 0 ? tabsList : [{ id: 'classes', label: 'Classes', icon: ClassIcon }];
-  }, [isClassesFeatureEnabled, showSectionsTab, showGroupsTab]);
-
-  const pageTitle = useMemo(() => {
-    if (showSectionsTab && showGroupsTab) return "Classes & Sections";
-    if (showSectionsTab) return "Classes & Sections";
-    if (showGroupsTab) return "Classes & Groups";
-    return "Academic Classes";
-  }, [showSectionsTab, showGroupsTab]);
+    if (activeTab === 'sections') return isSectionEnabled('sections_action_add_section') !== false;
+    if (activeTab === 'groups') return isSectionEnabled('groups_action_add_group') !== false;
+    return isSectionEnabled('classes_action_add_class') !== false;
+  }, [activeTab, isSectionEnabled]);
 
   const getDynamicCards = () => {
     if (activeTab === 'sections') {
       return [
         {
+          id: 'metric_0',
           label: 'Total Sections',
           value: sectionMetrics.total_sections ?? 0,
           icon: SectionIcon,
@@ -343,6 +312,7 @@ export default function ClassesSectionsHubView() {
           subLabel: 'Active sections',
         },
         {
+          id: 'metric_1',
           label: 'Total Capacity',
           value: sectionMetrics.total_capacity ?? 0,
           icon: StudentIcon,
@@ -350,6 +320,7 @@ export default function ClassesSectionsHubView() {
           subLabel: 'Allocated seats',
         },
         {
+          id: 'metric_2',
           label: 'Enrolled Students',
           value: sectionMetrics.total_enrolled ?? 0,
           icon: StudentIcon,
@@ -357,6 +328,7 @@ export default function ClassesSectionsHubView() {
           subLabel: 'Active enrollment',
         },
         {
+          id: 'metric_3',
           label: 'Occupancy Rate',
           value: `${sectionMetrics.occupancy_rate ?? 0}%`,
           icon: SparklesIcon,
@@ -369,13 +341,15 @@ export default function ClassesSectionsHubView() {
     if (activeTab === 'groups') {
       return [
         {
+          id: 'metric_0',
           label: 'Total Groups',
           value: groupMetrics.total_groups ?? 0,
           icon: GroupIcon,
           color: 'accent',
-          subLabel: 'Study circles & batches',
+          subLabel: 'Active batches',
         },
         {
+          id: 'metric_1',
           label: 'Assigned Students',
           value: groupMetrics.total_assigned_students ?? 0,
           icon: StudentIcon,
@@ -383,6 +357,7 @@ export default function ClassesSectionsHubView() {
           subLabel: 'Group enrollment',
         },
         {
+          id: 'metric_2',
           label: 'Parent Classes',
           value: groupMetrics.total_classes ?? 0,
           icon: ClassIcon,
@@ -390,6 +365,7 @@ export default function ClassesSectionsHubView() {
           subLabel: 'Target classes',
         },
         {
+          id: 'metric_3',
           label: 'Active Mentors',
           value: groupMetrics.active_mentors ?? 0,
           icon: TeacherIcon,
@@ -402,6 +378,7 @@ export default function ClassesSectionsHubView() {
     // Default: 'classes' tab
     return [
       {
+        id: 'metric_0',
         label: 'Total Classes',
         value: classMetrics.total_classes ?? 0,
         icon: ClassIcon,
@@ -409,6 +386,7 @@ export default function ClassesSectionsHubView() {
         subLabel: 'Academic grades',
       },
       {
+        id: 'metric_1',
         label: 'Enrolled Students',
         value: classMetrics.total_enrolled_students ?? 0,
         icon: StudentIcon,
@@ -416,6 +394,7 @@ export default function ClassesSectionsHubView() {
         subLabel: 'Active enrollment',
       },
       {
+        id: 'metric_2',
         label: 'Avg Students / Class',
         value: classMetrics.avg_students_per_class ?? 0,
         icon: DashboardIcon,
@@ -423,16 +402,19 @@ export default function ClassesSectionsHubView() {
         subLabel: 'Class density',
       },
       {
+        id: 'metric_3',
         label: 'Academic Departments',
         value: classMetrics.total_departments ?? 0,
         icon: DepartmentIcon,
         color: 'accent',
-        subLabel: 'Assigned divisions',
+        subLabel: 'Active divisions',
       },
     ];
   };
 
-  const dynamicCards = getDynamicCards();
+  const dynamicCards = useMemo(() => {
+    return getDynamicCards();
+  }, [activeTab, sectionMetrics, groupMetrics, classMetrics]);
 
   const getPrimaryActionText = () => {
     if (activeTab === 'sections') return 'Add Section';
@@ -442,18 +424,12 @@ export default function ClassesSectionsHubView() {
 
   return (
     <PageContainer>
-      {/* 1. Header Overview with Reusable PageHeader */}
-      <PageHeader
-        title={pageTitle}
-        subtitle="Unified academic console for managing academic grades, class sections, and student groups."
-        icon={ClassIcon}
-      />
-
-      {/* 2. Top Toolbar Row: Theme-Aware TabSwitcher on Left + Dynamic Action Button on Far Right */}
+      {/* 1. Top Toolbar Row: Theme-Aware TabSwitcher on Left + Dynamic Action Button on Far Right */}
       <TabSwitcher
         tabs={TABS}
         activeTab={activeTab}
         onChange={handleTabChange}
+        keepRightContentInline={true}
         rightContent={
           isPrimaryActionAllowed ? (
             <CustomButton
@@ -475,26 +451,34 @@ export default function ClassesSectionsHubView() {
         <MetricsGrid items={dynamicCards} />
       </div>
 
-      {/* 4. Tab Body Content (Persistent display switching to eliminate layout jumping) */}
+      {/* 4. Tab Body Content (Mounting active tab within Enterprise Error Boundary, preserved with zero-flicker keep-alive) */}
       <div className="w-full min-h-[460px]">
-        <div className={activeTab === 'classes' ? 'block' : 'hidden'}>
-          <ClassManagementView
-            hideHeader
-            hideMetrics
-            isEmbedded
-            isSuperAdmin={isSuperAdmin}
-            showSectionsTab={showSectionsTab}
-            showGroupsTab={showGroupsTab}
-          />
-        </div>
-        {showSectionsTab && (
-          <div className={activeTab === 'sections' ? 'block' : 'hidden'}>
-            <SectionManagementView hideHeader hideMetrics isEmbedded />
+        {visitedTabs.classes && (
+          <div className={activeTab === 'classes' ? 'block' : 'hidden'}>
+            <ErrorBoundary componentName="Classes Management">
+              <ClassManagementView
+                hideHeader
+                hideMetrics
+                isEmbedded
+                isSuperAdmin={isSuperAdmin}
+                showSectionsTab={true}
+                showGroupsTab={true}
+              />
+            </ErrorBoundary>
           </div>
         )}
-        {showGroupsTab && (
+        {visitedTabs.sections && (
+          <div className={activeTab === 'sections' ? 'block' : 'hidden'}>
+            <ErrorBoundary componentName="Sections Management">
+              <SectionManagementView hideHeader hideMetrics isEmbedded />
+            </ErrorBoundary>
+          </div>
+        )}
+        {visitedTabs.groups && (
           <div className={activeTab === 'groups' ? 'block' : 'hidden'}>
-            <GroupManagementView hideHeader hideMetrics isEmbedded />
+            <ErrorBoundary componentName="Groups Management">
+              <GroupManagementView hideHeader hideMetrics isEmbedded />
+            </ErrorBoundary>
           </div>
         )}
       </div>

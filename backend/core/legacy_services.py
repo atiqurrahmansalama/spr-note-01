@@ -332,16 +332,25 @@ def get_resolved_feature_flags_for_user(user=None):
         if getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser:
             is_super_admin = True
 
+    from .feature_registry import FEATURE_REGISTRY
     if is_super_admin:
+        for item in FEATURE_REGISTRY:
+            flags[item["key"]] = True
+            origins[item["key"]] = "SUPER_ADMIN_BYPASS"
         for k in list(flags.keys()):
             flags[k] = True
     else:
-        from .feature_registry import FEATURE_REGISTRY
         for item in FEATURE_REGISTRY:
             key = item["key"]
-            if key not in flags:
-                flags[key] = False
-                origins[key] = "FALLBACK_DENY"
+            default_val = item.get("default_enabled", True)
+            # If the key is not in flags or was denied solely due to hierarchy fallback, ensure default_enabled applies
+            if key not in flags or origins.get(key) in ("FALLBACK_DENY", "GLOBAL"):
+                if default_val:
+                    flags[key] = True
+                    origins[key] = "REGISTRY_DEFAULT"
+            elif key not in flags:
+                flags[key] = default_val
+                origins[key] = "REGISTRY_DEFAULT" if default_val else "FALLBACK_DENY"
 
     return flags, origins
 

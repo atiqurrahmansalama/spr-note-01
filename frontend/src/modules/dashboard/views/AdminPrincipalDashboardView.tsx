@@ -1,154 +1,157 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../../../i18n';
-import KpiMetricsWidget from '../components/widgets/KpiMetricsWidget';
-import AttendancePulseWidget from '../components/widgets/AttendancePulseWidget';
-import QuickActionsWidget from '../components/widgets/QuickActionsWidget';
-import AcademicProgressWidget from '../components/widgets/AcademicProgressWidget';
-import UpcomingEventsWidget from '../components/widgets/UpcomingEventsWidget';
-import RecentActivityFeedWidget from '../components/widgets/RecentActivityFeedWidget';
+import DashboardGridEngine from '../components/DashboardGridEngine';
 import { useDashboardData } from '../hooks/useDashboardData';
-import type { DashboardMetric, DashboardQuickAction } from '../types';
-import { 
-  GroupsIcon, 
-  TeacherIcon, 
-  AttendanceIcon, 
-  AdmissionIcon, 
-  BellIcon, 
-  CalendarIcon, 
+import { getSavedLayout, saveLayout } from '../widgetRegistry';
+import type { DashboardLayoutItem, DashboardMetric, DashboardQuickAction } from '../types';
+import { useTenant } from '../../../context/TenantContext';
+import {
+  GroupsIcon,
+  AttendanceIcon,
+  SparklesIcon,
+  AdmissionIcon,
+  BanknotesIcon,
+  BookOpenIcon,
+  CalendarIcon,
+  ShieldCheckIcon,
 } from '../../../components/ui/Icons';
 
-export default function AdminPrincipalDashboardView() {
+export interface AdminPrincipalDashboardViewProps {
+  isEditMode?: boolean;
+  onOpenWidgetCatalog?: () => void;
+}
+
+export default function AdminPrincipalDashboardView({
+  isEditMode = false,
+  onOpenWidgetCatalog,
+}: AdminPrincipalDashboardViewProps) {
   const { t, formatNumber } = useTranslation('dashboard');
   const navigate = useNavigate();
-  const { 
-    totalStudents, 
-    totalStaff, 
-    studentAttendanceRate, 
-    staffAttendanceRate,
-    pendingAdmissionsCount,
+  const { activeTenantId } = useTenant();
+  const {
+    totalStudents,
     pulseData,
-    upcomingEvents,
+    pendingAdmissionsCount,
     recentActivities,
+    upcomingEvents,
   } = useDashboardData();
+
+  const [layoutItems, setLayoutItems] = React.useState<DashboardLayoutItem[]>(() =>
+    getSavedLayout(activeTenantId || 'default', 'ADMIN')
+  );
+
+  const handleUpdateLayout = (newItems: DashboardLayoutItem[]) => {
+    setLayoutItems(newItems);
+    saveLayout(activeTenantId || 'default', 'ADMIN', newItems);
+  };
 
   const metrics: DashboardMetric[] = [
     {
-      id: 'students',
-      label: t('totalStudents', 'Enrolled Students'),
+      id: 'enrolled_students',
+      label: t('totalStudents', 'Active Enrollment'),
       value: totalStudents,
-      subLabel: `${formatNumber(totalStudents)} active learners`,
+      subLabel: 'Academic Session 2026-2027',
       trend: { value: '+14 this month', isPositive: true },
       icon: GroupsIcon,
       color: 'accent',
       onClick: () => navigate('/students'),
     },
     {
-      id: 'today_att',
-      label: t('todayAttendance', "Student Attendance"),
-      value: `${formatNumber(studentAttendanceRate)}%`,
-      subLabel: `${formatNumber(pulseData.present)} of ${formatNumber(totalStudents)} present`,
-      trend: { value: '+2.1% vs target', isPositive: true },
+      id: 'attendance_pulse',
+      label: t('todayAttendance', "Today's Attendance"),
+      value: `${pulseData.presentRate}%`,
+      subLabel: `${formatNumber(pulseData.present)} / ${formatNumber(pulseData.total)} present`,
+      trend: { value: '96% staff attendance', isPositive: true },
       icon: AttendanceIcon,
       color: 'emerald',
-      onClick: () => navigate('/attendance/students/monthly-matrix'),
+      onClick: () => navigate('/learning/daily-classroom?tab=attendance'),
     },
     {
-      id: 'staff_att',
-      label: t('staffAttendance', "Staff Attendance"),
-      value: `${formatNumber(staffAttendanceRate)}%`,
-      subLabel: `${formatNumber(totalStaff)} faculty members`,
-      trend: { value: 'Full roster', isPositive: true },
-      icon: TeacherIcon,
+      id: 'today_collection',
+      label: t('todayCollection', "Today's Collection"),
+      value: '৳ 48,500',
+      subLabel: 'Monthly Inflow: ৳ 4,12,000',
+      trend: { value: '83% target met', isPositive: true },
+      icon: BanknotesIcon,
       color: 'purple',
-      onClick: () => navigate('/staff/attendance'),
+      onClick: () => navigate('/finance'),
     },
     {
-      id: 'admissions',
-      label: t('pendingAdmissions', 'Pending Admissions'),
+      id: 'pending_admissions',
+      label: t('pendingApplications', 'New Applications'),
       value: pendingAdmissionsCount,
-      subLabel: 'Review applications',
-      trend: { value: 'Active cycle', isPositive: true },
+      subLabel: 'Pending review & verification',
+      trend: { value: '6 interview scheduled', isPositive: true },
       icon: AdmissionIcon,
       color: 'amber',
-      onClick: () => navigate('/admission'),
+      onClick: () => navigate('/student-management/admission?tab=applications'),
     },
   ];
 
   const quickActions: DashboardQuickAction[] = [
     {
-      id: 'new_admission',
-      title: t('newAdmission', 'New Admission'),
-      description: 'Enroll student record',
+      id: 'admission_action',
+      title: 'New Student Admission',
+      description: 'Register student profile, quota & Guardian binding',
       icon: AdmissionIcon,
       color: 'accent',
-      path: '/admission',
-      onClick: () => navigate('/admission'),
+      path: '/student-management/admission',
     },
     {
-      id: 'take_att',
-      title: t('logAttendance', 'Class Attendance'),
-      description: 'Daily roll-call matrix',
+      id: 'daily_rollcall',
+      title: 'Institutional Roll Call',
+      description: 'Audit section-wise live student & staff attendance',
       icon: AttendanceIcon,
       color: 'emerald',
-      path: '/attendance/students/monthly-matrix',
-      onClick: () => navigate('/attendance/students/monthly-matrix'),
+      path: '/learning/daily-classroom?tab=attendance',
     },
     {
-      id: 'broadcast',
-      title: t('createNotice', 'Broadcast Notice'),
-      description: 'SMS, WhatsApp, Telegram',
-      icon: BellIcon,
-      color: 'sky',
-      badge: 'Multi-Channel',
-      path: '/app-management/notifications',
-      onClick: () => navigate('/app-management/notifications'),
-    },
-    {
-      id: 'exam_routine',
-      title: t('examRoutine', 'Exam Schedules'),
-      description: 'Timetables & invigilation',
-      icon: CalendarIcon,
+      id: 'collection_counter',
+      title: 'Fee Collection Desk',
+      description: 'Process student fee invoice & generate receipt',
+      icon: BanknotesIcon,
       color: 'purple',
-      path: '/examinations/schedules',
-      onClick: () => navigate('/examinations/schedules'),
+      path: '/finance/ledger',
+    },
+    {
+      id: 'hifz_overview',
+      title: 'Hifz Velocity Console',
+      description: 'Review Quran memorization milestones and sabqi reviews',
+      icon: BookOpenIcon,
+      color: 'amber',
+      path: '/learning/daily-classroom?tab=hifz',
     },
   ];
 
-  const progressItems = [
-    { id: '1', label: 'Daily Sabaq Completion Rate', percentage: 92, subLabel: `${formatNumber(Math.round(totalStudents * 0.92))} of ${formatNumber(totalStudents)} target lessons memorized`, color: 'emerald' as const },
-    { id: '2', label: 'Sabqi Revision Target', percentage: 88, subLabel: 'Quarterly revision cycles in progress', color: 'accent' as const },
-    { id: '3', label: 'Mid-Term Exam Readiness', percentage: 76, subLabel: 'Syllabus modules covered', color: 'purple' as const },
-  ];
+  const widgetPropsMap = {
+    kpi_metrics: {
+      metrics,
+      cols: 4,
+    },
+    attendance_pulse: {
+      data: pulseData,
+      onTakeAttendance: () => navigate('/learning/daily-classroom?tab=attendance'),
+    },
+    recent_activity: {
+      items: recentActivities,
+    },
+    upcoming_events: {
+      items: upcomingEvents,
+    },
+    quick_actions: {
+      actions: quickActions,
+    },
+  };
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* 1. Main KPI Metrics Row */}
-      <KpiMetricsWidget metrics={metrics} />
-
-      {/* 2. Live Attendance Pulse & Academic Velocity Tracker */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <AttendancePulseWidget 
-          data={pulseData} 
-          onTakeAttendance={() => navigate('/attendance/students/monthly-matrix')} 
-        />
-        <AcademicProgressWidget items={progressItems} />
-      </div>
-
-      {/* 3. Quick Action Jump-Pads */}
-      <QuickActionsWidget actions={quickActions} />
-
-      {/* 4. Upcoming Events & Live Activity Log */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <UpcomingEventsWidget 
-          events={upcomingEvents} 
-          onViewCalendar={() => navigate('/academy/calendar-events')} 
-        />
-        <RecentActivityFeedWidget 
-          activities={recentActivities} 
-          onViewAll={() => navigate('/activity-analytics')} 
-        />
-      </div>
-    </div>
+    <DashboardGridEngine
+      items={layoutItems}
+      role="ADMIN"
+      isEditMode={isEditMode}
+      onUpdateItems={handleUpdateLayout}
+      onOpenWidgetCatalog={onOpenWidgetCatalog}
+      widgetPropsMap={widgetPropsMap}
+    />
   );
 }

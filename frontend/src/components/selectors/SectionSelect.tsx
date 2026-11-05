@@ -6,7 +6,7 @@ import { SectionIcon } from '../ui/Icons';
 
 export interface SectionItem {
   id: string | number;
-  section_name: string;
+  section_name?: string;
   name?: string;
   student_class?: any;
   student_class_id?: string | number;

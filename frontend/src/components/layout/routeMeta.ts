@@ -164,14 +164,8 @@ export function resolveRouteMeta(pathname: string, search: string = ""): RouteMe
     } else {
       meta = { title: "Academies", subCategory: "Academies & Departments", category: "Academy" };
     }
-  } else if (currentPath === "/academy/classes-groups" || currentPath === "/classes-groups") {
-    const searchParams = new URLSearchParams(search);
-    const activeTab = searchParams.get("tab");
-    if (activeTab === "groups") {
-      meta = { title: "Groups", subCategory: "Classes & Groups", category: "Academy" };
-    } else {
-      meta = { title: "Classes & Sections", subCategory: "Classes & Groups", category: "Academy" };
-    }
+  } else if (currentPath === "/academy/classes-groups" || currentPath === "/classes-groups" || currentPath === "/academy/classes-sections" || currentPath === "/classes-sections") {
+    meta = { title: "Classes & Sections", subCategory: "Classes & Groups", category: "Academy" };
   } else if (!meta) {
     if (/^\/students\/[^/]+\/profile/.test(currentPath)) {
       meta = { title: "Student Profile", category: "Student" };

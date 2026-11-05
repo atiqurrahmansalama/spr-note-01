@@ -32,6 +32,8 @@ export interface AcademicSection {
   name?: string;
   room_number?: string;
   max_capacity?: number;
+  department?: number | string | null;
+  department_name?: string;
   class_teacher?: number | string | null;
   teacher_name?: string;
   branch?: number | string | null;
@@ -53,6 +55,8 @@ export interface AcademicGroup {
   class_name?: string;
   section?: number | string | null;
   section_name?: string;
+  department?: number | string | null;
+  department_name?: string;
   mentor_teacher?: number | string | null;
   mentor_teacher_name?: string;
   order_rank?: number;

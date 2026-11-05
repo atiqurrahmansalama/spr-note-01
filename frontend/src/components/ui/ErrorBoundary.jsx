@@ -230,7 +230,8 @@ export class ErrorBoundary extends React.Component {
   }
 
   static getDerivedStateFromError(error) {
-    return { hasError: true };
+    const parsed = parseErrorDetails(error, null, 'React Render Error');
+    return { hasError: true, errors: [parsed] };
   }
 
   componentDidMount() {
@@ -333,8 +334,8 @@ export class ErrorBoundary extends React.Component {
   };
 
   render() {
-    if (this.state.hasError && this.state.errors.length > 0) {
-      const errors = this.state.errors;
+    if (this.state.hasError) {
+      const errors = this.state.errors.length > 0 ? this.state.errors : [parseErrorDetails(new Error('A runtime error interrupted view rendering.'))];
       const isMultiError = errors.length > 1;
       const selectedIndex = Math.min(Math.max(0, this.state.selectedErrorIndex), errors.length - 1);
       const activeError = errors[selectedIndex] || errors[0];
@@ -731,7 +732,7 @@ export class ErrorBoundary extends React.Component {
                             : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub'
                         }`}
                       >
-                        Call Stack Trace ({activeError.parsedFrames.length})
+                        Call Stack Trace ({(activeError?.parsedFrames || []).length})
                       </button>
                       <button
                         type="button"
@@ -775,7 +776,7 @@ export class ErrorBoundary extends React.Component {
                         <pre className="whitespace-pre-wrap theme-text-secondary text-[11px] leading-relaxed">
                           {activeError.rawStack || 'No raw stack available'}
                         </pre>
-                      ) : activeError.parsedFrames.length > 0 ? (
+                      ) : (activeError?.parsedFrames || []).length > 0 ? (
                         activeError.parsedFrames.map((frame, idx) => (
                           <div
                             key={idx}

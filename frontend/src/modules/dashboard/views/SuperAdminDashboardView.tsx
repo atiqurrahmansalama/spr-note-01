@@ -1,12 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../../../i18n';
-import KpiMetricsWidget from '../components/widgets/KpiMetricsWidget';
-import QuickActionsWidget from '../components/widgets/QuickActionsWidget';
-import SystemGatewaysWidget from '../components/widgets/SystemGatewaysWidget';
-import RecentActivityFeedWidget from '../components/widgets/RecentActivityFeedWidget';
+import DashboardGridEngine from '../components/DashboardGridEngine';
 import { useDashboardData } from '../hooks/useDashboardData';
-import type { DashboardMetric, DashboardQuickAction } from '../types';
+import { getSavedLayout, saveLayout } from '../widgetRegistry';
+import type { DashboardLayoutItem, DashboardMetric, DashboardQuickAction } from '../types';
+import { useTenant } from '../../../context/TenantContext';
 import { 
   BuildingOfficeIcon, 
   GroupsIcon, 
@@ -18,15 +17,34 @@ import {
   SettingsIcon,
 } from '../../../components/ui/Icons';
 
-export default function SuperAdminDashboardView() {
+export interface SuperAdminDashboardViewProps {
+  isEditMode?: boolean;
+  onOpenWidgetCatalog?: () => void;
+}
+
+export default function SuperAdminDashboardView({
+  isEditMode = false,
+  onOpenWidgetCatalog,
+}: SuperAdminDashboardViewProps) {
   const { t, formatNumber } = useTranslation('dashboard');
   const navigate = useNavigate();
+  const { activeTenantId } = useTenant();
   const { 
     totalStudents, 
     totalStaff, 
     totalTenantsCount, 
-    recentActivities 
+    recentActivities,
+    upcomingEvents 
   } = useDashboardData();
+
+  const [layoutItems, setLayoutItems] = React.useState<DashboardLayoutItem[]>(() =>
+    getSavedLayout(activeTenantId || 'default', 'SUPER_ADMIN')
+  );
+
+  const handleUpdateLayout = (newItems: DashboardLayoutItem[]) => {
+    setLayoutItems(newItems);
+    saveLayout(activeTenantId || 'default', 'SUPER_ADMIN', newItems);
+  };
 
   const metrics: DashboardMetric[] = [
     {
@@ -60,74 +78,76 @@ export default function SuperAdminDashboardView() {
       onClick: () => navigate('/staff/roster'),
     },
     {
-      id: 'storage_used',
-      label: t('storageUsed', 'Cloud Storage Used'),
-      value: '2.4 GB',
-      subLabel: 'Of 50 GB allotted',
-      trend: { value: '95% free', isPositive: true },
-      icon: CloudIcon,
+      id: 'system_health',
+      label: 'SaaS Platform Health',
+      value: '99.98%',
+      subLabel: 'Realtime edge sync',
+      trend: { value: 'Optimal', isPositive: true },
+      icon: SparklesIcon,
       color: 'sky',
-      onClick: () => navigate('/data-backup'),
     },
   ];
 
   const quickActions: DashboardQuickAction[] = [
     {
-      id: 'dev_tools',
-      title: t('devTools', 'Developer Tools'),
-      description: 'System schemas & configs',
-      icon: SparklesIcon,
-      color: 'purple',
-      badge: 'Admin',
-      path: '/admin-tools',
-      onClick: () => navigate('/admin-tools'),
+      id: 'new_tenant',
+      title: 'Onboard Academy',
+      description: 'Create new tenant instance with isolated database',
+      icon: BuildingOfficeIcon,
+      color: 'accent',
+      path: '/institutions?action=new',
+      badge: 'Multi-Tenant',
     },
     {
-      id: 'gateways',
-      title: t('gatewayStatus', 'Notification Gateways'),
-      description: 'Telegram, WhatsApp, SMS',
-      icon: BellIcon,
-      color: 'sky',
-      badge: 'Live',
-      path: '/app-management/notifications',
-      onClick: () => navigate('/app-management/notifications'),
-    },
-    {
-      id: 'section_control',
-      title: 'Feature & Module Control',
-      description: 'Feature toggles & access',
-      icon: SettingsIcon,
-      color: 'amber',
-      path: '/section-control',
-      onClick: () => navigate('/section-control'),
-    },
-    {
-      id: 'roles',
-      title: 'Role Permissions',
-      description: 'Access hierarchy policies',
+      id: 'global_audit',
+      title: 'Security & Audit Log',
+      description: 'Review cross-institution administrative access',
       icon: ShieldCheckIcon,
       color: 'emerald',
-      path: '/role-management',
-      onClick: () => navigate('/role-management'),
+      path: '/admin/audit-logs',
+    },
+    {
+      id: 'system_backup',
+      title: 'Database Cloud Sync',
+      description: 'Execute instant snapshot & restore test',
+      icon: CloudIcon,
+      color: 'purple',
+      path: '/settings/backup',
+    },
+    {
+      id: 'broadcast_alert',
+      title: 'System-Wide Notice',
+      description: 'Broadcast maintenance banner to all campuses',
+      icon: BellIcon,
+      color: 'amber',
+      path: '/admin/broadcasts',
     },
   ];
 
+  const widgetPropsMap = {
+    kpi_metrics: {
+      metrics,
+      cols: 4,
+    },
+    recent_activity: {
+      items: recentActivities,
+    },
+    upcoming_events: {
+      items: upcomingEvents,
+    },
+    quick_actions: {
+      actions: quickActions,
+    },
+  };
+
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* 1. Global KPI Metrics Row */}
-      <KpiMetricsWidget metrics={metrics} />
-
-      {/* 2. Gateways & Infrastructure Health + Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <SystemGatewaysWidget onConfigureGateways={() => navigate('/app-management/notifications')} />
-        <QuickActionsWidget actions={quickActions} />
-      </div>
-
-      {/* 3. Live System Activity Audit Feed */}
-      <RecentActivityFeedWidget 
-        activities={recentActivities} 
-        onViewAll={() => navigate('/activity-analytics')} 
-      />
-    </div>
+    <DashboardGridEngine
+      items={layoutItems}
+      role="SUPER_ADMIN"
+      isEditMode={isEditMode}
+      onUpdateItems={handleUpdateLayout}
+      onOpenWidgetCatalog={onOpenWidgetCatalog}
+      widgetPropsMap={widgetPropsMap}
+    />
   );
 }

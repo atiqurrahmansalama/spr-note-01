@@ -12,15 +12,19 @@ import {
   TrashIcon,
   TableIcon,
   Squares2X2Icon,
+  PlusIcon,
 } from "../../../../components/ui/Icons";
 import ActionMenu from "../../../../components/ui/ActionMenu";
 import DataTable from "../../../../components/ui/DataTable";
 import DataCardGrid from "../../../../components/ui/DataCardGrid";
+import EmptyState from "../../../../components/ui/EmptyState";
 import { useRightSidebar, useDrawerRegistration } from "../../../../context/RightSidebarContext";
 import { useTenant } from "../../../../context/TenantContext";
 import ClassForm from "./ClassForm";
 import ClassMigrationModal from "./ClassMigrationModal";
 import DeleteImpactModal from "../../../../components/common/DeleteImpactModal";
+import ClassesSectionsToolbar from "../components/ClassesSectionsToolbar";
+import { PageContainer } from "../../../../components/layout";
 import { AcademicClass, ClassManagementViewProps } from "../types";
 
 export default function ClassManagementView({
@@ -36,25 +40,46 @@ export default function ClassManagementView({
   const { openDrawer, closeDrawer } = useRightSidebar();
   const { activeTenantId } = useTenant();
   const { isSectionEnabled } = useFeatureControl();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const canMigrateDelete = isSectionEnabled("classes_action_migrate_delete");
+  const canMigrateDelete = isSectionEnabled("classes_action_migrate_delete") !== false;
+  const canAddClass = isSectionEnabled("classes_action_add_class") !== false;
 
   const queryDept = searchParams.get("department") || "ALL";
 
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [deptFilter, setDeptFilter] = useState<string>(queryDept);
+
+  useEffect(() => {
+    if (queryDept !== deptFilter) {
+      setDeptFilter(queryDept);
+    }
+  }, [queryDept]);
+
+  const handleDeptFilterChange = (val: string) => {
+    setDeptFilter(val);
+    const next = new URLSearchParams(searchParams);
+    if (val === "ALL" || !val) {
+      next.delete("department");
+    } else {
+      next.set("department", val);
+    }
+    setSearchParams(next);
+  };
 
   // View Mode
-  const [viewMode, setViewMode] = useState<"table" | "grid">(() => {
+  const [viewMode, setViewMode] = useState<"table" | "card">(() => {
     try {
-      return (localStorage.getItem("spr_classes_view_mode") as "table" | "grid") || "table";
+      const saved = localStorage.getItem("spr_classes_view_mode");
+      return saved === "card" || saved === "grid" ? "card" : "table";
     } catch {
       return "table";
     }
   });
 
-  const handleViewModeChange = (mode: "table" | "grid") => {
+  const handleViewModeChange = (mode: "table" | "card") => {
     setViewMode(mode);
     try {
       localStorage.setItem("spr_classes_view_mode", mode);
@@ -67,9 +92,11 @@ export default function ClassManagementView({
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
-  const loadClasses = useCallback(async () => {
+  const loadClasses = useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent && classes.length === 0) {
+        setLoading(true);
+      }
       const tenantParam = activeTenantId && activeTenantId !== "ALL" ? `&institution=${activeTenantId}` : "";
       const res = await fetchWithAuth(`/api/v1/classes/?page_size=500&all=true${tenantParam}`);
       if (res.ok) {
@@ -82,17 +109,17 @@ export default function ClassManagementView({
     } finally {
       setLoading(false);
     }
-  }, [showToast, activeTenantId]);
+  }, [showToast, activeTenantId, classes.length]);
 
   useEffect(() => {
     loadClasses();
 
     const handleTenantChanged = () => {
-      loadClasses();
+      loadClasses(false);
     };
 
     const handleClassUpdated = () => {
-      loadClasses();
+      loadClasses(true);
     };
 
     window.addEventListener("spr_tenant_changed", handleTenantChanged);
@@ -103,10 +130,22 @@ export default function ClassManagementView({
     };
   }, [loadClasses]);
 
-  // Filtered dataset (supporting URL department filter if navigated from department view)
-  const displayedClasses = queryDept !== "ALL"
-    ? classes.filter((cls) => String(cls.department) === String(queryDept))
-    : classes;
+  // Filtered dataset (supporting search query and URL department filter)
+  const displayedClasses = classes.filter((cls) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchName = cls.name?.toLowerCase().includes(q);
+      const matchCode = cls.code?.toLowerCase().includes(q);
+      const matchDept = cls.department_name?.toLowerCase().includes(q);
+      const matchTeacher = cls.class_teacher_name?.toLowerCase().includes(q);
+      if (!matchName && !matchCode && !matchDept && !matchTeacher) return false;
+    }
+
+    if (deptFilter !== "ALL" && String(cls.department) !== String(deptFilter)) {
+      return false;
+    }
+    return true;
+  });
 
   // Drawer Registration for Add/Edit Class
   useDrawerRegistration(
@@ -226,7 +265,7 @@ export default function ClassManagementView({
         <div className="space-y-0.5 py-1">
           <span className="font-bold text-sm theme-text-primary block">{cls.name}</span>
           {cls.code && (
-            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md theme-bg-sub theme-text-secondary border theme-border inline-block">
+            <span className="text-xs font-mono theme-text-secondary block">
               {cls.code}
             </span>
           )}
@@ -265,7 +304,7 @@ export default function ClassManagementView({
       headerClassName: "w-24 text-center",
       cellClassName: "w-24 text-center",
       render: (cls: AcademicClass) => (
-        <span className="text-xs font-bold font-mono theme-accent px-2.5 py-0.5 rounded-lg theme-bg-accent-soft/40 border theme-border inline-block">
+        <span className="text-xs font-semibold font-mono theme-accent">
           {(cls as any).student_count || cls.total_students || 0}
         </span>
       ),
@@ -277,7 +316,7 @@ export default function ClassManagementView({
       headerClassName: "w-24 text-center",
       cellClassName: "w-24 text-center",
       render: (cls: AcademicClass) => (
-        <span className="text-xs font-bold font-mono theme-text-primary px-2.5 py-0.5 rounded-lg theme-bg-sub border theme-border inline-block">
+        <span className="text-xs font-semibold font-mono theme-text-secondary">
           {(cls as any).section_count || cls.sections_count || 0}
         </span>
       ),
@@ -289,7 +328,7 @@ export default function ClassManagementView({
       headerClassName: "w-24 text-center",
       cellClassName: "w-24 text-center",
       render: (cls: AcademicClass) => (
-        <span className="text-xs font-bold font-mono theme-text-primary px-2.5 py-0.5 rounded-lg theme-bg-sub border theme-border inline-block">
+        <span className="text-xs font-semibold font-mono theme-text-secondary">
           {(cls as any).group_count || cls.groups_count || 0}
         </span>
       ),
@@ -362,39 +401,57 @@ export default function ClassManagementView({
   );
 
   return (
-    <div className="flex flex-col w-full space-y-3.5">
-      {/* ─── Compact Header & Switcher Row (Zero Background Box) ─── */}
-      <div className="flex items-center justify-between gap-3 px-1">
-        <div className="flex items-center gap-2">
-          <ClassIcon className="w-4 h-4 theme-accent" />
-          <h5 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
-            Academic Classes ({displayedClasses.length})
-          </h5>
-        </div>
+    <PageContainer
+      isEmbedded={isEmbedded}
+      maxWidth="7xl"
+      animate={!isEmbedded}
+      className="space-y-3.5"
+    >
+      {/* ─── Reusable Responsive Filter & View Toolbar ─── */}
+      <ClassesSectionsToolbar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search classes by name, code, teacher..."
+        viewMode={viewMode}
+        onViewModeChange={handleViewModeChange}
+        departmentFilter={{
+          value: deptFilter,
+          onChange: handleDeptFilterChange,
+        }}
+        totalCount={displayedClasses.length}
+        entityName="Classes"
+      />
 
-        {/* Standard View Switcher Toggle Button */}
-        <button
-          type="button"
-          onClick={() => handleViewModeChange(viewMode === "grid" ? "table" : "grid")}
-          className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
-          title={viewMode === "grid" ? "Switch to Table View" : "Switch to Cards View"}
-        >
-          {viewMode === "grid" ? (
-            <>
-              <TableIcon className="w-3.5 h-3.5 theme-accent" />
-              <span>Table View</span>
-            </>
-          ) : (
-            <>
-              <Squares2X2Icon className="w-3.5 h-3.5 theme-accent" />
-              <span>Cards View</span>
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Main View Content (Table or Cards Grid) */}
-      {viewMode === "table" ? (
+      {/* Main View Content (Table or Cards Grid with EmptyState fallback) */}
+      {!loading && displayedClasses.length === 0 ? (
+        <EmptyState
+          icon={ClassIcon}
+          iconVariant="sub"
+          title={searchQuery || deptFilter !== "ALL" ? "No Matching Classes" : "No Classes Found"}
+          description={
+            searchQuery || deptFilter !== "ALL"
+              ? "No classes match your current search and department filter criteria."
+              : "Get started by defining your institution's academic classes and grades."
+          }
+          action={
+            searchQuery || deptFilter !== "ALL"
+              ? {
+                  label: "Clear Filters",
+                  onClick: () => {
+                    setSearchQuery("");
+                    handleDeptFilterChange("ALL");
+                  },
+                }
+              : canAddClass
+              ? {
+                  label: "Add Class",
+                  icon: PlusIcon,
+                  onClick: () => openDrawer("class", { mode: "add" }),
+                }
+              : undefined
+          }
+        />
+      ) : viewMode === "table" ? (
         <DataTable
           columns={tableColumns}
           data={displayedClasses}
@@ -428,7 +485,7 @@ export default function ClassManagementView({
           onClose={() => {
             setIsDeleteModalOpen(false);
             setDeletingClass(null);
-          }}
+          } }
           title="Delete Class"
           itemName={deletingClass.name}
           itemType="class"
@@ -442,6 +499,7 @@ export default function ClassManagementView({
             setIsDeleteModalOpen(false);
             setIsMigrationModalOpen(true);
           }}
+          onConfirm={performDirectDelete}
           isDeleting={isDeleting}
         />
       )}
@@ -462,7 +520,7 @@ export default function ClassManagementView({
           }}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 

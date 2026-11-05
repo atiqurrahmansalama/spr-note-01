@@ -1,172 +1,145 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../../../i18n';
-import KpiMetricsWidget from '../components/widgets/KpiMetricsWidget';
-import TimetableScheduleWidget from '../components/widgets/TimetableScheduleWidget';
-import QuickActionsWidget from '../components/widgets/QuickActionsWidget';
-import AcademicProgressWidget from '../components/widgets/AcademicProgressWidget';
-import type { DashboardMetric, DashboardQuickAction, ScheduleItem } from '../types';
-import { 
-  BookOpenIcon, 
-  GroupsIcon, 
-  AttendanceIcon, 
-  SparklesIcon, 
-  SavedMessagesIcon,
+import DashboardGridEngine from '../components/DashboardGridEngine';
+import { useDashboardData } from '../hooks/useDashboardData';
+import { getSavedLayout, saveLayout } from '../widgetRegistry';
+import type { DashboardLayoutItem, DashboardMetric, DashboardQuickAction } from '../types';
+import { useTenant } from '../../../context/TenantContext';
+import {
+  GroupsIcon,
+  AttendanceIcon,
+  BookOpenIcon,
+  SparklesIcon,
   TimerIcon,
 } from '../../../components/ui/Icons';
 
-export default function TeacherUstadhDashboardView() {
-  const { t } = useTranslation('dashboard');
+export interface TeacherUstadhDashboardViewProps {
+  isEditMode?: boolean;
+  onOpenWidgetCatalog?: () => void;
+}
+
+export default function TeacherUstadhDashboardView({
+  isEditMode = false,
+  onOpenWidgetCatalog,
+}: TeacherUstadhDashboardViewProps) {
+  const { t, formatNumber } = useTranslation('dashboard');
   const navigate = useNavigate();
+  const { activeTenantId } = useTenant();
+  const {
+    pulseData,
+    scheduleItems,
+    upcomingEvents,
+  } = useDashboardData();
+
+  const [layoutItems, setLayoutItems] = React.useState<DashboardLayoutItem[]>(() =>
+    getSavedLayout(activeTenantId || 'default', 'TEACHER')
+  );
+
+  const handleUpdateLayout = (newItems: DashboardLayoutItem[]) => {
+    setLayoutItems(newItems);
+    saveLayout(activeTenantId || 'default', 'TEACHER', newItems);
+  };
 
   const metrics: DashboardMetric[] = [
     {
       id: 'my_students',
       label: 'My Assigned Students',
-      value: 28,
-      subLabel: 'Hifz Group B (Section 2)',
-      trend: { value: '100% active', isPositive: true },
+      value: 32,
+      subLabel: 'Class: Hifz Senior (Cohort A)',
+      trend: { value: '100% Active', isPositive: true },
       icon: GroupsIcon,
       color: 'accent',
-      onClick: () => navigate('/students'),
+      onClick: () => navigate('/learning/daily-classroom'),
     },
     {
-      id: 'classes_today',
-      label: t('classesToday', 'Periods Today'),
-      value: 4,
-      subLabel: '2 completed, 1 in progress',
-      trend: { value: 'On schedule', isPositive: true },
-      icon: TimerIcon,
+      id: 'class_attendance',
+      label: "Today's Class Presence",
+      value: '31 / 32',
+      subLabel: '97% present • 1 on leave',
+      trend: { value: 'Completed', isPositive: true },
+      icon: AttendanceIcon,
       color: 'emerald',
-      onClick: () => navigate('/studies/daily-classroom'),
+      onClick: () => navigate('/learning/daily-classroom?tab=attendance'),
     },
     {
-      id: 'pending_evaluations',
-      label: 'Pending Recitations',
-      value: 6,
-      subLabel: 'Sabaq & Sabqi to log',
-      trend: { value: '22 evaluated', isPositive: true },
+      id: 'sabaq_passed',
+      label: 'Today Sabaq Recited',
+      value: '28 / 32',
+      subLabel: '4 students pending verification',
+      trend: { value: '88% cleared', isPositive: true },
       icon: BookOpenIcon,
-      color: 'amber',
-      onClick: () => navigate('/studies/recitations'),
+      color: 'purple',
+      onClick: () => navigate('/learning/daily-classroom?tab=hifz'),
     },
     {
-      id: 'memorized_pages',
-      label: t('memorizedPages', 'Pages Memorized Today'),
-      value: 34,
-      subLabel: 'Across all assigned pupils',
-      trend: { value: '+4 vs target', isPositive: true },
+      id: 'dawr_progress',
+      label: 'Avg Dawr Velocity',
+      value: '2.5 Juz',
+      subLabel: 'Weekly revision cycle pace',
+      trend: { value: 'Exemplary', isPositive: true },
       icon: SparklesIcon,
-      color: 'purple',
-      onClick: () => navigate('/studies/progress-reports/records'),
+      color: 'sky',
     },
   ];
 
   const quickActions: DashboardQuickAction[] = [
     {
-      id: 'daily_classroom',
-      title: t('dailyClassroom', 'Daily Classroom'),
-      description: 'Sabaq & lessons assessment',
-      icon: BookOpenIcon,
-      color: 'accent',
-      badge: 'Live',
-      path: '/studies/daily-classroom',
-      onClick: () => navigate('/studies/daily-classroom'),
-    },
-    {
-      id: 'roll_call',
-      title: t('takeAttendance', 'Class Attendance'),
-      description: 'Mark student roll-call',
+      id: 'daily_attendance',
+      title: 'Take Period Roll Call',
+      description: 'Record morning attendance & auto-dispatch SMS',
       icon: AttendanceIcon,
       color: 'emerald',
-      path: '/attendance/students/monthly-matrix',
-      onClick: () => navigate('/attendance/students/monthly-matrix'),
+      path: '/learning/daily-classroom?tab=attendance',
     },
     {
-      id: 'report_builder',
-      title: 'Hifz Progress Log',
-      description: 'Record recitation marks',
-      icon: SavedMessagesIcon,
+      id: 'sabaq_entry',
+      title: 'Daily Sabaq & Dawr Entry',
+      description: 'Log mistakes, stucks, and completed verses',
+      icon: BookOpenIcon,
       color: 'purple',
-      path: '/studies/daily-classroom?tab=PROGRESS',
-      onClick: () => navigate('/studies/daily-classroom?tab=PROGRESS'),
+      path: '/learning/daily-classroom?tab=hifz',
     },
     {
-      id: 'my_routine',
-      title: t('mySchedule', 'My Class Routine'),
-      description: 'Weekly period matrix',
+      id: 'period_timetable',
+      title: 'Class Routine & Schedule',
+      description: 'Inspect assigned periods and upcoming rooms',
       icon: TimerIcon,
-      color: 'sky',
-      path: '/academy/periods',
-      onClick: () => navigate('/academy/periods'),
+      color: 'accent',
+      path: '/routine',
     },
   ];
 
-  const scheduleItems: ScheduleItem[] = [
-    {
-      id: '1',
-      periodName: 'Period 1',
-      timeSlot: '08:00 AM - 09:15 AM',
-      className: 'Hifz Group B',
-      sectionName: 'Morning Shift',
-      subject: 'New Lesson (Sabaq) Memorization',
-      room: 'Room 102',
-      status: 'COMPLETED',
+  const widgetPropsMap = {
+    kpi_metrics: {
+      metrics,
+      cols: 4,
     },
-    {
-      id: '2',
-      periodName: 'Period 2',
-      timeSlot: '09:30 AM - 10:45 AM',
-      className: 'Hifz Group B',
-      sectionName: 'Morning Shift',
-      subject: 'Recent Revision (Sabqi)',
-      room: 'Room 102',
-      status: 'IN_PROGRESS',
+    attendance_pulse: {
+      data: pulseData,
+      title: 'My Cohort Attendance Pulse',
+      onTakeAttendance: () => navigate('/learning/daily-classroom?tab=attendance'),
     },
-    {
-      id: '3',
-      periodName: 'Period 3',
-      timeSlot: '11:15 AM - 12:30 PM',
-      className: 'Tajweed & Makhaarij',
-      sectionName: 'Combined',
-      subject: 'Rules of Noon Saakin & Meem',
-      room: 'Auditorium Hall',
-      status: 'UPCOMING',
+    timetable_schedule: {
+      items: scheduleItems,
+      onViewAll: () => navigate('/routine'),
     },
-    {
-      id: '4',
-      periodName: 'Period 4',
-      timeSlot: '02:00 PM - 03:30 PM',
-      className: 'Hifz Group B',
-      sectionName: 'Afternoon Shift',
-      subject: 'Long-term Memorization (Amukhta)',
-      room: 'Room 102',
-      status: 'UPCOMING',
+    upcoming_events: {
+      items: upcomingEvents,
     },
-  ];
-
-  const progressItems = [
-    { id: '1', label: 'Assigned Group Sabaq Completion', percentage: 94, subLabel: '26 of 28 completed target page', color: 'emerald' as const },
-    { id: '2', label: 'Sabqi (Recent Revision) Accuracy', percentage: 89, subLabel: 'Strong memorization retention', color: 'accent' as const },
-    { id: '3', label: 'Quarterly Tajweed Mastery', percentage: 82, subLabel: 'Pronunciation evaluation on track', color: 'purple' as const },
-  ];
+    quick_actions: {
+      actions: quickActions,
+    },
+  };
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* 1. Teacher Focused KPI Metrics */}
-      <KpiMetricsWidget metrics={metrics} />
-
-      {/* 2. Today's Period Schedule & Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <TimetableScheduleWidget 
-          items={scheduleItems} 
-          onViewAll={() => navigate('/academy/periods')} 
-        />
-        <QuickActionsWidget actions={quickActions} />
-      </div>
-
-      {/* 3. Academic Group Progress Tracker */}
-      <AcademicProgressWidget items={progressItems} title="Assigned Group Memorization Health" />
-    </div>
+    <DashboardGridEngine
+      items={layoutItems}
+      role="TEACHER"
+      isEditMode={isEditMode}
+      onUpdateItems={handleUpdateLayout}
+      onOpenWidgetCatalog={onOpenWidgetCatalog}
+      widgetPropsMap={widgetPropsMap}
+    />
   );
 }
