@@ -1,6 +1,14 @@
 import React from 'react';
 
-export type DashboardRole = 'SUPER_ADMIN' | 'ADMIN' | 'TEACHER' | 'STAFF' | 'STUDENT' | 'GUARDIAN';
+export type DashboardRole = 'SUPER_ADMIN' | 'ADMIN' | 'TEACHER' | 'STAFF' | 'STUDENT' | 'GUARDIAN' | (string & {});
+
+export interface RoleDashboardViewProps {
+  role?: DashboardRole;
+  isEditMode?: boolean;
+  onOpenWidgetCatalog?: () => void;
+  layoutItems?: DashboardLayoutItem[];
+  onUpdateLayout?: (newItems: DashboardLayoutItem[]) => void;
+}
 
 export interface DashboardMetric {
   id: string;
@@ -137,10 +145,14 @@ export type WidgetCategory =
   | 'METRICS'
   | 'ACADEMIC'
   | 'ATTENDANCE'
+  | 'CALENDAR'
   | 'FINANCE'
   | 'OPERATIONS'
   | 'COMMUNICATION'
-  | 'SYSTEM';
+  | 'SYSTEM'
+  | 'TOOLS';
+
+export type WidgetColSpan = 1 | 2 | 3 | 4;
 
 export interface WidgetDefinition {
   id: string;
@@ -148,7 +160,9 @@ export interface WidgetDefinition {
   description: string;
   category: WidgetCategory;
   allowedRoles: DashboardRole[];
-  defaultColSpan: 1 | 2 | 3;
+  defaultColSpan: WidgetColSpan;
+  minColSpan?: WidgetColSpan;
+  maxColSpan?: WidgetColSpan;
   requiredFeatureKey?: string;
   component: React.ComponentType<any>;
 }
@@ -156,6 +170,7 @@ export interface WidgetDefinition {
 export interface DashboardLayoutItem {
   widgetId: string;
   order: number;
-  colSpan: 1 | 2 | 3;
+  colSpan: WidgetColSpan;
   isVisible: boolean;
+  settings?: Record<string, any>;
 }

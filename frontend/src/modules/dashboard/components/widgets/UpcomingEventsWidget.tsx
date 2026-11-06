@@ -11,10 +11,10 @@ export interface UpcomingEventsWidgetProps {
 }
 
 const EVENT_BADGES: Record<string, { bg: string; text: string; label: string }> = {
-  HOLIDAY: { bg: 'bg-emerald-500/10 border-emerald-500/20', text: 'text-emerald-600 dark:text-emerald-400', label: 'Holiday' },
-  EXAM: { bg: 'bg-rose-500/10 border-rose-500/20', text: 'text-rose-600 dark:text-rose-400', label: 'Exam' },
-  MEETING: { bg: 'bg-purple-500/10 border-purple-500/20', text: 'text-purple-600 dark:text-purple-400', label: 'Meeting' },
-  EVENT: { bg: 'bg-sky-500/10 border-sky-500/20', text: 'text-sky-600 dark:text-sky-400', label: 'Event' },
+  HOLIDAY: { bg: 'bg-emerald-500/10', text: 'text-emerald-600 dark:text-emerald-400', label: 'Holiday' },
+  EXAM: { bg: 'bg-rose-500/10', text: 'text-rose-600 dark:text-rose-400', label: 'Exam' },
+  MEETING: { bg: 'bg-purple-500/10', text: 'text-purple-600 dark:text-purple-400', label: 'Meeting' },
+  EVENT: { bg: 'bg-sky-500/10', text: 'text-sky-600 dark:text-sky-400', label: 'Event' },
 };
 
 export default function UpcomingEventsWidget({
@@ -26,8 +26,8 @@ export default function UpcomingEventsWidget({
   const { t, formatDate, formatNumber } = useTranslation('dashboard');
 
   return (
-    <div className={`p-5 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3.5 select-none ${className}`}>
-      <div className="flex items-center justify-between pb-2 border-b theme-border">
+    <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-3.5 select-none ${className}`}>
+      <div className="flex items-center justify-between pb-1">
         <div className="flex items-center gap-2">
           <CalendarIcon className="w-4 h-4 text-[var(--accent-main)]" />
           <h3 className="text-sm font-bold theme-text-primary">
@@ -59,7 +59,7 @@ export default function UpcomingEventsWidget({
             return (
               <div
                 key={evt.id}
-                className="p-3 rounded-xl theme-bg-sub/60 border theme-border flex items-center justify-between gap-3 text-left rtl:text-right"
+                className="p-3 rounded-xl theme-bg-sub/60 hover:theme-bg-sub transition-all flex items-center justify-between gap-3 text-left rtl:text-right"
               >
                 <div className="space-y-0.5 min-w-0">
                   <div className="text-xs font-bold theme-text-primary truncate">
@@ -72,7 +72,7 @@ export default function UpcomingEventsWidget({
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border ${badge.bg} ${badge.text}`}>
+                  <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full ${badge.bg} ${badge.text}`}>
                     {t(badge.label.toLowerCase(), badge.label)}
                   </span>
 

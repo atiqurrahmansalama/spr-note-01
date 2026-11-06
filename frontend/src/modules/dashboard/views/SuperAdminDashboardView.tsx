@@ -4,7 +4,7 @@ import { useTranslation } from '../../../i18n';
 import DashboardGridEngine from '../components/DashboardGridEngine';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { getSavedLayout, saveLayout } from '../widgetRegistry';
-import type { DashboardLayoutItem, DashboardMetric, DashboardQuickAction } from '../types';
+import type { DashboardRole, DashboardLayoutItem, DashboardMetric, DashboardQuickAction } from '../types';
 import { useTenant } from '../../../context/TenantContext';
 import { 
   BuildingOfficeIcon, 
@@ -18,13 +18,19 @@ import {
 } from '../../../components/ui/Icons';
 
 export interface SuperAdminDashboardViewProps {
+  role?: DashboardRole;
   isEditMode?: boolean;
   onOpenWidgetCatalog?: () => void;
+  layoutItems?: DashboardLayoutItem[];
+  onUpdateLayout?: (newItems: DashboardLayoutItem[]) => void;
 }
 
 export default function SuperAdminDashboardView({
+  role = 'SUPER_ADMIN',
   isEditMode = false,
   onOpenWidgetCatalog,
+  layoutItems: propLayoutItems,
+  onUpdateLayout,
 }: SuperAdminDashboardViewProps) {
   const { t, formatNumber } = useTranslation('dashboard');
   const navigate = useNavigate();
@@ -34,16 +40,29 @@ export default function SuperAdminDashboardView({
     totalStaff, 
     totalTenantsCount, 
     recentActivities,
-    upcomingEvents 
+    upcomingEvents,
+    pulseData,
   } = useDashboardData();
 
-  const [layoutItems, setLayoutItems] = React.useState<DashboardLayoutItem[]>(() =>
-    getSavedLayout(activeTenantId || 'default', 'SUPER_ADMIN')
+  const [internalLayout, setInternalLayout] = React.useState<DashboardLayoutItem[]>(() =>
+    propLayoutItems || getSavedLayout(activeTenantId || 'default', role)
   );
 
+  React.useEffect(() => {
+    if (propLayoutItems) {
+      setInternalLayout(propLayoutItems);
+    }
+  }, [propLayoutItems]);
+
+  const activeLayout = propLayoutItems || internalLayout;
+
   const handleUpdateLayout = (newItems: DashboardLayoutItem[]) => {
-    setLayoutItems(newItems);
-    saveLayout(activeTenantId || 'default', 'SUPER_ADMIN', newItems);
+    if (onUpdateLayout) {
+      onUpdateLayout(newItems);
+    } else {
+      setInternalLayout(newItems);
+      saveLayout(activeTenantId || 'default', role, newItems);
+    }
   };
 
   const metrics: DashboardMetric[] = [
@@ -129,6 +148,10 @@ export default function SuperAdminDashboardView({
       metrics,
       cols: 4,
     },
+    attendance_pulse: {
+      data: pulseData,
+      title: 'Institutional Attendance Pulse',
+    },
     recent_activity: {
       items: recentActivities,
     },
@@ -142,8 +165,8 @@ export default function SuperAdminDashboardView({
 
   return (
     <DashboardGridEngine
-      items={layoutItems}
-      role="SUPER_ADMIN"
+      items={activeLayout}
+      role={role}
       isEditMode={isEditMode}
       onUpdateItems={handleUpdateLayout}
       onOpenWidgetCatalog={onOpenWidgetCatalog}

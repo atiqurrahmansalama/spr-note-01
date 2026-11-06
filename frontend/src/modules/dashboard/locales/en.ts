@@ -44,6 +44,9 @@ export const en = {
   pendingApplications: 'Pending Admissions',
   bedOccupancy: 'Hostel Occupancy',
   hifzCompletion: 'Avg Juz Completed',
+  todayRecited: "Today's Students Recited",
+  pagesAndMistakes: 'Pages Heard & Mistakes',
+  errorImprovement: 'Mistakes & Stucks Improvement',
 
   // Common Actions
   takeAttendance: 'Roll Call',
@@ -51,5 +54,11 @@ export const en = {
   viewReport: 'View Report',
   payFees: 'Pay Online',
   viewDetails: 'View Details',
+  configureGridLayout: 'Configure Grid Layout',
+  exitGridLayout: 'Exit Grid Customization',
+  workspaceCustomizer: 'Workspace Customizer',
+  workspaceRoleBuilder: 'Workspace Customizer (Role Builder)',
+  widgetGovernance: 'Widget Role & Academy Scopes',
+  doneCustomizing: 'Done Customizing',
 };
 

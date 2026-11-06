@@ -3,7 +3,7 @@ import { useTranslation } from '../../../i18n';
 import DashboardGridEngine from '../components/DashboardGridEngine';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { getSavedLayout, saveLayout } from '../widgetRegistry';
-import type { DashboardLayoutItem, DashboardMetric } from '../types';
+import type { DashboardRole, DashboardLayoutItem, DashboardMetric } from '../types';
 import { useTenant } from '../../../context/TenantContext';
 import {
   BookOpenIcon,
@@ -14,13 +14,19 @@ import {
 } from '../../../components/ui/Icons';
 
 export interface GuardianDashboardViewProps {
+  role?: DashboardRole;
   isEditMode?: boolean;
   onOpenWidgetCatalog?: () => void;
+  layoutItems?: DashboardLayoutItem[];
+  onUpdateLayout?: (newItems: DashboardLayoutItem[]) => void;
 }
 
 export default function GuardianDashboardView({
+  role = 'GUARDIAN',
   isEditMode = false,
   onOpenWidgetCatalog,
+  layoutItems: propLayoutItems,
+  onUpdateLayout,
 }: GuardianDashboardViewProps) {
   const { t, formatNumber } = useTranslation('dashboard');
   const { activeTenantId } = useTenant();
@@ -36,13 +42,25 @@ export default function GuardianDashboardView({
 
   const currentChild = children[selectedChildIndex] || children[0];
 
-  const [layoutItems, setLayoutItems] = React.useState<DashboardLayoutItem[]>(() =>
-    getSavedLayout(activeTenantId || 'default', 'GUARDIAN')
+  const [internalLayout, setInternalLayout] = React.useState<DashboardLayoutItem[]>(() =>
+    propLayoutItems || getSavedLayout(activeTenantId || 'default', role)
   );
 
+  React.useEffect(() => {
+    if (propLayoutItems) {
+      setInternalLayout(propLayoutItems);
+    }
+  }, [propLayoutItems]);
+
+  const activeLayout = propLayoutItems || internalLayout;
+
   const handleUpdateLayout = (newItems: DashboardLayoutItem[]) => {
-    setLayoutItems(newItems);
-    saveLayout(activeTenantId || 'default', 'GUARDIAN', newItems);
+    if (onUpdateLayout) {
+      onUpdateLayout(newItems);
+    } else {
+      setInternalLayout(newItems);
+      saveLayout(activeTenantId || 'default', role, newItems);
+    }
   };
 
   const metrics: DashboardMetric[] = [
@@ -102,7 +120,7 @@ export default function GuardianDashboardView({
   return (
     <div className="space-y-5 w-full min-w-0">
       {/* Multi-Child Selector Ribbon */}
-      <div className="p-3.5 rounded-2xl theme-bg-surface border theme-border shadow-xs flex flex-wrap items-center justify-between gap-3">
+      <div className="p-3.5 rounded-2xl theme-bg-surface shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <UsersIcon className="w-4 h-4 theme-accent" />
           <span className="text-xs font-bold theme-text-secondary uppercase tracking-wider">
@@ -116,10 +134,10 @@ export default function GuardianDashboardView({
               key={child.id}
               type="button"
               onClick={() => setSelectedChildIndex(idx)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-2 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
                 selectedChildIndex === idx
-                  ? 'theme-bg-accent theme-accent-text border-transparent shadow-xs'
-                  : 'theme-bg-sub border theme-border theme-text-primary hover:theme-bg-elevated'
+                  ? 'theme-bg-accent theme-accent-text shadow-xs'
+                  : 'theme-bg-sub theme-text-primary hover:theme-bg-elevated'
               }`}
             >
               <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-[10px]">
@@ -134,8 +152,8 @@ export default function GuardianDashboardView({
 
       {/* Grid Engine */}
       <DashboardGridEngine
-        items={layoutItems}
-        role="GUARDIAN"
+        items={activeLayout}
+        role={role}
         isEditMode={isEditMode}
         onUpdateItems={handleUpdateLayout}
         onOpenWidgetCatalog={onOpenWidgetCatalog}

@@ -3,7 +3,7 @@ import { useTranslation } from '../../../i18n';
 import DashboardGridEngine from '../components/DashboardGridEngine';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { getSavedLayout, saveLayout, resetLayout } from '../widgetRegistry';
-import type { DashboardLayoutItem, DashboardMetric } from '../types';
+import type { DashboardRole, DashboardLayoutItem, DashboardMetric } from '../types';
 import { useTenant } from '../../../context/TenantContext';
 import {
   BookOpenIcon,
@@ -13,25 +13,43 @@ import {
 } from '../../../components/ui/Icons';
 
 export interface StudentDashboardViewProps {
+  role?: DashboardRole;
   isEditMode?: boolean;
   onOpenWidgetCatalog?: () => void;
+  layoutItems?: DashboardLayoutItem[];
+  onUpdateLayout?: (newItems: DashboardLayoutItem[]) => void;
 }
 
 export default function StudentDashboardView({
+  role = 'STUDENT',
   isEditMode = false,
   onOpenWidgetCatalog,
+  layoutItems: propLayoutItems,
+  onUpdateLayout,
 }: StudentDashboardViewProps) {
   const { t, formatNumber } = useTranslation('dashboard');
   const { activeTenantId } = useTenant();
   const { pulseData, scheduleItems, upcomingEvents } = useDashboardData();
 
-  const [layoutItems, setLayoutItems] = React.useState<DashboardLayoutItem[]>(() =>
-    getSavedLayout(activeTenantId || 'default', 'STUDENT')
+  const [internalLayout, setInternalLayout] = React.useState<DashboardLayoutItem[]>(() =>
+    propLayoutItems || getSavedLayout(activeTenantId || 'default', role)
   );
 
+  React.useEffect(() => {
+    if (propLayoutItems) {
+      setInternalLayout(propLayoutItems);
+    }
+  }, [propLayoutItems]);
+
+  const activeLayout = propLayoutItems || internalLayout;
+
   const handleUpdateLayout = (newItems: DashboardLayoutItem[]) => {
-    setLayoutItems(newItems);
-    saveLayout(activeTenantId || 'default', 'STUDENT', newItems);
+    if (onUpdateLayout) {
+      onUpdateLayout(newItems);
+    } else {
+      setInternalLayout(newItems);
+      saveLayout(activeTenantId || 'default', role, newItems);
+    }
   };
 
   // Student Personalized KPI Metrics
@@ -96,8 +114,8 @@ export default function StudentDashboardView({
 
   return (
     <DashboardGridEngine
-      items={layoutItems}
-      role="STUDENT"
+      items={activeLayout}
+      role={role}
       isEditMode={isEditMode}
       onUpdateItems={handleUpdateLayout}
       onOpenWidgetCatalog={onOpenWidgetCatalog}

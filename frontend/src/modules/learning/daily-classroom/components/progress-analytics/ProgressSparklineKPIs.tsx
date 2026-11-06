@@ -4,11 +4,13 @@ import MetricsGrid, { MetricItem } from "@/components/ui/MetricsGrid";
 
 export interface ProgressSparklineKPIsProps {
   kpis: ProgressKPI[];
+  cols?: number;
   className?: string;
 }
 
 export const ProgressSparklineKPIs: React.FC<ProgressSparklineKPIsProps> = ({
   kpis,
+  cols,
   className = "",
 }) => {
   const metricItems: MetricItem[] = useMemo(() => {
@@ -29,9 +31,11 @@ export const ProgressSparklineKPIs: React.FC<ProgressSparklineKPIsProps> = ({
     }));
   }, [kpis]);
 
+  const effectiveCols = cols || (metricItems.length <= 3 ? 3 : 4);
+
   return (
     <div className={className}>
-      <MetricsGrid items={metricItems} cols={4} variant="kpi" />
+      <MetricsGrid items={metricItems} cols={effectiveCols} variant="kpi" />
     </div>
   );
 };

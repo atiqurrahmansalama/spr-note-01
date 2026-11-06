@@ -19,8 +19,8 @@ export default function TimetableScheduleWidget({
   const { t } = useTranslation('dashboard');
 
   return (
-    <div className={`p-5 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3.5 select-none ${className}`}>
-      <div className="flex items-center justify-between pb-2 border-b theme-border">
+    <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-3.5 select-none ${className}`}>
+      <div className="flex items-center justify-between pb-1">
         <div className="flex items-center gap-2">
           <TimerIcon className="w-4 h-4 text-[var(--accent-main)]" />
           <h3 className="text-sm font-bold theme-text-primary">
@@ -53,10 +53,10 @@ export default function TimetableScheduleWidget({
             return (
               <div
                 key={slot.id}
-                className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 text-left rtl:text-right ${
+                className={`p-3 rounded-xl transition-all flex items-center justify-between gap-3 text-left rtl:text-right ${
                   isCurrent
-                    ? 'theme-bg-accent-soft border-[var(--accent-main)]/30 ring-1 ring-[var(--accent-main)]/20 shadow-xs'
-                    : 'theme-bg-sub/60 theme-border'
+                    ? 'theme-bg-accent-soft shadow-xs'
+                    : 'theme-bg-sub/60 hover:theme-bg-sub'
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -64,8 +64,8 @@ export default function TimetableScheduleWidget({
                     isCurrent
                       ? 'theme-bg-accent theme-accent-text font-bold'
                       : isCompleted
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                      : 'theme-bg-surface theme-text-secondary border theme-border'
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                      : 'theme-bg-surface theme-text-secondary'
                   }`}>
                     <BookOpenIcon className="w-4 h-4" />
                   </div>
@@ -85,10 +85,10 @@ export default function TimetableScheduleWidget({
                 <div className="shrink-0">
                   <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${
                     isCurrent
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 animate-pulse'
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 animate-pulse'
                       : isCompleted
-                      ? 'theme-bg-surface theme-text-muted border theme-border'
-                      : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                      ? 'theme-bg-surface theme-text-muted'
+                      : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
                   }`}>
                     {isCurrent ? t('inProgress', 'In Progress') : isCompleted ? t('completed', 'Completed') : t('upcoming', 'Upcoming')}
                   </span>

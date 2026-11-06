@@ -46,5 +46,7 @@ export interface ProgressAnalyticsDashboardProps {
   showKpis?: boolean;
   showTrendsChart?: boolean;
   showBreakdown?: boolean;
+  visibleKpiIds?: string[];
+  kpiCols?: 3 | 4;
   className?: string;
 }

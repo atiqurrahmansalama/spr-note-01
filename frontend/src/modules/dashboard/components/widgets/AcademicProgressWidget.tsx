@@ -31,9 +31,16 @@ export default function AcademicProgressWidget({
 }: AcademicProgressWidgetProps) {
   const { t, formatNumber } = useTranslation('dashboard');
 
+  const progressItems = items || [
+    { id: '1', label: 'Quranic Tajweed & Makhaarij', percentage: 88, subLabel: 'Section Al-Baqarah', color: 'emerald' as const },
+    { id: '2', label: 'Arabic Morphology (Sarf)', percentage: 74, subLabel: 'Mizan & Munshaib Book', color: 'purple' as const },
+    { id: '3', label: 'Fiqh & Taharah Essentials', percentage: 92, subLabel: 'Nurul Idah Curriculum', color: 'accent' as const },
+    { id: '4', label: 'Hadith Memorization (40 Hadith)', percentage: 65, subLabel: 'Imam An-Nawawi Collection', color: 'amber' as const },
+  ];
+
   return (
-    <div className={`p-5 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-4 select-none ${className}`}>
-      <div className="flex items-center gap-2 pb-2 border-b theme-border">
+    <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs h-full flex flex-col justify-start space-y-4 select-none ${className}`}>
+      <div className="flex items-center gap-2 pb-1">
         <AcademicCapIcon className="w-4 h-4 text-[var(--accent-main)]" />
         <h3 className="text-sm font-bold theme-text-primary">
           {title || t('academicVelocity', 'Academic & Hifz Progress')}
@@ -41,7 +48,7 @@ export default function AcademicProgressWidget({
       </div>
 
       <div className="space-y-3.5">
-        {items.map((item) => {
+        {progressItems.map((item) => {
           const colors = BAR_COLORS[item.color || 'emerald'] || BAR_COLORS.emerald;
           const cappedPct = Math.min(100, Math.max(0, item.percentage));
 
@@ -52,7 +59,7 @@ export default function AcademicProgressWidget({
                 <span className={`font-mono font-bold ${colors.text}`}>{formatNumber(cappedPct)}%</span>
               </div>
 
-              <div className="h-2 rounded-full overflow-hidden bg-zinc-800/20 border theme-border">
+              <div className="h-2 rounded-full overflow-hidden bg-zinc-800/15">
                 <div
                   style={{ width: `${cappedPct}%` }}
                   className={`h-full ${colors.bar} rounded-full transition-all duration-500`}

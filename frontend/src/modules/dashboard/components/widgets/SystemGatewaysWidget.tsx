@@ -27,8 +27,8 @@ export default function SystemGatewaysWidget({
   ];
 
   return (
-    <div className={`p-5 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3.5 select-none ${className}`}>
-      <div className="flex items-center justify-between pb-2 border-b theme-border">
+    <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-3.5 select-none ${className}`}>
+      <div className="flex items-center justify-between pb-1">
         <div className="flex items-center gap-2">
           <SparklesIcon className="w-4 h-4 text-[var(--accent-main)]" />
           <h3 className="text-sm font-bold theme-text-primary">
@@ -55,10 +55,10 @@ export default function SystemGatewaysWidget({
           return (
             <div
               key={gw.id}
-              className="p-3 rounded-xl theme-bg-sub/60 border theme-border flex items-center justify-between gap-3 text-left rtl:text-right"
+              className="p-3 rounded-xl theme-bg-sub/60 hover:theme-bg-sub transition-all flex items-center justify-between gap-3 text-left rtl:text-right"
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg theme-bg-surface border theme-border flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg theme-bg-surface flex items-center justify-center shrink-0">
                   <Icon className="w-4 h-4" />
                 </div>
                 <div className="space-y-0.5 min-w-0">

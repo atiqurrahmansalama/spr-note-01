@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { auth as authStore } from "../../utils/localStore";
 import { useFeatureControl } from "../../context/FeatureControlContext";
 import { useTenant } from "../../context/TenantContext";
 import { useTranslation } from "../../i18n";
@@ -73,8 +74,21 @@ export default function SidebarContainer({
 
   const { isSectionEnabled } = useFeatureControl();
 
+  const currentUser = authStore.getUser() || {};
+  const dashboardRoleSlug = isMultiTenantAdmin || currentUser.is_superuser || currentUser.role === 'SUPER_ADMIN'
+    ? 'super-admin'
+    : String(currentUser.role || currentUser.user_type || 'admin').trim().toLowerCase().replace(/[_\s]+/g, '-');
+
   const menuItems = [
-    { id: "Dashboard", name: "Dashboard", i18nKey: "dashboard", path: "/dashboard", Icon: DashboardIcon, key: "nav_dashboard" },
+    {
+      id: "Dashboard",
+      name: "Dashboard",
+      i18nKey: "dashboard",
+      path: `/dashboard/${dashboardRoleSlug}`,
+      matchPaths: ["/dashboard"],
+      Icon: DashboardIcon,
+      key: "nav_dashboard"
+    },
     {
       id: "Academy",
       name: "Academy Structure",

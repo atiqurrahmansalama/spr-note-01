@@ -4,7 +4,7 @@ import { useTranslation } from '../../../i18n';
 import DashboardGridEngine from '../components/DashboardGridEngine';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { getSavedLayout, saveLayout } from '../widgetRegistry';
-import type { DashboardLayoutItem, DashboardMetric, DashboardQuickAction } from '../types';
+import type { DashboardRole, DashboardLayoutItem, DashboardMetric, DashboardQuickAction } from '../types';
 import { useTenant } from '../../../context/TenantContext';
 import {
   GroupsIcon,
@@ -18,13 +18,19 @@ import {
 } from '../../../components/ui/Icons';
 
 export interface AdminPrincipalDashboardViewProps {
+  role?: DashboardRole;
   isEditMode?: boolean;
   onOpenWidgetCatalog?: () => void;
+  layoutItems?: DashboardLayoutItem[];
+  onUpdateLayout?: (newItems: DashboardLayoutItem[]) => void;
 }
 
 export default function AdminPrincipalDashboardView({
+  role = 'ADMIN',
   isEditMode = false,
   onOpenWidgetCatalog,
+  layoutItems: propLayoutItems,
+  onUpdateLayout,
 }: AdminPrincipalDashboardViewProps) {
   const { t, formatNumber } = useTranslation('dashboard');
   const navigate = useNavigate();
@@ -35,15 +41,29 @@ export default function AdminPrincipalDashboardView({
     pendingAdmissionsCount,
     recentActivities,
     upcomingEvents,
+    todayCollection,
+    monthlyCollection,
   } = useDashboardData();
 
-  const [layoutItems, setLayoutItems] = React.useState<DashboardLayoutItem[]>(() =>
-    getSavedLayout(activeTenantId || 'default', 'ADMIN')
+  const [internalLayout, setInternalLayout] = React.useState<DashboardLayoutItem[]>(() =>
+    propLayoutItems || getSavedLayout(activeTenantId || 'default', role)
   );
 
+  React.useEffect(() => {
+    if (propLayoutItems) {
+      setInternalLayout(propLayoutItems);
+    }
+  }, [propLayoutItems]);
+
+  const activeLayout = propLayoutItems || internalLayout;
+
   const handleUpdateLayout = (newItems: DashboardLayoutItem[]) => {
-    setLayoutItems(newItems);
-    saveLayout(activeTenantId || 'default', 'ADMIN', newItems);
+    if (onUpdateLayout) {
+      onUpdateLayout(newItems);
+    } else {
+      setInternalLayout(newItems);
+      saveLayout(activeTenantId || 'default', role, newItems);
+    }
   };
 
   const metrics: DashboardMetric[] = [
@@ -70,8 +90,8 @@ export default function AdminPrincipalDashboardView({
     {
       id: 'today_collection',
       label: t('todayCollection', "Today's Collection"),
-      value: '৳ 48,500',
-      subLabel: 'Monthly Inflow: ৳ 4,12,000',
+      value: `৳ ${formatNumber(todayCollection)}`,
+      subLabel: `Monthly Inflow: ৳ ${formatNumber(monthlyCollection)}`,
       trend: { value: '83% target met', isPositive: true },
       icon: BanknotesIcon,
       color: 'purple',
@@ -146,8 +166,8 @@ export default function AdminPrincipalDashboardView({
 
   return (
     <DashboardGridEngine
-      items={layoutItems}
-      role="ADMIN"
+      items={activeLayout}
+      role={role}
       isEditMode={isEditMode}
       onUpdateItems={handleUpdateLayout}
       onOpenWidgetCatalog={onOpenWidgetCatalog}

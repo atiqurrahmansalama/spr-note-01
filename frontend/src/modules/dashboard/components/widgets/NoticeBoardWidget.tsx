@@ -47,15 +47,15 @@ export default function NoticeBoardWidget({
 
   const getPriorityBadge = (p: NoticeItem['priority']) => {
     if (p === 'HIGH') {
-      return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20';
+      return 'bg-rose-500/10 text-rose-600 dark:text-rose-400';
     }
-    return 'theme-bg-sub theme-text-secondary border theme-border';
+    return 'theme-bg-sub theme-text-secondary';
   };
 
   return (
-    <div className={`p-5 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3.5 select-none ${className}`}>
+    <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-3.5 select-none ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between pb-2 border-b theme-border">
+      <div className="flex items-center justify-between pb-1">
         <div className="flex items-center gap-2">
           <BellIcon className="w-4 h-4 theme-accent" />
           <h3 className="text-sm font-bold theme-text-primary">
@@ -80,13 +80,13 @@ export default function NoticeBoardWidget({
         {notices.map((notice) => (
           <div
             key={notice.id}
-            className="p-3 rounded-xl theme-bg-sub/60 hover:theme-bg-sub border theme-border transition-all space-y-1.5"
+            className="p-3 rounded-xl theme-bg-sub/60 hover:theme-bg-sub transition-all space-y-1.5"
           >
             <div className="flex items-start justify-between gap-2">
               <h4 className="text-xs font-bold theme-text-primary leading-snug">
                 {notice.title}
               </h4>
-              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border shrink-0 ${getPriorityBadge(notice.priority)}`}>
+              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${getPriorityBadge(notice.priority)}`}>
                 {notice.date}
               </span>
             </div>

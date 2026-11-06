@@ -51,6 +51,15 @@ export const RoleDrawerForm: React.FC<RoleDrawerFormProps> = ({
     action_permissions: initialPermissions,
   });
 
+  const getInputValue = (valOrEvent: any): string => {
+    if (valOrEvent == null) return '';
+    if (typeof valOrEvent === 'string') return valOrEvent;
+    if (typeof valOrEvent === 'object' && valOrEvent.target) {
+      return String(valOrEvent.target.value ?? '');
+    }
+    return String(valOrEvent);
+  };
+
   const handleNameChange = (val: string) => {
     setFormData((prev) => {
       const next: RoleFormData = { ...prev, name: val };
@@ -119,7 +128,7 @@ export const RoleDrawerForm: React.FC<RoleDrawerFormProps> = ({
                 label={t('fields.name', 'Role Display Name')}
                 required
                 value={formData.name}
-                onChange={(e) => handleNameChange(e.target.value)}
+                onChange={(val) => handleNameChange(getInputValue(val))}
                 placeholder={t('fields.namePlaceholder', 'e.g. Senior Ustadh')}
               />
 
@@ -128,11 +137,11 @@ export const RoleDrawerForm: React.FC<RoleDrawerFormProps> = ({
                 required
                 disabled={isSuperAdmin}
                 value={formData.code}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '_'),
-                  })
+                onChange={(val) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    code: getInputValue(val).toUpperCase().replace(/[^A-Z0-9]/g, '_'),
+                  }))
                 }
                 placeholder={t('fields.codePlaceholder', 'e.g. SENIOR_USTADH')}
                 className="font-mono"
@@ -146,7 +155,12 @@ export const RoleDrawerForm: React.FC<RoleDrawerFormProps> = ({
               <textarea
                 rows={3}
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: getInputValue(e),
+                  }))
+                }
                 placeholder={t('fields.descriptionPlaceholder', 'Briefly describe the operational scope for this role...')}
                 className="w-full theme-bg-surface border theme-border theme-text-primary px-3.5 py-2.5 rounded-xl text-xs focus:outline-none focus:theme-border resize-none transition-colors"
               />
@@ -158,17 +172,18 @@ export const RoleDrawerForm: React.FC<RoleDrawerFormProps> = ({
 
       <DrawerFooter
         onCancel={onCancel}
-        cancelText="Discard"
-        confirmText={
+        onSubmit={handleSubmit}
+        cancelLabel={t('actions.cancel', 'Cancel')}
+        saveLabel={
           submitting
-            ? 'Saving...'
+            ? t('actions.saving', 'Saving...')
             : isEditing
-            ? 'Save Changes'
-            : 'Create Role'
+            ? t('actions.saveChanges', 'Save Changes')
+            : t('actions.createRole', 'Create Role')
         }
-        confirmIcon={SaveIcon}
-        confirmDisabled={submitting}
-        confirmLoading={submitting}
+        saveIcon={SaveIcon}
+        isSubmitting={submitting}
+        isSaveDisabled={submitting}
       />
     </form>
   );

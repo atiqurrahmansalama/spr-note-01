@@ -384,14 +384,14 @@ export default function RightSidebarPanel({
       <div
         className={`sidebar-screen-container flex-1 overflow-y-auto p-2 sm:p-3.5 @md:p-4 @lg:p-5 custom-scrollbar ${bodyClassName}`}
       >
-        <div className="w-full max-w-full min-w-0 h-full flex flex-col flex-1 animate-fade-in">
+        <div className="w-full max-w-full min-w-0 h-full flex flex-col flex-1 animate-fade-in pb-16 sm:pb-20">
           {children}
         </div>
       </div>
 
       {/* ─── Sticky Footer ────────────────────────────────────────── */}
       {(footer || onSave || formId) && (
-        <div className="theme-bg-surface border-t theme-border p-3 shrink-0">
+        <div className="theme-bg-surface border-t theme-border p-3.5 sm:p-4 pb-6 sm:pb-8 shrink-0">
           {footer ? (
             footer
           ) : (

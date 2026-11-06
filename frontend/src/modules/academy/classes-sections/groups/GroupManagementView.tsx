@@ -509,7 +509,7 @@ export default function GroupManagementView({
       isEmbedded={isEmbedded}
       maxWidth="7xl"
       animate={!isEmbedded}
-      className="space-y-3.5"
+      className="space-y-4 sm:space-y-6"
     >
       {/* ─── Reusable Responsive Filter & View Toolbar ─── */}
       <ClassesSectionsToolbar

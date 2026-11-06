@@ -12,6 +12,7 @@ import {
   SparklesIcon,
 } from '../../../components/ui/Icons';
 import TabSwitcher from '../../../components/ui/TabSwitcher';
+import PageHeader from '../../../components/ui/PageHeader';
 import CustomButton from '../../../components/ui/CustomButton';
 import MetricsGrid from '../../../components/ui/MetricsGrid';
 import ErrorBoundary from '../../../components/ui/ErrorBoundary';
@@ -262,15 +263,12 @@ export default function ClassesSectionsHubView() {
     return defaultTab;
   }, [rawTab, TABS, defaultTab]);
 
-  // Track visited tabs to preserve mounted instances across tab switches (zero flicker)
-  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>(() => ({
-    [activeTab]: true,
-  }));
-
-  // Re-synchronize visited tabs whenever activeTab changes
-  useEffect(() => {
-    setVisitedTabs((prev) => (prev[activeTab] ? prev : { ...prev, [activeTab]: true }));
-  }, [activeTab]);
+  // Pre-mount all tabs to completely eliminate layout jumping, delayed mounting, and UI flickering
+  const [visitedTabs] = useState<Record<string, boolean>>({
+    classes: true,
+    sections: true,
+    groups: true,
+  });
 
   const handleTabChange = (tabId: string) => {
     if (tabId === activeTab) return;
@@ -424,7 +422,14 @@ export default function ClassesSectionsHubView() {
 
   return (
     <PageContainer>
-      {/* 1. Top Toolbar Row: Theme-Aware TabSwitcher on Left + Dynamic Action Button on Far Right */}
+      {/* 1. Header Overview with Reusable PageHeader (Standardized across Academy Hub views) */}
+      <PageHeader
+        title="Classes & Sections"
+        subtitle="Unified central console for academic grades, section allocations, and student mentorship groups."
+        icon={ClassIcon}
+      />
+
+      {/* 2. Top Toolbar Row: Theme-Aware TabSwitcher on Left + Dynamic Action Button on Far Right */}
       <TabSwitcher
         tabs={TABS}
         activeTab={activeTab}

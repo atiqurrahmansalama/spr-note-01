@@ -157,6 +157,7 @@ export default function App() {
                 }
               >
                 <Route path="/dashboard" element={<DashboardHubView />} />
+                <Route path="/dashboard/:roleSlug" element={<DashboardHubView />} />
                 <Route path="/report-builder" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/student-reports" element={<Navigate to="/studies/progress-reports" replace />} />
                 <Route path="/students" element={<FeatureGuard sectionKey="student_roster"><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
@@ -334,7 +335,6 @@ export default function App() {
                 <Route path="/staff-payroll" element={<FeatureGuard sectionKey="finance_staff_payroll" fallback={<Navigate to="/finance" replace />}><FinanceHubView /></FeatureGuard>} />
                 <Route path="/general-ledger" element={<FeatureGuard sectionKey="finance_general_ledger" fallback={<Navigate to="/finance" replace />}><FinanceHubView /></FeatureGuard>} />
 
-                <Route path="/dashboard" element={<DashboardHubView />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>

@@ -110,15 +110,15 @@ export default function GuardianStudentDashboardView() {
   return (
     <div className="space-y-5 animate-fade-in">
       {/* 1. Student Identification Badge Card */}
-      <div className="p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 select-none">
+      <div className="p-4 rounded-2xl theme-bg-surface shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 select-none">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-12 h-12 rounded-2xl theme-bg-accent-soft text-[var(--accent-main)] border border-[var(--accent-main)]/20 flex items-center justify-center font-bold text-lg shrink-0 shadow-xs">
+          <div className="w-12 h-12 rounded-2xl theme-bg-accent-soft text-[var(--accent-main)] flex items-center justify-center font-bold text-lg shrink-0 shadow-xs">
             TR
           </div>
           <div className="space-y-0.5 min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-base font-bold theme-text-primary truncate">Tariqur Rahman</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                 Active Student
               </span>
             </div>

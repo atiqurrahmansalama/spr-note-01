@@ -22,6 +22,8 @@ export const ProgressAnalyticsDashboard: React.FC<ProgressAnalyticsDashboardProp
   showKpis = true,
   showTrendsChart = true,
   showBreakdown = true,
+  visibleKpiIds,
+  kpiCols,
   className = "",
 }) => {
   const [internalExpanded, setInternalExpanded] = useState(true);
@@ -38,6 +40,11 @@ export const ProgressAnalyticsDashboard: React.FC<ProgressAnalyticsDashboardProp
   const [activeMetric, setActiveMetric] = useState<MetricType>(defaultMetric);
 
   const analytics = useProgressAnalyticsEngine(reports, activeMetric, startDate, endDate);
+
+  const displayedKpis = React.useMemo(() => {
+    if (!visibleKpiIds || visibleKpiIds.length === 0) return analytics.kpis;
+    return analytics.kpis.filter((kpi) => visibleKpiIds.includes(kpi.id));
+  }, [analytics.kpis, visibleKpiIds]);
 
   return (
     <div className={`w-full space-y-4 animate-fade-in ${className}`}>
@@ -84,8 +91,11 @@ export const ProgressAnalyticsDashboard: React.FC<ProgressAnalyticsDashboardProp
       {(!collapsible || isExpanded) && (
         <div className="space-y-4 animate-fade-in">
           {/* 1. Sparkline KPI Cards */}
-          {showKpis && variant !== "chart-only" && (
-            <ProgressSparklineKPIs kpis={analytics.kpis} />
+          {showKpis && variant !== "chart-only" && displayedKpis.length > 0 && (
+            <ProgressSparklineKPIs
+              kpis={displayedKpis}
+              cols={kpiCols || (displayedKpis.length <= 3 ? 3 : 4)}
+            />
           )}
 
           {/* 2. Visual Trends & Breakdown Split */}

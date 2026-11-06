@@ -34,11 +34,11 @@ export default function AdmissionPipelineWidget({
   ];
 
   return (
-    <div className={`p-5 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-4 select-none ${className}`}>
+    <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs h-full flex flex-col justify-start space-y-4 select-none ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b theme-border">
+      <div className="flex items-center justify-between pb-1">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
             <AdmissionIcon className="w-4 h-4" />
           </div>
           <div>
@@ -55,7 +55,7 @@ export default function AdmissionPipelineWidget({
           <button
             type="button"
             onClick={onViewPipeline}
-            className="px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border text-xs font-semibold theme-text-primary transition-all cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-xl theme-bg-sub/60 hover:theme-bg-elevated text-xs font-semibold theme-text-primary transition-all cursor-pointer flex items-center gap-1.5"
           >
             <span>{t('viewReport', 'Pipeline')}</span>
             <span className="text-[10px]">→</span>
@@ -63,12 +63,12 @@ export default function AdmissionPipelineWidget({
         )}
       </div>
 
-      {/* Pipeline 4-Stage Grid */}
+      {/* Pipeline 4-Stage Grid (Borderless) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {stages.map((stage) => (
           <div
             key={stage.label}
-            className={`p-3 rounded-xl border theme-border text-center space-y-1 ${stage.bg}`}
+            className={`p-3 rounded-xl text-center space-y-1 ${stage.bg}`}
           >
             <div className={`text-lg font-bold font-mono ${stage.color}`}>
               {formatNumber(stage.count)}

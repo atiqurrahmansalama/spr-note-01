@@ -247,11 +247,19 @@ export function DrawerFooter({
   onCancel,
   onSubmit,
   onSave,
-  cancelLabel = "Cancel",
-  saveLabel = "Save Changes",
+  onConfirm,
+  cancelLabel,
+  cancelText,
+  saveLabel,
+  saveText,
+  confirmText,
   saveIcon,
+  confirmIcon,
   isSubmitting = false,
+  confirmLoading = false,
   isSaveDisabled = false,
+  saveDisabled = false,
+  confirmDisabled = false,
   autoSaveStatus = null,
   lastSavedAt = null,
   showAutoSave = false,
@@ -259,7 +267,14 @@ export function DrawerFooter({
   className = "",
   children,
 }) {
-  const hasStandardActions = Boolean(onCancel || onSubmit || onSave);
+  const resolvedCancelLabel = cancelLabel || cancelText || "Cancel";
+  const resolvedSaveLabel = saveLabel || saveText || confirmText || "Save Changes";
+  const resolvedSaveIcon = saveIcon || confirmIcon;
+  const resolvedIsSubmitting = Boolean(isSubmitting || confirmLoading);
+  const resolvedIsSaveDisabled = Boolean(isSaveDisabled || saveDisabled || confirmDisabled);
+  const hasSaveAction = Boolean(onSubmit || onSave || onConfirm || confirmText || saveText || saveLabel);
+
+  const hasStandardActions = Boolean(onCancel || hasSaveAction);
 
   if (!hasStandardActions && children) {
     return (
@@ -275,6 +290,16 @@ export function DrawerFooter({
     );
   }
 
+  const handleSaveClick = (e) => {
+    if (onSave) {
+      onSave(e);
+    } else if (onConfirm) {
+      onConfirm(e);
+    } else if (typeof onSubmit === "function") {
+      onSubmit(e);
+    }
+  };
+
   return (
     <div
       className={`flex items-center justify-between gap-2.5 pt-4 border-t theme-border w-full ${className}`}
@@ -286,9 +311,9 @@ export function DrawerFooter({
             variant="sub"
             size="md"
             onClick={onCancel}
-            disabled={isSubmitting}
+            disabled={resolvedIsSubmitting}
           >
-            {cancelLabel}
+            {resolvedCancelLabel}
           </CustomButton>
         )}
         {showAutoSave && (
@@ -299,17 +324,17 @@ export function DrawerFooter({
       </div>
 
       <div className="flex items-center gap-2 ml-auto shrink-0">
-        {(onSubmit || onSave) && (
+        {hasSaveAction && (
           <CustomButton
-            type={onSubmit ? "submit" : "button"}
+            type={typeof onSubmit === "function" ? "submit" : (onSubmit || (!onSave && !onConfirm) ? "submit" : "button")}
             variant="primary"
             size="md"
-            icon={saveIcon}
-            onClick={onSave || (typeof onSubmit === "function" ? onSubmit : undefined)}
-            loading={isSubmitting}
-            disabled={isSaveDisabled}
+            icon={resolvedSaveIcon}
+            onClick={handleSaveClick}
+            loading={resolvedIsSubmitting}
+            disabled={resolvedIsSaveDisabled}
           >
-            {saveLabel}
+            {resolvedSaveLabel}
           </CustomButton>
         )}
       </div>

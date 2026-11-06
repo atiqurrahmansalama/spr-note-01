@@ -44,6 +44,9 @@ export const ar = {
   pendingApplications: 'طلبات القبول المعلقة',
   bedOccupancy: 'إشغال المهجع',
   hifzCompletion: 'متوسط الأجزاء المكتملة',
+  todayRecited: 'الطلاب المسمعون اليوم',
+  pagesAndMistakes: 'الصفحات المستمعة والأخطاء',
+  errorImprovement: 'تحسن الأخطاء والتوقفات',
 
   // Common Actions
   takeAttendance: 'تسجيل الحضور',
@@ -51,5 +54,11 @@ export const ar = {
   viewReport: 'عرض التقرير',
   payFees: 'الدفع الإلكتروني',
   viewDetails: 'عرض التفاصيل',
+  configureGridLayout: 'تهيئة تخطيط الشبكة',
+  exitGridLayout: 'إنهاء تخصيص الشبكة',
+  workspaceCustomizer: 'مخصص مساحة العمل',
+  workspaceRoleBuilder: 'مخصص مساحة العمل (منشئ الأدوار)',
+  widgetGovernance: 'نطاقات أدوار الأدوات والأكاديمية',
+  doneCustomizing: 'تم التخصيص',
 };
 

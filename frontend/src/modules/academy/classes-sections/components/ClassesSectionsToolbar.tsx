@@ -59,21 +59,20 @@ export default function ClassesSectionsToolbar({
   const hasClass = Boolean(classFilter);
   const hasSection = Boolean(sectionFilter);
 
-  // Dynamic filter widths ensuring zero text truncation on placeholders ("All Departments", "All Classes", etc.)
-  // Classes: Search (288px) + Department (256px)
-  // Sections: Search (288px) + Department (240px) + Class (224px)
-  // Groups: Search (256px) + Department (224px) + Class (208px) + Section (208px)
+  // Dynamic enterprise filter widths matching Campus Structure standard
+  // Ensures zero text truncation on placeholders ("All Departments", "All Classes", "All Sections")
+  // and balanced horizontal distribution across all screen sizes.
   const deptWidthClass = hasClass
     ? hasSection
-      ? 'w-full sm:w-52 md:w-56 min-w-[200px]'
-      : 'w-full sm:w-56 md:w-60 min-w-[210px]'
-    : 'w-full sm:w-60 md:w-64 min-w-[220px]';
+      ? 'w-full sm:w-44 md:w-48 lg:w-52 min-w-[180px]'
+      : 'w-full sm:w-52 md:w-60 lg:w-64 min-w-[210px]'
+    : 'w-full sm:w-64 md:w-72 lg:w-80 min-w-[240px]';
 
   const classWidthClass = hasSection
-    ? 'w-full sm:w-48 md:w-52 min-w-[190px]'
-    : 'w-full sm:w-52 md:w-60 min-w-[200px]';
+    ? 'w-full sm:w-44 md:w-48 lg:w-52 min-w-[180px]'
+    : 'w-full sm:w-52 md:w-60 lg:w-64 min-w-[210px]';
 
-  const sectionWidthClass = 'w-full sm:w-48 md:w-52 min-w-[190px]';
+  const sectionWidthClass = 'w-full sm:w-44 md:w-48 lg:w-52 min-w-[180px]';
 
   const filterElement = (
     <div className="flex items-end gap-2 sm:gap-2.5 flex-nowrap">
@@ -131,9 +130,11 @@ export default function ClassesSectionsToolbar({
     </div>
   );
 
+  const resolvedSearchLabel = searchLabel || `Search ${entityName || 'Records'}`;
+
   return (
     <DataViewToolbar
-      searchLabel={searchLabel || `Search ${entityName}`}
+      searchLabel={resolvedSearchLabel}
       searchQuery={searchQuery}
       onSearchChange={onSearchChange}
       searchPlaceholder={searchPlaceholder}

@@ -37,11 +37,11 @@ export default function HifzQuranProgressWidget({
   const completedPct = Math.round((progress.completedJuz / 30) * 100);
 
   return (
-    <div className={`p-5 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-4 select-none ${className}`}>
+    <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-4 select-none ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b theme-border">
+      <div className="flex items-center justify-between pb-2">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
             <BookOpenIcon className="w-4 h-4" />
           </div>
           <div>
@@ -58,7 +58,7 @@ export default function HifzQuranProgressWidget({
           <button
             type="button"
             onClick={onOpenTracker}
-            className="px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border text-xs font-semibold theme-text-primary transition-all cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated text-xs font-semibold theme-text-primary transition-all cursor-pointer flex items-center gap-1.5"
           >
             <span>{t('viewReport', 'Tracker')}</span>
             <span className="text-[10px]">→</span>
@@ -77,7 +77,7 @@ export default function HifzQuranProgressWidget({
           </span>
         </div>
 
-        <div className="h-2.5 rounded-full overflow-hidden bg-zinc-800/15 border theme-border">
+        <div className="h-2.5 rounded-full overflow-hidden bg-zinc-800/15">
           <div
             style={{ width: `${completedPct}%` }}
             className="h-full bg-purple-500 rounded-full transition-all duration-500 shadow-xs"
@@ -88,7 +88,7 @@ export default function HifzQuranProgressWidget({
       {/* Sabaq, Sabqi, Dawr Tri-Pill Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
         {/* Sabaq */}
-        <div className="p-2.5 rounded-xl theme-bg-sub/70 border theme-border space-y-1">
+        <div className="p-2.5 rounded-xl theme-bg-sub/70 space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
               Sabaq (New)
@@ -103,7 +103,7 @@ export default function HifzQuranProgressWidget({
         </div>
 
         {/* Sabqi */}
-        <div className="p-2.5 rounded-xl theme-bg-sub/70 border theme-border space-y-1">
+        <div className="p-2.5 rounded-xl theme-bg-sub/70 space-y-1">
           <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">
             Sabqi (Recent)
           </span>
@@ -113,7 +113,7 @@ export default function HifzQuranProgressWidget({
         </div>
 
         {/* Dawr */}
-        <div className="p-2.5 rounded-xl theme-bg-sub/70 border theme-border space-y-1">
+        <div className="p-2.5 rounded-xl theme-bg-sub/70 space-y-1">
           <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">
             Dawr (Review)
           </span>
@@ -124,16 +124,16 @@ export default function HifzQuranProgressWidget({
       </div>
 
       {/* Mistakes & Stucks Counter */}
-      <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl theme-bg-sub/40 border theme-border text-xs">
+      <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl theme-bg-sub/40 text-xs">
         <div className="flex items-center gap-2">
           <SparklesIcon className="w-3.5 h-3.5 theme-accent" />
           <span className="theme-text-secondary font-medium">Daily Mistakes / Stucks:</span>
         </div>
         <div className="flex items-center gap-2 font-mono font-bold">
-          <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+          <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
             {formatNumber(progress.dailyMistakes)} M
           </span>
-          <span className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+          <span className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400">
             {formatNumber(progress.dailyStucks)} S
           </span>
         </div>

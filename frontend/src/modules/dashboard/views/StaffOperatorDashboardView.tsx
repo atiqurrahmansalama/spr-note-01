@@ -4,7 +4,7 @@ import { useTranslation } from '../../../i18n';
 import DashboardGridEngine from '../components/DashboardGridEngine';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { getSavedLayout, saveLayout } from '../widgetRegistry';
-import type { DashboardLayoutItem, DashboardMetric, DashboardQuickAction } from '../types';
+import type { DashboardRole, DashboardLayoutItem, DashboardMetric, DashboardQuickAction } from '../types';
 import { useTenant } from '../../../context/TenantContext';
 import {
   BanknotesIcon,
@@ -15,13 +15,19 @@ import {
 } from '../../../components/ui/Icons';
 
 export interface StaffOperatorDashboardViewProps {
+  role?: DashboardRole;
   isEditMode?: boolean;
   onOpenWidgetCatalog?: () => void;
+  layoutItems?: DashboardLayoutItem[];
+  onUpdateLayout?: (newItems: DashboardLayoutItem[]) => void;
 }
 
 export default function StaffOperatorDashboardView({
+  role = 'STAFF',
   isEditMode = false,
   onOpenWidgetCatalog,
+  layoutItems: propLayoutItems,
+  onUpdateLayout,
 }: StaffOperatorDashboardViewProps) {
   const { t, formatNumber } = useTranslation('dashboard');
   const navigate = useNavigate();
@@ -30,22 +36,35 @@ export default function StaffOperatorDashboardView({
     pulseData,
     pendingAdmissionsCount,
     upcomingEvents,
+    todayCollection,
   } = useDashboardData();
 
-  const [layoutItems, setLayoutItems] = React.useState<DashboardLayoutItem[]>(() =>
-    getSavedLayout(activeTenantId || 'default', 'STAFF')
+  const [internalLayout, setInternalLayout] = React.useState<DashboardLayoutItem[]>(() =>
+    propLayoutItems || getSavedLayout(activeTenantId || 'default', role)
   );
 
+  React.useEffect(() => {
+    if (propLayoutItems) {
+      setInternalLayout(propLayoutItems);
+    }
+  }, [propLayoutItems]);
+
+  const activeLayout = propLayoutItems || internalLayout;
+
   const handleUpdateLayout = (newItems: DashboardLayoutItem[]) => {
-    setLayoutItems(newItems);
-    saveLayout(activeTenantId || 'default', 'STAFF', newItems);
+    if (onUpdateLayout) {
+      onUpdateLayout(newItems);
+    } else {
+      setInternalLayout(newItems);
+      saveLayout(activeTenantId || 'default', role, newItems);
+    }
   };
 
   const metrics: DashboardMetric[] = [
     {
       id: 'staff_counter_collection',
       label: "Today's Fee Collection",
-      value: '৳ 48,500',
+      value: `৳ ${formatNumber(todayCollection)}`,
       subLabel: '14 transactions completed',
       trend: { value: 'Counter Active', isPositive: true },
       icon: BanknotesIcon,
@@ -130,8 +149,8 @@ export default function StaffOperatorDashboardView({
 
   return (
     <DashboardGridEngine
-      items={layoutItems}
-      role="STAFF"
+      items={activeLayout}
+      role={role}
       isEditMode={isEditMode}
       onUpdateItems={handleUpdateLayout}
       onOpenWidgetCatalog={onOpenWidgetCatalog}

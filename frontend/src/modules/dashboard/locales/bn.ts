@@ -44,6 +44,9 @@ export const bn = {
   pendingApplications: 'অপেক্ষমাণ ভর্তি আবেদন',
   bedOccupancy: 'হোস্টেল সিট বুকিং',
   hifzCompletion: 'গড় সম্পন্ন পারা',
+  todayRecited: 'আজ পড়া শোনানো শিক্ষার্থী',
+  pagesAndMistakes: 'শোনা পৃষ্ঠা ও মোট ভুল',
+  errorImprovement: 'ভুল ও আটকে যাওয়া সংশোধন',
 
   // Common Actions
   takeAttendance: 'হাজিরা গ্রহণ',
@@ -51,5 +54,11 @@ export const bn = {
   viewReport: 'রিপোর্ট দেখুন',
   payFees: 'অনলাইনে ফি পরিশোধ',
   viewDetails: 'বিস্তারিত দেখুন',
+  configureGridLayout: 'গ্রিড লেআউট কনফিগার',
+  exitGridLayout: 'গ্রিড কাস্টমাইজেশন সমাপ্ত',
+  workspaceCustomizer: 'ওয়ার্কস্পেস কাস্টমাইজার',
+  workspaceRoleBuilder: 'ওয়ার্কস্পেস কাস্টমাইজার (রোল বিল্ডার)',
+  widgetGovernance: 'উইজেট রোল ও অ্যাকাডেমি স্কোপ',
+  doneCustomizing: 'কাস্টমাইজ সম্পন্ন',
 };
 

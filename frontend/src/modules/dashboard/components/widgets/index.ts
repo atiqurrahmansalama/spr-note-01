@@ -11,4 +11,6 @@ export { default as FinanceCollectionWidget } from './FinanceCollectionWidget';
 export { default as AdmissionPipelineWidget } from './AdmissionPipelineWidget';
 export { default as ResidentialOccupancyWidget } from './ResidentialOccupancyWidget';
 export { default as NoticeBoardWidget } from './NoticeBoardWidget';
+export { default as RecitationTrendsWidget } from './RecitationTrendsWidget';
+export { default as AcademicCalendarWidget } from './AcademicCalendarWidget';
 

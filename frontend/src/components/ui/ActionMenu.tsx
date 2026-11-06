@@ -307,17 +307,15 @@ export default function ActionMenu({
                 ? 'accent-soft'
                 : variant === 'surface'
                 ? 'surface'
-                : variant === 'sub'
-                ? 'sub'
-                : 'sub'
+                : 'ghost'
             }
             shape="rounded"
             active={isMenuOpen}
             className={`${
               isMenuOpen
-                ? (showActiveRing ?? (variant !== 'ghost' && variant !== 'sub' && variant !== 'surface'))
+                ? showActiveRing
                   ? 'ring-2 ring-[var(--accent-main)]/30 theme-bg-sub'
-                  : 'theme-bg-sub'
+                  : 'theme-bg-sub/60'
                 : ''
             } ${buttonClassName}`}
           />

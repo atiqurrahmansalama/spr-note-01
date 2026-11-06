@@ -44,6 +44,9 @@ export const ur = {
   pendingApplications: 'زیر التواء داخلے',
   bedOccupancy: 'ہاسٹل میں نشستیں',
   hifzCompletion: 'اوسط مکمل پارے',
+  todayRecited: 'آج سبق سنانے والے طلباء',
+  pagesAndMistakes: 'سنے گئے صفحات اور غلطیاں',
+  errorImprovement: 'غلطیوں اور اٹکاؤ میں بہتری',
 
   // Common Actions
   takeAttendance: 'حاضری لگائیں',
@@ -51,5 +54,11 @@ export const ur = {
   viewReport: 'رپورٹ دیکھیں',
   payFees: 'آن لائن ادائیگی',
   viewDetails: 'تفصیلات دیکھیں',
+  configureGridLayout: 'گرڈ لے آؤٹ ترتیب دیں',
+  exitGridLayout: 'گرڈ حسب ضرورت ختم کریں',
+  workspaceCustomizer: 'ورک اسپیس حسب ضرورت کار',
+  workspaceRoleBuilder: 'ورک اسپیس حسب ضرورت کار (رول بلڈر)',
+  widgetGovernance: 'وجیٹ رول اور اکیڈمی اسکوپس',
+  doneCustomizing: 'حسب ضرورت مکمل',
 };
 

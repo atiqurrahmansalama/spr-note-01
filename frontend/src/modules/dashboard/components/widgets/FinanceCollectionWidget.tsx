@@ -31,11 +31,11 @@ export default function FinanceCollectionWidget({
   };
 
   return (
-    <div className={`p-5 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-4 select-none ${className}`}>
+    <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-4 select-none ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b theme-border">
+      <div className="flex items-center justify-between pb-2">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
             <BanknotesIcon className="w-4 h-4" />
           </div>
           <div>
@@ -52,7 +52,7 @@ export default function FinanceCollectionWidget({
           <button
             type="button"
             onClick={onViewLedger}
-            className="px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated border theme-border text-xs font-semibold theme-text-primary transition-all cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated text-xs font-semibold theme-text-primary transition-all cursor-pointer flex items-center gap-1.5"
           >
             <span>{t('viewReport', 'Ledger')}</span>
             <span className="text-[10px]">→</span>
@@ -62,7 +62,7 @@ export default function FinanceCollectionWidget({
 
       {/* Hero Stats */}
       <div className="grid grid-cols-2 gap-2.5">
-        <div className="p-3.5 rounded-xl theme-bg-sub border theme-border space-y-1">
+        <div className="p-3.5 rounded-xl theme-bg-sub/70 space-y-1">
           <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">
             Today's Inflow
           </span>
@@ -71,7 +71,7 @@ export default function FinanceCollectionWidget({
           </div>
         </div>
 
-        <div className="p-3.5 rounded-xl theme-bg-sub border theme-border space-y-1">
+        <div className="p-3.5 rounded-xl theme-bg-sub/70 space-y-1">
           <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">
             Unpaid Tuition
           </span>
@@ -90,7 +90,7 @@ export default function FinanceCollectionWidget({
           {finance.recentTransactions.map((tx) => (
             <div
               key={tx.id}
-              className="px-3 py-2 rounded-xl theme-bg-sub/50 border theme-border flex items-center justify-between text-xs"
+              className="px-3 py-2 rounded-xl theme-bg-sub/50 flex items-center justify-between text-xs"
             >
               <div className="truncate">
                 <span className="font-semibold theme-text-primary block truncate">{tx.studentName}</span>
