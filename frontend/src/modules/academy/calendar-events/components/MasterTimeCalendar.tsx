@@ -1,33 +1,33 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import ActionMenu from "../ui/ActionMenu";
-import CustomInput from "../ui/CustomInput";
+import ActionMenu from "../../../../components/ui/ActionMenu";
+import CustomInput from "../../../../components/ui/CustomInput";
+import CustomButton from "../../../../components/ui/CustomButton";
+import IconButton from "../../../../components/ui/IconButton";
 import {
   CalendarIcon,
-  SearchIcon,
-  CloseIcon,
-  TrashIcon,
-  EditIcon,
-  PlusIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   GridIcon,
   TimelineIcon,
-} from "../ui/Icons";
-import DateHeaderCell from "../common/DateHeaderCell";
-import { useRightSidebar } from "../../context/RightSidebarContext";
-import { EVENT_COLORS } from "./TimeScheduleDrawerForm";
-import { calendarEventTypesStore, calendarEventKindsStore, calendarSettings } from "../../utils/localStore";
-import { useTenant } from "../../context/TenantContext";
-import { getHijriDateString, getHijriDetails } from "../../utils/hijriUtils";
+} from "../../../../components/ui/Icons";
+import DateHeaderCell from "../../../../components/common/DateHeaderCell";
+import { useRightSidebar } from "../../../../context/RightSidebarContext";
+import { calendarEventTypesStore, calendarEventKindsStore, calendarSettings } from "../../../../utils/localStore";
+import { useTenant } from "../../../../context/TenantContext";
+import { getHijriDateString, getHijriDetails } from "../../../../utils/hijriUtils";
+import type { CalendarEvent, CalendarCategory, CalendarDisplayMode, DeleteEventOptions } from "../types";
+
+export interface EventColorStyle {
+  bg: string;
+  border: string;
+  text: string;
+  dot: string;
+  hex: string;
+}
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
-];
-
-const MONTH_NAMES_SHORT = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ];
 
 const WEEKDAY_NAMES_SHORT = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -35,7 +35,7 @@ const WEEKDAY_NAMES_FULL = [
   "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 ];
 
-export const EVENT_COLOR_MAP = {
+export const EVENT_COLOR_MAP: Record<string, EventColorStyle> = {
   emerald: { bg: "bg-emerald-500/10", border: "border-emerald-500/25", text: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500", hex: "#10b981" },
   indigo: { bg: "bg-indigo-500/10", border: "border-indigo-500/25", text: "text-indigo-600 dark:text-indigo-400", dot: "bg-indigo-500", hex: "#6366f1" },
   blue: { bg: "bg-blue-500/10", border: "border-blue-500/25", text: "text-blue-600 dark:text-blue-400", dot: "bg-blue-500", hex: "#3b82f6" },
@@ -67,7 +67,7 @@ export const EVENT_COLOR_MAP = {
  * Resolves the precise display label for any calendar event or schedule.
  * Looks up custom types configured in Developer Tools as well as built-in categories.
  */
-export function getEventDisplayType(evt, tenantId) {
+export function getEventDisplayType(evt?: CalendarEvent | null, tenantId?: string): string {
   if (!evt) return "Event";
   if (evt.category === "WORKING_HOURS" || evt.type === "WORKING_HOURS") {
     return "Working Hours";
@@ -77,19 +77,19 @@ export function getEventDisplayType(evt, tenantId) {
   const explicitType = evt.type || evt.event_type || evt.kind;
 
   // 2. Lookup in configured Event Types from Developer Tools store
-  let matchedEventType = null;
+  let matchedEventType: any = null;
   if (typeof window !== "undefined") {
     try {
       const types = calendarEventTypesStore.getEventTypes(tenantId);
       matchedEventType = types.find(
-        (t) => t.id === evt.eventTypeId || t.name === evt.title || t.code === evt.code
+        (t: any) => t.id === evt.eventTypeId || t.name === evt.title || t.code === evt.code
       );
     } catch {}
   }
 
   const rawType = explicitType || matchedEventType?.type || (evt.category !== "ACADEMIC_EVENT" ? evt.category : null);
 
-  const kindsMap = {
+  const kindsMap: Record<string, string> = {
     HOLIDAY: "Holiday",
     EXAM: "Exam",
     WORKING_HOURS: "Working Hours",
@@ -114,13 +114,15 @@ export function getEventDisplayType(evt, tenantId) {
   return "Academic Event";
 }
 
-const eventColorsCache = new Map();
+const eventColorsCache = new Map<string, EventColorStyle>();
 
-export function getEventColors(evt, tenantId) {
-  if (!evt) return null;
-  const cacheKey = `${tenantId || 'def'}_${evt.id || evt.title || ''}_${evt.color || ''}_${evt.category || ''}_${evt.type || ''}`;
+export function getEventColors(evt?: CalendarEvent | null, tenantId?: string): EventColorStyle {
+  if (!evt) {
+    return EVENT_COLOR_MAP.emerald;
+  }
+  const cacheKey = `${tenantId || "def"}_${evt.id || evt.title || ""}_${evt.color || ""}_${evt.category || ""}_${evt.type || ""}`;
   if (eventColorsCache.has(cacheKey)) {
-    return eventColorsCache.get(cacheKey);
+    return eventColorsCache.get(cacheKey)!;
   }
 
   const isWorkingHours = evt?.category === "WORKING_HOURS" || evt?.type === "WORKING_HOURS";
@@ -128,7 +130,7 @@ export function getEventColors(evt, tenantId) {
   // 1. Direct explicit color on event
   if (evt?.color && EVENT_COLOR_MAP[evt.color]) {
     const base = EVENT_COLOR_MAP[evt.color];
-    const res = isWorkingHours ? { ...base, text: "theme-text-primary" } : base;
+    const res: EventColorStyle = isWorkingHours ? { ...base, text: "theme-text-primary" } : base;
     eventColorsCache.set(cacheKey, res);
     return res;
   }
@@ -138,17 +140,17 @@ export function getEventColors(evt, tenantId) {
     try {
       const types = calendarEventTypesStore.getEventTypes(tenantId);
       const matchedType = types.find(
-        (t) => t.id === evt?.eventTypeId || t.name === evt?.title || t.code === evt?.code
+        (t: any) => t.id === evt?.eventTypeId || t.name === evt?.title || t.code === evt?.code
       );
       const rawType = matchedType?.type || evt?.type || evt?.event_type || evt?.kind || evt?.category;
       if (rawType) {
         const kinds = calendarEventKindsStore.getKinds(tenantId);
         const matchedKind = kinds.find(
-          (k) => k.value === rawType || k.id === rawType || String(k.value).toUpperCase() === String(rawType).toUpperCase()
+          (k: any) => k.value === rawType || k.id === rawType || String(k.value).toUpperCase() === String(rawType).toUpperCase()
         );
         if (matchedKind?.color && EVENT_COLOR_MAP[matchedKind.color]) {
           const base = EVENT_COLOR_MAP[matchedKind.color];
-          const res = isWorkingHours ? { ...base, text: "theme-text-primary" } : base;
+          const res: EventColorStyle = isWorkingHours ? { ...base, text: "theme-text-primary" } : base;
           eventColorsCache.set(cacheKey, res);
           return res;
         }
@@ -157,7 +159,7 @@ export function getEventColors(evt, tenantId) {
   }
 
   if (isWorkingHours) {
-    const res = {
+    const res: EventColorStyle = {
       bg: "theme-bg-accent-soft",
       border: "border-[var(--accent-main)]/20",
       text: "theme-text-primary",
@@ -181,7 +183,7 @@ export function getEventColors(evt, tenantId) {
   return fallback;
 }
 
-function formatTime12(timeStr) {
+function formatTime12(timeStr?: string): string {
   if (!timeStr) return "";
   const parts = String(timeStr).split(":");
   let h = parseInt(parts[0], 10);
@@ -193,20 +195,55 @@ function formatTime12(timeStr) {
   return `${h}:${m}${ampm}`;
 }
 
-function getOrdinalSuffix(day) {
-  if (day > 3 && day < 21) return "th";
-  switch (day % 10) {
-    case 1: return "st";
-    case 2: return "nd";
-    case 3: return "rd";
-    default: return "th";
-  }
+export interface MasterTimeCalendarProps {
+  events?: CalendarEvent[];
+  onSaveEvent?: (eventData: any) => void;
+  onDeleteEvent?: (eventOrId: any, options?: DeleteEventOptions) => void;
+  readOnly?: boolean;
+  selectedCategory?: CalendarCategory | string;
+  viewMode?: "month" | "list";
+  actionMenuItems?: Array<{
+    label: string;
+    icon?: React.ComponentType<any>;
+    onClick: () => void;
+  }>;
+  onDateSelect?: (dateStr: string) => void;
+  onDisplayModeChange?: (mode: CalendarDisplayMode | string) => void;
+  className?: string;
+  isHijriEnabled?: boolean;
+}
+
+interface MonthGridCell {
+  dateStr: string;
+  dayNum: number;
+  isCurrentMonth: boolean;
+  weekday: number;
+}
+
+interface WeekEventItem {
+  event: CalendarEvent;
+  startCol: number; // 1 to 7
+  endCol: number;   // 1 to 7
+  span: number;     // 1 to 7
+  isStart: boolean;
+  isEnd: boolean;
+  row: number;
+}
+
+interface TimelineStripDay {
+  dateObj: Date;
+  dateStr: string;
+  dayNum: number;
+  monthIdx: number;
+  yearNum: number;
+  weekday: number;
+  isCurrentMonth: boolean;
+  isPrevMonth?: boolean;
+  isNextMonth?: boolean;
 }
 
 export default function MasterTimeCalendar({
   events = [],
-  onSaveEvent,
-  onDeleteEvent,
   readOnly = false,
   selectedCategory = "WORKING_HOURS",
   viewMode: propViewMode,
@@ -214,45 +251,75 @@ export default function MasterTimeCalendar({
   onDateSelect,
   onDisplayModeChange,
   className = "",
-}) {
+  isHijriEnabled: propIsHijriEnabled = undefined,
+}: MasterTimeCalendarProps) {
   const { openDrawer } = useRightSidebar();
   const { activeTenantId } = useTenant();
 
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDay, setSelectedDay] = useState(() => new Date().getDate());
-  const [searchQuery, setSearchQuery] = useState("");
-  const [displayMode, setDisplayMode] = useState(() => {
-    return localStorage.getItem("spr_calendar_display_mode") || "grid";
+  const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
+  const [selectedDay, setSelectedDay] = useState<number>(() => new Date().getDate());
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [displayMode, setDisplayMode] = useState<CalendarDisplayMode>(() => {
+    return (localStorage.getItem("spr_calendar_display_mode") as CalendarDisplayMode) || "grid";
   });
-  const [isHijriEnabled, setIsHijriEnabled] = useState(() => calendarSettings.getHijriEnabled());
-  const [, setTaxonomyVersion] = useState(0);
+  const [internalHijriEnabled, setInternalHijriEnabled] = useState<boolean>(() => calendarSettings.getHijriEnabled());
+  const isHijriEnabled = propIsHijriEnabled !== undefined ? Boolean(propIsHijriEnabled) : internalHijriEnabled;
+  const [, setTaxonomyVersion] = useState<number>(0);
 
   useEffect(() => {
-    const handleSettingsUpdate = () => {
-      setIsHijriEnabled(calendarSettings.getHijriEnabled());
+    const handleSettingsUpdate = (e: any) => {
+      if (e?.detail?.enableHijri !== undefined) {
+        setInternalHijriEnabled(Boolean(e.detail.enableHijri));
+      } else {
+        setInternalHijriEnabled(calendarSettings.getHijriEnabled());
+      }
+    };
+    const handleStorageUpdate = (e: StorageEvent) => {
+      if (!e.key || e.key === "spr_enable_hijri") {
+        setInternalHijriEnabled(calendarSettings.getHijriEnabled());
+      }
     };
     const handleTaxonomyUpdate = () => {
       setTaxonomyVersion((v) => v + 1);
     };
 
     window.addEventListener("spr_calendar_settings_updated", handleSettingsUpdate);
+    window.addEventListener("storage", handleStorageUpdate);
     window.addEventListener("spr_calendar_event_kinds_updated", handleTaxonomyUpdate);
     window.addEventListener("spr_calendar_event_types_updated", handleTaxonomyUpdate);
     window.addEventListener("spr_calendar_events_updated", handleTaxonomyUpdate);
+    window.addEventListener("spr_tenant_changed", handleTaxonomyUpdate);
     return () => {
       window.removeEventListener("spr_calendar_settings_updated", handleSettingsUpdate);
+      window.removeEventListener("storage", handleStorageUpdate);
       window.removeEventListener("spr_calendar_event_kinds_updated", handleTaxonomyUpdate);
       window.removeEventListener("spr_calendar_event_types_updated", handleTaxonomyUpdate);
       window.removeEventListener("spr_calendar_events_updated", handleTaxonomyUpdate);
+      window.removeEventListener("spr_tenant_changed", handleTaxonomyUpdate);
     };
   }, []);
 
-  const monthStripRef = useRef(null);
-  const dayStripRef = useRef(null);
+  const dayStripRef = useRef<HTMLDivElement | null>(null);
 
   const viewMode = propViewMode || (selectedCategory === "AGENDA" ? "list" : "month");
   const viewYear = currentDate.getFullYear();
   const viewMonth = currentDate.getMonth();
+
+  // Check if calendar is currently focused on today
+  const isViewingToday = useMemo(() => {
+    const now = new Date();
+    const todayYear = now.getFullYear();
+    const todayMonth = now.getMonth();
+    const todayDay = now.getDate();
+
+    if (viewYear !== todayYear || viewMonth !== todayMonth) {
+      return false;
+    }
+    if (displayMode === "timeline") {
+      return selectedDay === todayDay;
+    }
+    return true;
+  }, [viewYear, viewMonth, displayMode, selectedDay]);
 
   const hijriMonthHeader = useMemo(() => {
     if (!isHijriEnabled) return "";
@@ -271,7 +338,7 @@ export default function MasterTimeCalendar({
     }
   }, [viewYear, viewMonth, isHijriEnabled]);
 
-  const handleSetDisplayMode = (mode) => {
+  const handleSetDisplayMode = (mode: CalendarDisplayMode) => {
     setDisplayMode(mode);
     localStorage.setItem("spr_calendar_display_mode", mode);
     if (onDisplayModeChange) {
@@ -308,7 +375,7 @@ export default function MasterTimeCalendar({
   };
 
   // Open Right Sidebar for viewing event / working hours details
-  const handleOpenEventDetail = (evt, dateStr = "") => {
+  const handleOpenEventDetail = (evt: CalendarEvent, dateStr = "") => {
     openDrawer("schedule", {
       mode: "detail",
       eventId: evt.id,
@@ -326,23 +393,12 @@ export default function MasterTimeCalendar({
     });
   };
 
-  // Open Right Sidebar for editing entry
-  const handleEditEvent = (evt, dateStr = "") => {
-    openDrawer("schedule", {
-      mode: "edit",
-      eventId: evt.id,
-      category: evt.category,
-      date: dateStr || selectedDateStr,
-    });
-  };
-
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
       if (selectedCategory && selectedCategory !== "ALL" && selectedCategory !== "AGENDA") {
         if (selectedCategory === "WORKING_HOURS") {
           if (e.category !== "WORKING_HOURS") return false;
         } else if (selectedCategory === "ACADEMIC_EVENT") {
-          // Under Academic Events tab, include all academic events, exams, holidays, etc.
           if (e.category === "WORKING_HOURS") return false;
         } else if (e.category !== selectedCategory) {
           return false;
@@ -358,12 +414,12 @@ export default function MasterTimeCalendar({
     });
   }, [events, selectedCategory, searchQuery]);
 
-  const monthGridDays = useMemo(() => {
+  const monthGridDays: MonthGridCell[] = useMemo(() => {
     const firstDay = new Date(viewYear, viewMonth, 1).getDay();
     const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
     const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
 
-    const cells = [];
+    const cells: MonthGridCell[] = [];
 
     // Prev month padding
     for (let i = firstDay - 1; i >= 0; i--) {
@@ -413,10 +469,161 @@ export default function MasterTimeCalendar({
     return cells;
   }, [viewYear, viewMonth]);
 
-  const getEventsForDate = (dateStr, weekday) => {
+  // Group month grid cells into 7-day calendar weeks
+  const weeks = useMemo<MonthGridCell[][]>(() => {
+    const result: MonthGridCell[][] = [];
+    for (let i = 0; i < monthGridDays.length; i += 7) {
+      result.push(monthGridDays.slice(i, i + 7));
+    }
+    return result;
+  }, [monthGridDays]);
+
+  // Pack multi-day and single-day events for a 7-day week into non-colliding continuous rows
+  const getWeekEvents = (weekDays: MonthGridCell[]): { items: WeekEventItem[]; maxTracks: number } => {
+    if (weekDays.length !== 7) return { items: [], maxTracks: 0 };
+
+    const rawItems: Omit<WeekEventItem, "row">[] = [];
+
+    filteredEvents.forEach((evt) => {
+      // Find all active columns (1 to 7) for this event within this 7-day week
+      const activeCols: number[] = [];
+
+      weekDays.forEach((cell, idx) => {
+        const col = idx + 1; // 1-based (1 = Sun, 7 = Sat)
+        const dateStr = cell.dateStr;
+        const weekday = cell.weekday;
+
+        // Skip exceptions
+        if (Array.isArray(evt.exceptions) && evt.exceptions.includes(dateStr)) {
+          return;
+        }
+
+        let isActive = false;
+
+        if (evt.repeats && Array.isArray(evt.repeatDays)) {
+          if (evt.repeatDays.includes(weekday)) {
+            if (!evt.startDate || dateStr >= evt.startDate) {
+              if (evt.until !== "DATE" || !evt.untilDate || dateStr <= evt.untilDate) {
+                isActive = true;
+              }
+            }
+          }
+        } else {
+          const evtStart = evt.startDate || "";
+          const evtEnd = evt.endDate || evt.untilDate || evt.startDate || "";
+          if (evtStart && dateStr >= evtStart && dateStr <= evtEnd) {
+            isActive = true;
+          }
+        }
+
+        if (isActive) {
+          activeCols.push(col);
+        }
+      });
+
+      if (activeCols.length === 0) return;
+
+      // Group consecutive active columns into contiguous multi-day spans
+      activeCols.sort((a, b) => a - b);
+      const spans: { startCol: number; endCol: number }[] = [];
+      let currentSpan: { startCol: number; endCol: number } | null = null;
+
+      activeCols.forEach((col) => {
+        if (!currentSpan) {
+          currentSpan = { startCol: col, endCol: col };
+        } else if (col === currentSpan.endCol + 1) {
+          currentSpan.endCol = col;
+        } else {
+          spans.push(currentSpan);
+          currentSpan = { startCol: col, endCol: col };
+        }
+      });
+      if (currentSpan) {
+        spans.push(currentSpan);
+      }
+
+      // Determine isStart and isEnd for each span
+      spans.forEach((sp) => {
+        const spanLength = sp.endCol - sp.startCol + 1;
+        const startDayStr = weekDays[sp.startCol - 1].dateStr;
+        const endDayStr = weekDays[sp.endCol - 1].dateStr;
+
+        let isStart = true;
+        let isEnd = true;
+
+        if (!evt.repeats) {
+          const evtStart = evt.startDate || "";
+          const evtEnd = evt.endDate || evt.untilDate || evt.startDate || "";
+          if (evtStart) isStart = startDayStr === evtStart;
+          if (evtEnd) isEnd = endDayStr === evtEnd;
+        } else {
+          if (sp.startCol === 1 && evt.repeatDays?.includes(6)) {
+            isStart = false;
+          }
+          if (sp.endCol === 7 && evt.repeatDays?.includes(0)) {
+            isEnd = false;
+          }
+        }
+
+        rawItems.push({
+          event: evt,
+          startCol: sp.startCol,
+          endCol: sp.endCol,
+          span: spanLength,
+          isStart,
+          isEnd,
+        });
+      });
+    });
+
+    // Spanning multi-day items first so they occupy top rows continuously across days
+    rawItems.sort((a, b) => {
+      if (a.span !== b.span) return b.span - a.span;
+      if (a.startCol !== b.startCol) return a.startCol - b.startCol;
+      const rankA = a.event.priorityRank !== undefined && a.event.priorityRank !== null ? Number(a.event.priorityRank) : (a.event.rank !== undefined ? Number(a.event.rank) : 999);
+      const rankB = b.event.priorityRank !== undefined && b.event.priorityRank !== null ? Number(b.event.priorityRank) : (b.event.rank !== undefined ? Number(b.event.rank) : 999);
+      if (rankA !== rankB) return rankA - rankB;
+      return (a.event.title || "").localeCompare(b.event.title || "");
+    });
+
+    // Greedy non-overlapping track allocation
+    const tracks: boolean[][] = [];
+    const items: WeekEventItem[] = [];
+
+    rawItems.forEach((item) => {
+      let assignedRow = 0;
+      while (true) {
+        if (!tracks[assignedRow]) {
+          tracks[assignedRow] = new Array(7).fill(false);
+        }
+        let fits = true;
+        for (let c = item.startCol - 1; c < item.endCol; c++) {
+          if (tracks[assignedRow][c]) {
+            fits = false;
+            break;
+          }
+        }
+        if (fits) {
+          for (let c = item.startCol - 1; c < item.endCol; c++) {
+            tracks[assignedRow][c] = true;
+          }
+          items.push({
+            ...item,
+            row: assignedRow + 1,
+          });
+          break;
+        }
+        assignedRow++;
+      }
+    });
+
+    return { items, maxTracks: tracks.length };
+  };
+
+  // Consistently sort events so multi-day events occupy identical vertical slot across rows
+  const getEventsForDate = (dateStr: string, weekday: number): CalendarEvent[] => {
     return filteredEvents
       .filter((e) => {
-        // If this occurrence has an exception/override, skip the recurring parent
         if (Array.isArray(e.exceptions) && e.exceptions.includes(dateStr)) {
           return false;
         }
@@ -435,9 +642,20 @@ export default function MasterTimeCalendar({
         return false;
       })
       .sort((a, b) => {
+        // 1. Multi-day events first so they form an unbroken horizontal bar across consecutive days
+        const isMultiA = a.startDate && a.endDate && a.startDate !== a.endDate ? 1 : 0;
+        const isMultiB = b.startDate && b.endDate && b.startDate !== b.endDate ? 1 : 0;
+        if (isMultiA !== isMultiB) return isMultiB - isMultiA;
+
+        // 2. Rank priority
         const rankA = a.priorityRank !== undefined && a.priorityRank !== null ? Number(a.priorityRank) : (a.rank !== undefined ? Number(a.rank) : 999);
         const rankB = b.priorityRank !== undefined && b.priorityRank !== null ? Number(b.priorityRank) : (b.rank !== undefined ? Number(b.rank) : 999);
-        return rankA - rankB;
+        if (rankA !== rankB) return rankA - rankB;
+
+        // 3. Start date or time
+        if (a.startDate !== b.startDate) return (a.startDate || "").localeCompare(b.startDate || "");
+        if (a.startTime && b.startTime) return a.startTime.localeCompare(b.startTime);
+        return (a.title || "").localeCompare(b.title || "");
       });
   };
 
@@ -449,7 +667,6 @@ export default function MasterTimeCalendar({
     return `${y}-${m}-${d}`;
   }, []);
 
-  // Timeline selected day safe resolution
   const daysInCurrentViewMonth = useMemo(() => {
     return new Date(viewYear, viewMonth + 1, 0).getDate();
   }, [viewYear, viewMonth]);
@@ -477,12 +694,11 @@ export default function MasterTimeCalendar({
     return getEventsForDate(selectedDateStr, selectedWeekday);
   }, [selectedDateStr, selectedWeekday, filteredEvents]);
 
-  // Continuous Day Strip: Includes days from previous and next months for seamless scrolling beyond month boundaries
-  const timelineStripDays = useMemo(() => {
-    const list = [];
+  // Continuous Day Strip for Timeline
+  const timelineStripDays: TimelineStripDay[] = useMemo(() => {
+    const list: TimelineStripDay[] = [];
     const prevMonthLastDate = new Date(viewYear, viewMonth, 0).getDate();
 
-    // 10 trailing days from previous month
     const prevDaysCount = 10;
     for (let d = prevMonthLastDate - prevDaysCount + 1; d <= prevMonthLastDate; d++) {
       const dObj = new Date(viewYear, viewMonth - 1, d);
@@ -499,7 +715,6 @@ export default function MasterTimeCalendar({
       });
     }
 
-    // All days of current view month
     for (let d = 1; d <= daysInCurrentViewMonth; d++) {
       const dObj = new Date(viewYear, viewMonth, d);
       const dStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -514,7 +729,6 @@ export default function MasterTimeCalendar({
       });
     }
 
-    // 14 leading days from next month
     const nextDaysCount = 14;
     for (let d = 1; d <= nextDaysCount; d++) {
       const dObj = new Date(viewYear, viewMonth + 1, d);
@@ -534,15 +748,14 @@ export default function MasterTimeCalendar({
     return list;
   }, [viewYear, viewMonth, daysInCurrentViewMonth]);
 
-  // Attach mouse wheel and drag-to-scroll to an element
-  const setupHorizontalScroll = (el) => {
+  const setupHorizontalScroll = (el: HTMLElement | null) => {
     if (!el) return () => {};
 
     let isDown = false;
     let startX = 0;
     let scrollLeft = 0;
 
-    const handleWheel = (e) => {
+    const handleWheel = (e: WheelEvent) => {
       const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
       if (delta !== 0) {
         e.preventDefault();
@@ -551,7 +764,7 @@ export default function MasterTimeCalendar({
       }
     };
 
-    const handleMouseDown = (e) => {
+    const handleMouseDown = (e: MouseEvent) => {
       if (e.button !== 0) return;
       isDown = true;
       startX = e.pageX - el.offsetLeft;
@@ -566,7 +779,7 @@ export default function MasterTimeCalendar({
       isDown = false;
     };
 
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (e: MouseEvent) => {
       if (!isDown) return;
       e.preventDefault();
       const x = e.pageX - el.offsetLeft;
@@ -589,7 +802,6 @@ export default function MasterTimeCalendar({
     };
   };
 
-  // Setup wheel & drag scroll for day strip
   useEffect(() => {
     const cleanupDay = setupHorizontalScroll(dayStripRef.current);
     return () => {
@@ -597,7 +809,6 @@ export default function MasterTimeCalendar({
     };
   }, [displayMode, viewMonth, viewYear]);
 
-  // Auto-scroll selected day into view in day strip
   useEffect(() => {
     if (dayStripRef.current && displayMode === "timeline") {
       const activeEl = dayStripRef.current.querySelector('[data-active="true"]');
@@ -611,54 +822,59 @@ export default function MasterTimeCalendar({
     <div className={`flex flex-col w-full min-w-0 @container ${className}`}>
       
       {/* ─── Single Unified Calendar Control Bar Card ──────────────────── */}
-      <div className="p-3 sm:p-4 rounded-2xl border theme-border theme-bg-surface shadow-xs flex flex-col @lg:flex-row items-stretch @lg:items-center justify-between gap-3 mb-4 w-full min-w-0">
+      <div className="p-2.5 sm:p-3.5 rounded-2xl border theme-border theme-bg-surface shadow-xs flex flex-col @[720px]:flex-row items-stretch @[720px]:items-center justify-between gap-2.5 sm:gap-3 mb-4 w-full min-w-0">
         
-        {/* Left Side: Month Navigator with Arrow Buttons & Hijri Date or Agenda Header */}
+        {/* Left Side: Month Navigator with Arrow Buttons & Hijri Date (Left-aligned on all screen sizes) */}
         {viewMode === "month" ? (
-          <div className="flex items-center gap-2 @sm:gap-3 shrink-0 flex-wrap">
+          <div className="flex items-center justify-start gap-2 sm:gap-3 shrink-0 flex-wrap">
             <div className="flex items-center gap-1 shrink-0">
-              <button
-                type="button"
+              <IconButton
+                icon={ChevronLeftIcon}
+                variant="sub"
+                size="sm"
                 onClick={handlePrevMonth}
-                className="p-1.5 rounded-xl theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer shadow-2xs shrink-0"
                 title="Previous Month"
-              >
-                <ChevronLeftIcon className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
+                ariaLabel="Previous Month"
+              />
+              <IconButton
+                icon={ChevronRightIcon}
+                variant="sub"
+                size="sm"
                 onClick={handleNextMonth}
-                className="p-1.5 rounded-xl theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer shadow-2xs shrink-0"
                 title="Next Month"
-              >
-                <ChevronRightIcon className="w-3.5 h-3.5" />
-              </button>
+                ariaLabel="Next Month"
+              />
             </div>
 
-            <div className="flex flex-col">
-              <h3 className="text-sm @sm:text-base font-bold theme-text-primary tracking-tight leading-tight">
+            <div className="flex flex-col min-w-0">
+              <h3 className="text-sm sm:text-base font-bold theme-text-primary tracking-tight leading-tight truncate">
                 {MONTH_NAMES[viewMonth]} {viewYear}
               </h3>
               {isHijriEnabled && hijriMonthHeader && (
-                <span className="text-[10px] @sm:text-xs font-mono theme-accent font-semibold leading-none pt-0.5">
+                <span className="text-[10px] sm:text-xs font-mono theme-accent font-semibold leading-none pt-0.5 truncate">
                   {hijriMonthHeader}
                 </span>
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={handleJumpToday}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
-              title="Jump to Today"
-            >
-              <CalendarIcon className="w-3.5 h-3.5 theme-accent" />
-              <span>Today</span>
-            </button>
+            {/* Today Button: Automatically hidden when calendar is currently viewing today */}
+            {!isViewingToday && (
+              <CustomButton
+                type="button"
+                variant="sub"
+                size="sm"
+                icon={CalendarIcon}
+                onClick={handleJumpToday}
+                title="Jump to Today"
+                className="shrink-0"
+              >
+                <span>Today</span>
+              </CustomButton>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-2.5 shrink-0">
-            <h3 className="text-sm @sm:text-base font-bold theme-text-primary tracking-tight">
+            <h3 className="text-sm sm:text-base font-bold theme-text-primary tracking-tight">
               Upcoming Agenda & Schedules
             </h3>
             <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
@@ -668,37 +884,30 @@ export default function MasterTimeCalendar({
         )}
 
         {/* Right Side Tools: Single Toggle View Switcher, Custom Search & ActionMenu */}
-        <div className="flex items-center gap-2 justify-between @lg:justify-end flex-1 @lg:flex-none min-w-0">
+        <div className="flex items-center gap-2 justify-start @[720px]:justify-end flex-1 @[720px]:flex-none min-w-0">
           
           {/* Single View Mode Toggle Button */}
           {viewMode === "month" && (
-            <button
+            <CustomButton
               type="button"
+              variant="sub"
+              size="sm"
+              icon={displayMode === "grid" ? TimelineIcon : GridIcon}
               onClick={() => handleSetDisplayMode(displayMode === "grid" ? "timeline" : "grid")}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
               title={displayMode === "grid" ? "Switch to Timeline View" : "Switch to Grid View"}
+              className="shrink-0 select-none"
             >
-              {displayMode === "grid" ? (
-                <>
-                  <TimelineIcon className="w-3.5 h-3.5 theme-accent" />
-                  <span>Timeline</span>
-                </>
-              ) : (
-                <>
-                  <GridIcon className="w-3.5 h-3.5 theme-accent" />
-                  <span>Grid</span>
-                </>
-              )}
-            </button>
+              <span className="hidden @[440px]:inline">{displayMode === "grid" ? "Timeline" : "Grid"}</span>
+            </CustomButton>
           )}
 
           {/* Reusable Search Box with CustomInput */}
-          <div className="flex-1 @sm:w-48 @lg:w-60 min-w-0">
+          <div className="flex-1 @[480px]:w-48 @[860px]:w-60 min-w-0">
             <CustomInput
               type="search"
-              size="md"
+              size="sm"
               value={searchQuery}
-              onChange={(val) => setSearchQuery(val)}
+              onChange={(val: string) => setSearchQuery(val)}
               placeholder="Search..."
               clearable={true}
             />
@@ -726,116 +935,135 @@ export default function MasterTimeCalendar({
               ))}
             </div>
 
-            {/* Month Day Cells Grid (Square & Compact on Mobile / Narrow Containers - No bottom dead space) */}
-            <div className="grid grid-cols-7 w-full bg-[var(--border-color,rgba(0,0,0,0.06))] gap-px">
-              {monthGridDays.map((cell) => {
-                const dayEvents = getEventsForDate(cell.dateStr, cell.weekday);
-                const isToday = cell.dateStr === todayStr;
+            {/* Month Grid Weeks Rows with Spanning Multi-Day Banners */}
+            <div className="flex flex-col w-full">
+              {weeks.map((weekDays, weekIdx) => {
+                const { items: weekEvents, maxTracks } = getWeekEvents(weekDays);
+                const weekRowMinHeight = Math.max(88, 36 + maxTracks * 26);
 
                 return (
                   <div
-                    key={cell.dateStr}
-                    onClick={() => {
-                      setSelectedDay(cell.dayNum);
-                      if (!cell.isCurrentMonth) {
-                        const targetDate = new Date(cell.dateStr);
-                        setCurrentDate(new Date(targetDate.getFullYear(), targetDate.getMonth(), cell.dayNum));
-                      }
-                      if (dayEvents.length > 0) {
-                        // Switch to Timeline view on this selected day to immediately display all works for this day
-                        handleSetDisplayMode("timeline");
-                      } else if (!readOnly) {
-                        handleOpenAddDrawer(cell.dateStr);
-                      }
-                    }}
-                    className={`aspect-square @xl:aspect-auto min-h-0 @xl:min-h-[110px] w-full p-1 @sm:p-1.5 @xl:p-2 flex flex-col items-center @xl:items-stretch justify-center @xl:justify-between transition-colors cursor-pointer group relative select-none ${
-                      cell.isCurrentMonth
-                        ? "theme-bg-surface hover:theme-bg-sub/40"
-                        : "theme-bg-sub/30 opacity-40 hover:opacity-75"
-                    }`}
-                    title={dayEvents.length > 0 ? `${dayEvents.length} item(s) on ${cell.dateStr}. Click to view all works.` : cell.dateStr}
+                    key={`week-${weekIdx}-${weekDays[0].dateStr}`}
+                    className="relative w-full border-b theme-border last:border-b-0"
                   >
-                    {/* Top: Day Number (Top Left/Center) & Hijri Day Number (Top Right) */}
-                    <div className="flex items-center justify-between relative w-full mb-0.5">
-                      <span
-                        className={`text-[10px] @sm:text-[11px] @xl:text-xs font-bold inline-flex items-center justify-center w-5 h-5 @sm:w-5.5 @sm:h-5.5 @xl:w-6 @xl:h-6 rounded-full transition ${
-                          isToday
-                            ? "theme-bg-accent text-white shadow-xs"
-                            : "theme-text-primary group-hover:theme-accent font-mono"
-                        }`}
-                      >
-                        {cell.dayNum}
-                      </span>
-
-                      {isHijriEnabled && (
-                        <span
-                          className="text-[9px] @sm:text-[10px] font-mono theme-accent font-semibold leading-none select-none opacity-85"
-                          title={`Hijri: ${getHijriDateString(cell.dateStr)}`}
-                        >
-                          {getHijriDateString(cell.dateStr).split(' ')[0]}
-                        </span>
-                      )}
-
-                      {!readOnly && (
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenAddDrawer(cell.dateStr);
-                          }}
-                          className="hidden @2xl:inline-block absolute right-0 top-0 opacity-0 group-hover:opacity-100 text-[10px] theme-accent font-bold px-1 rounded transition hover:theme-bg-sub cursor-pointer"
-                          title="Add schedule"
-                        >
-                          +
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Middle: Event Indicators */}
-                    {/* Compact View (< @xl): Colored Dots Indicator centered directly below day number in the square box */}
-                    <div className="flex @xl:hidden items-center justify-center gap-1 mt-0.5 max-w-full">
-                      {dayEvents.slice(0, 3).map((evt) => {
-                        const style = getEventColors(evt, activeTenantId);
-                        return (
-                          <span
-                            key={evt.id}
-                            className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot} shadow-2xs`}
-                            title={`${evt.title} (${evt.category === 'WORKING_HOURS' ? 'Working Hours' : 'Event'})`}
-                          />
-                        );
-                      })}
-                      {dayEvents.length > 3 && (
-                        <span
-                          className="text-[8px] font-mono font-bold theme-text-secondary leading-none px-0.5 rounded theme-bg-sub border theme-border"
-                          title={`+${dayEvents.length - 3} more items`}
-                        >
-                          +{dayEvents.length - 3}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Wide Container View (>= @xl): Full Event Pills */}
-                    <div className="hidden @xl:block flex-1 space-y-1 overflow-y-auto max-h-[84px] scrollbar-none mt-1">
-                      {dayEvents.map((evt) => {
-                        const style = getEventColors(evt, activeTenantId);
-                        const isAllDay = evt.isFullDay || !evt.startTime || !evt.endTime;
+                    {/* Background 7-Day Columns Grid matching Weekday Header border */}
+                    <div
+                      className="grid grid-cols-7 w-full min-h-0"
+                      style={{ "--week-min-h": `${weekRowMinHeight}px` } as React.CSSProperties}
+                    >
+                      {weekDays.map((cell) => {
+                        const dayEvents = getEventsForDate(cell.dateStr, cell.weekday);
+                        const isToday = cell.dateStr === todayStr;
+                        const topEvent = dayEvents.length > 0 ? dayEvents[0] : null;
+                        const topStyle = topEvent ? getEventColors(topEvent, activeTenantId) : null;
 
                         return (
                           <div
-                            key={evt.id}
+                            key={cell.dateStr}
+                            onClick={() => {
+                              setSelectedDay(cell.dayNum);
+                              if (!cell.isCurrentMonth) {
+                                const targetDate = new Date(cell.dateStr);
+                                setCurrentDate(new Date(targetDate.getFullYear(), targetDate.getMonth(), cell.dayNum));
+                              }
+                              if (dayEvents.length > 0) {
+                                handleSetDisplayMode("timeline");
+                              } else if (!readOnly) {
+                                handleOpenAddDrawer(cell.dateStr);
+                              }
+                            }}
+                            className={`border-r theme-border last:border-r-0 aspect-square @md:aspect-auto min-h-0 @md:min-h-[var(--week-min-h,88px)] w-full p-1 @sm:p-1.5 @xl:p-2 flex flex-col justify-between transition-colors cursor-pointer group select-none theme-bg-surface hover:theme-bg-sub/40 ${
+                              cell.isCurrentMonth ? "" : "opacity-40 hover:opacity-75"
+                            }`}
+                            title={dayEvents.length > 0 ? `${dayEvents.length} item(s) on ${cell.dateStr}. Click to view details.` : cell.dateStr}
+                          >
+                            {/* Top: Day Number (Top Left) & Hijri Day Number (Top Right) */}
+                            <div className="flex items-center justify-between relative w-full mb-0.5 shrink-0 pointer-events-auto">
+                              <span
+                                className={`text-[10px] @sm:text-[11px] @xl:text-xs font-bold inline-flex items-center justify-center w-5 h-5 @sm:w-5.5 @sm:h-5.5 @xl:w-6 @xl:h-6 rounded-full transition ${
+                                  isToday
+                                    ? "theme-bg-accent text-white shadow-xs"
+                                    : "theme-text-primary group-hover:theme-accent font-mono"
+                                }`}
+                              >
+                                {cell.dayNum}
+                              </span>
+
+                              {isHijriEnabled && (
+                                <span
+                                  className="text-[9px] @sm:text-[10px] font-mono theme-accent font-semibold leading-none select-none opacity-85"
+                                  title={`Hijri: ${getHijriDateString(cell.dateStr)}`}
+                                >
+                                  {getHijriDateString(cell.dateStr).split(" ")[0]}
+                                </span>
+                              )}
+
+                              {!readOnly && (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenAddDrawer(cell.dateStr);
+                                  }}
+                                  className="hidden @2xl:inline-block absolute right-0 top-0 opacity-0 group-hover:opacity-100 text-[10px] theme-accent font-bold px-1 rounded transition hover:theme-bg-sub cursor-pointer"
+                                  title="Add schedule"
+                                >
+                                  +
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Small Screen: Strictly ONE single dot indicator (একটি ডট থাকবে, এর বেশি না) */}
+                            {dayEvents.length > 0 && topStyle && (
+                              <div className="flex @md:hidden items-center justify-center mt-auto pb-0.5 shrink-0">
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${topStyle.dot} shadow-2xs`}
+                                  title={`${dayEvents.length} item(s)`}
+                                />
+                              </div>
+                            )}
+
+                            {/* Desktop/Tablet vertical spacer so cell holds proper height */}
+                            <div className="hidden @md:block flex-1 min-h-[44px] pointer-events-none" />
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Medium & Large Screens: Continuous Spanning Events Grid Layer across the Week */}
+                    <div className="hidden @md:grid grid-cols-7 gap-y-1 absolute inset-x-0 top-[32px] bottom-1 pointer-events-none z-10 auto-rows-max">
+                      {weekEvents.map((item) => {
+                        const { event: evt, startCol, span, isStart, isEnd, row } = item;
+                        const style = getEventColors(evt, activeTenantId);
+                        const isAllDay = evt.isFullDay || !evt.startTime || !evt.endTime;
+                        const isMultiDay = span > 1 || !isStart || !isEnd;
+
+                        const edgeClasses = isStart && isEnd
+                          ? "mx-1 rounded-md"
+                          : isStart && !isEnd
+                          ? "ml-1 mr-0 rounded-l-md rounded-r-none"
+                          : !isStart && isEnd
+                          ? "ml-0 mr-1 rounded-r-md rounded-l-none"
+                          : "mx-0 rounded-none";
+
+                        return (
+                          <div
+                            key={`${evt.id}-${startCol}-${row}`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleOpenEventDetail(evt, cell.dateStr);
+                              handleOpenEventDetail(evt, weekDays[startCol - 1]?.dateStr || evt.startDate);
                             }}
-                            className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold truncate transition-all cursor-pointer select-none drop-shadow-2xs ${style.bg} ${style.text} border ${style.border} hover:opacity-90 shadow-2xs`}
-                            title={`${evt.title}${!isAllDay ? ` (${formatTime12(evt.startTime)} - ${formatTime12(evt.endTime)})` : " (Full Day)"}`}
+                            style={{
+                              gridColumn: `${startCol} / span ${span}`,
+                              gridRow: row,
+                            }}
+                            className={`h-[22px] px-2 py-0.5 text-[10px] font-semibold truncate transition-all cursor-pointer select-none pointer-events-auto flex items-center shadow-2xs ${style.bg} ${style.text} hover:opacity-90 ${edgeClasses}`}
+                            title={`${evt.title}${!isAllDay ? ` (${formatTime12(evt.startTime)} - ${formatTime12(evt.endTime)})` : " (Full Day)"}${isMultiDay ? " (Multi-day Event)" : ""}`}
                           >
-                            {!isAllDay ? (
-                              <span className="font-mono">
-                                {formatTime12(evt.startTime)}-{formatTime12(evt.endTime)}
-                              </span>
-                            ) : (
-                              <span className="truncate">{evt.title}</span>
-                            )}
+                            {/* Title rendered ONCE across the entire spanned width */}
+                            <span className="truncate block font-medium leading-none">
+                              {!isStart && <span className="opacity-70 mr-1 text-[9px] font-mono">...</span>}
+                              {evt.title}
+                            </span>
                           </div>
                         );
                       })}
@@ -884,6 +1112,7 @@ export default function MasterTimeCalendar({
                     isSelected={isSelected}
                     isToday={isToday}
                     isCurrentMonth={item.isCurrentMonth}
+                    keepNormalBgOnOtherMonths={true}
                     onClick={() => {
                       if (item.isCurrentMonth) {
                         setSelectedDay(item.dayNum);
@@ -914,7 +1143,7 @@ export default function MasterTimeCalendar({
                   )}
                 </div>
                 <span className="text-[11px] font-mono theme-text-secondary">
-                  {selectedDayEvents.length} {selectedDayEvents.length === 1 ? 'entry' : 'entries'}
+                  {selectedDayEvents.length} {selectedDayEvents.length === 1 ? "entry" : "entries"}
                 </span>
               </div>
 
@@ -980,7 +1209,7 @@ export default function MasterTimeCalendar({
                             {/* Type Line */}
                             <div className="flex items-center gap-1 flex-wrap">
                               <span className="text-[8px] @sm:text-[10px] uppercase font-mono tracking-wider theme-text-secondary">Type:</span>
-                              <span className={`text-[9px] @sm:text-[10px] font-bold px-1.5 py-0.2 rounded-full border ${style.bg} ${style.text} ${style.border}`}>
+                              <span className={`text-[9px] @sm:text-[10px] font-bold px-2 py-0.5 rounded-full ${style.bg} ${style.text}`}>
                                 {getEventDisplayType(evt, activeTenantId)}
                               </span>
                             </div>
@@ -1003,7 +1232,7 @@ export default function MasterTimeCalendar({
 
                           {/* Right Avatar Badge & Chevron */}
                           <div className="flex items-center gap-1 @sm:gap-2 shrink-0">
-                            <div className={`w-6 h-6 @sm:w-8 @sm:h-8 rounded-full flex items-center justify-center font-bold font-mono text-[9px] @sm:text-xs ${style.bg} ${style.text} border ${style.border} shadow-2xs`}>
+                            <div className={`w-6 h-6 @sm:w-8 @sm:h-8 rounded-full flex items-center justify-center font-bold font-mono text-[9px] @sm:text-xs ${style.bg} ${style.text} shadow-2xs`}>
                               {(evt.audience || "ALL").slice(0, 2).toUpperCase()}
                             </div>
                             <ChevronRightIcon className="w-3 h-3 @sm:w-4 @sm:h-4 theme-text-secondary group-hover:translate-x-0.5 transition-transform" />
@@ -1061,7 +1290,7 @@ export default function MasterTimeCalendar({
                         <div className="text-xs font-semibold theme-text-secondary">Full Day</div>
                       )}
                       <div className="text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5 font-mono flex items-center gap-1.5 flex-wrap">
-                        <span>{evt.repeats ? `Repeats weekly` : evt.startDate}</span>
+                        <span>{evt.repeats ? "Repeats weekly" : evt.startDate}</span>
                         {isHijriEnabled && evt.startDate && !evt.repeats && (
                           <span className="theme-accent font-semibold">• {getHijriDateString(evt.startDate)}</span>
                         )}
@@ -1077,3 +1306,4 @@ export default function MasterTimeCalendar({
     </div>
   );
 }
+

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MasterTimeCalendar } from '../../../../components/calendar';
+import { MasterTimeCalendar } from '../../../academy/calendar-events';
 import { masterCalendarStore } from '../../../../utils/localStore';
 import { useTenant } from '../../../../context/TenantContext';
 import { useRightSidebar } from '../../../../context/RightSidebarContext';
@@ -88,7 +88,7 @@ export default function AcademicCalendarWidget({
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {/* Quick Category Filter Pills */}
           <div className="flex items-center gap-1 p-0.5 rounded-xl theme-bg-sub/60 text-[11px] font-semibold">
             <button

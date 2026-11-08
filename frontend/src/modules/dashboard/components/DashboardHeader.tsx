@@ -150,18 +150,26 @@ export default function DashboardHeader({
           <span>{formatDate(new Date().toISOString(), { dateStyle: 'medium' })}</span>
         </div>
 
-        {/* Super Admin Dynamic Role Switcher (Project ActionMenu, Only Role Name, No Hardcoded Text) */}
-        {isSuperAdmin && (
+        {/* Dynamic Role Switcher / Role Badge (ActionMenu for Super Admin, Static Pill for others) */}
+        {isSuperAdmin ? (
           <ActionMenu
             label={currentRoleName}
             icon={ActiveRoleIcon}
             items={roleMenuItems}
             variant="surface"
             align="right"
-            header="Switch Role View (Super Admin)"
+            header={t('switchView', 'Switch Role View (Super Admin)')}
             showChevron={true}
             buttonClassName="px-3 py-1.5 rounded-xl theme-bg-surface hover:theme-bg-sub shadow-xs text-xs font-semibold cursor-pointer border-0"
           />
+        ) : (
+          <div
+            className="px-3 py-1.5 rounded-xl theme-bg-surface shadow-xs flex items-center gap-2 theme-text-primary text-xs font-semibold select-none border-0"
+            title={currentRoleName}
+          >
+            <ActiveRoleIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
+            <span className="truncate max-w-[140px] sm:max-w-[200px]">{currentRoleName}</span>
+          </div>
         )}
 
         {/* High-Visibility Exit Customization Mode Button */}

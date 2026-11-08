@@ -21,23 +21,25 @@ export default function TimetableScheduleWidget({
   return (
     <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-3.5 select-none ${className}`}>
       <div className="flex items-center justify-between pb-1">
-        <div className="flex items-center gap-2">
-          <TimerIcon className="w-4 h-4 text-[var(--accent-main)]" />
-          <h3 className="text-sm font-bold theme-text-primary">
+        <div className="flex items-center gap-2 min-w-0">
+          <TimerIcon className="w-4 h-4 text-[var(--accent-main)] shrink-0" />
+          <h3 className="text-sm font-bold theme-text-primary truncate">
             {title || t('todaysTimetable', "Today's Class Schedule")}
           </h3>
         </div>
 
-        {onViewAll && (
-          <button
-            type="button"
-            onClick={onViewAll}
-            className="text-xs font-semibold text-[var(--accent-main)] hover:underline cursor-pointer flex items-center gap-1"
-          >
-            <span>{t('mySchedule', 'View Schedule')}</span>
-            <span className="text-[10px]">→</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {onViewAll && (
+            <button
+              type="button"
+              onClick={onViewAll}
+              className="text-xs font-semibold text-[var(--accent-main)] hover:underline cursor-pointer flex items-center gap-1"
+            >
+              <span>{t('mySchedule', 'View Schedule')}</span>
+              <span className="text-[10px]">→</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {!items || items.length === 0 ? (

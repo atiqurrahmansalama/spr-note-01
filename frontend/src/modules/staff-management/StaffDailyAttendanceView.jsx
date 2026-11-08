@@ -11,7 +11,7 @@ import useAttendanceDateManager from '../attendance/hooks/useAttendanceDateManag
 import {
   attendanceTimingPolicyStore,
 } from '../../utils/localStore';
-import { DayAgendaDrawer, TimeScheduleDrawerForm } from '../../components/calendar';
+import { DayAgendaDrawer, TimeScheduleDrawerForm } from '../academy/calendar-events';
 import {
   getAttendanceCellTimingState,
   cycleStatusWithinAllowed,
@@ -444,7 +444,7 @@ export default function StaffDailyAttendanceView() {
 
     openRightSidebar({
       title: `Staff Day Roster: ${fullDate}`,
-      subtitle: `${getHijriDateString(fullDate)} • Master Calendar & Duties`,
+      subtitle: isHijriEnabled ? `${getHijriDateString(fullDate)} • Master Calendar & Duties` : 'Master Calendar & Duties',
       icon: CalendarIcon,
       width: 580,
       content: (

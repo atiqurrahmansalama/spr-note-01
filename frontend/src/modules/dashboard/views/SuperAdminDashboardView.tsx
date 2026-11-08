@@ -42,6 +42,7 @@ export default function SuperAdminDashboardView({
     recentActivities,
     upcomingEvents,
     pulseData,
+    activeAcademyName,
   } = useDashboardData();
 
   const [internalLayout, setInternalLayout] = React.useState<DashboardLayoutItem[]>(() =>
@@ -79,8 +80,8 @@ export default function SuperAdminDashboardView({
     {
       id: 'students_total',
       label: t('totalStudents', 'Global Student Roster'),
-      value: totalStudents > 320 ? totalStudents : 1420,
-      subLabel: `${formatNumber(totalStudents > 320 ? totalStudents : 1420)} enrolled pupils`,
+      value: totalStudents,
+      subLabel: `${formatNumber(totalStudents)} pupils • Enrolled across network`,
       trend: { value: '+8.4%', isPositive: true },
       icon: GroupsIcon,
       color: 'emerald',
@@ -89,8 +90,8 @@ export default function SuperAdminDashboardView({
     {
       id: 'staff_total',
       label: t('activeStaff', 'Active Staff & Faculty'),
-      value: totalStaff > 24 ? totalStaff : 94,
-      subLabel: 'Instructors & admin',
+      value: totalStaff,
+      subLabel: `${formatNumber(totalStaff)} members • Faculty & operations`,
       trend: { value: '100% active', isPositive: true },
       icon: TeacherIcon,
       color: 'purple',
@@ -100,7 +101,7 @@ export default function SuperAdminDashboardView({
       id: 'system_health',
       label: 'SaaS Platform Health',
       value: '99.98%',
-      subLabel: 'Realtime edge sync',
+      subLabel: 'Realtime sync & operations',
       trend: { value: 'Optimal', isPositive: true },
       icon: SparklesIcon,
       color: 'sky',
@@ -161,6 +162,10 @@ export default function SuperAdminDashboardView({
     quick_actions: {
       actions: quickActions,
     },
+    system_gateways: {},
+    finance_overview: {},
+    notice_board: {},
+    academic_calendar: {},
   };
 
   return (

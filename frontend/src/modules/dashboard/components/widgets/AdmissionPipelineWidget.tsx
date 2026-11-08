@@ -37,30 +37,32 @@ export default function AdmissionPipelineWidget({
     <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs h-full flex flex-col justify-start space-y-4 select-none ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between pb-1">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
             <AdmissionIcon className="w-4 h-4" />
           </div>
-          <div>
-            <h3 className="text-sm font-bold theme-text-primary leading-tight">
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold theme-text-primary leading-tight truncate">
               {title || t('admissionPipeline', 'Admission Application Pipeline')}
             </h3>
-            <p className="text-[11px] theme-text-secondary mt-0.5">
+            <p className="text-[11px] theme-text-secondary mt-0.5 truncate">
               Total Applicants: <span className="font-mono font-bold theme-text-primary">{formatNumber(pipeline.totalApplications)}</span>
             </p>
           </div>
         </div>
 
-        {onViewPipeline && (
-          <button
-            type="button"
-            onClick={onViewPipeline}
-            className="px-3 py-1.5 rounded-xl theme-bg-sub/60 hover:theme-bg-elevated text-xs font-semibold theme-text-primary transition-all cursor-pointer flex items-center gap-1.5"
-          >
-            <span>{t('viewReport', 'Pipeline')}</span>
-            <span className="text-[10px]">→</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {onViewPipeline && (
+            <button
+              type="button"
+              onClick={onViewPipeline}
+              className="px-3 py-1.5 rounded-xl theme-bg-sub/60 hover:theme-bg-elevated text-xs font-semibold theme-text-primary transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <span>{t('viewReport', 'Pipeline')}</span>
+              <span className="text-[10px]">→</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Pipeline 4-Stage Grid (Borderless) */}

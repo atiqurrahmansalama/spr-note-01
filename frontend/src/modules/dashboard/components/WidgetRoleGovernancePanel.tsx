@@ -7,8 +7,10 @@ import {
   saveWidgetRoleEntitlements,
   resetWidgetRoleEntitlements,
   isWidgetFeaturePermitted,
+  getSavedLayout,
+  saveLayout,
 } from '../widgetRegistry';
-import { SECTION_CATEGORIES } from '../widgetCategories';
+import { MODULE_CATEGORIES } from '../widgetCategories';
 import DashboardWidgetCardItem from './DashboardWidgetCardItem';
 import DrawerContainer from '../../../components/layout/DrawerContainer';
 import CustomButton from '../../../components/ui/CustomButton';
@@ -75,6 +77,22 @@ export default function WidgetRoleGovernancePanel({
     setEntitlements(getWidgetRoleEntitlements(scopeKey));
     setHasUnsavedChanges(false);
   }, [governanceMode, selectedAcademyScope]);
+
+  // Load role-specific widget settings when selectedRole changes
+  useEffect(() => {
+    if (governanceMode === 'role' && selectedRole !== 'ALL') {
+      const currentLayout = getSavedLayout(activeTenantId || 'default', selectedRole as DashboardRole);
+      const initialSettings: Record<string, any> = {};
+      currentLayout.forEach((item) => {
+        if (item.settings) {
+          initialSettings[item.widgetId] = item.settings;
+        }
+      });
+      setWidgetSettings(initialSettings);
+    } else {
+      setWidgetSettings({});
+    }
+  }, [governanceMode, selectedRole, activeTenantId]);
 
   // Dynamic role options with "All Roles" at top
   const roleSelectOptions = useMemo(() => {
@@ -210,7 +228,32 @@ export default function WidgetRoleGovernancePanel({
     [entitlements, governanceMode, selectedRole, roles]
   );
 
-  // Toggle entitlement for a single widget based on active dimension
+  // Helper to persist entitlements immediately and broadcast live sync events across application layers
+  const persistEntitlementsLive = useCallback(
+    (nextEntitlements: Record<string, string[]>) => {
+      try {
+        if (governanceMode === 'role') {
+          saveWidgetRoleEntitlements('GLOBAL', nextEntitlements);
+          saveWidgetRoleEntitlements('ALL', nextEntitlements);
+        } else {
+          if (selectedAcademyScope === 'ALL') {
+            saveWidgetRoleEntitlements('GLOBAL', nextEntitlements);
+            institutions.forEach((inst: any) => {
+              saveWidgetRoleEntitlements(String(inst.id), nextEntitlements);
+            });
+            saveWidgetRoleEntitlements('ALL', nextEntitlements);
+          } else {
+            saveWidgetRoleEntitlements(selectedAcademyScope, nextEntitlements);
+          }
+        }
+      } catch (err) {
+        console.warn('Dashboard Governance: Live sync failed:', err);
+      }
+    },
+    [governanceMode, selectedAcademyScope, institutions]
+  );
+
+  // Toggle entitlement for a single widget based on active dimension (INSTANT LIVE SYNC)
   const handleToggleWidget = useCallback(
     (widgetId: string) => {
       setEntitlements((prev) => {
@@ -219,26 +262,33 @@ export default function WidgetRoleGovernancePanel({
         // 1. Academy Override Dimension
         if (governanceMode === 'academy') {
           const isCurrentlyPermitted = currentAllowed.length > 0;
-          return {
+          const nextAllowed = isCurrentlyPermitted ? [] : (WIDGET_REGISTRY[widgetId]?.allowedRoles || ['ALL']);
+          const nextState = {
             ...prev,
-            [widgetId]: isCurrentlyPermitted ? [] : (WIDGET_REGISTRY[widgetId]?.allowedRoles || ['ALL']),
+            [widgetId]: nextAllowed,
           };
+          persistEntitlementsLive(nextState);
+          return nextState;
         }
 
         // 2. Role Scope Dimension
         if (selectedRole === 'ALL') {
           const status = getWidgetStatus(widgetId);
           if (status.permitted) {
-            return {
+            const nextState = {
               ...prev,
               [widgetId]: [],
             };
+            persistEntitlementsLive(nextState);
+            return nextState;
           }
           const allRoleCodes = Array.from(new Set(['ALL', ...roles.map((r) => r.code)]));
-          return {
+          const nextState = {
             ...prev,
             [widgetId]: allRoleCodes,
           };
+          persistEntitlementsLive(nextState);
+          return nextState;
         }
 
         const target = String(selectedRole).toUpperCase();
@@ -257,17 +307,19 @@ export default function WidgetRoleGovernancePanel({
           nextAllowed = [...currentAllowed, selectedRole];
         }
 
-        return {
+        const nextState = {
           ...prev,
           [widgetId]: nextAllowed,
         };
+        persistEntitlementsLive(nextState);
+        return nextState;
       });
       setHasUnsavedChanges(true);
     },
-    [governanceMode, selectedRole, getWidgetStatus, roles]
+    [governanceMode, selectedRole, getWidgetStatus, roles, persistEntitlementsLive]
   );
 
-  // Batch toggle category widgets
+  // Batch toggle category widgets (INSTANT LIVE SYNC)
   const handleToggleAllInCategory = useCallback(
     (widgetIds: string[], enable: boolean) => {
       setEntitlements((prev) => {
@@ -304,22 +356,54 @@ export default function WidgetRoleGovernancePanel({
           });
         }
 
+        persistEntitlementsLive(next);
         return next;
       });
       setHasUnsavedChanges(true);
     },
-    [governanceMode, selectedRole, roles]
+    [governanceMode, selectedRole, roles, persistEntitlementsLive]
   );
 
-  // Update widget settings (like KPI cards, calendar filters)
+  // Update widget settings (like KPI cards, calendar filters) with live layout template sync
   const handleUpdateWidgetSettings = (widgetId: string, updatedSettings: Record<string, any>) => {
-    setWidgetSettings((prev) => ({
-      ...prev,
-      [widgetId]: {
-        ...(prev[widgetId] || {}),
-        ...updatedSettings,
-      },
-    }));
+    setWidgetSettings((prev) => {
+      const nextSettings = {
+        ...prev,
+        [widgetId]: {
+          ...(prev[widgetId] || {}),
+          ...updatedSettings,
+        },
+      };
+
+      // Live sync widget settings to role template layout
+      try {
+        if (governanceMode === 'role') {
+          const rolesToSync: DashboardRole[] =
+            selectedRole === 'ALL'
+              ? (['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STAFF', 'STUDENT', 'GUARDIAN'] as DashboardRole[])
+              : [selectedRole as DashboardRole];
+
+          rolesToSync.forEach((r) => {
+            const currentLayout = getSavedLayout(activeTenantId || 'default', r);
+            const nextLayout = currentLayout.map((item) => {
+              if (item.widgetId !== widgetId) return item;
+              return {
+                ...item,
+                settings: {
+                  ...(item.settings || {}),
+                  ...updatedSettings,
+                },
+              };
+            });
+            saveLayout(activeTenantId || 'default', r, nextLayout, undefined, true);
+          });
+        }
+      } catch (err) {
+        console.warn('Dashboard Governance: Failed to live sync widget settings:', err);
+      }
+
+      return nextSettings;
+    });
     setHasUnsavedChanges(true);
   };
 
@@ -336,31 +420,24 @@ export default function WidgetRoleGovernancePanel({
     if (selectedAcademyScope === 'ALL') {
       resetWidgetRoleEntitlements('ALL');
     }
-    setEntitlements(getWidgetRoleEntitlements(scopeToReset));
+    const fresh = getWidgetRoleEntitlements(scopeToReset);
+    setEntitlements(fresh);
+    setWidgetSettings({});
     setHasUnsavedChanges(false);
     showToast?.('Widget permissions reset to system baseline defaults.', 'info');
   };
 
   // Save changes and broadcast across application layers
   const handleSave = () => {
+    persistEntitlementsLive(entitlements);
+    setHasUnsavedChanges(false);
+
     if (governanceMode === 'role') {
-      saveWidgetRoleEntitlements('GLOBAL', entitlements);
-      saveWidgetRoleEntitlements('ALL', entitlements);
-      showToast?.(`Widget permissions saved for ${selectedRoleDisplayName}`, 'success');
+      showToast?.(`Widget permissions confirmed and saved for ${selectedRoleDisplayName}`, 'success');
     } else {
-      if (selectedAcademyScope === 'ALL') {
-        saveWidgetRoleEntitlements('GLOBAL', entitlements);
-        institutions.forEach((inst: any) => {
-          saveWidgetRoleEntitlements(String(inst.id), entitlements);
-        });
-        saveWidgetRoleEntitlements('ALL', entitlements);
-      } else {
-        saveWidgetRoleEntitlements(selectedAcademyScope, entitlements);
-      }
-      showToast?.(`Academy widget permissions saved for ${selectedAcademyDisplayName}`, 'success');
+      showToast?.(`Academy widget permissions confirmed and saved for ${selectedAcademyDisplayName}`, 'success');
     }
 
-    setHasUnsavedChanges(false);
     onClose();
   };
 
@@ -387,7 +464,7 @@ export default function WidgetRoleGovernancePanel({
   }, [allWidgets, getWidgetStatus, isFeatureEnabled]);
 
   const allCategorizedWidgetIds = useMemo(
-    () => new Set(SECTION_CATEGORIES.flatMap((s) => s.widgetIds)),
+    () => new Set(MODULE_CATEGORIES.flatMap((s) => s.widgetIds)),
     []
   );
 
@@ -402,14 +479,13 @@ export default function WidgetRoleGovernancePanel({
       className="space-y-6 pt-2 pb-16 @container text-left rtl:text-right"
       footer={
         <div className="p-3.5 rounded-2xl border theme-border theme-bg-surface shadow-md flex items-center justify-between gap-3">
-          <div className="text-xs theme-text-secondary truncate">
-            {hasUnsavedChanges ? (
-              <span className="font-medium text-amber-600 dark:text-amber-400">
-                You have unsaved permission changes.
-              </span>
-            ) : (
-              <span>All permissions synced with governance storage.</span>
-            )}
+          <div className="flex items-center gap-2 text-xs theme-text-secondary truncate">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+              Live Synced
+            </span>
+            <span className="opacity-40">|</span>
+            <span className="truncate">Permissions apply instantly to dashboard</span>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -428,7 +504,7 @@ export default function WidgetRoleGovernancePanel({
               size="sm"
               icon={CheckCircleIcon}
               onClick={handleSave}
-              className="rounded-xl"
+              className="rounded-xl px-4"
             >
               Save Permissions
             </CustomButton>
@@ -534,7 +610,7 @@ export default function WidgetRoleGovernancePanel({
 
       {/* 3. Categorized Widget Entitlement Rows (Reusing Reusable DashboardWidgetCardItem with Full Expand Options) */}
       <div className="space-y-6 pt-2">
-        {SECTION_CATEGORIES.map((section) => {
+        {MODULE_CATEGORIES.map((section) => {
           const categoryWidgets = allWidgets.filter((w) => section.widgetIds.includes(w.id));
           if (categoryWidgets.length === 0) return null;
 

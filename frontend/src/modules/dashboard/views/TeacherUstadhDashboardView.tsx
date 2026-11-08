@@ -44,6 +44,7 @@ export default function TeacherUstadhDashboardView({
     pulseData,
     scheduleItems,
     upcomingEvents,
+    activeAcademyName,
   } = useDashboardData();
 
   // Load daily progress reports from Daily Classroom repositories (Single Source of Truth)
@@ -188,7 +189,7 @@ export default function TeacherUstadhDashboardView({
         id: 'today_recited',
         label: t('todayRecited', "Today's Students Recited"),
         value: `${formatNumber(recitedCount)} / ${formatNumber(assignedTotal)}`,
-        subLabel: `${formatNumber(recitedPct)}% of cohort recited today`,
+        subLabel: `${formatNumber(recitedPct)}% recited`,
         trend: { value: `${formatNumber(recitedCount)} Recited`, isPositive: true },
         icon: BookOpenIcon,
         color: 'purple',
@@ -208,7 +209,7 @@ export default function TeacherUstadhDashboardView({
         id: 'error_improvement',
         label: t('errorImprovement', 'Mistakes & Stucks Improvement'),
         value: `${isImproved ? '+' : ''}${formatNumber(improvementPct)}% Improvement`,
-        subLabel: `Yesterday: ${formatNumber(yesterdayTotalErrors)} errs → Today: ${formatNumber(todayTotalErrors)} errs`,
+        subLabel: `Yesterday: ${formatNumber(yesterdayTotalErrors)} → Today: ${formatNumber(todayTotalErrors)}`,
         trend: { value: `${isImproved ? '+' : ''}${formatNumber(improvementPct)}% vs Yesterday`, isPositive: isImproved },
         icon: TimerIcon,
         color: 'emerald',
@@ -218,42 +219,11 @@ export default function TeacherUstadhDashboardView({
         id: 'class_attendance',
         label: t('todayAttendance', "Today's Class Presence"),
         value: `${formatNumber(assignedTotal - 1)} / ${formatNumber(assignedTotal)}`,
-        subLabel: '97% present • 1 on leave',
+        subLabel: '97% present',
         trend: { value: '97% Presence', isPositive: true },
         icon: AttendanceIcon,
         color: 'sky',
         onClick: () => navigate('/learning/daily-classroom?tab=attendance'),
-      },
-      {
-        id: 'my_students',
-        label: t('myStudents', 'My Assigned Students'),
-        value: assignedTotal,
-        subLabel: 'Class: Hifz Senior (Cohort A)',
-        trend: { value: '100% Active', isPositive: true },
-        icon: GroupsIcon,
-        color: 'accent',
-        onClick: () => navigate('/learning/daily-classroom'),
-      },
-      // Backwards-compatible aliases for legacy saved layouts:
-      {
-        id: 'sabaq_passed',
-        label: t('todayRecited', "Today's Students Recited"),
-        value: `${formatNumber(recitedCount)} / ${formatNumber(assignedTotal)}`,
-        subLabel: `${formatNumber(assignedTotal - recitedCount)} students pending verification`,
-        trend: { value: `${formatNumber(recitedPct)}% cleared`, isPositive: true },
-        icon: BookOpenIcon,
-        color: 'purple',
-        onClick: () => navigate('/learning/daily-classroom?tab=hifz'),
-      },
-      {
-        id: 'dawr_progress',
-        label: t('pagesAndMistakes', 'Pages Heard & Mistakes'),
-        value: `${formatNumber(displayPages)} Pages`,
-        subLabel: `${formatNumber(displayMistakes)} Mistakes · ${formatNumber(displayStucks)} Stucks`,
-        trend: { value: 'Exemplary', isPositive: true },
-        icon: SparklesIcon,
-        color: 'sky',
-        onClick: () => navigate('/studies/progress-reports'),
       },
     ];
   }, [reports, students, todayStr, yesterdayStr, t, formatNumber, navigate]);
@@ -309,6 +279,9 @@ export default function TeacherUstadhDashboardView({
     quick_actions: {
       actions: quickActions,
     },
+    notice_board: {},
+    academic_calendar: {},
+    hifz_tracker: {},
   };
 
   return (

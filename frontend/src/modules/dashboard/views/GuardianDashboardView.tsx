@@ -30,7 +30,7 @@ export default function GuardianDashboardView({
 }: GuardianDashboardViewProps) {
   const { t, formatNumber } = useTranslation('dashboard');
   const { activeTenantId } = useTenant();
-  const { pulseData, upcomingEvents } = useDashboardData();
+  const { pulseData, upcomingEvents, activeAcademyName } = useDashboardData();
 
   // Multi-child switcher state
   const [selectedChildIndex, setSelectedChildIndex] = useState(0);
@@ -68,7 +68,7 @@ export default function GuardianDashboardView({
       id: 'child_hifz',
       label: 'Hifz Memorization',
       value: selectedChildIndex === 0 ? '17 Juz' : 'Nazira Ampara',
-      subLabel: selectedChildIndex === 0 ? 'Surah Al-Kahf' : 'Juz Amma (Complete)',
+      subLabel: selectedChildIndex === 0 ? 'Surah Al-Kahf' : 'Juz Amma',
       trend: { value: 'On Track', isPositive: true },
       icon: BookOpenIcon,
       color: 'purple',
@@ -77,7 +77,7 @@ export default function GuardianDashboardView({
       id: 'child_attendance',
       label: 'Presence Today',
       value: 'Present',
-      subLabel: 'Entry: 07:15 AM (Morning Session)',
+      subLabel: 'Morning Session',
       trend: { value: '99% Month', isPositive: true },
       icon: AttendanceIcon,
       color: 'emerald',
@@ -115,6 +115,9 @@ export default function GuardianDashboardView({
       items: upcomingEvents,
       title: 'Academic Calendar & Exams',
     },
+    finance_overview: {},
+    notice_board: {},
+    hifz_tracker: {},
   };
 
   return (

@@ -178,6 +178,16 @@ export default function DashboardWidgetCardItem({
               .map((i) => i.id);
             const currentIds = settings.visibleMetricIds || allRoleIds;
 
+            // Group KPI cards by module for structured clean subheadings
+            const moduleGroups = new Map<string, typeof roleKpis>();
+            roleKpis.forEach((item) => {
+              const mod = item.module || 'General Metrics';
+              if (!moduleGroups.has(mod)) {
+                moduleGroups.set(mod, []);
+              }
+              moduleGroups.get(mod)!.push(item);
+            });
+
             return (
               <div className="space-y-3 pt-1">
                 <div className="flex items-center justify-between pb-1 border-b theme-border">
@@ -185,42 +195,57 @@ export default function DashboardWidgetCardItem({
                     <SparklesIcon className="w-3.5 h-3.5 theme-accent" />
                     <span>Included Executive KPI Cards</span>
                   </div>
-                  <span className="text-[10px] theme-text-secondary">
+                  <span className="text-[10px] theme-text-secondary font-mono">
                     {currentIds.length} Active
                   </span>
                 </div>
 
-                <div className="space-y-1.5 pr-1">
-                  {roleKpis.map((kpiItem) => {
-                    const isCardBlocked =
-                      kpiItem.requiredFeatureKey && !isFeatureEnabled(kpiItem.requiredFeatureKey);
-                    if (!isSuperAdmin && isCardBlocked) return null;
-
-                    const isChecked = currentIds.includes(kpiItem.id) && !isCardBlocked;
-
-                    return (
-                      <div key={kpiItem.id} className="py-1 flex items-center justify-between">
-                        <CustomCheckbox
-                          checked={isChecked}
-                          onChange={(kpiChecked: boolean) => {
-                            if (isCardBlocked || !onUpdateSettings) return;
-                            const nextIds = kpiChecked
-                              ? [...currentIds, kpiItem.id]
-                              : currentIds.filter((id: string) => id !== kpiItem.id);
-                            onUpdateSettings({ visibleMetricIds: nextIds });
-                          }}
-                          label={kpiItem.label}
-                          disabled={isCardBlocked || disabled}
-                          size="sm"
-                        />
-                        {isCardBlocked && (
-                          <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                            (Feature Disabled)
+                <div className="space-y-3.5 pr-1">
+                  {Array.from(moduleGroups.entries()).map(([modTitle, items]) => (
+                    <div key={modTitle} className="space-y-1.5">
+                      {moduleGroups.size > 1 && (
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--accent-main)] pt-2 pb-1 border-b theme-border select-none">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-main)]" />
+                          <span>{modTitle}</span>
+                          <span className="ml-auto text-[9px] font-mono theme-text-secondary font-semibold">
+                            {items.length} {items.length === 1 ? 'card' : 'cards'}
                           </span>
-                        )}
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        {items.map((kpiItem) => {
+                          const isCardBlocked =
+                            kpiItem.requiredFeatureKey && !isFeatureEnabled(kpiItem.requiredFeatureKey);
+                          if (!isSuperAdmin && isCardBlocked) return null;
+
+                          const isChecked = currentIds.includes(kpiItem.id) && !isCardBlocked;
+
+                          return (
+                            <div key={kpiItem.id} className="py-1 flex items-center justify-between">
+                              <CustomCheckbox
+                                checked={isChecked}
+                                onChange={(kpiChecked: boolean) => {
+                                  if (isCardBlocked || !onUpdateSettings) return;
+                                  const nextIds = kpiChecked
+                                    ? [...currentIds, kpiItem.id]
+                                    : currentIds.filter((id: string) => id !== kpiItem.id);
+                                  onUpdateSettings({ visibleMetricIds: nextIds });
+                                }}
+                                label={kpiItem.label}
+                                disabled={isCardBlocked || disabled}
+                                size="sm"
+                              />
+                              {isCardBlocked && (
+                                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                                  (Feature Disabled)
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               </div>
             );

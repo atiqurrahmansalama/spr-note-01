@@ -29,7 +29,7 @@ export default function StudentDashboardView({
 }: StudentDashboardViewProps) {
   const { t, formatNumber } = useTranslation('dashboard');
   const { activeTenantId } = useTenant();
-  const { pulseData, scheduleItems, upcomingEvents } = useDashboardData();
+  const { pulseData, scheduleItems, upcomingEvents, activeAcademyName } = useDashboardData();
 
   const [internalLayout, setInternalLayout] = React.useState<DashboardLayoutItem[]>(() =>
     propLayoutItems || getSavedLayout(activeTenantId || 'default', role)
@@ -58,7 +58,7 @@ export default function StudentDashboardView({
       id: 'hifz_juz',
       label: t('hifzCompletion', 'Completed Juz'),
       value: '17 / 30',
-      subLabel: 'Surah Al-Kahf • Ayah 46',
+      subLabel: 'Surah Al-Kahf',
       trend: { value: '+2 pages this week', isPositive: true },
       icon: BookOpenIcon,
       color: 'purple',
@@ -67,7 +67,7 @@ export default function StudentDashboardView({
       id: 'my_attendance',
       label: t('todayAttendance', 'My Attendance Rate'),
       value: '98.5%',
-      subLabel: '182 Present • 2 Late',
+      subLabel: '182 Present',
       trend: { value: 'Punctual', isPositive: true },
       icon: AttendanceIcon,
       color: 'emerald',
@@ -110,6 +110,8 @@ export default function StudentDashboardView({
       items: upcomingEvents,
       title: 'Upcoming Assessments & Holidays',
     },
+    hifz_tracker: {},
+    notice_board: {},
   };
 
   return (

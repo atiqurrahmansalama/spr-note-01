@@ -7,7 +7,7 @@ import {
   academicYearsStore,
 } from '@/utils/localStore';
 import { getHijriDateString } from '@/utils/hijriUtils';
-import { getEventColors } from '@/components/calendar/MasterTimeCalendar';
+import { getEventColors } from '@/modules/academy/calendar-events';
 import type {
   UseAttendanceDateManagerParams,
   UseAttendanceDateManagerReturn,

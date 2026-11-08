@@ -1,6 +1,8 @@
 export { default as CalendarEventsHubView } from './CalendarEventsHubView';
 export { default as TimeCalendarManagerView } from './CalendarEventsHubView';
-export { default as WeeklyHolidaySettingsPanel } from './WeeklyHolidaySettingsPanel';
-export * from './WeeklyHolidaySettingsPanel';
-export * from './CalendarSchedulesTaxonomyPanels';
+export * from './work-schedule';
+export * from './events';
+export * from './components';
+export * from './types';
+export * from './locales';
 export { default } from './CalendarEventsHubView';

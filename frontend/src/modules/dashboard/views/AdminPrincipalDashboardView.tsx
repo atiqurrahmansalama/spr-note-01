@@ -43,6 +43,7 @@ export default function AdminPrincipalDashboardView({
     upcomingEvents,
     todayCollection,
     monthlyCollection,
+    activeAcademyName,
   } = useDashboardData();
 
   const [internalLayout, setInternalLayout] = React.useState<DashboardLayoutItem[]>(() =>
@@ -71,7 +72,7 @@ export default function AdminPrincipalDashboardView({
       id: 'enrolled_students',
       label: t('totalStudents', 'Active Enrollment'),
       value: totalStudents,
-      subLabel: 'Academic Session 2026-2027',
+      subLabel: 'Session 2026-2027',
       trend: { value: '+14 this month', isPositive: true },
       icon: GroupsIcon,
       color: 'accent',
@@ -91,7 +92,7 @@ export default function AdminPrincipalDashboardView({
       id: 'today_collection',
       label: t('todayCollection', "Today's Collection"),
       value: `৳ ${formatNumber(todayCollection)}`,
-      subLabel: `Monthly Inflow: ৳ ${formatNumber(monthlyCollection)}`,
+      subLabel: `Monthly: ৳ ${formatNumber(monthlyCollection)}`,
       trend: { value: '83% target met', isPositive: true },
       icon: BanknotesIcon,
       color: 'purple',
@@ -101,7 +102,7 @@ export default function AdminPrincipalDashboardView({
       id: 'pending_admissions',
       label: t('pendingApplications', 'New Applications'),
       value: pendingAdmissionsCount,
-      subLabel: 'Pending review & verification',
+      subLabel: 'Verification Queue',
       trend: { value: '6 interview scheduled', isPositive: true },
       icon: AdmissionIcon,
       color: 'amber',
@@ -162,6 +163,16 @@ export default function AdminPrincipalDashboardView({
     quick_actions: {
       actions: quickActions,
     },
+    finance_overview: {},
+    residential_occupancy: {},
+    admission_pipeline: {},
+    notice_board: {},
+    timetable_schedule: {},
+    system_gateways: {},
+    academic_calendar: {},
+    academic_progress: {},
+    hifz_tracker: {},
+    recitation_trends: {},
   };
 
   return (

@@ -46,30 +46,32 @@ export default function AttendancePulseWidget({
     <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs h-full flex flex-col justify-start space-y-4 select-none ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between gap-2 pb-1">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
             <AttendanceIcon className="w-4 h-4" />
           </div>
-          <div>
-            <h3 className="text-sm font-bold theme-text-primary leading-tight">
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold theme-text-primary leading-tight truncate">
               {pulseTitle}
             </h3>
-            <p className="text-[11px] theme-text-secondary mt-0.5">
+            <p className="text-[11px] theme-text-secondary mt-0.5 truncate">
               {t('totalStudents', 'Total Students')}: <span className="font-mono font-bold theme-text-primary">{formatNumber(total)}</span>
             </p>
           </div>
         </div>
 
-        {onTakeAttendance && (
-          <button
-            type="button"
-            onClick={onTakeAttendance}
-            className="px-3 py-1.5 rounded-xl theme-bg-accent theme-accent-text text-xs font-semibold shadow-xs hover:opacity-95 transition-all cursor-pointer flex items-center gap-1.5"
-          >
-            <span>{t('takeAttendance', 'Roll Call')}</span>
-            <span className="text-[10px]">→</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {onTakeAttendance && (
+            <button
+              type="button"
+              onClick={onTakeAttendance}
+              className="px-3 py-1.5 rounded-xl theme-bg-accent theme-accent-text text-xs font-semibold shadow-xs hover:opacity-95 transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <span>{t('takeAttendance', 'Roll Call')}</span>
+              <span className="text-[10px]">→</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Rate Hero Banner (Borderless) */}

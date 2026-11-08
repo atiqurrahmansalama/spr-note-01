@@ -256,7 +256,7 @@ export default function AppLayout() {
 
   // Route Meta Resolution
   const currentPath = location.pathname;
-  const isDashboardRoute = currentPath === "/dashboard" || currentPath === "/";
+  const isDashboardRoute = currentPath === "/" || currentPath.startsWith("/dashboard");
   const showRoutePanel = !isDashboardRoute;
   const routeMeta = resolveRouteMeta(currentPath, location.search);
 

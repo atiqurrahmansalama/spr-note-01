@@ -21,6 +21,7 @@ import {
 export interface KpiCardCatalogItem {
   id: string;
   label: string;
+  module?: string;
   requiredFeatureKey?: string;
 }
 
@@ -30,43 +31,40 @@ export interface KpiCardCatalogItem {
  */
 export const ROLE_KPI_CARDS_CATALOG: Record<string, KpiCardCatalogItem[]> = {
   SUPER_ADMIN: [
-    { id: 'tenants', label: 'Total Institutions', requiredFeatureKey: 'campus_profile' },
-    { id: 'students_total', label: 'Global Student Roster', requiredFeatureKey: 'student_roster' },
-    { id: 'staff_total', label: 'Active Staff & Faculty', requiredFeatureKey: 'staff_roster' },
-    { id: 'system_health', label: 'SaaS Platform Health', requiredFeatureKey: 'app_section_control' },
+    { id: 'tenants', label: 'Total Institutions', module: 'Campus & Academy', requiredFeatureKey: 'campus_profile' },
+    { id: 'students_total', label: 'Global Student Roster', module: 'Student Management', requiredFeatureKey: 'student_roster' },
+    { id: 'staff_total', label: 'Active Staff & Faculty', module: 'Staff Management', requiredFeatureKey: 'staff_roster' },
+    { id: 'system_health', label: 'SaaS Platform Health', module: 'System & Infrastructure', requiredFeatureKey: 'app_section_control' },
   ],
   ADMIN: [
-    { id: 'enrolled_students', label: 'Active Enrollment', requiredFeatureKey: 'student_roster' },
-    { id: 'attendance_pulse', label: "Today's Attendance", requiredFeatureKey: 'monthly_attendance_matrix' },
-    { id: 'today_collection', label: "Today's Collection", requiredFeatureKey: 'nav_finance' },
-    { id: 'pending_admissions', label: 'New Applications', requiredFeatureKey: 'student_admission' },
+    { id: 'enrolled_students', label: 'Active Enrollment', module: 'Student Management', requiredFeatureKey: 'student_roster' },
+    { id: 'attendance_pulse', label: "Today's Attendance", module: 'Class Attendance', requiredFeatureKey: 'monthly_attendance_matrix' },
+    { id: 'today_collection', label: "Today's Collection", module: 'Finance & Accounts', requiredFeatureKey: 'nav_finance' },
+    { id: 'pending_admissions', label: 'New Applications', module: 'Student Admission', requiredFeatureKey: 'student_admission' },
   ],
   TEACHER: [
-    { id: 'today_recited', label: "Today's Students Recited", requiredFeatureKey: 'progress_management' },
-    { id: 'pages_and_mistakes', label: 'Pages Heard & Total Mistakes', requiredFeatureKey: 'progress_management' },
-    { id: 'error_improvement', label: 'Mistakes & Stucks Improvement', requiredFeatureKey: 'progress_management' },
-    { id: 'class_attendance', label: "Today's Class Presence", requiredFeatureKey: 'monthly_attendance_matrix' },
-    { id: 'my_students', label: 'My Assigned Students', requiredFeatureKey: 'student_roster' },
-    { id: 'sabaq_passed', label: 'Today Sabaq Recited', requiredFeatureKey: 'progress_management' },
-    { id: 'dawr_progress', label: 'Avg Dawr Velocity', requiredFeatureKey: 'progress_management' },
+    { id: 'today_recited', label: "Today's Students Recited", module: 'Daily Classroom & Hifz', requiredFeatureKey: 'progress_management' },
+    { id: 'pages_and_mistakes', label: 'Pages Heard & Total Mistakes', module: 'Daily Classroom & Hifz', requiredFeatureKey: 'progress_management' },
+    { id: 'error_improvement', label: 'Mistakes & Stucks Improvement', module: 'Daily Classroom & Hifz', requiredFeatureKey: 'progress_management' },
+    { id: 'class_attendance', label: "Today's Class Presence", module: 'Class Attendance', requiredFeatureKey: 'monthly_attendance_matrix' },
   ],
   STAFF: [
-    { id: 'staff_counter_collection', label: "Today's Fee Collection", requiredFeatureKey: 'nav_finance' },
-    { id: 'staff_admissions', label: 'Pending Admissions', requiredFeatureKey: 'student_admission' },
-    { id: 'staff_dorm_beds', label: 'Allocated Hostel Beds', requiredFeatureKey: 'residential_quarters' },
-    { id: 'staff_attendance', label: 'Staff Presence Today', requiredFeatureKey: 'staff_daily_attendance' },
+    { id: 'staff_counter_collection', label: "Today's Fee Collection", module: 'Finance & Accounts', requiredFeatureKey: 'nav_finance' },
+    { id: 'staff_admissions', label: 'Pending Admissions', module: 'Student Admission', requiredFeatureKey: 'student_admission' },
+    { id: 'staff_dorm_beds', label: 'Allocated Hostel Beds', module: 'Residential & Hostel', requiredFeatureKey: 'residential_quarters' },
+    { id: 'staff_attendance', label: 'Staff Presence Today', module: 'Staff Management', requiredFeatureKey: 'staff_daily_attendance' },
   ],
   STUDENT: [
-    { id: 'hifz_juz', label: 'Completed Juz', requiredFeatureKey: 'progress_management' },
-    { id: 'my_attendance', label: 'My Attendance Rate', requiredFeatureKey: 'monthly_attendance_matrix' },
-    { id: 'sabaq_streak', label: 'Sabaq Daily Streak', requiredFeatureKey: 'progress_management' },
-    { id: 'exam_standing', label: 'Terminal Exam Score', requiredFeatureKey: 'lesson_management' },
+    { id: 'hifz_juz', label: 'Completed Juz', module: 'Daily Classroom & Hifz', requiredFeatureKey: 'progress_management' },
+    { id: 'my_attendance', label: 'My Attendance Rate', module: 'Class Attendance', requiredFeatureKey: 'monthly_attendance_matrix' },
+    { id: 'sabaq_streak', label: 'Sabaq Daily Streak', module: 'Daily Classroom & Hifz', requiredFeatureKey: 'progress_management' },
+    { id: 'exam_standing', label: 'Terminal Exam Score', module: 'Examinations & Lesson', requiredFeatureKey: 'lesson_management' },
   ],
   GUARDIAN: [
-    { id: 'child_hifz', label: 'Quran Memorization Track', requiredFeatureKey: 'progress_management' },
-    { id: 'child_attendance', label: 'Attendance Record', requiredFeatureKey: 'monthly_attendance_matrix' },
-    { id: 'child_dues', label: 'Pending Monthly Tuition', requiredFeatureKey: 'nav_finance' },
-    { id: 'child_standing', label: 'Conduct & Tarbiyah', requiredFeatureKey: 'lesson_management' },
+    { id: 'child_hifz', label: 'Quran Memorization Track', module: 'Daily Classroom & Hifz', requiredFeatureKey: 'progress_management' },
+    { id: 'child_attendance', label: 'Attendance Record', module: 'Class Attendance', requiredFeatureKey: 'monthly_attendance_matrix' },
+    { id: 'child_dues', label: 'Pending Monthly Tuition', module: 'Finance & Accounts', requiredFeatureKey: 'nav_finance' },
+    { id: 'child_standing', label: 'Conduct & Tarbiyah', module: 'Daily Classroom & Hifz', requiredFeatureKey: 'lesson_management' },
   ],
 };
 

@@ -37,6 +37,7 @@ export default function StaffOperatorDashboardView({
     pendingAdmissionsCount,
     upcomingEvents,
     todayCollection,
+    activeAcademyName,
   } = useDashboardData();
 
   const [internalLayout, setInternalLayout] = React.useState<DashboardLayoutItem[]>(() =>
@@ -65,7 +66,7 @@ export default function StaffOperatorDashboardView({
       id: 'staff_counter_collection',
       label: "Today's Fee Collection",
       value: `৳ ${formatNumber(todayCollection)}`,
-      subLabel: '14 transactions completed',
+      subLabel: 'Intake',
       trend: { value: 'Counter Active', isPositive: true },
       icon: BanknotesIcon,
       color: 'emerald',
@@ -75,7 +76,7 @@ export default function StaffOperatorDashboardView({
       id: 'staff_admissions',
       label: 'Pending Admissions',
       value: pendingAdmissionsCount,
-      subLabel: 'Awaiting birth certificate verification',
+      subLabel: 'Verification',
       trend: { value: 'Urgent', isPositive: false },
       icon: AdmissionIcon,
       color: 'amber',
@@ -85,7 +86,7 @@ export default function StaffOperatorDashboardView({
       id: 'staff_dorm_beds',
       label: 'Allocated Hostel Beds',
       value: '164 / 180',
-      subLabel: '16 vacancies remaining',
+      subLabel: 'Hostel',
       trend: { value: '91% Full', isPositive: true },
       icon: BuildingOfficeIcon,
       color: 'purple',
@@ -145,6 +146,10 @@ export default function StaffOperatorDashboardView({
     quick_actions: {
       actions: quickActions,
     },
+    finance_overview: {},
+    residential_occupancy: {},
+    admission_pipeline: {},
+    notice_board: {},
   };
 
   return (

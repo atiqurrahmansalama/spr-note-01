@@ -1,31 +1,42 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo } from 'react';
 import {
   CalendarIcon,
   TimerIcon,
   EditIcon,
   TrashIcon,
-} from "../ui/Icons";
-import CustomSelect from "../ui/CustomSelect";
-import { getEventColors, getEventDisplayType } from "./MasterTimeCalendar";
-import { calendarImpactScopesStore } from "../../utils/localStore";
-import { useTenant } from "../../context/TenantContext";
-import { DrawerContainer } from "../layout";
+} from '../../../../components/ui/Icons';
+import CustomSelect from '../../../../components/ui/CustomSelect';
+import { getEventColors, getEventDisplayType } from './MasterTimeCalendar';
+import { calendarImpactScopesStore } from '../../../../utils/localStore';
+import { useTenant } from '../../../../context/TenantContext';
+import { DrawerContainer } from '../../../../components/layout';
+import type { CalendarEvent } from '../types';
 
-function formatTime12(timeStr) {
-  if (!timeStr) return "";
-  const parts = String(timeStr).split(":");
+function formatTime12(timeStr?: string): string {
+  if (!timeStr) return '';
+  const parts = String(timeStr).split(':');
   let h = parseInt(parts[0], 10);
-  const m = String(parts[1] || "00").padStart(2, "0");
+  const m = String(parts[1] || '00').padStart(2, '0');
   if (isNaN(h)) return timeStr;
-  const ampm = h >= 12 ? "pm" : "am";
+  const ampm = h >= 12 ? 'pm' : 'am';
   h = h % 12;
   if (h === 0) h = 12;
   return `${h}:${m}${ampm}`;
 }
 
-const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-export default function TimeScheduleDetailDrawer({
+export interface TimeScheduleDetailDrawerProps {
+  event: CalendarEvent;
+  currentDate?: string;
+  initialDate?: string;
+  onEdit?: () => void;
+  onDelete?: (deleteInfo: any) => void;
+  onClose?: () => void;
+  readOnly?: boolean;
+}
+
+export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> = ({
   event,
   currentDate,
   initialDate,
@@ -33,28 +44,28 @@ export default function TimeScheduleDetailDrawer({
   onDelete,
   onClose,
   readOnly = false,
-}) {
+}) => {
   const { activeTenantId } = useTenant();
-  const effectiveDate = currentDate || initialDate || event?.startDate || new Date().toISOString().split("T")[0];
+  const effectiveDate = currentDate || initialDate || event?.startDate || new Date().toISOString().split('T')[0];
 
-  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const [deleteScope, setDeleteScope] = useState("THIS_EVENT");
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState<boolean>(false);
+  const [deleteScope, setDeleteScope] = useState<string>('THIS_EVENT');
 
   const deleteScopeOptions = useMemo(() => [
     {
-      value: "THIS_EVENT",
+      value: 'THIS_EVENT',
       label: `This day only (${effectiveDate})`,
-      description: "Delete only this specific day occurrence. Past and future schedules will remain intact.",
+      description: 'Delete only this specific day occurrence. Past and future schedules will remain intact.',
     },
     {
-      value: "THIS_AND_FOLLOWING",
-      label: "This and following days",
+      value: 'THIS_AND_FOLLOWING',
+      label: 'This and following days',
       description: `Delete from ${effectiveDate} onwards. Preserves all past attendance and logs.`,
     },
     {
-      value: "ALL_EVENTS",
-      label: "All days in series",
-      description: "Delete the entire recurring schedule series completely.",
+      value: 'ALL_EVENTS',
+      label: 'All days in series',
+      description: 'Delete the entire recurring schedule series completely.',
     },
   ], [effectiveDate]);
 
@@ -65,7 +76,7 @@ export default function TimeScheduleDetailDrawer({
   if (!event) return null;
 
   const style = getEventColors(event, activeTenantId);
-  const isWorkingHours = event.category === "WORKING_HOURS";
+  const isWorkingHours = event.category === 'WORKING_HOURS';
   const isAllDay = event.isFullDay || !event.startTime || !event.endTime;
   const isRecurringOrMultiDay = Boolean(
     event.repeats || (event.endDate && event.endDate !== event.startDate)
@@ -93,7 +104,7 @@ export default function TimeScheduleDetailDrawer({
                   {getEventDisplayType(event, activeTenantId)}
                 </span>
                 <span className="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-md theme-bg-sub border theme-border theme-text-secondary">
-                  Audience: {event.audience || "ALL"}
+                  Audience: {event.audience || 'ALL'}
                 </span>
               </div>
             </div>
@@ -117,7 +128,7 @@ export default function TimeScheduleDetailDrawer({
         <div className="flex items-center justify-between py-2 border-b theme-border">
           <span className="theme-text-secondary font-medium">Session Timing:</span>
           <span className="font-mono font-bold theme-text-primary">
-            {isAllDay ? "Full Day" : `${formatTime12(event.startTime)} – ${formatTime12(event.endTime)}`}
+            {isAllDay ? 'Full Day' : `${formatTime12(event.startTime)} – ${formatTime12(event.endTime)}`}
           </span>
         </div>
 
@@ -125,7 +136,7 @@ export default function TimeScheduleDetailDrawer({
         <div className="flex items-center justify-between py-2 border-b theme-border">
           <span className="theme-text-secondary font-medium">Recurrence Pattern:</span>
           <span className="font-semibold theme-text-primary">
-            {event.repeats ? "Weekly Recurring" : "Single Date"}
+            {event.repeats ? 'Weekly Recurring' : 'Single Date'}
           </span>
         </div>
 
@@ -142,7 +153,7 @@ export default function TimeScheduleDetailDrawer({
           <div className="py-2 border-b theme-border space-y-1.5">
             <span className="theme-text-secondary font-medium block">Active Days:</span>
             <div className="flex flex-wrap gap-1.5">
-              {event.repeatDays.map((d) => (
+              {event.repeatDays.map((d: number) => (
                 <span
                   key={d}
                   className="px-2 py-0.5 rounded-lg text-[11px] font-semibold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20"
@@ -159,8 +170,8 @@ export default function TimeScheduleDetailDrawer({
           <div className="py-2 border-b theme-border space-y-1.5">
             <span className="theme-text-secondary font-medium block">Active System Impacts:</span>
             <div className="flex flex-wrap gap-1.5">
-              {event.impacts.map((impactId) => {
-                const matched = allScopes.find((i) => i.id === impactId || i.code === impactId);
+              {event.impacts.map((impactId: string) => {
+                const matched = allScopes.find((i: any) => i.id === impactId || i.code === impactId);
                 return (
                   <span
                     key={impactId}
@@ -179,7 +190,7 @@ export default function TimeScheduleDetailDrawer({
         <div className="flex items-center justify-between py-2 border-b theme-border">
           <span className="theme-text-secondary font-medium">Precedence Priority:</span>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
-            Rank {event.priorityRank || event.rank || 1}
+            Rank {event.priorityRank || (event as any).rank || 1}
           </span>
         </div>
 
@@ -209,7 +220,7 @@ export default function TimeScheduleDetailDrawer({
               </label>
               <CustomSelect
                 value={deleteScope}
-                onChange={(val) => setDeleteScope(val)}
+                onChange={(val: any) => setDeleteScope(String(val))}
                 options={deleteScopeOptions}
                 placeholder="Select delete scope..."
                 showDescription={true}
@@ -220,7 +231,7 @@ export default function TimeScheduleDetailDrawer({
 
           {!isRecurringOrMultiDay && (
             <p className="text-[11px] theme-text-secondary">
-              Are you sure you want to permanently delete "{event.title}"?
+              Are you sure you want to permanently delete &quot;{event.title}&quot;?
             </p>
           )}
 
@@ -238,7 +249,7 @@ export default function TimeScheduleDetailDrawer({
                 if (onDelete) {
                   onDelete({
                     id: event.id,
-                    deleteScope: isRecurringOrMultiDay ? deleteScope : "ALL_EVENTS",
+                    deleteScope: isRecurringOrMultiDay ? deleteScope : 'ALL_EVENTS',
                     targetDate: effectiveDate,
                   });
                 }
@@ -252,7 +263,7 @@ export default function TimeScheduleDetailDrawer({
         </div>
       ) : (
         /* Action Buttons (Read-Only shows only Close button) */
-        <div className={`pt-4 border-t theme-border flex items-center ${readOnly || (!onEdit && !onDelete) ? "justify-end" : "justify-between"} gap-2.5`}>
+        <div className={`pt-4 border-t theme-border flex items-center ${readOnly || (!onEdit && !onDelete) ? 'justify-end' : 'justify-between'} gap-2.5`}>
           {!readOnly && onDelete && (
             <button
               type="button"
@@ -289,4 +300,7 @@ export default function TimeScheduleDetailDrawer({
       )}
     </DrawerContainer>
   );
-}
+};
+
+export default TimeScheduleDetailDrawer;
+

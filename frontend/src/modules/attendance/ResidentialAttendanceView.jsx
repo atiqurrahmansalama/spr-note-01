@@ -30,7 +30,7 @@ import {
   academicYearsStore,
 } from '../../utils/localStore';
 import { getHijriDateString, getCurrentHijriMonthRange } from '../../utils/hijriUtils';
-import { getEventColors, DayAgendaDrawer, TimeScheduleDrawerForm } from '../../components/calendar';
+import { getEventColors, DayAgendaDrawer, TimeScheduleDrawerForm } from '../academy/calendar-events';
 import { useToast } from '../../context/ToastContext';
 import { useTenant } from '../../context/TenantContext';
 import { useRightSidebar, useDrawerRegistration } from '../../context/RightSidebarContext';
@@ -704,7 +704,7 @@ export default function ResidentialAttendanceView({
 
     openRightSidebar({
       title: `Day Agenda: ${dateStr}`,
-      subtitle: `${getHijriDateString(dateStr)} • Master Calendar & Events`,
+      subtitle: isHijriEnabled ? `${getHijriDateString(dateStr)} • Master Calendar & Events` : 'Master Calendar & Events',
       icon: CalendarIcon,
       width: 580,
       content: (

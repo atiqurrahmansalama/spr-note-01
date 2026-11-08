@@ -373,18 +373,25 @@ export default function DateRangePicker({
     return placeholder;
   };
 
-  const PRESET_OPTIONS = [
-    { key: "all_time", label: "Full Month (Reset)" },
-    { key: "today", label: "Today" },
-    { key: "yesterday", label: "Yesterday" },
-    { key: "past_week", label: "Last 7 Days" },
-    { key: "past_2weeks", label: "Last 14 Days" },
-    { key: "this_month", label: "This Month" },
-    { key: "full_hijri_month", label: `Full Hijri Month` },
-    { key: "past_month", label: "Last 30 Days" },
-    { key: "past_3months", label: "Last 90 Days" },
-    { key: "custom", label: "Custom Date Range…" },
-  ];
+  const PRESET_OPTIONS = useMemo(() => {
+    const list = [
+      { key: "all_time", label: "Full Month (Reset)" },
+      { key: "today", label: "Today" },
+      { key: "yesterday", label: "Yesterday" },
+      { key: "past_week", label: "Last 7 Days" },
+      { key: "past_2weeks", label: "Last 14 Days" },
+      { key: "this_month", label: "This Month" },
+    ];
+    if (isHijriActive) {
+      list.push({ key: "full_hijri_month", label: "Full Hijri Month" });
+    }
+    list.push(
+      { key: "past_month", label: "Last 30 Days" },
+      { key: "past_3months", label: "Last 90 Days" },
+      { key: "custom", label: "Custom Date Range…" }
+    );
+    return list;
+  }, [isHijriActive]);
 
   const heightClass = size === "sm" ? "h-[38px] text-xs py-1.5" : "h-[42px] text-xs py-2";
 

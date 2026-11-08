@@ -19,6 +19,7 @@ export interface DateHeaderCellProps {
   isSelected?: boolean;
   isToday?: boolean;
   isCurrentMonth?: boolean;
+  keepNormalBgOnOtherMonths?: boolean;
   showEventBackground?: boolean;
   onClick?: (e?: React.MouseEvent) => void;
   title?: string;
@@ -58,6 +59,7 @@ export const DateHeaderCell: React.FC<DateHeaderCellProps> = ({
   isSelected = false,
   isToday: propIsToday,
   isCurrentMonth = true,
+  keepNormalBgOnOtherMonths = false,
   showEventBackground = false,
   onClick,
   title,
@@ -119,7 +121,9 @@ export const DateHeaderCell: React.FC<DateHeaderCellProps> = ({
   } else if (isHoliday) {
     statusClasses = 'theme-bg-sub/80 hover:theme-bg-sub theme-text-secondary';
   } else if (!isCurrentMonth) {
-    statusClasses = 'theme-bg-sub/30 opacity-40 hover:opacity-75 theme-text-secondary';
+    statusClasses = keepNormalBgOnOtherMonths
+      ? 'theme-bg-surface hover:theme-bg-sub/40 opacity-40 hover:opacity-75 theme-text-secondary'
+      : 'theme-bg-sub/30 opacity-40 hover:opacity-75 theme-text-secondary';
   } else {
     statusClasses = 'theme-bg-surface hover:theme-bg-sub/40 theme-text-primary';
   }

@@ -11,7 +11,7 @@ import useAttendanceDateManager from '../attendance/hooks/useAttendanceDateManag
 import { getTeacherAttendanceMatrix, bulkMarkStudentAttendance } from '../../api/attendance';
 import { attendanceTimingPolicyStore } from '../../utils/localStore';
 import { getAttendanceCellTimingState } from '../../utils/attendanceTimingEngine';
-import { DayAgendaDrawer, TimeScheduleDrawerForm } from '../../components/calendar';
+import { DayAgendaDrawer, TimeScheduleDrawerForm } from '../academy/calendar-events';
 
 // Icons & UI Components
 import {
@@ -415,7 +415,7 @@ export default function TeacherAttendanceView() {
 
     openRightSidebar({
       title: `Teacher Class Schedule: ${fullDate}`,
-      subtitle: `${getHijriDateString(fullDate)} • Academic Time & Master Events`,
+      subtitle: isHijriEnabled ? `${getHijriDateString(fullDate)} • Academic Time & Master Events` : 'Academic Time & Master Events',
       icon: CalendarIcon,
       width: 580,
       content: (

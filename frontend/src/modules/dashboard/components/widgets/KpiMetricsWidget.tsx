@@ -148,14 +148,14 @@ export default function KpiMetricsWidget({
               isDragOver && isEditMode ? 'ring-2 ring-[var(--accent-main)] scale-[1.01]' : ''
             }`}
           >
-            {/* Top Row: Bare Icon (zero bg, zero border) & Bare Trend Badge in theme color (zero bg, zero border) */}
+            {/* Top Row: Bare Icon & Trend Badge */}
             <div className="flex items-center justify-between gap-2">
               <div className="shrink-0 flex items-center justify-center">
                 <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${theme.iconColor}`} />
               </div>
 
               {item.trend && (
-                <span className="text-[11px] font-mono font-bold flex items-center gap-0.5 theme-text-secondary">
+                <span className="text-[11px] font-mono font-bold flex items-center gap-0.5 theme-text-secondary shrink-0">
                   <span>{item.trend.isPositive !== false ? '↑' : '↓'}</span>
                   <span>{item.trend.value}</span>
                 </span>

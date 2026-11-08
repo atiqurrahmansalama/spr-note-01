@@ -34,30 +34,32 @@ export default function FinanceCollectionWidget({
     <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-4 select-none ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between pb-2">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
             <BanknotesIcon className="w-4 h-4" />
           </div>
-          <div>
-            <h3 className="text-sm font-bold theme-text-primary leading-tight">
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold theme-text-primary leading-tight truncate">
               {title || t('financeOverview', 'Finance & Fee Collection')}
             </h3>
-            <p className="text-[11px] theme-text-secondary mt-0.5">
+            <p className="text-[11px] theme-text-secondary mt-0.5 truncate">
               Monthly Rate: <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{formatNumber(finance.collectionRate)}%</span>
             </p>
           </div>
         </div>
 
-        {onViewLedger && (
-          <button
-            type="button"
-            onClick={onViewLedger}
-            className="px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated text-xs font-semibold theme-text-primary transition-all cursor-pointer flex items-center gap-1.5"
-          >
-            <span>{t('viewReport', 'Ledger')}</span>
-            <span className="text-[10px]">→</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {onViewLedger && (
+            <button
+              type="button"
+              onClick={onViewLedger}
+              className="px-3 py-1.5 rounded-xl theme-bg-sub hover:theme-bg-elevated text-xs font-semibold theme-text-primary transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <span>{t('viewReport', 'Ledger')}</span>
+              <span className="text-[10px]">→</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Hero Stats */}

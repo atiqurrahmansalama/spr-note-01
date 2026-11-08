@@ -144,13 +144,15 @@ export default function DashboardHubView() {
       if (e?.detail?.role === effectiveRole || !e?.detail?.role) {
         setCurrentRoleLayout(getSavedLayout(activeTenantId || 'default', effectiveRole, currentUser.id));
       }
+    };
+    const handleGovernanceUpdate = () => {
       setGovernanceTick((t) => t + 1);
     };
     window.addEventListener('spr_dashboard_layout_updated', handleLayoutUpdate);
-    window.addEventListener('spr_dashboard_governance_updated', handleLayoutUpdate);
+    window.addEventListener('spr_dashboard_governance_updated', handleGovernanceUpdate);
     return () => {
       window.removeEventListener('spr_dashboard_layout_updated', handleLayoutUpdate);
-      window.removeEventListener('spr_dashboard_governance_updated', handleLayoutUpdate);
+      window.removeEventListener('spr_dashboard_governance_updated', handleGovernanceUpdate);
     };
   }, [effectiveRole, activeTenantId, currentUser.id]);
 
@@ -163,8 +165,8 @@ export default function DashboardHubView() {
     if (roleToPersist === effectiveRole) {
       setCurrentRoleLayout(newLayout);
     }
-    // When Super Admin configures a layout (via grid drag or customizer), always persist as the institutional role default
-    const shouldSaveAsRoleDefault = isSuperAdmin ? true : saveAsRoleDefault;
+    // Super Admin can toggle saving as institutional default or personal override
+    const shouldSaveAsRoleDefault = isSuperAdmin ? Boolean(saveAsRoleDefault) : false;
     saveLayout(activeTenantId || 'default', roleToPersist, newLayout, currentUser.id, shouldSaveAsRoleDefault);
   }, [activeTenantId, effectiveRole, currentUser.id, isSuperAdmin]);
 

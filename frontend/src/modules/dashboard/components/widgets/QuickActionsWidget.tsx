@@ -276,11 +276,13 @@ export default function QuickActionsWidget({
   return (
     <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-3.5 select-none min-w-0 ${className}`}>
       {/* Header */}
-      <div className="flex items-center gap-2 pb-1 shrink-0">
-        <SparklesIcon className="w-4 h-4 theme-accent" />
-        <h3 className="text-sm font-bold theme-text-primary">
-          {title || t('quickActions', 'Quick Actions')}
-        </h3>
+      <div className="flex items-center justify-between pb-1 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <SparklesIcon className="w-4 h-4 theme-accent shrink-0" />
+          <h3 className="text-sm font-bold theme-text-primary truncate">
+            {title || t('quickActions', 'Quick Actions')}
+          </h3>
+        </div>
       </div>
 
       {/* Grid: Naturally top-aligned, leftover space stays at bottom */}

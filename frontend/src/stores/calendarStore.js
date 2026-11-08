@@ -20,8 +20,29 @@ export const calendarSettings = {
   getFirstDay:    () => readString(KEYS.FIRST_DAY, "Saturday"),
   saveFirstDay:   (v) => writeString(KEYS.FIRST_DAY, v),
 
-  getHijriEnabled:  () => readString(KEYS.ENABLE_HIJRI, "true") === "true",
-  saveHijriEnabled: (v) => writeString(KEYS.ENABLE_HIJRI, v.toString()),
+  getHijriEnabled: () => {
+    try {
+      const val = typeof window !== "undefined" ? localStorage.getItem(KEYS.ENABLE_HIJRI) : null;
+      return val === "true" || val === "1" || val === "enabled";
+    } catch {
+      return false;
+    }
+  },
+  saveHijriEnabled: (v) => {
+    try {
+      const isTrue = Boolean(v);
+      writeString(KEYS.ENABLE_HIJRI, isTrue ? "true" : "false");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("spr_calendar_settings_updated", {
+            detail: { enableHijri: isTrue },
+          })
+        );
+      }
+    } catch (err) {
+      console.warn("[calendarStore] Failed to save Hijri preference:", err);
+    }
+  },
 };
 
 export const dateTimeSettings = calendarSettings;

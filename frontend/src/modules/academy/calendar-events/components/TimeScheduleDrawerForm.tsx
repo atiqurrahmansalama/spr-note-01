@@ -1,15 +1,15 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import CustomSelect from "../ui/CustomSelect";
-import CustomInput from "../ui/CustomInput";
-import TimezoneSelect from "../selectors/TimezoneSelect";
-import ReusableCalendar from "../common/ReusableCalendar";
+import CustomSelect from "../../../../components/ui/CustomSelect";
+import CustomInput from "../../../../components/ui/CustomInput";
+import TimezoneSelect from "../../../../components/selectors/TimezoneSelect";
+import ReusableCalendar from "../../../../components/common/ReusableCalendar";
 import {
   SaveIcon,
   CloseIcon,
   ChevronIcon,
   CalendarIcon,
   CheckIcon,
-} from "../ui/Icons";
+} from "../../../../components/ui/Icons";
 import {
   calendarEventTypesStore,
   calendarEventKindsStore,
@@ -18,10 +18,10 @@ import {
   masterCalendarStore,
   calendarSettings,
   getDynamicPriorityRankOptions,
-} from "../../utils/localStore";
-import { useTenant } from "../../context/TenantContext";
-import { fetchWithAuth } from "../../utils/authService";
-import { DrawerContainer } from "../layout";
+} from "../../../../utils/localStore";
+import { useTenant } from "../../../../context/TenantContext";
+import { fetchWithAuth } from "../../../../utils/authService";
+import { DrawerContainer } from "../../../../components/layout";
 
 const CATEGORY_OPTIONS = [
   { value: "WORKING_HOURS", label: "Add a Working Schedule" },
@@ -546,6 +546,42 @@ export function resolveEventFormColor(evt, targetCategory, kinds = [], types = [
   return "emerald";
 }
 
+export interface TimeScheduleFormData {
+  title: string;
+  category: string;
+  type?: string;
+  eventTypeId?: string;
+  audience: string[];
+  impacts: string[];
+  priorityRank: number;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  timezone: string;
+  repeats: boolean;
+  repeatDays: number[];
+  frequency: string;
+  until: string;
+  untilDate: string;
+  isFullDay: boolean;
+  description: string;
+  color: string;
+  [key: string]: any;
+}
+
+export interface EventTitleOption {
+  id?: string;
+  value: string;
+  label: string;
+  typeLabel?: string;
+  category: string;
+  type?: string;
+  color?: string;
+  repeats?: boolean;
+  description?: string;
+}
+
 export default function TimeScheduleDrawerForm({
   event = null,
   initialDate = '',
@@ -653,11 +689,11 @@ export default function TimeScheduleDrawerForm({
 
   // Dynamic Impact Options based on Developer Tools System Impact Scopes
   const impactOptions = useMemo(() => {
-    const opts = [
-      { value: "ALL", label: "All Integrations (Entire System)", badge: "ALL" },
+    const opts: Array<{ value: string; label: string; badge: string; description?: string }> = [
+      { value: "ALL", label: "All Integrations (Entire System)", badge: "ALL", description: "" },
     ];
-    const active = (impactScopes || []).filter((s) => s.is_active !== false);
-    active.forEach((s) => {
+    const active = (impactScopes || []).filter((s: any) => s.is_active !== false);
+    active.forEach((s: any) => {
       const code = s.id || s.code;
       const label = s.name || s.label || s.code;
       const badge = s.badge || s.code || s.name;
@@ -688,7 +724,7 @@ export default function TimeScheduleDrawerForm({
     return masterCalendarStore.getEvents(activeTenantId) || [];
   }, [activeTenantId]);
 
-  const [formData, setFormData] = useState(() => {
+  const [formData, setFormData] = useState<TimeScheduleFormData>(() => {
     if (event) {
       let initialAudience = ["ALL"];
       if (Array.isArray(event.audience)) {
@@ -712,6 +748,7 @@ export default function TimeScheduleDrawerForm({
       return {
         title: event.title || "",
         category: event.category || defaultCategory,
+        type: event.type || (event.category === "WORKING_HOURS" ? "WORKING_HOURS" : "ACADEMIC"),
         audience: initialAudience.length > 0 ? initialAudience : ["ALL"],
         impacts: initialImpacts.length > 0 ? initialImpacts : ["ALL"],
         priorityRank: event.priorityRank !== undefined && event.priorityRank !== null
@@ -741,6 +778,7 @@ export default function TimeScheduleDrawerForm({
     return {
       title: initialTitle,
       category: defaultCategory,
+      type: defaultCategory === "WORKING_HOURS" ? "WORKING_HOURS" : "ACADEMIC",
       audience: ["ALL"],
       impacts: ["ALL"],
       priorityRank: initialEventsList.length + 1,
@@ -828,18 +866,18 @@ export default function TimeScheduleDrawerForm({
     }
   }, [event, initialDate, defaultCategory, impactScopes, eventKinds, eventTypes]);
 
-  const eventTitleOptions = useMemo(() => {
+  const eventTitleOptions = useMemo<EventTitleOption[]>(() => {
     const isWorkingHoursCategory = formData.category === "WORKING_HOURS";
 
     if (isWorkingHoursCategory) {
-      const activeSchedules = (workingSchedules || []).filter((ws) => ws.is_active !== false);
+      const activeSchedules = (workingSchedules || []).filter((ws: any) => ws.is_active !== false);
       const baseList = activeSchedules.length > 0 ? activeSchedules : [
-        { name: "Morning Working Session", description: "Standard morning operational shifts and faculty hours" },
-        { name: "Afternoon Working Session", description: "Staff & faculty afternoon working hours" },
-        { name: "Evening Support Session", description: "Evening tutorial, revision, and support hours" },
+        { id: "ws-morning", name: "Morning Working Session", description: "Standard morning operational shifts and faculty hours" },
+        { id: "ws-afternoon", name: "Afternoon Working Session", description: "Staff & faculty afternoon working hours" },
+        { id: "ws-evening", name: "Evening Support Session", description: "Evening tutorial, revision, and support hours" },
       ];
 
-      const opts = baseList.map((ws) => ({
+      const opts: EventTitleOption[] = baseList.map((ws: any) => ({
         id: ws.id,
         value: ws.name,
         label: ws.name,
@@ -853,6 +891,7 @@ export default function TimeScheduleDrawerForm({
 
       if (formData.title && !opts.some((o) => o.value === formData.title)) {
         opts.unshift({
+          id: formData.title,
           value: formData.title,
           label: formData.title,
           typeLabel: "Working Hours",
@@ -860,13 +899,14 @@ export default function TimeScheduleDrawerForm({
           type: "WORKING_HOURS",
           color: "indigo",
           repeats: true,
+          description: "",
         });
       }
       return opts;
     }
 
     // Dynamic Academic Event Categories from Developer Tools
-    const kindsMap = {
+    const kindsMap: Record<string, string> = {
       ACADEMIC: "Academic",
       HOLIDAY: "Holiday",
       EXAM: "Exam",
@@ -874,7 +914,7 @@ export default function TimeScheduleDrawerForm({
       ACTIVITY: "Sports & Cultural",
       GENERAL: "General",
     };
-    const kindsColorMap = {
+    const kindsColorMap: Record<string, string> = {
       ACADEMIC: "emerald",
       HOLIDAY: "rose",
       EXAM: "amber",
@@ -883,7 +923,7 @@ export default function TimeScheduleDrawerForm({
       GENERAL: "slate",
     };
 
-    (eventKinds || []).forEach((k) => {
+    (eventKinds || []).forEach((k: any) => {
       const key = k.value || k.id;
       if (key) {
         kindsMap[key] = k.label || k.name || key;
@@ -891,18 +931,18 @@ export default function TimeScheduleDrawerForm({
       }
     });
 
-    const activeEvents = (eventTypes || []).filter((et) => et.is_active !== false);
+    const activeEvents = (eventTypes || []).filter((et: any) => et.is_active !== false);
     const baseList = activeEvents.length > 0 ? activeEvents : [
-      { name: "Mid-Term Examination", type: "EXAM", description: "Formal mid-term evaluation & exam schedule" },
-      { name: "Final Term Examination", type: "EXAM", description: "Annual and final institutional examinations" },
-      { name: "Weekly Holiday", type: "HOLIDAY", description: "Standard weekend institutional recess" },
-      { name: "Eid Vacation", type: "HOLIDAY", description: "Special holiday closure for holy Eid celebration" },
-      { name: "Annual Sports & Cultural Day", type: "ACTIVITY", description: "Annual athletic competitions and campus gathering" },
-      { name: "Parent-Teacher Conference", type: "MEETING", description: "Quarterly progress review meetings with guardians" },
-      { name: "Special Academic Event", type: "ACADEMIC", description: "Institutional conferences, orientation, and symposiums" },
+      { id: "et-midterm", name: "Mid-Term Examination", type: "EXAM", description: "Formal mid-term evaluation & exam schedule" },
+      { id: "et-final", name: "Final Term Examination", type: "EXAM", description: "Annual and final institutional examinations" },
+      { id: "et-weekly", name: "Weekly Holiday", type: "HOLIDAY", description: "Standard weekend institutional recess" },
+      { id: "et-eid", name: "Eid Vacation", type: "HOLIDAY", description: "Special holiday closure for holy Eid celebration" },
+      { id: "et-sports", name: "Annual Sports & Cultural Day", type: "ACTIVITY", description: "Annual athletic competitions and campus gathering" },
+      { id: "et-ptm", name: "Parent-Teacher Conference", type: "MEETING", description: "Quarterly progress review meetings with guardians" },
+      { id: "et-special", name: "Special Academic Event", type: "ACADEMIC", description: "Institutional conferences, orientation, and symposiums" },
     ];
 
-    const opts = baseList.map((et) => {
+    const opts: EventTitleOption[] = baseList.map((et: any) => {
       const rawType = et.type || et.category || "ACADEMIC";
       const typeLabel = kindsMap[rawType] || (rawType ? rawType.replace(/_/g, " ") : "Academic Event");
       const dynamicColor = kindsColorMap[rawType] || "emerald";
@@ -915,21 +955,25 @@ export default function TimeScheduleDrawerForm({
         category: "ACADEMIC_EVENT",
         type: rawType,
         color: dynamicColor,
+        repeats: false,
         description: et.description || "",
       };
     });
 
     if (formData.title && !opts.some((o) => o.value === formData.title)) {
       const currentKind = (eventKinds || []).find(
-        (k) => k.value === formData.type || k.id === formData.type || k.value === formData.category || k.id === formData.category
+        (k: any) => k.value === formData.type || k.id === formData.type || k.value === formData.category || k.id === formData.category
       );
       opts.unshift({
+        id: formData.title,
         value: formData.title,
         label: formData.title,
         typeLabel: currentKind?.label || (formData.category === "WORKING_HOURS" ? "Working Hours" : "Academic Event"),
         category: formData.category,
         type: formData.type || (formData.category === "WORKING_HOURS" ? "WORKING_HOURS" : "ACADEMIC"),
         color: formData.color || currentKind?.color || "emerald",
+        repeats: false,
+        description: "",
       });
     }
     return opts;
@@ -1031,7 +1075,7 @@ export default function TimeScheduleDrawerForm({
                     category: val,
                     title: defaultTitle,
                     color: newColor,
-                    repeats: isWH ? true : prev.repeats,
+                    repeats: isWH ? true : false,
                   }));
                 }}
                 options={CATEGORY_OPTIONS}

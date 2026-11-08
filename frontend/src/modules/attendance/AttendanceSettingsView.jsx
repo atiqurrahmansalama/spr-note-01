@@ -21,7 +21,7 @@ import {
   attendanceTimingPolicyStore,
   DEFAULT_ATTENDANCE_TIMING_POLICY,
 } from "../../utils/localStore";
-import { EVENT_COLOR_MAP } from "../../components/calendar";
+import { EVENT_COLOR_MAP } from "../academy/calendar-events";
 import DataTable from "../../components/ui/DataTable";
 import CustomInput from "../../components/ui/CustomInput";
 import CustomCheckbox from "../../components/ui/CustomCheckbox";

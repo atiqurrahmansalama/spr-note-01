@@ -40,11 +40,13 @@ export default function AcademicProgressWidget({
 
   return (
     <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs h-full flex flex-col justify-start space-y-4 select-none ${className}`}>
-      <div className="flex items-center gap-2 pb-1">
-        <AcademicCapIcon className="w-4 h-4 text-[var(--accent-main)]" />
-        <h3 className="text-sm font-bold theme-text-primary">
-          {title || t('academicVelocity', 'Academic & Hifz Progress')}
-        </h3>
+      <div className="flex items-center justify-between gap-2 pb-1">
+        <div className="flex items-center gap-2 min-w-0">
+          <AcademicCapIcon className="w-4 h-4 text-[var(--accent-main)] shrink-0" />
+          <h3 className="text-sm font-bold theme-text-primary truncate">
+            {title || t('academicVelocity', 'Academic & Hifz Progress')}
+          </h3>
+        </div>
       </div>
 
       <div className="space-y-3.5">

@@ -166,6 +166,31 @@ export default function ReusableCalendar({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
 
+  const [isSystemHijriEnabled, setIsSystemHijriEnabled] = useState<boolean>(() => calendarSettings?.getHijriEnabled?.() ?? false);
+
+  useEffect(() => {
+    const handleUpdate = (e: any) => {
+      if (e?.detail?.enableHijri !== undefined) {
+        setIsSystemHijriEnabled(Boolean(e.detail.enableHijri));
+      } else {
+        setIsSystemHijriEnabled(calendarSettings?.getHijriEnabled?.() ?? false);
+      }
+    };
+    const handleStorage = (e: StorageEvent) => {
+      if (!e.key || e.key === 'spr_enable_hijri') {
+        setIsSystemHijriEnabled(calendarSettings?.getHijriEnabled?.() ?? false);
+      }
+    };
+    window.addEventListener('spr_calendar_settings_updated', handleUpdate);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('spr_calendar_settings_updated', handleUpdate);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  const effectiveShowHijri = showHijri && isSystemHijriEnabled;
+
   const effectiveTz = timeZone || (calendarSettings?.getTimezone?.() ?? "");
 
   const todayStr = useMemo(() => {
@@ -699,7 +724,7 @@ export default function ReusableCalendar({
               </button>
 
               {/* Hijri Dynamic Subtitle (Optional) */}
-              {showHijri && (() => {
+              {effectiveShowHijri && (() => {
                 try {
                   const firstDayStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-01`;
                   const d = getHijriDetails(new Date(firstDayStr));

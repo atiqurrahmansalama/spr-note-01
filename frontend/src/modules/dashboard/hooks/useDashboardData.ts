@@ -28,6 +28,9 @@ export interface DashboardDataState {
   allocatedBeds: number;
   todayCollection: number;
   monthlyCollection: number;
+  activeAcademyName: string;
+  activeAcademyCode: string;
+  isAllCampuses: boolean;
   isLoading: boolean;
   refetch: () => void;
 }
@@ -35,18 +38,45 @@ export interface DashboardDataState {
 export function useDashboardData(): DashboardDataState {
   const { activeTenant, activeTenantId, isMultiTenantAdmin } = useTenant();
   const [loading, setLoading] = useState(false);
+  const [tenantTick, setTenantTick] = useState(0);
 
-  // 1. Live Students Count
+  // Synchronize immediately on active tenant switch
+  useEffect(() => {
+    const handleTenantChange = () => setTenantTick((t) => t + 1);
+    window.addEventListener('spr_tenant_changed', handleTenantChange);
+    return () => window.removeEventListener('spr_tenant_changed', handleTenantChange);
+  }, []);
+
+  const isAllCampuses = !activeTenantId || activeTenantId === 'ALL';
+  const activeAcademyName = isAllCampuses 
+    ? 'All Campuses (Universal)' 
+    : (activeTenant?.name || (activeTenant?.code ? `Campus ${activeTenant.code}` : `Campus #${activeTenantId}`));
+  const activeAcademyCode = isAllCampuses ? 'GLOBAL' : (activeTenant?.code || 'CAMPUS');
+
+  // 1. Live Students Count Scoped to Active Academy
   const localStudentsList = useMemo(() => {
     try {
+      if (!isAllCampuses && activeTenantId) {
+        const tenantCache = 
+          readJSON(`spr_students_cache_${activeTenantId}_v1`, null) ||
+          readJSON(`spr_students_cache_${activeTenantId}`, null);
+        if (Array.isArray(tenantCache) && tenantCache.length > 0) {
+          return tenantCache;
+        }
+      }
       const list = studentsStore.getAll();
-      return Array.isArray(list) ? list : [];
+      if (!Array.isArray(list)) return [];
+      if (isAllCampuses) return list;
+      const filtered = list.filter((s: any) => 
+        String(s.institution_id || s.institution || s.tenant_id || '') === String(activeTenantId)
+      );
+      return filtered.length > 0 ? filtered : list;
     } catch {
       return [];
     }
-  }, []);
+  }, [activeTenantId, isAllCampuses, tenantTick]);
 
-  const totalStudents = localStudentsList.length > 0 ? localStudentsList.length : 320;
+  const totalStudents = localStudentsList.length;
 
   // 2. Live Staff Count
   const [totalStaff, setTotalStaff] = useState<number>(24);
@@ -71,19 +101,27 @@ export function useDashboardData(): DashboardDataState {
     };
   }, [totalStudents, totalStaff]);
 
-  // 4. Pending Admissions
+  // 4. Pending Admissions Scoped to Active Academy
   const pendingAdmissionsCount = useMemo(() => {
     try {
-      const list = readJSON('spr_admission_applications', []);
-      const pending = Array.isArray(list) ? list.filter((a: any) => a.status === 'PENDING' || a.status === 'SUBMITTED') : [];
-      return pending.length > 0 ? pending.length : 8;
-    } catch {
-      return 8;
-    }
-  }, []);
+      const tenantKey = (!isAllCampuses && activeTenantId) ? `spr_admission_applications_${activeTenantId}` : 'spr_admission_applications';
+      let list = readJSON(tenantKey, readJSON('spr_admission_applications', []));
+      if (Array.isArray(list) && list.length > 0) {
+        if (!isAllCampuses && activeTenantId) {
+          const tenantSpecific = list.filter((a: any) => 
+            !a.institution_id || String(a.institution_id) === String(activeTenantId)
+          );
+          if (tenantSpecific.length > 0) list = tenantSpecific;
+        }
+        const pending = list.filter((a: any) => a.status === 'PENDING' || a.status === 'SUBMITTED');
+        return pending.length > 0 ? pending.length : 8;
+      }
+    } catch {}
+    return 8;
+  }, [activeTenantId, isAllCampuses, tenantTick]);
 
   // 5. Active Campuses & Institutions
-  const activeCampusesCount = 3;
+  const activeCampusesCount = isAllCampuses ? 3 : 1;
   const totalTenantsCount = isMultiTenantAdmin ? 12 : 1;
 
   // 6. Dormitory Bed Occupancy from residentialStore
@@ -222,30 +260,50 @@ export function useDashboardData(): DashboardDataState {
     },
   ], []);
 
-  // Fetch live staff metrics from backend if available
+  // Fetch live staff metrics from backend if available, scoped to active academy
   const fetchLiveMetrics = useCallback(async () => {
     try {
-      const res = await fetchWithAuth('/api/v1/staff/');
+      const url = (!isAllCampuses && activeTenantId) 
+        ? `/api/v1/staff/?tenant_id=${encodeURIComponent(activeTenantId)}&page_size=500&all=true`
+        : '/api/v1/staff/?page_size=500&all=true';
+      const res = await fetchWithAuth(url);
       if (res && res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
-          setTotalStaff(data.length);
-        } else if (data && Array.isArray(data.results)) {
-          setTotalStaff(data.results.length);
+        const staffList = Array.isArray(data) ? data : (data.results || []);
+        if (staffList.length > 0) {
+          setTotalStaff(staffList.length);
+          return;
         }
       }
     } catch {}
-  }, []);
+
+    try {
+      if (!isAllCampuses && activeTenantId) {
+        const cached = readJSON(`spr_staff_cache_${activeTenantId}`, []);
+        if (Array.isArray(cached) && cached.length > 0) {
+          setTotalStaff(cached.length);
+          return;
+        }
+      }
+    } catch {}
+  }, [activeTenantId, isAllCampuses]);
 
   useEffect(() => {
     fetchLiveMetrics();
-  }, [fetchLiveMetrics]);
+  }, [fetchLiveMetrics, tenantTick]);
 
-  // 10. Live Financial Collection
+  // 10. Live Financial Collection Scoped to Active Academy
   const { todayCollection, monthlyCollection } = useMemo(() => {
     try {
-      const txs = readJSON('spr_finance_transactions', readJSON('spr_fee_collection_records', []));
+      const tenantKey = (!isAllCampuses && activeTenantId) ? `spr_finance_transactions_${activeTenantId}` : 'spr_finance_transactions';
+      let txs = readJSON(tenantKey, readJSON('spr_finance_transactions', readJSON('spr_fee_collection_records', [])));
       if (Array.isArray(txs) && txs.length > 0) {
+        if (!isAllCampuses && activeTenantId) {
+          const tenantSpecific = txs.filter((t: any) => 
+            !t.institution_id || String(t.institution_id) === String(activeTenantId)
+          );
+          if (tenantSpecific.length > 0) txs = tenantSpecific;
+        }
         const today = new Date().toISOString().substring(0, 10);
         const thisMonth = today.substring(0, 7);
         let todaySum = 0;
@@ -262,7 +320,7 @@ export function useDashboardData(): DashboardDataState {
       }
     } catch {}
     return { todayCollection: 48500, monthlyCollection: 412000 };
-  }, []);
+  }, [activeTenantId, isAllCampuses, tenantTick]);
 
   return {
     totalStudents,
@@ -281,6 +339,9 @@ export function useDashboardData(): DashboardDataState {
     allocatedBeds,
     todayCollection,
     monthlyCollection,
+    activeAcademyName,
+    activeAcademyCode,
+    isAllCampuses,
     isLoading: loading,
     refetch: fetchLiveMetrics,
   };
