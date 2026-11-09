@@ -1,10 +1,23 @@
+import { resolveRouteMeta } from '../components/layout/routeMeta';
+
 /**
  * SPR Note — Persistent Navigation & Route Restoration Service
  * =============================================================
- * Tracks and restores the user's last visited module/route across browser restarts.
+ * Tracks and restores the user's last visited module/route across browser restarts,
+ * and maintains a session-based navigation history stack for back button long-press menus.
  */
 
 const LAST_ACTIVE_ROUTE_KEY = 'spr_last_active_route';
+const ROUTE_HISTORY_STACK_KEY = 'spr_route_history_stack';
+const MAX_HISTORY_ITEMS = 12;
+
+export interface RouteHistoryItem {
+  path: string;
+  title: string;
+  category: string;
+  subCategory?: string;
+  timestamp: number;
+}
 
 // Routes that should never be saved as the "last active module"
 const EXCLUDED_PREFIXES = [
@@ -77,8 +90,83 @@ export function setLastActiveRoute(fullPath: string): void {
     if (!isSavableRoute(cleanPath)) return;
 
     localStorage.setItem(LAST_ACTIVE_ROUTE_KEY, cleanPath);
+    recordRouteHistory(cleanPath);
   } catch {
     // Ignore storage quota or security errors
+  }
+}
+
+/**
+ * Records a route in the session-level navigation history stack.
+ */
+export function recordRouteHistory(cleanPath: string): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    if (!isSavableRoute(cleanPath)) return;
+
+    const raw = sessionStorage.getItem(ROUTE_HISTORY_STACK_KEY);
+    let stack: RouteHistoryItem[] = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(stack)) stack = [];
+
+    const [pathname, search] = cleanPath.split('?');
+    const meta = resolveRouteMeta(pathname, search ? `?${search}` : '');
+
+    // If already the top item, just update timestamp
+    if (stack.length > 0 && stack[0].path === cleanPath) {
+      stack[0].timestamp = Date.now();
+      stack[0].title = meta.title || stack[0].title;
+      sessionStorage.setItem(ROUTE_HISTORY_STACK_KEY, JSON.stringify(stack));
+      return;
+    }
+
+    // Remove any previous occurrence of the exact same path to keep list clean & unique
+    stack = stack.filter((item) => item.path !== cleanPath);
+
+    // Prepend the new route entry
+    stack.unshift({
+      path: cleanPath,
+      title: meta.title || 'Page',
+      category: meta.category || 'Navigation',
+      subCategory: meta.subCategory,
+      timestamp: Date.now(),
+    });
+
+    // Constrain stack to MAX_HISTORY_ITEMS
+    if (stack.length > MAX_HISTORY_ITEMS) {
+      stack = stack.slice(0, MAX_HISTORY_ITEMS);
+    }
+
+    sessionStorage.setItem(ROUTE_HISTORY_STACK_KEY, JSON.stringify(stack));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+/**
+ * Retrieves the current session's route history stack.
+ */
+export function getRouteHistoryStack(): RouteHistoryItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = sessionStorage.getItem(ROUTE_HISTORY_STACK_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Clears the session route history stack.
+ */
+export function clearRouteHistoryStack(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.removeItem(ROUTE_HISTORY_STACK_KEY);
+  } catch {
+    // Ignore storage errors
   }
 }
 
@@ -134,6 +222,7 @@ export function clearLastActiveRoute(): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.removeItem(LAST_ACTIVE_ROUTE_KEY);
+    clearRouteHistoryStack();
   } catch {
     // Ignore storage errors
   }

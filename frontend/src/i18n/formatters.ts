@@ -4,7 +4,7 @@
  * High-performance Intl formatting utilities for multi-language display.
  */
 
-import type { LanguageCode } from './types';
+import type { LanguageCode, NumeralSystem } from './types';
 
 const LOCALE_TAG_MAP: Record<LanguageCode, string> = {
   en: 'en-US',
@@ -15,16 +15,26 @@ const LOCALE_TAG_MAP: Record<LanguageCode, string> = {
 
 /**
  * Formats a numeric value using locale-specific digits and conventions.
+ * If numeralSystem is 'LATIN', universally renders standard Western Arabic digits (1, 2, 3...).
+ * If numeralSystem is 'LOCALIZED', renders native script digits (১, ২, ৩ / ١, ٢, ٣...).
  */
 export function formatLocalizedNumber(
   value: number | string,
   lang: LanguageCode = 'en',
-  options?: Intl.NumberFormatOptions
+  options?: Intl.NumberFormatOptions,
+  numeralSystem?: NumeralSystem
 ): string {
   const num = typeof value === 'string' ? Number(value) : value;
   if (isNaN(num)) return String(value);
 
-  const localeTag = LOCALE_TAG_MAP[lang] || 'en-US';
+  const effectiveSystem: NumeralSystem =
+    numeralSystem ||
+    (typeof localStorage !== 'undefined'
+      ? (localStorage.getItem('spr_numeral_system') as NumeralSystem) || 'LATIN'
+      : 'LATIN');
+
+  const effectiveLang: LanguageCode = effectiveSystem === 'LATIN' ? 'en' : lang;
+  const localeTag = LOCALE_TAG_MAP[effectiveLang] || 'en-US';
   try {
     return new Intl.NumberFormat(localeTag, options).format(num);
   } catch {

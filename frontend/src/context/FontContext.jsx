@@ -8,7 +8,7 @@ export function FontProvider({ children }) {
   const [fontSizeId, setFontSizeId] = useState(() => appStore.getFontSize());
 
   const activeFont = FONT_OPTIONS.find((f) => f.id === fontId) || FONT_OPTIONS[2];
-  const activeFontSize = FONT_SIZES.find((s) => s.id === fontSizeId) || FONT_SIZES[1];
+  const activeFontSize = FONT_SIZES.find((s) => s.id === fontSizeId) || FONT_SIZES.find((s) => s.id === "normal") || FONT_SIZES[2];
 
   useEffect(() => {
     appStore.saveFontId(fontId);

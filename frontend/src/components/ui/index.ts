@@ -64,5 +64,7 @@ export { default as SelectionActionBar } from './SelectionActionBar';
 export type { SelectionActionBarProps, SelectionActionItem } from './SelectionActionBar';
 export { default as FilterBox } from './FilterBox';
 export type { FilterBoxProps, FilterBoxScopeItem, FilterBoxRenderProps } from './FilterBox';
+export { default as NavigationBackButton, NavigationBackButton as NamedNavigationBackButton } from './NavigationBackButton';
+export type { NavigationBackButtonProps, NavigationHistoryCustomItem } from './NavigationBackButton';
 export * from './Icons';
 

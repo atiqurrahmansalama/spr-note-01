@@ -49,7 +49,7 @@ export default function LanguageSelector({
       {
         label: t('settings.languageTitle', 'More Language Settings'),
         icon: ChevronRightIcon,
-        onClick: () => navigate('/personalize'),
+        onClick: () => navigate('/preferences?section=language'),
       },
     ];
   }, [supportedLanguages, language, switchLanguage, navigate, t]);

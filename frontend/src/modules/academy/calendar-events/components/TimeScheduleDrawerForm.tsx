@@ -1054,10 +1054,18 @@ export default function TimeScheduleDrawerForm({
   };
 
   return (
-    <DrawerContainer padding="normal" spacing="normal">
-      <form id={formId} onSubmit={handleSubmit} className="space-y-4">
-          {/* Category & Dynamic Multi-Select Audience */}
-          <div className="grid grid-cols-1 @[420px]:grid-cols-2 gap-3">
+    <DrawerContainer padding="none" spacing="normal">
+      <form id={formId} onSubmit={handleSubmit} className="space-y-6 pt-2 @container">
+        {/* ─── 1. Schedule Information Section ─── */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b theme-border">
+            <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
+              Schedule Information
+            </h4>
+          </div>
+
+          {/* Category & Schedule/Event Dropdown */}
+          <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3">
             <div>
               <CustomSelect
                 label="Entry Purpose"
@@ -1085,6 +1093,35 @@ export default function TimeScheduleDrawerForm({
 
             <div>
               <CustomSelect
+                label="Schedule / Event"
+                value={formData.title}
+                onChange={(val) => {
+                  const matched = eventTitleOptions.find((o) => o.value === val);
+                  if (matched) {
+                    setFormData((prev) => ({
+                      ...prev,
+                      title: matched.value,
+                      type: matched.type,
+                      category: matched.category,
+                      color: matched.color || prev.color,
+                      repeats: matched.repeats !== undefined ? matched.repeats : prev.repeats,
+                    }));
+                  } else {
+                    setFormData((prev) => ({ ...prev, title: val }));
+                  }
+                }}
+                options={eventTitleOptions}
+                placeholder="Select Schedule / Event..."
+                searchable={true}
+                showDescription={true}
+              />
+            </div>
+          </div>
+
+          {/* Target Audience & System Impact Multi-Select */}
+          <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3">
+            <div>
+              <CustomSelect
                 label="Target Audience (Roles)"
                 multiple={true}
                 value={formData.audience}
@@ -1093,22 +1130,21 @@ export default function TimeScheduleDrawerForm({
                 placeholder="Select Target Roles..."
               />
             </div>
+
+            <div>
+              <CustomSelect
+                label="System Impact & Integration"
+                multiple={true}
+                value={formData.impacts}
+                onChange={(val) => setFormData({ ...formData, impacts: val })}
+                options={impactOptions}
+                placeholder="Select Impacted Modules..."
+                showDescription={true}
+              />
+            </div>
           </div>
 
-          {/* System Impact & Integration Multi-Select Dropdown */}
-          <div>
-            <CustomSelect
-              label="System Impact & Integration"
-              multiple={true}
-              value={formData.impacts}
-              onChange={(val) => setFormData({ ...formData, impacts: val })}
-              options={impactOptions}
-              placeholder="Select Impacted Modules..."
-              showDescription={true}
-            />
-          </div>
-
-          {/* Priority & Precedence Rank (Dynamic selection based on existing calendar items) */}
+          {/* Priority & Precedence Rank */}
           <div>
             <CustomSelect
               label="Priority Rank"
@@ -1121,34 +1157,7 @@ export default function TimeScheduleDrawerForm({
             />
           </div>
 
-          {/* Schedule / Event Dropdown (Configured from Developer Tools) */}
-          <div>
-            <CustomSelect
-              label="Schedule / Event"
-              value={formData.title}
-              onChange={(val) => {
-                const matched = eventTitleOptions.find((o) => o.value === val);
-                if (matched) {
-                  setFormData((prev) => ({
-                    ...prev,
-                    title: matched.value,
-                    type: matched.type,
-                    category: matched.category,
-                    color: matched.color || prev.color,
-                    repeats: matched.repeats !== undefined ? matched.repeats : prev.repeats,
-                  }));
-                } else {
-                  setFormData((prev) => ({ ...prev, title: val }));
-                }
-              }}
-              options={eventTitleOptions}
-              placeholder="Select Schedule / Event..."
-              searchable={true}
-              showDescription={true}
-            />
-          </div>
-
-          {/* Description / Notes (Placed above Date) */}
+          {/* Description / Notes */}
           <div>
             <CustomInput
               type="textarea"
@@ -1160,9 +1169,18 @@ export default function TimeScheduleDrawerForm({
               placeholder="Add schedule details, agenda, instructions or remarks..."
             />
           </div>
+        </div>
 
-          {/* Date & Until when? Section (Clean inline 2 columns, calendar directly below Until when?) */}
-          <div className="grid grid-cols-1 @[380px]:grid-cols-2 gap-3">
+        {/* ─── 2. Timing & Recurrence Section ─── */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b theme-border">
+            <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
+              Date & Timing
+            </h4>
+          </div>
+
+          {/* Date & Until when? Section */}
+          <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3">
             <div>
               <ReusableCalendar
                 label="Date"
@@ -1204,7 +1222,7 @@ export default function TimeScheduleDrawerForm({
 
           {/* From & To Time Pickers (Visible when NOT All Day) */}
           {!formData.isFullDay && (
-            <div className="grid grid-cols-2 gap-3 animate-fade-in">
+            <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3 animate-fade-in">
               <InlineTimePicker
                 label="From"
                 value={formData.startTime}
@@ -1217,12 +1235,6 @@ export default function TimeScheduleDrawerForm({
               />
             </div>
           )}
-
-          {/* Event Color Picker Dropdown with Single Visible Default & Expandable Palette */}
-          <EventColorPickerDropdown
-            value={formData.color}
-            onChange={(val) => setFormData({ ...formData, color: val })}
-          />
 
           {/* Repeats Toggle Switch (Matches All Day Toggle Design) */}
           <div className="flex items-center justify-between p-3 rounded-xl border theme-border theme-bg-sub/50">
@@ -1284,21 +1296,36 @@ export default function TimeScheduleDrawerForm({
               </div>
             </div>
           )}
+        </div>
 
-          {/* Apply Changes To Dropdown (Standard Reusable CustomSelect) */}
-          {isRecurringOrMultiDay && (
-            <div className="pt-2 animate-fade-in">
-              <CustomSelect
-                label="Apply Changes To"
-                value={editScope}
-                onChange={(val) => setEditScope(val)}
-                options={editScopeOptions}
-                placeholder="Select update scope..."
-                showDescription={true}
-                direction="auto"
-              />
-            </div>
-          )}
+        {/* ─── 3. Visual Styling Section ─── */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b theme-border">
+            <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
+              Visual Appearance
+            </h4>
+          </div>
+
+          <EventColorPickerDropdown
+            value={formData.color}
+            onChange={(val) => setFormData({ ...formData, color: val })}
+          />
+        </div>
+
+        {/* Apply Changes To Dropdown (Standard Reusable CustomSelect) */}
+        {isRecurringOrMultiDay && (
+          <div className="pt-2 animate-fade-in">
+            <CustomSelect
+              label="Apply Changes To"
+              value={editScope}
+              onChange={(val) => setEditScope(val)}
+              options={editScopeOptions}
+              placeholder="Select update scope..."
+              showDescription={true}
+              direction="auto"
+            />
+          </div>
+        )}
 
         {/* Bottom Action Buttons (Normal scrolling with content, not sticky) */}
         <div className="pt-4 border-t theme-border flex items-center justify-end gap-2.5">

@@ -47,6 +47,8 @@ export interface TranslationParams {
   [key: string]: string | number | boolean | undefined | null;
 }
 
+export type NumeralSystem = 'LATIN' | 'LOCALIZED';
+
 export interface I18nContextType {
   language: LanguageCode;
   direction: TextDirection;
@@ -54,6 +56,8 @@ export interface I18nContextType {
   config: LanguageConfig;
   supportedLanguages: LanguageConfig[];
   setLanguage: (lang: LanguageCode) => void;
+  numeralSystem: NumeralSystem;
+  setNumeralSystem: (sys: NumeralSystem) => void;
   t: (key: string, defaultTextOrParams?: string | TranslationParams, params?: TranslationParams) => string;
   formatNumber: (num: number | string, options?: Intl.NumberFormatOptions) => string;
   formatDate: (date: Date | string | number, options?: Intl.DateTimeFormatOptions) => string;

@@ -65,7 +65,12 @@ export const FONT_OPTIONS = [
 ];
 
 export const FONT_SIZES = [
-  { id: "small", name: "Small", px: "14px", label: "Compact (14px)" },
-  { id: "normal", name: "Normal", px: "15px", label: "Default (15px)" },
-  { id: "large", name: "Large", px: "17px", label: "Spacious (17px)" },
+  { id: "compact", name: "Compact", px: "13px", label: "Compact (13px)" },
+  { id: "small", name: "Small", px: "14px", label: "Small (14px)" },
+  { id: "normal", name: "Normal", px: "15px", label: "Normal (15px)" },
+  { id: "medium", name: "Medium", px: "16px", label: "Medium (16px)" },
+  { id: "large", name: "Large", px: "17px", label: "Large (17px)" },
 ];
+
+export const AVAILABLE_FONTS = FONT_OPTIONS;
+export const FONT_SIZE_OPTIONS = FONT_SIZES;

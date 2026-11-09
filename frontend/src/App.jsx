@@ -73,7 +73,7 @@ const TrashRestorationView = lazy(() => import("./modules/admin/TrashRestoration
 
 // ─── Protected Settings & Personalization Views (Lazy Loaded) ───────────────
 const ProfileSettingsView = lazy(() => import("./modules/profile/ProfileSettingsView"));
-const PersonalizeSettingsHubView = lazy(() => import("./modules/settings/PersonalizeSettingsHubView"));
+const PersonalizeSettingsHubView = lazy(() => import("./modules/settings/preferences"));
 const SecuritySessionsView = lazy(() => import("./modules/settings/components/SecuritySessionsView"));
 const ClassroomConfigurationView = lazy(() => import("./modules/learning/daily-classroom/components/ClassroomConfigurationView"));
 const ReportSettingsView = ClassroomConfigurationView;
@@ -303,9 +303,13 @@ export default function App() {
                 <Route path="/settings/institution" element={<AcademyProfileView />} />
                 <Route path="/institution-profile" element={<AcademyProfileView />} />
                 <Route path="/security-sessions" element={<FeatureGuard sectionKey="settings_security"><SecuritySessionsView /></FeatureGuard>} />
+                <Route path="/preferences" element={<PersonalizeSettingsHubView />} />
+                <Route path="/preferences/:sectionId" element={<PersonalizeSettingsHubView />} />
                 <Route path="/personalize" element={<PersonalizeSettingsHubView />} />
+                <Route path="/personalize/:sectionId" element={<PersonalizeSettingsHubView />} />
                 <Route path="/appearance" element={<PersonalizeSettingsHubView />} />
                 <Route path="/date-time" element={<PersonalizeSettingsHubView />} />
+                <Route path="/language" element={<PersonalizeSettingsHubView />} />
                 <Route path="/classroom-config" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomConfigurationView /></FeatureGuard>} />
                 <Route path="/classroom-settings" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomConfigurationView /></FeatureGuard>} />
                 <Route path="/copy-report" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomConfigurationView /></FeatureGuard>} />

@@ -102,9 +102,11 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
 
   "/profile-settings": { title: "Profile Settings", category: "Settings" },
   "/security-sessions": { title: "Security & Sessions", category: "Settings" },
-  "/appearance": { title: "Appearance", category: "Settings" },
-  "/date-time": { title: "Date & Time", category: "Settings" },
-  "/language": { title: "Language", category: "Settings" },
+  "/preferences": { title: "Preferences", category: "Settings" },
+  "/personalize": { title: "Preferences", category: "Settings" },
+  "/appearance": { title: "Appearance", subCategory: "Preferences", category: "Settings" },
+  "/date-time": { title: "Date & Time", subCategory: "Preferences", category: "Settings" },
+  "/language": { title: "Language", subCategory: "Preferences", category: "Settings" },
   "/data-backup": { title: "Data & Backup", category: "Settings" },
 
   "/shortcuts": { title: "Shortcuts", category: "Shortcuts" },
@@ -153,6 +155,26 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
 export function resolveRouteMeta(pathname: string, search: string = ""): RouteMeta {
   const currentPath = pathname;
   let meta = ROUTE_TITLE_MAP[currentPath];
+
+  if (
+    currentPath === "/preferences" ||
+    currentPath === "/personalize" ||
+    currentPath.startsWith("/preferences/") ||
+    currentPath.startsWith("/personalize/")
+  ) {
+    const parts = currentPath.split("/");
+    const pathSection = parts[2];
+    const searchParams = new URLSearchParams(search);
+    const section = pathSection || searchParams.get("section") || searchParams.get("tab");
+    if (section === "appearance") {
+      return { title: "Appearance", subCategory: "Preferences", category: "Settings" };
+    } else if (section === "datetime" || section === "date-time") {
+      return { title: "Date & Time", subCategory: "Preferences", category: "Settings" };
+    } else if (section === "language") {
+      return { title: "Language", subCategory: "Preferences", category: "Settings" };
+    }
+    return { title: "Preferences", category: "Settings" };
+  }
 
   if (currentPath === "/academy/campus-profile") {
     const searchParams = new URLSearchParams(search);

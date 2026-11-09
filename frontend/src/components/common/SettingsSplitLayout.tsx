@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import PageHeader from "../ui/PageHeader";
-import { ChevronRightIcon, ChevronLeftIcon } from "../ui/Icons";
+import { ChevronRightIcon } from "../ui/Icons";
 import CustomInput from "../ui/CustomInput";
 
 export interface SettingsSectionItem {
@@ -126,7 +126,7 @@ export const SettingsSplitLayout: React.FC<SettingsSplitLayoutProps> = ({
 
     if (groupKeys.length === 0) {
       return (
-        <div className="p-6 rounded-2xl border theme-border theme-bg-surface text-center">
+        <div className="p-6 rounded-3xl theme-bg-surface shadow-xs border-0 text-center">
           <p className="text-xs theme-text-secondary">No matching settings found</p>
         </div>
       );
@@ -139,12 +139,12 @@ export const SettingsSplitLayout: React.FC<SettingsSplitLayoutProps> = ({
           return (
             <div key={groupName || "default"} className="space-y-1.5">
               {groupName && (
-                <div className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary px-1 select-none">
+                <div className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary px-2 select-none">
                   {groupName}
                 </div>
               )}
 
-              <div className="rounded-2xl border theme-border theme-bg-surface shadow-xs overflow-hidden">
+              <div className="rounded-3xl theme-bg-surface shadow-xs p-1.5 space-y-1 border-0">
                 {items.map((sec) => {
                   const isActive = sec.id === activeSection;
                   const IconComp = sec.icon;
@@ -154,10 +154,10 @@ export const SettingsSplitLayout: React.FC<SettingsSplitLayoutProps> = ({
                       key={sec.id}
                       type="button"
                       onClick={() => handleSelectSection(sec.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition-colors border-b theme-border last:border-b-0 cursor-pointer group select-none ${
+                      className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-left transition-all cursor-pointer group select-none border-0 ${
                         isActive
-                          ? "theme-bg-accent-soft"
-                          : "hover:theme-bg-sub/60"
+                          ? "theme-bg-accent-soft theme-accent font-bold shadow-2xs"
+                          : "hover:theme-bg-elevated/60 theme-text-secondary hover:theme-text-primary"
                       }`}
                     >
                       {/* Left: Theme-Colored Icon + Section Title */}
@@ -199,8 +199,8 @@ export const SettingsSplitLayout: React.FC<SettingsSplitLayoutProps> = ({
                           <span
                             className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
                               isActive
-                                ? "theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20"
-                                : "theme-bg-sub theme-text-secondary border theme-border"
+                                ? "theme-bg-accent-soft theme-accent"
+                                : "theme-bg-elevated/70 theme-text-secondary"
                             }`}
                           >
                             {sec.badge}
@@ -229,7 +229,7 @@ export const SettingsSplitLayout: React.FC<SettingsSplitLayoutProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`w-full max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-6 space-y-5 font-sans text-left min-h-screen theme-text-primary animate-fade-in select-none min-w-0 ${className}`}
+      className={`w-full max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-6 pb-16 @sm:pb-20 @md:pb-24 space-y-5 font-sans text-left min-h-screen theme-text-primary animate-fade-in select-none min-w-0 ${className}`}
     >
       {/* ─── 1. Compact Container Mode (< 740px width or mobile) ──────── */}
       {isCompact ? (
@@ -258,28 +258,9 @@ export const SettingsSplitLayout: React.FC<SettingsSplitLayoutProps> = ({
               {renderNavigationGroups(true)}
             </div>
           ) : (
-            /* State B: Full Width Detail View with Back Button */
-            <div className="space-y-4 animate-fade-in">
-              <div className="flex items-center justify-between gap-3 pb-3 border-b theme-border">
-                <button
-                  type="button"
-                  onClick={handleBackToList}
-                  className="flex items-center gap-1.5 text-xs font-bold theme-accent hover:underline cursor-pointer"
-                >
-                  <ChevronLeftIcon className="w-4 h-4" />
-                  <span>Back to Menu</span>
-                </button>
-
-                {currentSectionObj && (
-                  <span className="text-xs font-bold theme-text-primary truncate">
-                    {currentSectionObj.title}
-                  </span>
-                )}
-              </div>
-
-              <div className="w-full min-w-0">
-                {children}
-              </div>
+            /* State B: Full Width Detail View */
+            <div className="w-full min-w-0 animate-fade-in">
+              {children}
             </div>
           )}
         </div>

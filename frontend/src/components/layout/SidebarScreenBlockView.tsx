@@ -7,6 +7,7 @@ import {
   ChevronDoubleRightIcon,
 } from "../ui/Icons";
 import IconButton from "../ui/IconButton";
+import NavigationBackButton from "../ui/NavigationBackButton";
 import { useRightSidebar } from "../../context/RightSidebarContext";
 
 export interface SidebarScreenBlockViewProps {
@@ -64,23 +65,22 @@ export default function SidebarScreenBlockView({
       {/* Header Bar with Back Button & Breadcrumbs */}
       <div className="theme-bg-surface border-b theme-border px-3 @sm:px-5 py-2 @sm:py-2.5 flex justify-between items-center shrink-0 shadow-md gap-2 h-[48px] @sm:h-[52px]">
         <div className="flex items-center gap-2 @sm:gap-3 min-w-0 flex-1">
-          {/* Universal Back Navigation Icon Button */}
-          <IconButton
-            icon={ArrowLeftIcon}
-            size="sm"
-            variant="ghost"
-            onClick={handleBackNavigation}
-            title="Go back to previous page"
+          {/* Universal Back Navigation Button with Long-Press History Mechanism */}
+          <NavigationBackButton
+            onBack={handleBackNavigation}
+            title="Go back to previous page (Press & hold for history)"
             ariaLabel="Go back to previous page"
           />
 
           {/* Module Category & View Title Breadcrumbs */}
           <div className="flex items-center gap-1.5 min-w-0 truncate">
-            <span className="text-[10px] @sm:text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0">
-              {category} /
-            </span>
+            {category && (
+              <span className="hidden sm:inline-block text-[10px] @sm:text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0">
+                {category} /
+              </span>
+            )}
             {subCategory && (
-              <span className="hidden @md:inline-block text-[10px] @sm:text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0">
+              <span className="hidden sm:inline-block text-[10px] @sm:text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0">
                 {subCategory} /
               </span>
             )}
@@ -127,7 +127,7 @@ export default function SidebarScreenBlockView({
         </div>
       </div>
 
-      <div className="sidebar-screen-container flex-1 overflow-y-auto overflow-x-hidden p-1 @sm:p-2 @md:p-3.5 @lg:p-5 w-full min-w-0 flex flex-col no-scrollbar">
+      <div className="sidebar-screen-container flex-1 overflow-y-auto overflow-x-hidden p-1 @sm:p-2 @md:p-3.5 @lg:p-5 pb-16 @sm:pb-20 @md:pb-24 w-full min-w-0 flex flex-col no-scrollbar">
         <div className="w-full max-w-full min-w-0 h-full flex flex-col flex-1 min-h-0">
           {children}
         </div>

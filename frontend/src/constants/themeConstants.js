@@ -1,4 +1,5 @@
 export const THEME_PALETTES = [
+
   {
     id: "slate",
     name: "Enterprise Slate",
@@ -54,6 +55,9 @@ export const THEME_MODES = [
   { id: "dark", name: "Dark Mode", label: "Recommended for low light" },
   { id: "system", name: "System Mode", label: "Syncs with OS preferences" },
 ];
+
+export const AVAILABLE_THEMES = THEME_PALETTES;
+export const AVAILABLE_MODES = THEME_MODES;
 
 export const BRAND_COLORS = {
   accent: "var(--accent-main)",

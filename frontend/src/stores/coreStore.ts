@@ -32,6 +32,7 @@ export const KEYS = {
   MODE:           "spr_app_mode",
   FONT_ID:        "spr_app_font_id",
   FONT_SIZE:      "spr_app_font_size",
+  NUMERAL_SYSTEM: "spr_numeral_system",
 
   // Copy Report settings
   COPY_GROUP:     "spr_copy_include_group",

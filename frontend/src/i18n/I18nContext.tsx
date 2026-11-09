@@ -5,6 +5,7 @@ import type {
   LanguageConfig,
   I18nContextType,
   TranslationParams,
+  NumeralSystem,
 } from './types';
 import {
   DEFAULT_LANGUAGE,
@@ -84,6 +85,49 @@ export interface I18nProviderProps {
 
 export function I18nProvider({ children }: I18nProviderProps) {
   const [language, setLanguageState] = useState<LanguageCode>(resolveInitialLanguage);
+  const [numeralSystem, setNumeralSystemState] = useState<NumeralSystem>(() => {
+    try {
+      const saved = typeof window !== 'undefined' ? localStorage.getItem('spr_numeral_system') : null;
+      if (saved === 'LATIN' || saved === 'LOCALIZED') return saved;
+    } catch {}
+    return 'LATIN';
+  });
+
+  const setNumeralSystem = useCallback((newSystem: NumeralSystem) => {
+    setNumeralSystemState(newSystem);
+    try {
+      localStorage.setItem('spr_numeral_system', newSystem);
+    } catch {}
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('spr_numeral_system_changed', {
+          detail: { numeralSystem: newSystem },
+        })
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleStorageUpdate = (e: StorageEvent) => {
+      if (!e.key || e.key === 'spr_numeral_system') {
+        const val = localStorage.getItem('spr_numeral_system');
+        if (val === 'LATIN' || val === 'LOCALIZED') {
+          setNumeralSystemState(val);
+        }
+      }
+    };
+    const handleCustomUpdate = (e: any) => {
+      if (e?.detail?.numeralSystem) {
+        setNumeralSystemState(e.detail.numeralSystem);
+      }
+    };
+    window.addEventListener('storage', handleStorageUpdate);
+    window.addEventListener('spr_numeral_system_changed', handleCustomUpdate);
+    return () => {
+      window.removeEventListener('storage', handleStorageUpdate);
+      window.removeEventListener('spr_numeral_system_changed', handleCustomUpdate);
+    };
+  }, []);
 
   const config = useMemo(() => LANGUAGE_MAP[language] || LANGUAGE_MAP[DEFAULT_LANGUAGE], [language]);
   const direction: TextDirection = config.dir;
@@ -206,9 +250,9 @@ export function I18nProvider({ children }: I18nProviderProps) {
 
   const formatNumber = useCallback(
     (num: number | string, options?: Intl.NumberFormatOptions) => {
-      return formatLocalizedNumber(num, language, options);
+      return formatLocalizedNumber(num, language, options, numeralSystem);
     },
-    [language]
+    [language, numeralSystem]
   );
 
   const formatDate = useCallback(
@@ -233,6 +277,8 @@ export function I18nProvider({ children }: I18nProviderProps) {
       config,
       supportedLanguages: SUPPORTED_LANGUAGES,
       setLanguage,
+      numeralSystem,
+      setNumeralSystem,
       t,
       formatNumber,
       formatDate,
@@ -244,6 +290,8 @@ export function I18nProvider({ children }: I18nProviderProps) {
       isRTL,
       config,
       setLanguage,
+      numeralSystem,
+      setNumeralSystem,
       t,
       formatNumber,
       formatDate,

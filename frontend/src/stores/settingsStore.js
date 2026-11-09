@@ -20,6 +20,9 @@ export const appearanceSettings = {
 
   getFontSize:  () => readString(KEYS.FONT_SIZE, "normal"),
   saveFontSize: (v) => writeString(KEYS.FONT_SIZE, v),
+
+  getNumeralSystem:  () => readString(KEYS.NUMERAL_SYSTEM, "LATIN"),
+  saveNumeralSystem: (v) => writeString(KEYS.NUMERAL_SYSTEM, v),
 };
 
 // ─── Classroom & Report Settings ──────────────────────────────────────────────

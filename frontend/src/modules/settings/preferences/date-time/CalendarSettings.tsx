@@ -9,7 +9,7 @@ import {
   SearchIcon,
   CloseIcon,
   InfoIcon,
-} from "../../../components/ui/Icons";
+} from "@/components/ui/Icons";
 import {
   getEnrichedTimezoneList,
   getSystemTimezone,
@@ -17,9 +17,9 @@ import {
   getTodayInTimezone,
   DATE_FORMAT_LIST,
   FIRST_DAY_LIST,
-} from "../../../constants/calendarConstants";
-import { calendarSettings as calStore } from "../../../utils/localStore";
-import { getHijriDateString } from "../../../utils/hijriUtils";
+} from "@/constants/calendarConstants";
+import { calendarSettings as calStore } from "@/utils/localStore";
+import { getHijriDateString } from "@/utils/hijriUtils";
 
 export interface CalendarSettingsProps {
   timeZone?: string;
@@ -39,6 +39,7 @@ interface OutletContextType {
 
 /**
  * Enterprise Date, Time & Calendar Settings Section
+ * Borderless & Soft-Surface Visual Architecture
  * Provides centralized configuration for:
  * 1. Workspace Regional Timezone & Live Clock Sync
  * 2. Enterprise Date Formatting Patterns
@@ -247,14 +248,14 @@ export default function CalendarSettings({
       className={`w-full ${
         isEmbedded ? "max-w-none" : "max-w-4xl mx-auto"
       } flex flex-col space-y-6 animate-fade-in theme-text-primary ${
-        isEmbedded ? "py-0 px-0" : "py-4 px-3 sm:px-6"
+        isEmbedded ? "pt-0 pb-12 sm:pb-16 px-0" : "py-4 px-3 sm:px-6 pb-12 sm:pb-16"
       }`}
     >
       {/* ─── 1. TOP HEADER & LIVE TELEMETRY BANNER ────────────────────────── */}
       {!hideHeader && (
-        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="w-full theme-bg-surface rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-0">
           <div className="flex items-center gap-3.5">
-            <div className="p-2.5 theme-bg-accent-soft rounded-xl theme-accent shrink-0">
+            <div className="p-2.5 theme-bg-accent-soft rounded-2xl theme-accent shrink-0">
               <CalendarIcon className="w-5 h-5" />
             </div>
             <div>
@@ -270,7 +271,7 @@ export default function CalendarSettings({
           <button
             type="button"
             onClick={handleResetDefaults}
-            className="px-3.5 py-1.5 text-xs font-semibold theme-text-secondary hover:theme-text-primary theme-bg-sub hover:theme-bg-elevated rounded-xl transition flex items-center gap-1.5 shrink-0 cursor-pointer border theme-border"
+            className="px-3.5 py-1.5 text-xs font-semibold theme-text-secondary hover:theme-text-primary theme-bg-app hover:theme-bg-elevated/40 rounded-xl transition flex items-center gap-1.5 shrink-0 cursor-pointer border-0"
           >
             <RefreshIcon className="w-3.5 h-3.5 theme-text-secondary" />
             <span>Reset Defaults</span>
@@ -279,8 +280,8 @@ export default function CalendarSettings({
       )}
 
       {/* ─── 2. LIVE CLOCK & DATE PREVIEW CAROUSEL CARD ─────────────────────── */}
-      <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b theme-border">
+      <div className="w-full theme-bg-surface rounded-3xl p-5 sm:p-6 shadow-xs space-y-5 border-0">
+        <div className="flex items-center justify-between pb-1 border-0">
           <div className="flex items-center gap-2">
             <ClockIcon className="w-4 h-4 theme-accent" />
             <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
@@ -288,7 +289,7 @@ export default function CalendarSettings({
             </h3>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono theme-accent theme-bg-accent-soft px-2.5 py-0.5 rounded-md font-bold">
+            <span className="text-[11px] font-mono theme-accent theme-bg-accent-soft px-2.5 py-0.5 rounded-lg font-bold">
               {activeOffsetString}
             </span>
             <span className="text-xs font-medium theme-text-secondary hidden sm:inline">
@@ -299,7 +300,7 @@ export default function CalendarSettings({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
           {/* Live Digital Clock */}
-          <div className="p-4 theme-bg-sub rounded-xl border theme-border flex flex-col justify-between">
+          <div className="p-4 theme-bg-app hover:theme-bg-elevated/40 transition-colors rounded-2xl border-0 flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">
                 Live Digital Time
@@ -315,12 +316,12 @@ export default function CalendarSettings({
           </div>
 
           {/* Formatted Date */}
-          <div className="p-4 theme-bg-sub rounded-xl border theme-border flex flex-col justify-between">
+          <div className="p-4 theme-bg-app hover:theme-bg-elevated/40 transition-colors rounded-2xl border-0 flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">
                 Formatted System Date
               </span>
-              <span className="text-[10px] font-mono font-semibold theme-accent theme-bg-accent-soft px-1.5 py-0.5 rounded">
+              <span className="text-[10px] font-mono font-semibold theme-accent theme-bg-accent-soft px-2 py-0.5 rounded-lg">
                 {activeDateFormat}
               </span>
             </div>
@@ -333,16 +334,16 @@ export default function CalendarSettings({
           </div>
 
           {/* Hijri Lunar Preview or Standard Week */}
-          <div className="p-4 theme-bg-sub rounded-xl border theme-border flex flex-col justify-between">
+          <div className="p-4 theme-bg-app hover:theme-bg-elevated/40 transition-colors rounded-2xl border-0 flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">
                 {enableHijri ? "Islamic Lunar Estimate" : "Academic Week Start"}
               </span>
               <span
-                className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg ${
                   enableHijri
-                    ? "theme-bg-accent-soft theme-accent"
-                    : "theme-bg-elevated theme-text-secondary"
+                    ? "theme-bg-accent-soft theme-accent font-bold"
+                    : "theme-bg-surface/80 theme-text-secondary"
                 }`}
               >
                 {enableHijri ? "Hijri Active" : firstDay}
@@ -361,8 +362,8 @@ export default function CalendarSettings({
       </div>
 
       {/* ─── 3. TIMEZONE SELECTION SECTION ─────────────────────────────────── */}
-      <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b theme-border">
+      <div className="w-full theme-bg-surface rounded-3xl p-5 sm:p-6 shadow-xs space-y-4 border-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-0">
           <div className="flex items-center gap-2">
             <GlobeIcon className="w-4 h-4 theme-accent" />
             <div>
@@ -380,7 +381,7 @@ export default function CalendarSettings({
             <button
               type="button"
               onClick={() => handleTimezoneSelect(systemTimezone)}
-              className="px-3 py-1.5 text-xs font-semibold theme-text-secondary hover:theme-text-primary theme-bg-sub hover:theme-bg-elevated rounded-xl transition flex items-center gap-1.5 shrink-0 cursor-pointer border theme-border self-start sm:self-auto"
+              className="px-3 py-1.5 text-xs font-semibold theme-text-secondary hover:theme-text-primary theme-bg-app hover:theme-bg-elevated/40 rounded-xl transition flex items-center gap-1.5 shrink-0 cursor-pointer border-0 self-start sm:self-auto"
             >
               <GlobeIcon className="w-3.5 h-3.5 theme-accent" />
               <span>Use Device Timezone ({systemTimezone})</span>
@@ -390,19 +391,19 @@ export default function CalendarSettings({
 
         {/* Search Bar for Timezones */}
         <div className="relative w-full">
-          <SearchIcon className="w-4 h-4 theme-text-secondary absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <SearchIcon className="w-4 h-4 theme-text-secondary absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search timezone by city, country or offset (e.g. Dhaka, Riyadh, London, UTC+06)..."
-            className="w-full pl-9 pr-9 py-2 text-xs theme-bg-sub border theme-border rounded-xl theme-text-primary placeholder:theme-text-secondary/60 focus:outline-none focus:border-[var(--accent-main)] transition"
+            className="w-full pl-10 pr-10 py-2.5 text-xs theme-bg-app border-0 rounded-2xl theme-text-primary placeholder:theme-text-secondary/60 focus:outline-none transition"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:theme-bg-elevated/50 theme-text-secondary hover:theme-text-primary transition cursor-pointer"
             >
               <CloseIcon className="w-3.5 h-3.5" />
             </button>
@@ -427,10 +428,10 @@ export default function CalendarSettings({
                   key={tz.id}
                   type="button"
                   onClick={() => handleTimezoneSelect(tz.id)}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-left transition-all duration-150 cursor-pointer flex items-center justify-between gap-3 border ${
+                  className={`w-full px-4 py-2.5 rounded-2xl text-left transition-all duration-150 cursor-pointer flex items-center justify-between gap-3 border-0 ${
                     isSelected
-                      ? "theme-bg-elevated border-[var(--accent-main)]/60 theme-text-primary font-bold shadow-sm"
-                      : "theme-bg-sub border-transparent theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated"
+                      ? "bg-[var(--accent-main)]/15 dark:bg-[var(--accent-main)]/25 theme-text-primary font-bold shadow-xs"
+                      : "theme-bg-app hover:theme-bg-elevated/40 theme-text-secondary hover:theme-text-primary"
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -444,7 +445,7 @@ export default function CalendarSettings({
                         {tz.name}
                       </span>
                       {isSystemTz && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider theme-bg-accent-soft theme-accent shrink-0">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider theme-bg-accent-soft theme-accent shrink-0">
                           Detected Device
                         </span>
                       )}
@@ -457,10 +458,14 @@ export default function CalendarSettings({
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md theme-bg-app theme-accent font-semibold">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg theme-bg-surface/80 theme-accent font-semibold">
                       {tz.offset}
                     </span>
-                    {isSelected && <CheckIcon className="w-4 h-4 theme-accent shrink-0" />}
+                    {isSelected && (
+                      <div className="w-5 h-5 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center shadow-xs shrink-0">
+                        <CheckIcon className="w-3 h-3" />
+                      </div>
+                    )}
                   </div>
                 </button>
               );
@@ -470,8 +475,8 @@ export default function CalendarSettings({
       </div>
 
       {/* ─── 4. DATE FORMAT STANDARD ───────────────────────────────────────── */}
-      <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b theme-border">
+      <div className="w-full theme-bg-surface rounded-3xl p-5 sm:p-6 shadow-xs space-y-4 border-0">
+        <div className="flex items-center justify-between pb-1 border-0">
           <div className="flex items-center gap-2">
             <CalendarIcon className="w-4 h-4 theme-accent" />
             <div>
@@ -483,7 +488,7 @@ export default function CalendarSettings({
               </p>
             </div>
           </div>
-          <span className="text-xs font-mono theme-accent theme-bg-accent-soft px-2.5 py-0.5 rounded-md font-bold">
+          <span className="text-xs font-mono theme-accent theme-bg-accent-soft px-2.5 py-0.5 rounded-lg font-bold">
             {activeDateFormat}
           </span>
         </div>
@@ -498,17 +503,21 @@ export default function CalendarSettings({
                 key={fmt.id}
                 type="button"
                 onClick={() => handleDateFormatSelect(fmt.id)}
-                className={`p-3.5 rounded-xl text-left transition-all duration-150 cursor-pointer flex flex-col justify-between gap-2 border ${
+                className={`p-4 rounded-2xl text-left transition-all duration-150 cursor-pointer flex flex-col justify-between gap-2 border-0 ${
                   isSelected
-                    ? "theme-bg-elevated border-[var(--accent-main)]/70 shadow-sm"
-                    : "theme-bg-sub border-transparent hover:theme-bg-elevated"
+                    ? "bg-[var(--accent-main)]/15 dark:bg-[var(--accent-main)]/25 shadow-xs"
+                    : "theme-bg-app hover:theme-bg-elevated/40"
                 }`}
               >
                 <div className="flex items-center justify-between w-full">
                   <span className="text-xs font-mono font-bold theme-text-primary">
                     {fmt.name}
                   </span>
-                  {isSelected && <CheckIcon className="w-3.5 h-3.5 theme-accent shrink-0" />}
+                  {isSelected && (
+                    <div className="w-5 h-5 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center shadow-xs shrink-0">
+                      <CheckIcon className="w-3 h-3" />
+                    </div>
+                  )}
                 </div>
 
                 <div className="text-sm font-mono font-semibold theme-accent">
@@ -527,8 +536,8 @@ export default function CalendarSettings({
       {/* ─── 5. ACADEMIC WEEK START & HIJRI ESTIMATE DUAL GRID ──────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* First Day of the Week */}
-        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-sm space-y-3.5">
-          <div className="flex items-center gap-2 pb-2 border-b theme-border">
+        <div className="w-full theme-bg-surface rounded-3xl p-5 sm:p-6 shadow-xs space-y-3.5 border-0">
+          <div className="flex items-center gap-2 pb-1 border-0">
             <CalendarIcon className="w-4 h-4 theme-accent" />
             <div>
               <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
@@ -548,17 +557,21 @@ export default function CalendarSettings({
                   key={item.id}
                   type="button"
                   onClick={() => handleFirstDayChange(item.id)}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-left transition-all cursor-pointer flex items-center justify-between border ${
+                  className={`w-full px-4 py-2.5 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between border-0 ${
                     isSelected
-                      ? "theme-bg-elevated border-[var(--accent-main)]/60 font-bold"
-                      : "theme-bg-sub border-transparent hover:theme-bg-elevated theme-text-secondary"
+                      ? "bg-[var(--accent-main)]/15 dark:bg-[var(--accent-main)]/25 font-bold shadow-xs"
+                      : "theme-bg-app hover:theme-bg-elevated/40 theme-text-secondary hover:theme-text-primary"
                   }`}
                 >
                   <div className="min-w-0">
                     <div className="text-xs font-bold theme-text-primary">{item.name}</div>
                     <div className="text-[10px] theme-text-secondary truncate">{item.label}</div>
                   </div>
-                  {isSelected && <CheckIcon className="w-4 h-4 theme-accent shrink-0 ml-2" />}
+                  {isSelected && (
+                    <div className="w-5 h-5 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center shadow-xs shrink-0 ml-2">
+                      <CheckIcon className="w-3 h-3" />
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -566,9 +579,9 @@ export default function CalendarSettings({
         </div>
 
         {/* Islamic Lunar (Hijri) Estimate Tracking */}
-        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-sm space-y-3.5 flex flex-col justify-between">
+        <div className="w-full theme-bg-surface rounded-3xl p-5 sm:p-6 shadow-xs space-y-3.5 flex flex-col justify-between border-0">
           <div>
-            <div className="flex items-center gap-2 pb-2 border-b theme-border">
+            <div className="flex items-center gap-2 pb-1 border-0">
               <CalendarIcon className="w-4 h-4 theme-accent" />
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
@@ -580,7 +593,7 @@ export default function CalendarSettings({
               </div>
             </div>
 
-            <div className="p-3.5 mt-3 theme-bg-sub rounded-xl flex items-center justify-between border theme-border">
+            <div className="p-4 mt-3 theme-bg-app rounded-2xl flex items-center justify-between border-0">
               <div className="space-y-1 pr-3">
                 <div className="text-xs font-bold theme-text-primary">Enable Hijri Tracking</div>
                 <div className="text-[11px] theme-text-secondary">
@@ -596,8 +609,8 @@ export default function CalendarSettings({
               <button
                 type="button"
                 onClick={handleHijriToggle}
-                className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
-                  enableHijri ? "theme-bg-accent" : "theme-bg-elevated"
+                className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 border-0 ${
+                  enableHijri ? "theme-bg-accent" : "theme-bg-surface/80"
                 }`}
                 aria-label="Toggle Hijri Calendar"
               >
@@ -617,9 +630,9 @@ export default function CalendarSettings({
       </div>
 
       {/* ─── 6. DAILY CLASSROOM INDEPENDENT TIMEZONE INFORMATION CARD ──────── */}
-      <div className="w-full theme-bg-surface border theme-border rounded-2xl p-5 shadow-sm space-y-3">
+      <div className="w-full theme-bg-surface rounded-3xl p-5 sm:p-6 shadow-xs space-y-3 border-0">
         <div className="flex items-start gap-3.5">
-          <div className="p-2.5 theme-bg-accent-soft rounded-xl theme-accent shrink-0 mt-0.5">
+          <div className="p-2.5 theme-bg-accent-soft rounded-2xl theme-accent shrink-0 mt-0.5">
             <InfoIcon className="w-5 h-5" />
           </div>
           <div className="space-y-1.5 flex-1">
@@ -627,7 +640,7 @@ export default function CalendarSettings({
               <h3 className="text-xs font-bold theme-text-primary uppercase tracking-wider">
                 Multi-Region Architecture Standard
               </h3>
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold theme-bg-accent-soft theme-accent uppercase tracking-wider">
+              <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold theme-bg-accent-soft theme-accent uppercase tracking-wider">
                 Daily Classroom Isolation
               </span>
             </div>
@@ -658,7 +671,7 @@ export default function CalendarSettings({
         <button
           type="button"
           onClick={handleResetDefaults}
-          className="px-3.5 py-1.5 text-xs font-semibold theme-text-secondary hover:theme-text-primary theme-bg-sub hover:theme-bg-elevated rounded-xl transition flex items-center gap-1.5 cursor-pointer border theme-border"
+          className="px-3.5 py-1.5 text-xs font-semibold theme-text-secondary hover:theme-text-primary theme-bg-app hover:theme-bg-elevated/40 rounded-xl transition flex items-center gap-1.5 cursor-pointer border-0"
         >
           <RefreshIcon className="w-3.5 h-3.5" />
           <span>Reset All to System Defaults</span>
