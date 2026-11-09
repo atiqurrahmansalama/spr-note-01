@@ -1,15 +1,25 @@
 import React from 'react';
-import QRCodeCardModal from '../../../components/common/QRCodeCardModal';
-import { TeacherIcon } from '../../../components/ui/Icons';
+import QRCodeCardModal from '@/components/common/QRCodeCardModal';
+import { TeacherIcon } from '@/components/ui/Icons';
 
-export default function StaffQRCodeCardModal({ isOpen, onClose, tokenData }) {
+interface StaffQRCodeCardModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  tokenData: any;
+}
+
+export const StaffQRCodeCardModal: React.FC<StaffQRCodeCardModalProps> = ({
+  isOpen,
+  onClose,
+  tokenData,
+}) => {
   if (!isOpen || !tokenData) return null;
 
   const publicUrl = `${window.location.origin}/staff-onboard?token=${tokenData.token}`;
   const roleText = tokenData.designation ? `as ${tokenData.designation}` : 'as Faculty / Staff';
   const shareText = `Assalamu Alaikum,\nYou are invited to join the staff and faculty of ${tokenData.institution_name || 'our institution'} ${roleText}.\n\nPlease complete your official onboarding here:\n${publicUrl}`;
 
-  const details = [];
+  const details: Array<{ label: string; value: string | number }> = [];
   if (tokenData.designation) {
     details.push({ label: 'Designation', value: tokenData.designation });
   }
@@ -38,4 +48,5 @@ export default function StaffQRCodeCardModal({ isOpen, onClose, tokenData }) {
       details={details}
     />
   );
-}
+};
+
