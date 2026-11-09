@@ -186,6 +186,10 @@ export function getClassId(item: any): string {
   if (item.academic_class_id !== undefined && item.academic_class_id !== null) return String(item.academic_class_id);
   if (item.class_id !== undefined && item.class_id !== null) return String(item.class_id);
   if (item.classId !== undefined && item.classId !== null) return String(item.classId);
+  if (item.cls_id !== undefined && item.cls_id !== null) return String(item.cls_id);
+  if (item.clsId !== undefined && item.clsId !== null) return String(item.clsId);
+  if (item.target_class !== undefined && item.target_class !== null && item.target_class !== '') return String(item.target_class);
+  if (item.target_class_id !== undefined && item.target_class_id !== null) return String(item.target_class_id);
   if (item.class !== undefined && item.class !== null && item.class !== '') return String(item.class);
   return '';
 }

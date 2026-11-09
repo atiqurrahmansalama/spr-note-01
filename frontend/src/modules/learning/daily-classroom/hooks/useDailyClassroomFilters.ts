@@ -131,13 +131,28 @@ export default function useDailyClassroomFilters({
   const filteredSectionsForClass = useMemo(() => {
     let list = sections || [];
     if (effectiveClassId) {
-      list = list.filter((s) => doesStudentMatchClass(s, effectiveClassId, classes));
+      const matched = list.filter((s) => doesStudentMatchClass(s, effectiveClassId, classes));
+      if (matched.length > 0) {
+        list = matched;
+      } else if (selectedDepartmentId) {
+        const validClassIds = new Set(filteredClassList.map((c) => String(c.id)));
+        const deptMatched = list.filter((s) => {
+          const sClsId = getClassId(s);
+          return validClassIds.has(sClsId) || doesLessonMatchDepartment(s, selectedDepartmentId, departments, classes);
+        });
+        if (deptMatched.length > 0) {
+          list = deptMatched;
+        }
+      }
     } else if (selectedDepartmentId) {
       const validClassIds = new Set(filteredClassList.map((c) => String(c.id)));
-      list = list.filter((s) => {
+      const deptMatched = list.filter((s) => {
         const sClsId = getClassId(s);
         return validClassIds.has(sClsId) || doesLessonMatchDepartment(s, selectedDepartmentId, departments, classes);
       });
+      if (deptMatched.length > 0) {
+        list = deptMatched;
+      }
     }
 
     const seenSecNames = new Set<string>();
@@ -154,7 +169,7 @@ export default function useDailyClassroomFilters({
     return cleanSecList;
   }, [sections, classes, effectiveClassId, selectedDepartmentId, filteredClassList, departments]);
 
-  const hasSectionsForClass = filteredSectionsForClass.length > 0;
+  const hasSectionsForClass = true;
 
   const sectionSelectOptions = useMemo(() => {
     const opts: Array<{ value: string; label: string }> = [

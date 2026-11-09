@@ -194,7 +194,7 @@ export default function DailyClassroomFilterControls({
   classPlaceholder = filterProps?.classPlaceholder ?? 'Select Class...',
 
   // Section
-  hasSectionsForClass = filterProps?.hasSectionsForClass ?? false,
+  hasSectionsForClass = filterProps?.hasSectionsForClass ?? true,
   selectedSectionId = filterProps?.selectedSectionId ?? '',
   onSectionChange = filterProps?.onSectionChange,
   sectionSelectOptions = filterProps?.sectionSelectOptions ?? [],
@@ -242,13 +242,20 @@ export default function DailyClassroomFilterControls({
     return fromData?.name || '';
   }, [selectedClassId, classSelectOptions, academicData.classes]);
 
+  const effectiveSectionOptions = useMemo(() => {
+    if (Array.isArray(sectionSelectOptions) && sectionSelectOptions.length > 0) {
+      return sectionSelectOptions;
+    }
+    return [{ value: '', label: 'All Sections' }];
+  }, [sectionSelectOptions]);
+
   const activeSectionLabel = useMemo(() => {
     if (!selectedSectionId || selectedSectionId === 'ALL') return '';
-    const opt = sectionSelectOptions.find((s) => String(s.value) === String(selectedSectionId));
+    const opt = effectiveSectionOptions.find((s) => String(s.value) === String(selectedSectionId));
     if (opt) return opt.label;
     const fromData = (academicData.sections || []).find((s: any) => String(s.id) === String(selectedSectionId));
     return fromData?.name || '';
-  }, [selectedSectionId, sectionSelectOptions, academicData.sections]);
+  }, [selectedSectionId, effectiveSectionOptions, academicData.sections]);
 
   const activeTeacherLabel = useMemo(() => {
     if (!selectedTeacherId || selectedTeacherId === 'ALL') return '';
@@ -347,11 +354,11 @@ export default function DailyClassroomFilterControls({
         <CustomSelect
           label={sectionLabel}
           placeholder={sectionPlaceholder}
-          options={sectionSelectOptions}
+          options={effectiveSectionOptions}
           value={selectedSectionId}
           onChange={onSectionChange}
           size="md"
-          disabled={!hasSectionsForClass}
+          disabled={Boolean(filterProps?.disabledSection || false)}
         />
       </div>
 

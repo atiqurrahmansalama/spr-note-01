@@ -30,7 +30,7 @@ import DailyClassroomFilterControls from "../../components/DailyClassroomFilterC
 import { StudentSelector } from "../../components";
 import { ProgressAnalyticsDashboard } from "../../components/progress-analytics";
 import { isReportUnsynced } from "@/utils/syncEngine";
-import { normalizeToISODate } from "../../utils/dailyClassroomUtils";
+import { normalizeToISODate, getClassId } from "../../utils/dailyClassroomUtils";
 import { useAcademicData } from "@/hooks/useAcademicData";
 import { useTenant } from "@/context/TenantContext";
 import { useFeatureControl } from "@/context/FeatureControlContext";
@@ -671,7 +671,7 @@ export default function ProgressReportsView({
                 if (!candClassId && candSecId) {
                   const secObj = (academicData?.sections || []).find((s: any) => String(s.id) === candSecId);
                   if (secObj) {
-                    candClassId = String(secObj.academic_class || secObj.class_id || "");
+                    candClassId = getClassId(secObj);
                   }
                 }
 

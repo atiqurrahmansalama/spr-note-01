@@ -48,7 +48,7 @@ export function useProgressReportsFilters({
         { value: "", label: "All Classes" },
         ...(academicData.classes || []).map((c: any) => ({ value: String(c.id), label: c.name })),
       ],
-      hasSectionsForClass: (academicData.sections || []).length > 0,
+      hasSectionsForClass: true,
       selectedSectionId: internalSectionId,
       onSectionChange: (val: any) => {
         const v = typeof val === "object" ? val?.value || val?.id || "" : val;
@@ -56,7 +56,10 @@ export function useProgressReportsFilters({
       },
       sectionSelectOptions: [
         { value: "", label: "All Sections" },
-        ...(academicData.sections || []).map((s: any) => ({ value: String(s.id), label: s.name })),
+        ...(academicData.sections || []).map((s: any) => ({
+          value: String(s.id),
+          label: s.section_name || s.name || `Section ${s.id}`,
+        })),
       ],
     };
   }, [filterProps, academicData, internalDeptId, internalClassId, internalSectionId]);

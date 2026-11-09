@@ -19,7 +19,7 @@ import { useDailyClassroomAssessment } from './lesson-management/lesson-assessme
 import useDailyClassroomData from './hooks/useDailyClassroomData';
 import useDailyClassroomFilters from './hooks/useDailyClassroomFilters';
 import { getClassroomTodayDate } from '@/constants/calendarConstants';
-import { doesLessonMatchClass, normalizeToISODate } from './utils/dailyClassroomUtils';
+import { doesLessonMatchClass, getClassId, normalizeToISODate } from './utils/dailyClassroomUtils';
 import { HubTabSkeletonLoader, DrawerFallbackSkeleton } from './components';
 import AccessDeniedView from '@/components/common/AccessDeniedView';
 
@@ -938,15 +938,19 @@ export default function DailyClassroomHubView({
   }, [classes, reportsDeptId]);
 
   const reportsSectionOptions = useMemo(() => {
-    let raw = (sections || []).map((s: any) => ({
+    const raw = (sections || []).map((s: any) => ({
       value: String(s.id),
-      label: s.name || s.section_name,
-      classId: s.academic_class || s.class_id,
+      label: s.section_name || s.name || `Section ${s.id}`,
+      classId: getClassId(s),
     }));
+    let filtered = raw;
     if (reportsClassId) {
-      raw = raw.filter((s: any) => String(s.classId) === String(reportsClassId));
+      const matched = raw.filter((s: any) => !s.classId || String(s.classId) === String(reportsClassId));
+      if (matched.length > 0) {
+        filtered = matched;
+      }
     }
-    return [{ value: '', label: 'All Sections' }, ...raw];
+    return [{ value: '', label: 'All Sections' }, ...filtered];
   }, [sections, reportsClassId]);
 
   const reportsFilterProps = useMemo(() => ({
@@ -966,7 +970,7 @@ export default function DailyClassroomHubView({
       setReportsSectionId('');
     },
     classSelectOptions: reportsClassOptions,
-    hasSectionsForClass: reportsSectionOptions.length > 1,
+    hasSectionsForClass: true,
     selectedSectionId: reportsSectionId,
     onSectionChange: (val: any) => {
       const v = typeof val === 'object' ? val?.value || val?.id || '' : val || '';
