@@ -160,12 +160,18 @@ export function resolveRouteMeta(pathname: string, search: string = ""): RouteMe
     currentPath === "/preferences" ||
     currentPath === "/personalize" ||
     currentPath.startsWith("/preferences/") ||
-    currentPath.startsWith("/personalize/")
+    currentPath.startsWith("/personalize/") ||
+    currentPath === "/appearance" ||
+    currentPath === "/date-time" ||
+    currentPath === "/language"
   ) {
     const parts = currentPath.split("/");
     const pathSection = parts[2];
     const searchParams = new URLSearchParams(search);
-    const section = pathSection || searchParams.get("section") || searchParams.get("tab");
+    const section = pathSection || searchParams.get("section") || searchParams.get("tab") || (
+      currentPath === "/date-time" ? "datetime" :
+      currentPath === "/language" ? "language" : "appearance"
+    );
     if (section === "appearance") {
       return { title: "Appearance", subCategory: "Preferences", category: "Settings" };
     } else if (section === "datetime" || section === "date-time") {
@@ -173,7 +179,7 @@ export function resolveRouteMeta(pathname: string, search: string = ""): RouteMe
     } else if (section === "language") {
       return { title: "Language", subCategory: "Preferences", category: "Settings" };
     }
-    return { title: "Preferences", category: "Settings" };
+    return { title: "Appearance", subCategory: "Preferences", category: "Settings" };
   }
 
   if (currentPath === "/academy/campus-profile") {

@@ -190,7 +190,9 @@ export function RightSidebarProvider({ children }) {
       onClose: onClose || null,
       ownerId: ownerId || null,
       syncUrl,
-      _renderKey: prev?.drawerKey === drawerKey ? prev._renderKey : `${drawerKey || 'panel'}-${Date.now()}`,
+      _renderKey: (prev && drawerKey && prev.drawerKey === drawerKey && prev._renderKey)
+        ? prev._renderKey
+        : `${drawerKey || 'panel'}-${Date.now()}`,
       ...restConfig,
     }));
   }, [setDrawerWidth, closeRightSidebar]);

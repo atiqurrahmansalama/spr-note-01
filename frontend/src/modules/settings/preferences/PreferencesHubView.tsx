@@ -41,7 +41,7 @@ export default function PreferencesHubView() {
   const basePath = location.pathname.startsWith("/personalize") ? "/personalize" : "/preferences";
 
   // Determine active section from route path or query parameter
-  const resolveSection = (): PreferencesSectionId | null => {
+  const resolveSection = (): PreferencesSectionId => {
     if (pathSectionId && SECTIONS.some((s) => s.id === pathSectionId)) {
       return pathSectionId as PreferencesSectionId;
     }
@@ -53,10 +53,10 @@ export default function PreferencesHubView() {
     if (querySec && SECTIONS.some((s) => s.id === querySec)) {
       return querySec as PreferencesSectionId;
     }
-    return null;
+    return "appearance";
   };
 
-  const [activeSection, setActiveSection] = useState<string | null>(resolveSection);
+  const [activeSection, setActiveSection] = useState<string>(resolveSection);
 
   useEffect(() => {
     const nextSection = resolveSection();
