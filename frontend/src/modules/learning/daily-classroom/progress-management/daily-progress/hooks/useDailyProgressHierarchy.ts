@@ -1,17 +1,22 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useAcademicData } from "@/hooks/useAcademicData";
-import { students as studentStore } from "@/utils/localStore";
-import { readJSON } from "@/stores/coreStore";
 import { useTenant } from "@/context/TenantContext";
 import {
   doesStudentMatchDepartment,
+  doesLessonMatchDepartment,
   doesStudentMatchClass,
-  getDepartmentId,
   getClassId,
-  getSectionId,
+  getDepartmentId,
 } from "@/modules/learning/daily-classroom/utils/dailyClassroomUtils";
-import { sortStudentsByUsage, recordStudentUsage } from "@/utils/studentUsageTracker";
-import type { DailyProgressFilterProps, StudentProfileOption } from "../types";
+import { recordStudentUsage } from "@/utils/studentUsageTracker";
+import type { DailyProgressFilterProps } from "../types";
+import { useEffectiveAcademicHierarchy } from "./academicHierarchyFallback";
+import { resolveAllStudentDatabase } from "./studentDatabaseResolver";
+import { findStudentCandidate, resolveStudentHierarchy } from "./studentHierarchyResolver";
+
+export * from "./academicHierarchyFallback";
+export * from "./studentDatabaseResolver";
+export * from "./studentHierarchyResolver";
 
 const PROGRESS_FILTERS_KEY = "spr_daily_progress_filters_v1";
 
@@ -25,6 +30,11 @@ interface UseDailyProgressHierarchyParams {
   setGroupName: (val: string) => void;
 }
 
+/**
+ * Enterprise Academic Hierarchy Orchestrator for Daily Progress.
+ * Manages cascading Department, Class, and Section state with multi-tier offline caches,
+ * clean URL query-parameter synchronization, and zero dead-code overhead.
+ */
 export function useDailyProgressHierarchy({
   filterProps,
   studentDatabase,
@@ -43,58 +53,20 @@ export function useDailyProgressHierarchy({
     students: academicStudents = [],
   } = academicData || {};
 
-  const cachedSections = useMemo(() => {
-    try {
-      const tenantKey = activeTenantId || 'default';
-      let localSecs = readJSON(`spr_sections_cache_${tenantKey}`, []);
-      if (!Array.isArray(localSecs) || localSecs.length === 0) {
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('spr_sections_cache_')) {
-            const parsed = readJSON(key, []);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              localSecs = parsed;
-              break;
-            }
-          }
-        }
-      }
-      return Array.isArray(localSecs) ? localSecs : [];
-    } catch {
-      return [];
-    }
-  }, [activeTenantId]);
+  // ── Multi-Tier Fallback: Cached and Harvested Classes & Sections ───────────
+  const { effectiveClasses, effectiveSections } = useEffectiveAcademicHierarchy({
+    classes,
+    sections,
+    academicStudents,
+    studentDatabase,
+    activeTenantId,
+  });
 
-  const harvestedSections = useMemo(() => {
-    const combinedStudents = [...(academicStudents || []), ...(studentDatabase || [])];
-    const seenSecIds = new Set<string>();
-    const harvested: any[] = [];
-    combinedStudents.forEach((st: any) => {
-      const sId = st?.student_section || st?.section_id || st?.section;
-      const sName = st?.section_name || st?.student_section_name || (typeof st?.sub === 'string' ? st.sub : null);
-      if (sId && !seenSecIds.has(String(sId))) {
-        seenSecIds.add(String(sId));
-        harvested.push({
-          id: sId,
-          section_name: sName || `Section ${sId}`,
-          name: sName || `Section ${sId}`,
-          student_class: st?.student_class || st?.class_id || st?.academic_class,
-        });
-      }
-    });
-    return harvested;
-  }, [academicStudents, studentDatabase]);
-
-  const effectiveSections = useMemo(() => {
-    if (Array.isArray(sections) && sections.length > 0) return sections;
-    if (cachedSections.length > 0) return cachedSections;
-    return harvestedSections;
-  }, [sections, cachedSections, harvestedSections]);
-
+  // ── Persistent Local Filter State & URL Hydration ──────────────────────────
   const [localDeptId, setLocalDeptId] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      const fromUrl = params.get("dept");
+      const fromUrl = params.get("dept") || params.get("department");
       if (fromUrl) return fromUrl;
       const saved = localStorage.getItem(PROGRESS_FILTERS_KEY);
       return saved ? JSON.parse(saved).departmentId || "" : "";
@@ -106,7 +78,7 @@ export function useDailyProgressHierarchy({
   const [localClassId, setLocalClassId] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      const fromUrl = params.get("class");
+      const fromUrl = params.get("class") || params.get("cls");
       if (fromUrl) return fromUrl;
       const saved = localStorage.getItem(PROGRESS_FILTERS_KEY);
       return saved ? JSON.parse(saved).classId || "" : "";
@@ -118,7 +90,7 @@ export function useDailyProgressHierarchy({
   const [localSectionId, setLocalSectionId] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      const fromUrl = params.get("section");
+      const fromUrl = params.get("section") || params.get("sec");
       if (fromUrl) return fromUrl;
       const saved = localStorage.getItem(PROGRESS_FILTERS_KEY);
       return saved ? JSON.parse(saved).sectionId || "" : "";
@@ -138,10 +110,11 @@ export function useDailyProgressHierarchy({
         })
       );
     } catch {
-      // Ignore
+      // Ignore write errors
     }
   }, [localDeptId, localClassId, localSectionId]);
 
+  // ── Cascading Props vs Local State Resolution ──────────────────────────────
   const selectedDepartmentId =
     filterProps?.selectedDepartmentId !== undefined ? filterProps.selectedDepartmentId : localDeptId;
   const rawOnDepartmentChange =
@@ -151,6 +124,7 @@ export function useDailyProgressHierarchy({
       setLocalClassId("");
       setLocalSectionId("");
     });
+
   const departmentSelectOptions = useMemo(() => {
     const raw =
       filterProps?.departmentSelectOptions ||
@@ -174,16 +148,62 @@ export function useDailyProgressHierarchy({
     });
 
   const classSelectOptions = useMemo(() => {
-    const raw =
-      filterProps?.classSelectOptions ||
-      (classes || [])
-        .filter((c: any) => !selectedDepartmentId || doesStudentMatchDepartment(c, selectedDepartmentId, departments, classes))
-        .map((c: any) => ({
-          value: String(c.id),
-          label: c.name || c.class_name || `Class ${c.id}`,
+    let candidateClasses = effectiveClasses;
+    if (selectedDepartmentId) {
+      const matched = effectiveClasses.filter((c: any) =>
+        doesLessonMatchDepartment(c, selectedDepartmentId, departments, effectiveClasses)
+      );
+      if (matched.length > 0) {
+        candidateClasses = matched;
+      }
+    }
+
+    let candidateOptions: Array<{ value: string; label: string }> = candidateClasses.map((c: any) => ({
+      value: String(c.id),
+      label: c.name || c.class_name || `Class ${c.id}`,
+    }));
+
+    if (filterProps?.classSelectOptions && filterProps.classSelectOptions.length > 0) {
+      const cleaned = filterProps.classSelectOptions
+        .filter((opt: any) => opt && opt.value !== "" && opt.value !== "ALL" && !opt.label?.toLowerCase().startsWith("all "))
+        .map((opt: any) => ({
+          value: String(opt.value ?? opt.id),
+          label: opt.label || opt.name || `Class ${opt.value}`,
         }));
-    return raw.filter((opt: any) => opt.value !== "" && opt.value !== "ALL" && !opt.label?.toLowerCase().startsWith("all "));
-  }, [filterProps?.classSelectOptions, classes, selectedDepartmentId, departments]);
+      if (cleaned.length > 0) {
+        candidateOptions = cleaned;
+      }
+    }
+
+    const cleanList: Array<{ value: string; label: string }> = [];
+    const seen = new Set<string>();
+
+    candidateOptions.forEach((opt) => {
+      if (!opt) return;
+      const valStr = String(opt.value ?? "").trim();
+      const lblStr = String(opt.label ?? "").trim();
+      if (!valStr || seen.has(valStr)) return;
+      seen.add(valStr);
+      cleanList.push({ value: valStr, label: lblStr });
+    });
+
+    // Ensure selectedClassId is always present so CustomSelect never displays blank
+    if (selectedClassId && selectedClassId !== "ALL" && selectedClassId !== "" && !seen.has(String(selectedClassId))) {
+      const foundInEffective = effectiveClasses.find((c: any) => String(c.id) === String(selectedClassId));
+      cleanList.unshift({
+        value: String(selectedClassId),
+        label: foundInEffective?.name || foundInEffective?.class_name || `Class ${selectedClassId}`,
+      });
+    }
+
+    return cleanList;
+  }, [
+    filterProps?.classSelectOptions,
+    effectiveClasses,
+    selectedDepartmentId,
+    departments,
+    selectedClassId,
+  ]);
 
   const selectedSectionId =
     filterProps?.selectedSectionId !== undefined ? filterProps.selectedSectionId : localSectionId;
@@ -235,23 +255,23 @@ export function useDailyProgressHierarchy({
 
     if (filterProps?.sectionSelectOptions && filterProps.sectionSelectOptions.length > 0) {
       candidateOptions = filterProps.sectionSelectOptions.map((o: any) => ({
-        value: String(o.value ?? o.id ?? ''),
+        value: String(o.value ?? o.id ?? ""),
         label: String(o.label ?? o.name ?? o.section_name ?? `Section ${o.value}`),
       }));
     } else {
       let filtered = effectiveSections;
       if (selectedClassId) {
-        const classMatched = effectiveSections.filter((s: any) => doesStudentMatchClass(s, selectedClassId, classes));
+        const classMatched = effectiveSections.filter((s: any) => doesStudentMatchClass(s, selectedClassId, effectiveClasses));
         if (classMatched.length > 0) {
           filtered = classMatched;
         } else if (selectedDepartmentId) {
-          const deptMatched = effectiveSections.filter((s: any) => doesStudentMatchDepartment(s, selectedDepartmentId, departments, classes));
+          const deptMatched = effectiveSections.filter((s: any) => doesStudentMatchDepartment(s, selectedDepartmentId, departments, effectiveClasses));
           if (deptMatched.length > 0) {
             filtered = deptMatched;
           }
         }
       } else if (selectedDepartmentId) {
-        const deptMatched = effectiveSections.filter((s: any) => doesStudentMatchDepartment(s, selectedDepartmentId, departments, classes));
+        const deptMatched = effectiveSections.filter((s: any) => doesStudentMatchDepartment(s, selectedDepartmentId, departments, effectiveClasses));
         if (deptMatched.length > 0) {
           filtered = deptMatched;
         }
@@ -268,11 +288,11 @@ export function useDailyProgressHierarchy({
 
     candidateOptions.forEach((opt: any) => {
       if (!opt) return;
-      const valStr = String(opt.value ?? '').trim();
-      const lblStr = String(opt.label ?? '').trim();
+      const valStr = String(opt.value ?? "").trim();
+      const lblStr = String(opt.label ?? "").trim();
       const lower = lblStr.toLowerCase();
-      if (lower === 'general group' || lower === 'general') return;
-      if (valStr === '' || lower === 'all sections' || lower.startsWith('all ')) return;
+      if (lower === "general group" || lower === "general") return;
+      if (valStr === "" || lower === "all sections" || lower.startsWith("all ")) return;
 
       const key = `${valStr}___${lower}`;
       if (!seen.has(key)) {
@@ -281,13 +301,13 @@ export function useDailyProgressHierarchy({
       }
     });
 
-    return [{ value: '', label: 'All Sections' }, ...cleanList];
+    return [{ value: "", label: "All Sections" }, ...cleanList];
   }, [
     filterProps?.sectionSelectOptions,
     effectiveSections,
     selectedClassId,
     selectedDepartmentId,
-    classes,
+    effectiveClasses,
     departments,
   ]);
 
@@ -330,171 +350,10 @@ export function useDailyProgressHierarchy({
     }
   };
 
+  // ── Authoritative Unified Student Database ─────────────────────────────────
   const allStudentDatabase = useMemo(() => {
-    const fullList: any[] = [];
-    const seenIds = new Set<string>();
-    const seenUniqs = new Set<string>();
-    const seenCards = new Set<string>();
-    const idToIdxMap = new Map<string, number>();
-
-    const appendStudent = (st: any) => {
-      const stName = (typeof st === "object" ? st.name_en || st.name || st.label : String(st || "")).trim();
-      if (!stName) return;
-
-      const secSub =
-        typeof st === "object"
-          ? st.section_name ||
-            st.student_section_name ||
-            (st.section && typeof st.section === "object" ? st.section.section_name : null) ||
-            st.sub ||
-            st.group_name ||
-            st.student_class_name ||
-            ""
-          : "";
-
-      const roll = typeof st === "object" ? (st.roll_number ?? st.originalData?.roll_number) : undefined;
-      const cardNo = typeof st === "object" ? (st.student_id_card_number ?? st.originalData?.student_id_card_number) : undefined;
-      const uniq = typeof st === "object" ? (st.uniq_id ?? st.originalData?.uniq_id) : undefined;
-      const rawId = typeof st === "object" && (st?.id != null ? String(st.id) : (st?.student_id != null ? String(st.student_id) : null));
-
-      const stClsId = typeof st === "object" ? getClassId(st) || (st.student_class || st.class_id) : undefined;
-      const stSecId = typeof st === "object" ? getSectionId(st) || (st.student_section || st.section_id) : undefined;
-      const stDeptId = typeof st === "object" ? getDepartmentId(st) || (st.department || st.department_id) : undefined;
-
-      const hasId = rawId != null && String(rawId).trim() !== "";
-      const hasUniq = Boolean(uniq && String(uniq).trim() !== "");
-      const hasCard = Boolean(cardNo && String(cardNo).trim() !== "");
-
-      // Deduplicate strictly by unique identifiers to allow multiple students with the exact same name
-      const isDuplicateId = hasId && seenIds.has(String(rawId));
-      const isDuplicateUniq = hasUniq && seenUniqs.has(String(uniq));
-      const isDuplicateCard = hasCard && seenCards.has(String(cardNo));
-
-      if (isDuplicateId || isDuplicateUniq || isDuplicateCard) {
-        const existingIdx = hasId
-          ? idToIdxMap.get(`id_${rawId}`)
-          : hasUniq
-          ? idToIdxMap.get(`uniq_${uniq}`)
-          : idToIdxMap.get(`card_${cardNo}`);
-
-        if (existingIdx !== undefined && fullList[existingIdx]) {
-          const target = fullList[existingIdx];
-          if (!target.id && rawId) target.id = rawId;
-          if (!target.roll_number && roll != null) target.roll_number = roll;
-          if (!target.student_id_card_number && cardNo) target.student_id_card_number = cardNo;
-          if (!target.uniq_id && uniq) target.uniq_id = uniq;
-          if (!target.student_class && stClsId) target.student_class = stClsId;
-          if (!target.student_section && stSecId) target.student_section = stSecId;
-          if (!target.department && stDeptId) target.department = stDeptId;
-          if (!target.sub && secSub) target.sub = secSub;
-        }
-        return;
-      }
-
-      // If record completely lacks unique identifiers, fallback to composite key
-      if (!hasId && !hasUniq && !hasCard) {
-        const normName = stName.toLowerCase();
-        const fallbackKey = `noid_${normName}_cls_${stClsId || ""}_sec_${stSecId || ""}_roll_${roll != null ? roll : ""}`;
-        if (idToIdxMap.has(fallbackKey)) return;
-        idToIdxMap.set(fallbackKey, fullList.length);
-        fullList.push({
-          id: undefined,
-          label: stName,
-          name: stName,
-          name_en: typeof st === "object" ? st.name_en || stName : stName,
-          sub: secSub,
-          section_name: (typeof st === "object" ? st.section_name || st.student_section_name : null) || secSub || undefined,
-          roll_number: roll,
-          student_id_card_number: cardNo,
-          uniq_id: uniq,
-          badge: undefined,
-          student_class: stClsId,
-          student_class_name: typeof st === "object" ? st.student_class_name || st.class_name : undefined,
-          student_section: stSecId,
-          department: stDeptId,
-          department_name: typeof st === "object" ? st.department_name : undefined,
-          originalData: st,
-        });
-        return;
-      }
-
-      const newIdx = fullList.length;
-      if (hasId) {
-        seenIds.add(String(rawId));
-        idToIdxMap.set(`id_${rawId}`, newIdx);
-      }
-      if (hasUniq) {
-        seenUniqs.add(String(uniq));
-        idToIdxMap.set(`uniq_${uniq}`, newIdx);
-      }
-      if (hasCard) {
-        seenCards.add(String(cardNo));
-        idToIdxMap.set(`card_${cardNo}`, newIdx);
-      }
-
-      const badge =
-        (typeof st === "object" && st.badge ? st.badge : null) ||
-        (typeof uniq === "string" && uniq.trim() ? uniq.trim() : null) ||
-        (typeof cardNo === "string" && cardNo.trim() ? cardNo.trim() : null) ||
-        (roll != null ? `Roll: ${roll}` : undefined) ||
-        (rawId != null ? `ID: ${rawId}` : undefined);
-
-      fullList.push({
-        id: rawId || undefined,
-        label: stName,
-        name: stName,
-        name_en: typeof st === "object" ? st.name_en || stName : stName,
-        sub: secSub,
-        section_name: (typeof st === "object" ? st.section_name || st.student_section_name : null) || secSub || undefined,
-        roll_number: roll,
-        student_id_card_number: cardNo,
-        uniq_id: uniq,
-        badge,
-        student_class: stClsId,
-        student_class_name: typeof st === "object" ? st.student_class_name || st.class_name : undefined,
-        student_section: stSecId,
-        department: stDeptId,
-        department_name: typeof st === "object" ? st.department_name : undefined,
-        originalData: st,
-      });
-    };
-
-    (academicStudents || []).forEach(appendStudent);
-    (studentDatabase || []).forEach(appendStudent);
-
-    // Fallback or reconcile with studentStore
-    if (fullList.length === 0) {
-      (studentStore.getAll() || []).forEach(appendStudent);
-    } else {
-      const canonicalKeys = new Set(
-        fullList.map((s: any) => `${(s.name_en || s.name || s.label || '').trim().toLowerCase()}___${(s.section_name || s.sub || '').trim().toLowerCase()}`)
-      );
-      const staleLocalIdsToClean: string[] = [];
-
-      (studentStore.getAll() || []).forEach((ls: any) => {
-        if (!ls) return;
-        const lsName = (ls.name_en || ls.name || ls.label || '').trim().toLowerCase();
-        const lsGroup = (ls.section_name || ls.sub || '').trim().toLowerCase();
-        const key = `${lsName}___${lsGroup}`;
-
-        if (canonicalKeys.has(key)) {
-          // If this was an uncleaned temporary local draft, queue it for eviction
-          if (ls._local || (typeof ls.id === 'string' && ls.id.startsWith('stu_'))) {
-            staleLocalIdsToClean.push(ls.id);
-          }
-        } else {
-          // Genuinely distinct offline student
-          appendStudent(ls);
-        }
-      });
-
-      if (staleLocalIdsToClean.length > 0 && typeof studentStore.remove === 'function') {
-        staleLocalIdsToClean.forEach((id) => studentStore.remove(id));
-      }
-    }
-
-    return sortStudentsByUsage(fullList);
-  }, [studentDatabase, academicStudents]);
+    return resolveAllStudentDatabase(academicStudents, studentDatabase);
+  }, [academicStudents, studentDatabase]);
 
   const handleDepartmentChange = (newDeptId: string) => {
     setLocalDeptId(newDeptId);
@@ -522,6 +381,7 @@ export function useDailyProgressHierarchy({
     }
   };
 
+  // ── Resolved Academic Labels Context for Report Generation ─────────────────
   const resolvedAcademicContext = useMemo(() => {
     let deptName = "";
     if (selectedDepartmentId) {
@@ -542,7 +402,7 @@ export function useDailyProgressHierarchy({
       );
       clsName = opt?.label || "";
       if (!clsName) {
-        const c = (classes || []).find((x: any) => String(x.id) === String(selectedClassId));
+        const c = (effectiveClasses || []).find((x: any) => String(x.id) === String(selectedClassId));
         clsName = c?.name || c?.class_name || c?.title || c?.label || "";
       }
     }
@@ -572,11 +432,11 @@ export function useDailyProgressHierarchy({
     classSelectOptions,
     sectionSelectOptions,
     departments,
-    classes,
+    effectiveClasses,
     effectiveSections,
   ]);
 
-  const isSelectingStudentRef = useRef(false);
+  // ── Smart Student Selection & Hierarchy Auto-Wiring ────────────────────────
   const lastSelectedStudentNameRef = useRef("");
 
   const handleStudentSelect = (sel: any) => {
@@ -616,153 +476,42 @@ export function useDailyProgressHierarchy({
     }
 
     lastSelectedStudentNameRef.current = chosenName.trim();
-    if (isExplicitSelection) isSelectingStudentRef.current = true;
 
-    // 1. Locate best academic profile from all student sources
-    let academicProfile: any = null;
-    const query = chosenName.trim().toLowerCase();
-    const allCandidates = [
-      ...(allStudentDatabase || []),
-      ...(academicStudents || []),
-      ...(studentStore.getAll() || []),
-    ];
-
-    if (studentExplicitId) {
-      academicProfile = allCandidates.find((a: any) => String(a.id) === studentExplicitId);
-    } else if (query) {
-      // 1. Direct match by ID, uniq_id, or student_id_card_number
-      const idMatch = allCandidates.find(
-        (a: any) =>
-          String(a.id) === query ||
-          (a.uniq_id && String(a.uniq_id).toLowerCase() === query) ||
-          (a.student_id_card_number && String(a.student_id_card_number).toLowerCase() === query)
-      );
-
-      if (idMatch) {
-        academicProfile = idMatch;
-      } else {
-        // 2. Match by exact Name
-        const nameMatches = allCandidates.filter(
-          (a: any) =>
-            (a.name_en || a.name || a.bangla_name || a.label || "").toLowerCase().trim() === query
-        );
-        if (nameMatches.length === 1) {
-          academicProfile = nameMatches[0];
-        } else if (nameMatches.length > 1) {
-          academicProfile =
-            (selectedSectionId && nameMatches.find((a: any) => String(a.student_section || a.section_id) === String(selectedSectionId))) ||
-            (selectedClassId && nameMatches.find((a: any) => String(a.student_class || a.class_id) === String(selectedClassId))) ||
-            (selectedDepartmentId && nameMatches.find((a: any) => String(a.department || a.department_id) === String(selectedDepartmentId))) ||
-            nameMatches[0];
-        } else if (/^\d+$/.test(query)) {
-          // If query is numeric, check roll number within active section/class
-          const rollMatches = allCandidates.filter(
-            (a: any) => String(a.roll_number ?? a.roll ?? "").trim() === query
-          );
-          if (rollMatches.length === 1) {
-            academicProfile = rollMatches[0];
-          } else if (rollMatches.length > 1) {
-            academicProfile =
-              (selectedSectionId && rollMatches.find((a: any) => String(a.student_section || a.section_id) === String(selectedSectionId))) ||
-              (selectedClassId && rollMatches.find((a: any) => String(a.student_class || a.class_id) === String(selectedClassId))) ||
-              rollMatches[0];
-          }
-        }
-      }
-    }
-
-    const candidate = academicProfile || matchedStudent;
+    // Locate candidate strictly within the normalized single source of truth
+    const candidate =
+      matchedStudent ||
+      findStudentCandidate(chosenName, studentExplicitId, allStudentDatabase, {
+        selectedDepartmentId,
+        selectedClassId,
+        selectedSectionId,
+      });
 
     if (candidate) {
-      const realName = candidate.name_en || candidate.name || candidate.label || candidate.bangla_name || chosenName;
+      const hierarchy = resolveStudentHierarchy(
+        candidate,
+        effectiveClasses,
+        effectiveSections,
+        departments,
+        { selectedDepartmentId, selectedClassId, selectedSectionId },
+        chosenSub
+      );
+
       if (!isExplicitSelection && (/^\d+$/.test(chosenName.trim()) || chosenName.trim().toUpperCase().startsWith("STU-"))) {
-        setStudentName(realName);
+        setStudentName(hierarchy.realName);
       }
-      const resolvedId = candidate.id != null ? String(candidate.id) : studentExplicitId;
-      if (resolvedId) setSelectedStudentId(resolvedId);
-      if (!chosenSub && (candidate.section_name || candidate.student_section_name || candidate.sub || candidate.group_name)) {
-        chosenSub = candidate.section_name || candidate.student_section_name || candidate.sub || candidate.group_name;
+      if (hierarchy.resolvedStudentId) {
+        setSelectedStudentId(hierarchy.resolvedStudentId);
       }
+      setGroupName(hierarchy.groupName);
       recordStudentUsage(candidate);
-
-      // A. Extract Section
-      let candSecId =
-        getSectionId(candidate) ||
-        getSectionId(candidate?.originalData) ||
-        getSectionId(matchedStudent) ||
-        "";
-      if (!candSecId && (candidate.student_section || candidate.section_id || candidate.section)) {
-        const rawSec = candidate.student_section || candidate.section_id || candidate.section;
-        candSecId = typeof rawSec === "object" ? String(rawSec?.id || "") : String(rawSec || "");
-      }
-      if (!candSecId && (candidate.section_name || candidate.student_section_name || chosenSub)) {
-        const secSearch = (candidate.section_name || candidate.student_section_name || chosenSub).toLowerCase().trim();
-        const matchedSec = (sections || []).find(
-          (s: any) => (s.section_name || s.name || "").toLowerCase().trim() === secSearch
-        );
-        if (matchedSec) candSecId = String(matchedSec.id);
-      }
-      const secObj = candSecId ? (sections || []).find((s: any) => String(s.id) === String(candSecId)) : null;
-
-      // B. Extract Class
-      let candClassId =
-        getClassId(candidate) ||
-        getClassId(candidate?.originalData) ||
-        getClassId(matchedStudent) ||
-        (secObj ? getClassId(secObj) : "");
-
-      if (!candClassId && (candidate.student_class || candidate.class_id || candidate.academic_class || candidate.academic_class_id)) {
-        const rawCls = candidate.student_class || candidate.class_id || candidate.academic_class || candidate.academic_class_id;
-        candClassId = typeof rawCls === "object" ? String(rawCls?.id || "") : String(rawCls || "");
-      }
-      if (!candClassId && (candidate.student_class_name || candidate.class_name)) {
-        const targetClsName = (candidate.student_class_name || candidate.class_name || "").toLowerCase().trim();
-        const matchedCls = (classes || []).find(
-          (c: any) => (c.name || c.class_name || "").toLowerCase().trim() === targetClsName ||
-                      (c.code || "").toLowerCase().trim() === targetClsName
-        );
-        if (matchedCls) candClassId = String(matchedCls.id);
-      }
-      const classObj = candClassId ? (classes || []).find((c: any) => String(c.id) === String(candClassId)) : null;
-
-      // C. Extract Department
-      let candDeptId =
-        getDepartmentId(candidate) ||
-        getDepartmentId(candidate?.originalData) ||
-        getDepartmentId(matchedStudent) ||
-        (classObj ? getDepartmentId(classObj) : "") ||
-        (secObj ? getDepartmentId(secObj) : "");
-
-      if (!candDeptId && (candidate.department || candidate.department_id || candidate.dept_id)) {
-        const rawDept = candidate.department || candidate.department_id || candidate.dept_id;
-        candDeptId = typeof rawDept === "object" ? String(rawDept?.id || "") : String(rawDept || "");
-      }
-      if (!candDeptId && (candidate.department_name || classObj?.department_name)) {
-        const targetDeptName = (candidate.department_name || classObj?.department_name || "").toLowerCase().trim();
-        const matchedDept = (departments || []).find(
-          (d: any) => (d.name || d.department_name || "").toLowerCase().trim() === targetDeptName ||
-                      (d.code || "").toLowerCase().trim() === targetDeptName
-        );
-        if (matchedDept) candDeptId = String(matchedDept.id);
-      }
-
-      const effectiveGroupName =
-        secObj?.section_name || secObj?.name || candidate.section_name || candidate.student_section_name || candidate.sub || chosenSub || "";
-      setGroupName(effectiveGroupName || "");
-
-      // Auto-select resolved Department, Class, and Section
-      const targetDept = candDeptId || (classObj ? getDepartmentId(classObj) : "") || selectedDepartmentId || "";
-      const targetClass = candClassId || (secObj ? getClassId(secObj) : "") || selectedClassId || "";
-      const targetSec = candSecId || "";
-
-      updateHierarchy(targetDept, targetClass, targetSec);
+      updateHierarchy(hierarchy.departmentId, hierarchy.classId, hierarchy.sectionId);
     } else if (chosenSub) {
-      const matchedSec = (sections || []).find(
+      const matchedSec = (effectiveSections || []).find(
         (s: any) => (s.section_name || s.name || "").toLowerCase().trim() === chosenSub.toLowerCase().trim()
       );
       if (matchedSec) {
         const secClassId = getClassId(matchedSec);
-        const classObj = secClassId ? (classes || []).find((c: any) => String(c.id) === String(secClassId)) : null;
+        const classObj = secClassId ? (effectiveClasses || []).find((c: any) => String(c.id) === String(secClassId)) : null;
         const deptId = classObj ? getDepartmentId(classObj) : "";
         setGroupName(matchedSec.section_name || matchedSec.name || chosenSub);
         updateHierarchy(deptId || selectedDepartmentId || "", secClassId || selectedClassId || "", String(matchedSec.id));
@@ -800,7 +549,8 @@ export function useDailyProgressHierarchy({
 
   return {
     departments,
-    classes,
+    classes: effectiveClasses,
+    effectiveClasses,
     sections: effectiveSections,
     effectiveSections,
     academicStudents,

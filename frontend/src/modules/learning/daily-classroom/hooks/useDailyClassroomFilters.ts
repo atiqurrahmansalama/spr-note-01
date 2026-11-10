@@ -106,6 +106,11 @@ export default function useDailyClassroomFilters({
         cleanList.push(c);
       }
     });
+    // Fallback: if department filtering yielded 0 matches (e.g. classes not yet tagged to department),
+    // retain available classes rather than returning an empty list that blanks out the Class dropdown
+    if (cleanList.length === 0 && Array.isArray(classes) && classes.length > 0) {
+      return classes;
+    }
     return cleanList;
   }, [classes, departments, hasDepartments, selectedDepartmentId]);
 

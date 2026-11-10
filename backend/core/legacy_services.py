@@ -75,6 +75,15 @@ def get_scoped_tenant_id(request):
         return None
 
     inst_id = getattr(request.user, 'institution_id', None)
+    if not inst_id and hasattr(request.user, 'staff_profile') and request.user.staff_profile:
+        inst_id = request.user.staff_profile.institution_id
+        if inst_id and not getattr(request.user, 'institution_id', None):
+            request.user.institution_id = inst_id
+            try:
+                request.user.save(update_fields=['institution'])
+            except Exception:
+                pass
+
     if inst_id:
         try:
             return str(uuid.UUID(str(inst_id)))
@@ -231,6 +240,9 @@ def evaluate_section_config_for_user(user=None):
         if getattr(user, 'role', None):
             r_val = getattr(user.role, 'code', None) or str(user.role)
             role_codes.add(str(r_val).upper().strip())
+        staff_prof = getattr(user, 'staff_profile', None)
+        if staff_prof and staff_prof.staff_type == 'ADMIN':
+            role_codes.add('ADMIN')
 
         if role_codes:
             q_expr = Q()

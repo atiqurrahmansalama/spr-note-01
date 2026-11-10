@@ -92,6 +92,8 @@ class InstitutionViewSet(viewsets.ModelViewSet):
                 qs = qs.filter(id=tenant_id)
             elif user.institution_id:
                 qs = qs.filter(id=user.institution_id)
+            elif hasattr(user, 'staff_profile') and user.staff_profile and user.staff_profile.institution_id:
+                qs = qs.filter(id=user.staff_profile.institution_id)
             # If neither tenant_id nor user.institution_id, allow institutional access for admins/staff
             elif getattr(user, 'user_type', '').upper() in ['ADMIN', 'HEADMASTER', 'DIRECTOR']:
                 pass

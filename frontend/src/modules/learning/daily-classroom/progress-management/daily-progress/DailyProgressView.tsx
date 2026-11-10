@@ -485,11 +485,19 @@ export default function DailyProgressView({
       <DailyClassroomFilterControls
         showCardWrapper={true}
         collapsible={true}
+        defaultExpanded={true}
         filterProps={filterProps ? {
           ...filterProps,
+          selectedDepartmentId,
+          onDepartmentChange: handleDepartmentChange,
           departmentSelectOptions,
+          selectedClassId,
+          onClassChange: handleClassChange,
           classSelectOptions,
+          selectedSectionId,
+          onSectionChange: handleSectionChange,
           sectionSelectOptions,
+          defaultExpanded: true,
         } : undefined}
         showDate={sectionConfig.headerDate?.enabled !== false}
         dateLabel="Date"

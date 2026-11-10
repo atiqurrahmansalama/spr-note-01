@@ -202,6 +202,11 @@ export interface MasterTimeCalendarProps {
   readOnly?: boolean;
   selectedCategory?: CalendarCategory | string;
   viewMode?: "month" | "list";
+  displayMode?: CalendarDisplayMode;
+  initialDisplayMode?: CalendarDisplayMode;
+  hideCategorySelector?: boolean;
+  hideSearch?: boolean;
+  hideViewModeToggle?: boolean;
   actionMenuItems?: Array<{
     label: string;
     icon?: React.ComponentType<any>;
@@ -252,6 +257,11 @@ export default function MasterTimeCalendar({
   onDisplayModeChange,
   className = "",
   isHijriEnabled: propIsHijriEnabled = undefined,
+  displayMode: propDisplayMode,
+  initialDisplayMode,
+  hideCategorySelector = false,
+  hideSearch = false,
+  hideViewModeToggle = false,
 }: MasterTimeCalendarProps) {
   const { openDrawer } = useRightSidebar();
   const { activeTenantId } = useTenant();
@@ -259,9 +269,24 @@ export default function MasterTimeCalendar({
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
   const [selectedDay, setSelectedDay] = useState<number>(() => new Date().getDate());
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [displayMode, setDisplayMode] = useState<CalendarDisplayMode>(() => {
-    return (localStorage.getItem("spr_calendar_display_mode") as CalendarDisplayMode) || "grid";
+  const [internalDisplayMode, setInternalDisplayMode] = useState<CalendarDisplayMode>(() => {
+    if (initialDisplayMode) return initialDisplayMode;
+    try {
+      return (localStorage.getItem("spr_calendar_display_mode") as CalendarDisplayMode) || "grid";
+    } catch {
+      return "grid";
+    }
   });
+
+  const displayMode = propDisplayMode !== undefined ? propDisplayMode : internalDisplayMode;
+
+  const handleSetDisplayMode = (mode: CalendarDisplayMode) => {
+    setInternalDisplayMode(mode);
+    try {
+      localStorage.setItem("spr_calendar_display_mode", mode);
+    } catch {}
+    if (onDisplayModeChange) onDisplayModeChange(mode);
+  };
   const [internalHijriEnabled, setInternalHijriEnabled] = useState<boolean>(() => calendarSettings.getHijriEnabled());
   const isHijriEnabled = propIsHijriEnabled !== undefined ? Boolean(propIsHijriEnabled) : internalHijriEnabled;
   const [, setTaxonomyVersion] = useState<number>(0);
@@ -338,13 +363,6 @@ export default function MasterTimeCalendar({
     }
   }, [viewYear, viewMonth, isHijriEnabled]);
 
-  const handleSetDisplayMode = (mode: CalendarDisplayMode) => {
-    setDisplayMode(mode);
-    localStorage.setItem("spr_calendar_display_mode", mode);
-    if (onDisplayModeChange) {
-      onDisplayModeChange(mode);
-    }
-  };
 
   useEffect(() => {
     if (onDisplayModeChange) {
@@ -884,40 +902,44 @@ export default function MasterTimeCalendar({
         )}
 
         {/* Right Side Tools: Single Toggle View Switcher, Custom Search & ActionMenu */}
-        <div className="flex items-center gap-2 justify-start @[720px]:justify-end flex-1 @[720px]:flex-none min-w-0">
-          
-          {/* Single View Mode Toggle Button */}
-          {viewMode === "month" && (
-            <CustomButton
-              type="button"
-              variant="sub"
-              size="sm"
-              icon={displayMode === "grid" ? TimelineIcon : GridIcon}
-              onClick={() => handleSetDisplayMode(displayMode === "grid" ? "timeline" : "grid")}
-              title={displayMode === "grid" ? "Switch to Timeline View" : "Switch to Grid View"}
-              className="shrink-0 select-none"
-            >
-              <span className="hidden @[440px]:inline">{displayMode === "grid" ? "Timeline" : "Grid"}</span>
-            </CustomButton>
-          )}
+        {(!hideViewModeToggle || !hideSearch || (actionMenuItems && actionMenuItems.length > 0)) && (
+          <div className="flex items-center gap-2 justify-start @[720px]:justify-end flex-1 @[720px]:flex-none min-w-0">
+            
+            {/* Single View Mode Toggle Button */}
+            {viewMode === "month" && !hideViewModeToggle && (
+              <CustomButton
+                type="button"
+                variant="sub"
+                size="sm"
+                icon={displayMode === "grid" ? TimelineIcon : GridIcon}
+                onClick={() => handleSetDisplayMode(displayMode === "grid" ? "timeline" : "grid")}
+                title={displayMode === "grid" ? "Switch to Timeline View" : "Switch to Grid View"}
+                className="shrink-0 select-none"
+              >
+                <span className="hidden @[440px]:inline">{displayMode === "grid" ? "Timeline" : "Grid"}</span>
+              </CustomButton>
+            )}
 
-          {/* Reusable Search Box with CustomInput */}
-          <div className="flex-1 @[480px]:w-48 @[860px]:w-60 min-w-0">
-            <CustomInput
-              type="search"
-              size="sm"
-              value={searchQuery}
-              onChange={(val: string) => setSearchQuery(val)}
-              placeholder="Search..."
-              clearable={true}
-            />
+            {/* Reusable Search Box with CustomInput */}
+            {!hideSearch && (
+              <div className="flex-1 @[480px]:w-48 @[860px]:w-60 min-w-0">
+                <CustomInput
+                  type="search"
+                  size="sm"
+                  value={searchQuery}
+                  onChange={(val: string) => setSearchQuery(val)}
+                  placeholder="Search..."
+                  clearable={true}
+                />
+              </div>
+            )}
+
+            {/* Three-dots Action Menu */}
+            {actionMenuItems && actionMenuItems.length > 0 && (
+              <ActionMenu items={actionMenuItems} />
+            )}
           </div>
-
-          {/* Three-dots Action Menu */}
-          {actionMenuItems && actionMenuItems.length > 0 && (
-            <ActionMenu items={actionMenuItems} />
-          )}
-        </div>
+        )}
       </div>
 
       {/* ─── Calendar Main Content Area ─── */}

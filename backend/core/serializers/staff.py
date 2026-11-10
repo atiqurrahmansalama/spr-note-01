@@ -211,7 +211,22 @@ class StaffProfileSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             staff = StaffProfile.objects.create(**validated_data)
 
+            # Auto-link user account if missing by matching phone or email
+            if not staff.user:
+                from core.models.iam import User
+                lookup_q = Q()
+                if phone_number and phone_number.strip():
+                    lookup_q |= Q(phone_number=phone_number.strip())
+                if email and email.strip():
+                    lookup_q |= Q(email__iexact=email.strip())
+                if lookup_q:
+                    matched_user = User.objects.filter(lookup_q).first()
+                    if matched_user:
+                        staff.user = matched_user
+                        staff.save(update_fields=['user'])
+
             if staff.user:
+                from core.models.iam import UserRole
                 user_updated = False
                 if name and staff.user.name != name:
                     staff.user.name = name
@@ -225,6 +240,25 @@ class StaffProfileSerializer(serializers.ModelSerializer):
                 if email and staff.user.email != email.strip():
                     staff.user.email = email.strip()
                     user_updated = True
+
+                # Align institution affinity
+                if staff.institution and staff.user.institution_id != staff.institution_id:
+                    staff.user.institution = staff.institution
+                    user_updated = True
+
+                # Promote to ADMIN if staff_type is ADMIN
+                if staff.staff_type == 'ADMIN':
+                    if (getattr(staff.user, 'user_type', '') or '').upper() != 'ADMIN':
+                        staff.user.user_type = 'ADMIN'
+                        user_updated = True
+                    if not staff.user.is_staff:
+                        staff.user.is_staff = True
+                        user_updated = True
+                    admin_role = UserRole.objects.filter(code__iexact='ADMIN').first()
+                    if admin_role and staff.user.role_id != admin_role.id:
+                        staff.user.role = admin_role
+                        user_updated = True
+
                 if user_updated:
                     staff.user.save()
 
@@ -246,7 +280,27 @@ class StaffProfileSerializer(serializers.ModelSerializer):
         email = validated_data.pop('email', None)
 
         with transaction.atomic():
+            old_staff_type = instance.staff_type
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            instance.save()
+
+            # Auto-link unlinked user account by matching phone or email
+            if not instance.user:
+                from core.models.iam import User
+                lookup_q = Q()
+                if phone_number and phone_number.strip():
+                    lookup_q |= Q(phone_number=phone_number.strip())
+                if email and email.strip():
+                    lookup_q |= Q(email__iexact=email.strip())
+                if lookup_q:
+                    matched_user = User.objects.filter(lookup_q).first()
+                    if matched_user:
+                        instance.user = matched_user
+                        instance.save(update_fields=['user'])
+
             if instance.user:
+                from core.models.iam import UserRole
                 user_updated = False
                 if name is not None and instance.user.name != name:
                     instance.user.name = name
@@ -260,13 +314,27 @@ class StaffProfileSerializer(serializers.ModelSerializer):
                 if email is not None and instance.user.email != email.strip():
                     instance.user.email = email.strip()
                     user_updated = True
+
+                # Align institution affinity
+                if instance.institution and instance.user.institution_id != instance.institution_id:
+                    instance.user.institution = instance.institution
+                    user_updated = True
+
+                # Promote to ADMIN if staff_type is ADMIN
+                if instance.staff_type == 'ADMIN':
+                    if (getattr(instance.user, 'user_type', '') or '').upper() != 'ADMIN':
+                        instance.user.user_type = 'ADMIN'
+                        user_updated = True
+                    if not instance.user.is_staff:
+                        instance.user.is_staff = True
+                        user_updated = True
+                    admin_role = UserRole.objects.filter(code__iexact='ADMIN').first()
+                    if admin_role and instance.user.role_id != admin_role.id:
+                        instance.user.role = admin_role
+                        user_updated = True
+
                 if user_updated:
                     instance.user.save()
-
-            old_staff_type = instance.staff_type
-            for attr, value in validated_data.items():
-                setattr(instance, attr, value)
-            instance.save()
 
             # Handle type migration or detail sync
             if instance.staff_type == 'TEACHING':

@@ -35,11 +35,12 @@ export const ProfileHeroCard: React.FC<ProfileHeroCardProps> = ({
 
   const avatarInitial = fullName.charAt(0).toUpperCase();
 
-  // Clean role format (e.g. 'SUPER_ADMIN' -> 'Super Admin')
+  // Clean role format (e.g. 'SUPER_ADMIN' -> 'Super Admin', or 'Academy Administrator')
   const rawRole =
-    typeof user.role === 'string'
+    user.staff_profile?.designation ||
+    (typeof user.role === 'string'
       ? user.role
-      : user.role?.name || user.role_info?.name || user.user_type || 'Teacher';
+      : user.role?.name || user.role_info?.name || user.user_type || 'Teacher');
 
   const roleName = rawRole
     .replace(/_/g, ' ')
@@ -124,7 +125,7 @@ export const ProfileHeroCard: React.FC<ProfileHeroCardProps> = ({
         {/* Dynamic Role & Active Academy Badges */}
         <div className="pt-2.5 flex items-center justify-center gap-2 flex-wrap">
           {/* Role Badge */}
-          <span className="theme-bg-accent-soft theme-accent border theme-border text-xs px-3.5 py-1 rounded-full font-semibold inline-flex items-center gap-1.5 shadow-2xs">
+          <span className="theme-bg-accent-soft theme-accent border-0 text-xs px-3.5 py-1 rounded-full font-semibold inline-flex items-center gap-1.5 shadow-2xs">
             <span>{roleName}</span>
           </span>
 

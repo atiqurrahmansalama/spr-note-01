@@ -24,6 +24,29 @@ export interface UserProfile {
   passkeys_count?: number;
   branch?: string;
   campus?: string;
+  institution_id?: string | number | null;
+  institution_name?: string;
+  institution_details?: {
+    id: string | number;
+    name: string;
+    code?: string;
+    slug?: string;
+    logo_url?: string;
+    [key: string]: any;
+  } | null;
+  staff_profile?: {
+    id: string | number;
+    employee_id?: string;
+    staff_type?: string;
+    designation?: string;
+    rank_order?: number;
+    employment_status?: string;
+    institution_id?: string | number | null;
+    department_id?: string | number | null;
+  } | null;
+  staff_id?: string | number | null;
+  is_academy_admin?: boolean;
+  is_staff?: boolean;
   date_joined?: string;
   last_login?: string;
   [key: string]: any;

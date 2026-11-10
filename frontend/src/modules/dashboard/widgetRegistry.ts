@@ -16,6 +16,9 @@ import {
   NoticeBoardWidget,
   RecitationTrendsWidget,
   AcademicCalendarWidget,
+  WorkingHoursWidget,
+  AcademicEventsWidget,
+  AgendaScheduleWidget,
 } from './components/widgets';
 
 export interface KpiCardCatalogItem {
@@ -213,6 +216,42 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     requiredFeatureKey: 'academy_calendar_events',
     component: AcademicCalendarWidget,
   },
+  working_hours: {
+    id: 'working_hours',
+    title: 'Working Hours & Shifts',
+    description: 'Operational work shifts, active roster coverage, and weekly holidays with Grid and Timeline views.',
+    category: 'CALENDAR',
+    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STAFF', 'STUDENT', 'GUARDIAN'],
+    defaultColSpan: 4,
+    minColSpan: 2,
+    maxColSpan: 4,
+    requiredFeatureKey: 'academy_calendar_events',
+    component: WorkingHoursWidget,
+  },
+  academic_events: {
+    id: 'academic_events',
+    title: 'Academic Events & Milestones',
+    description: 'Interactive academic calendar, examinations, holidays, and milestones with Grid and Timeline views.',
+    category: 'CALENDAR',
+    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STAFF', 'STUDENT', 'GUARDIAN'],
+    defaultColSpan: 4,
+    minColSpan: 2,
+    maxColSpan: 4,
+    requiredFeatureKey: 'academy_calendar_events',
+    component: AcademicEventsWidget,
+  },
+  agenda_schedule: {
+    id: 'agenda_schedule',
+    title: 'Daily Agenda & Schedule Checklist',
+    description: 'Day-by-day actionable agenda checklist, scheduled timeline events, and active milestones.',
+    category: 'CALENDAR',
+    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STAFF', 'STUDENT', 'GUARDIAN'],
+    defaultColSpan: 2,
+    minColSpan: 1,
+    maxColSpan: 4,
+    requiredFeatureKey: 'academy_calendar_events',
+    component: AgendaScheduleWidget,
+  },
   recent_activity: {
     id: 'recent_activity',
     title: 'Live Audit Trail & Activity Feed',
@@ -261,8 +300,10 @@ export const DEFAULT_ROLE_LAYOUTS: Record<string, DashboardLayoutItem[]> = {
     { widgetId: 'system_gateways', order: 2, colSpan: 2, isVisible: true },
     { widgetId: 'recent_activity', order: 3, colSpan: 2, isVisible: true },
     { widgetId: 'finance_overview', order: 4, colSpan: 2, isVisible: true },
-    { widgetId: 'upcoming_events', order: 5, colSpan: 2, isVisible: true },
-    { widgetId: 'notice_board', order: 6, colSpan: 4, isVisible: true },
+    { widgetId: 'academic_events', order: 5, colSpan: 4, isVisible: true },
+    { widgetId: 'working_hours', order: 6, colSpan: 4, isVisible: true },
+    { widgetId: 'agenda_schedule', order: 7, colSpan: 2, isVisible: true },
+    { widgetId: 'notice_board', order: 8, colSpan: 4, isVisible: true },
   ],
   ADMIN: [
     { widgetId: 'kpi_metrics', order: 1, colSpan: 4, isVisible: true },
@@ -271,9 +312,11 @@ export const DEFAULT_ROLE_LAYOUTS: Record<string, DashboardLayoutItem[]> = {
     { widgetId: 'residential_occupancy', order: 4, colSpan: 2, isVisible: true },
     { widgetId: 'admission_pipeline', order: 5, colSpan: 2, isVisible: true },
     { widgetId: 'notice_board', order: 6, colSpan: 2, isVisible: true },
-    { widgetId: 'upcoming_events', order: 7, colSpan: 2, isVisible: true },
-    { widgetId: 'recent_activity', order: 8, colSpan: 2, isVisible: true },
-    { widgetId: 'quick_actions', order: 9, colSpan: 4, isVisible: true },
+    { widgetId: 'agenda_schedule', order: 7, colSpan: 2, isVisible: true },
+    { widgetId: 'academic_events', order: 8, colSpan: 4, isVisible: true },
+    { widgetId: 'working_hours', order: 9, colSpan: 4, isVisible: true },
+    { widgetId: 'recent_activity', order: 10, colSpan: 2, isVisible: true },
+    { widgetId: 'quick_actions', order: 11, colSpan: 4, isVisible: true },
   ],
   TEACHER: [
     { widgetId: 'kpi_metrics', order: 1, colSpan: 4, isVisible: true },
@@ -281,18 +324,20 @@ export const DEFAULT_ROLE_LAYOUTS: Record<string, DashboardLayoutItem[]> = {
     { widgetId: 'hifz_tracker', order: 3, colSpan: 2, isVisible: true },
     { widgetId: 'attendance_pulse', order: 4, colSpan: 2, isVisible: true },
     { widgetId: 'timetable_schedule', order: 5, colSpan: 2, isVisible: true },
-    { widgetId: 'upcoming_events', order: 6, colSpan: 2, isVisible: true },
-    { widgetId: 'quick_actions', order: 7, colSpan: 4, isVisible: true },
-    { widgetId: 'academic_calendar', order: 8, colSpan: 4, isVisible: false },
+    { widgetId: 'agenda_schedule', order: 6, colSpan: 2, isVisible: true },
+    { widgetId: 'academic_events', order: 7, colSpan: 4, isVisible: true },
+    { widgetId: 'quick_actions', order: 8, colSpan: 4, isVisible: true },
     { widgetId: 'notice_board', order: 9, colSpan: 4, isVisible: true },
   ],
   STAFF: [
     { widgetId: 'kpi_metrics', order: 1, colSpan: 4, isVisible: true },
-    { widgetId: 'finance_overview', order: 2, colSpan: 2, isVisible: true },
-    { widgetId: 'residential_occupancy', order: 3, colSpan: 2, isVisible: true },
-    { widgetId: 'attendance_pulse', order: 4, colSpan: 2, isVisible: true },
-    { widgetId: 'admission_pipeline', order: 5, colSpan: 2, isVisible: true },
-    { widgetId: 'notice_board', order: 6, colSpan: 4, isVisible: true },
+    { widgetId: 'working_hours', order: 2, colSpan: 4, isVisible: true },
+    { widgetId: 'agenda_schedule', order: 3, colSpan: 2, isVisible: true },
+    { widgetId: 'finance_overview', order: 4, colSpan: 2, isVisible: true },
+    { widgetId: 'residential_occupancy', order: 5, colSpan: 2, isVisible: true },
+    { widgetId: 'attendance_pulse', order: 6, colSpan: 2, isVisible: true },
+    { widgetId: 'admission_pipeline', order: 7, colSpan: 2, isVisible: true },
+    { widgetId: 'notice_board', order: 8, colSpan: 4, isVisible: true },
   ],
   STUDENT: [
     { widgetId: 'kpi_metrics', order: 1, colSpan: 4, isVisible: true },
@@ -468,32 +513,70 @@ export function getSavedLayout(tenantId: string, role: DashboardRole, userId?: s
   const userKey = `spr_dashboard_layout_${tenantId || 'default'}_${role}_${userId || 'anon'}_v1`;
   const roleTemplateKey = `spr_dashboard_template_${tenantId || 'default'}_${role}_v1`;
 
+  const normalizeLayoutItems = (items: any[]): DashboardLayoutItem[] => {
+    // 1. Remove legacy monolithic academic_calendar widget
+    let filtered = items.filter((i) => i && i.widgetId !== 'academic_calendar');
+
+    // 2. Ensure separated widgets (working_hours, academic_events, agenda_schedule) exist for roles
+    const hasWorkingHours = filtered.some((i) => i.widgetId === 'working_hours');
+    const hasAcademicEvents = filtered.some((i) => i.widgetId === 'academic_events');
+    const hasAgenda = filtered.some((i) => i.widgetId === 'agenda_schedule');
+
+    if (!hasAcademicEvents) {
+      filtered.push({
+        widgetId: 'academic_events',
+        order: filtered.length + 1,
+        colSpan: 4,
+        isVisible: true,
+        settings: { displayMode: 'grid' },
+      });
+    }
+    if (!hasWorkingHours) {
+      filtered.push({
+        widgetId: 'working_hours',
+        order: filtered.length + 1,
+        colSpan: 4,
+        isVisible: true,
+        settings: { displayMode: 'grid' },
+      });
+    }
+    if (!hasAgenda) {
+      filtered.push({
+        widgetId: 'agenda_schedule',
+        order: filtered.length + 1,
+        colSpan: 2,
+        isVisible: true,
+      });
+    }
+
+    return filtered.map((item) => {
+      const def = WIDGET_REGISTRY[item.widgetId];
+      const colSpan = (item.colSpan === 3 && def?.defaultColSpan === 4) ? 4 : (item.colSpan || def?.defaultColSpan || 2);
+      return {
+        ...item,
+        colSpan,
+        settings: item.settings || {},
+      };
+    });
+  };
+
   try {
     let raw = localStorage.getItem(userKey);
     if (!raw && userId) {
-      // Fallback to anonymous key if available
       raw = localStorage.getItem(`spr_dashboard_layout_${tenantId || 'default'}_${role}_anon_v1`);
     }
 
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((item) => {
-          const def = WIDGET_REGISTRY[item.widgetId];
-          const colSpan = (item.colSpan === 3 && def?.defaultColSpan === 4) ? 4 : (item.colSpan || def?.defaultColSpan || 2);
-          return { ...item, colSpan };
-        });
+        return normalizeLayoutItems(parsed);
       }
     }
     const templateSaved = localStorage.getItem(roleTemplateKey);
     if (templateSaved) {
       const parsed = JSON.parse(templateSaved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((item) => {
-          const def = WIDGET_REGISTRY[item.widgetId];
-          const colSpan = (item.colSpan === 3 && def?.defaultColSpan === 4) ? 4 : (item.colSpan || def?.defaultColSpan || 2);
-          return { ...item, colSpan };
-        });
+        return normalizeLayoutItems(parsed);
       }
     }
   } catch (err) {
@@ -523,9 +606,13 @@ export function saveLayout(
     }
     if (saveAsRoleDefault) {
       localStorage.setItem(roleTemplateKey, JSON.stringify(items));
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('spr_dashboard_layout_updated', { detail: { role, tenantId } }));
-      }
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('spr_dashboard_layout_updated', {
+          detail: { role, tenantId, items },
+        })
+      );
     }
   } catch (err) {
     console.warn('Dashboard: Failed to persist layout to storage:', err);

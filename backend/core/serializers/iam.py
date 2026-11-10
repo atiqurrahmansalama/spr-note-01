@@ -141,15 +141,52 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 'color_theme': 'purple' if self.user.user_type == 'GUARDIAN' else 'blue',
             }
 
-        # Self-healing: Enforce staff enrollment and profile for any institutional member
-        if getattr(self.user, 'institution_id', None):
-            try:
-                from core.services import ensure_institution_staff_profile
-                ensure_institution_staff_profile(self.user)
-            except Exception:
-                pass
+        # Self-healing: Enforce staff enrollment, role synchronization, and profile for any institutional member
+        try:
+            from core.services import sync_user_and_staff_roles
+            sync_user_and_staff_roles(self.user)
+            self.user.refresh_from_db()
+        except Exception:
+            pass
 
         resolved_name = self.user.name or f"{self.user.first_name or ''} {self.user.last_name or ''}".strip() or self.user.phone_number
+
+        inst = getattr(self.user, 'institution', None)
+        staff_prof = getattr(self.user, 'staff_profile', None)
+
+        is_academy_admin = bool(
+            self.user.is_superuser or
+            (getattr(self.user, 'user_type', '') or '').upper() in ['ADMIN', 'SUPER_ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'] or
+            (staff_prof and staff_prof.staff_type == 'ADMIN')
+        )
+
+        institution_details = None
+        if inst:
+            institution_details = {
+                'id': str(inst.id),
+                'name': inst.name,
+                'bangla_name': getattr(inst, 'bangla_name', '') or '',
+                'code': getattr(inst, 'code', '') or '',
+                'slug': getattr(inst, 'slug', '') or '',
+                'logo_url': getattr(inst, 'logo_url', '') or '',
+                'institution_type': getattr(inst, 'institution_type', '') or '',
+                'address': getattr(inst, 'address', '') or '',
+                'district': getattr(inst, 'district', '') or '',
+                'is_verified': getattr(inst, 'is_verified', True),
+            }
+
+        staff_data = None
+        if staff_prof:
+            staff_data = {
+                'id': str(staff_prof.id),
+                'employee_id': staff_prof.employee_id,
+                'staff_type': staff_prof.staff_type,
+                'designation': staff_prof.designation,
+                'rank_order': staff_prof.rank_order,
+                'employment_status': staff_prof.employment_status,
+                'institution_id': str(staff_prof.institution_id) if staff_prof.institution_id else None,
+                'department_id': staff_prof.department_id,
+            }
 
         data['user'] = {
             'id': self.user.id,
@@ -161,9 +198,14 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'first_name': self.user.first_name,
             'last_name': self.user.last_name,
             'user_type': self.user.user_type,
-            'is_staff': getattr(self.user, 'is_staff', False),
-            'institution_id': str(self.user.institution_id) if self.user.institution_id else None,
-            'staff_id': str(self.user.staff_profile.id) if hasattr(self.user, 'staff_profile') and self.user.staff_profile else None,
+            'is_staff': getattr(self.user, 'is_staff', False) or bool(staff_prof),
+            'institution_id': str(inst.id) if inst else None,
+            'institution_name': inst.name if inst else "",
+            'institution_details': institution_details,
+            'staff_profile': staff_data,
+            'staff_id': str(staff_prof.id) if staff_prof else None,
+            'is_academy_admin': is_academy_admin,
+            'is_superuser': self.user.is_superuser,
             'role': role_data,
             'role_info': role_data,
             'avatar_url': self.user.avatar_url,

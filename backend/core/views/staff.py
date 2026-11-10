@@ -96,6 +96,8 @@ class StaffProfileViewSet(viewsets.ModelViewSet):
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
             if user.institution_id:
                 base_qs = base_qs.filter(institution_id=user.institution_id)
+            elif hasattr(user, 'staff_profile') and user.staff_profile and user.staff_profile.institution_id:
+                base_qs = base_qs.filter(institution_id=user.staff_profile.institution_id)
             else:
                 base_qs = base_qs.filter(user=user)
 

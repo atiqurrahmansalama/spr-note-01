@@ -155,7 +155,7 @@ export default function DailyClassroomFilterControls({
   showCardWrapper = true,
   className = '',
   collapsible = true,
-  defaultExpanded = false,
+  defaultExpanded = filterProps?.defaultExpanded ?? false,
 
   // Custom extensions
   searchControl,
@@ -234,13 +234,32 @@ export default function DailyClassroomFilterControls({
     return fromData?.name || '';
   }, [selectedDepartmentId, departmentSelectOptions, academicData.departments]);
 
+  const effectiveClassOptions = useMemo(() => {
+    let opts = Array.isArray(classSelectOptions) ? [...classSelectOptions] : [];
+
+    // Ensure active selectedClassId is always represented so CustomSelect never displays blank
+    if (selectedClassId && selectedClassId !== 'ALL' && selectedClassId !== '') {
+      const exists = opts.some((c) => String(c.value) === String(selectedClassId));
+      if (!exists) {
+        const fromData = (academicData.classes || []).find((c: any) => String(c.id) === String(selectedClassId));
+        const label = fromData?.name || fromData?.class_name || `Class ${selectedClassId}`;
+        opts.push({ value: String(selectedClassId), label });
+      }
+    }
+
+    if (opts.length === 0) {
+      return [{ value: '', label: 'All Classes' }];
+    }
+    return opts;
+  }, [classSelectOptions, selectedClassId, academicData.classes]);
+
   const activeClassLabel = useMemo(() => {
     if (!selectedClassId || selectedClassId === 'ALL') return '';
-    const opt = classSelectOptions.find((c) => String(c.value) === String(selectedClassId));
+    const opt = effectiveClassOptions.find((c) => String(c.value) === String(selectedClassId));
     if (opt) return opt.label;
     const fromData = (academicData.classes || []).find((c: any) => String(c.id) === String(selectedClassId));
     return fromData?.name || '';
-  }, [selectedClassId, classSelectOptions, academicData.classes]);
+  }, [selectedClassId, effectiveClassOptions, academicData.classes]);
 
   const effectiveSectionOptions = useMemo(() => {
     if (Array.isArray(sectionSelectOptions) && sectionSelectOptions.length > 0) {
@@ -342,7 +361,7 @@ export default function DailyClassroomFilterControls({
         <CustomSelect
           label={classLabel}
           placeholder={classPlaceholder}
-          options={classSelectOptions}
+          options={effectiveClassOptions}
           value={selectedClassId}
           onChange={onClassChange}
           size="md"

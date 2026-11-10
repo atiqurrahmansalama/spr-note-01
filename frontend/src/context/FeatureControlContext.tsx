@@ -281,6 +281,7 @@ export function FeatureControlProvider({ children }: { children: React.ReactNode
     } catch {}
 
     window.addEventListener("spr_auth_updated", handleUpdate);
+    window.addEventListener("spr_tenant_changed", handleUpdate);
     window.addEventListener("spr_section_config_updated", handleUpdate);
     window.addEventListener("focus", checkVersionAndSync);
 
@@ -296,6 +297,7 @@ export function FeatureControlProvider({ children }: { children: React.ReactNode
         } catch {}
       }
       window.removeEventListener("spr_auth_updated", handleUpdate);
+      window.removeEventListener("spr_tenant_changed", handleUpdate);
       window.removeEventListener("spr_section_config_updated", handleUpdate);
       window.removeEventListener("focus", checkVersionAndSync);
       document.removeEventListener("visibilitychange", handleVisibilityChange);

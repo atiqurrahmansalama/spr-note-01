@@ -38,6 +38,15 @@ class UserProfileView(APIView):
         if not user:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
+        # Enterprise Self-Healing: Harmonize User & StaffProfile bi-directionally
+        try:
+            from core.services import sync_user_and_staff_roles
+            sync_user_and_staff_roles(user)
+            user.refresh_from_db()
+        except Exception as sync_err:
+            import logging
+            logging.getLogger('core').warning(f"Self-healing role sync warning on profile GET: {sync_err}")
+
         role_data = None
         if user.role:
             perms_obj = getattr(user.role, 'action_permissions', None)
@@ -72,6 +81,44 @@ class UserProfileView(APIView):
 
         full_name = user.name or f"{user.first_name or ''} {user.last_name or ''}".strip()
 
+        # Institutional Context & Staff Profile Enrichment
+        institution = getattr(user, 'institution', None)
+        staff_profile = getattr(user, 'staff_profile', None)
+
+        is_academy_admin = bool(
+            user.is_superuser or
+            (getattr(user, 'user_type', '') or '').upper() in ['ADMIN', 'SUPER_ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'] or
+            (staff_profile and staff_profile.staff_type == 'ADMIN')
+        )
+
+        institution_details = None
+        if institution:
+            institution_details = {
+                'id': str(institution.id),
+                'name': institution.name,
+                'bangla_name': getattr(institution, 'bangla_name', '') or '',
+                'code': getattr(institution, 'code', '') or '',
+                'slug': getattr(institution, 'slug', '') or '',
+                'logo_url': getattr(institution, 'logo_url', '') or '',
+                'institution_type': getattr(institution, 'institution_type', '') or '',
+                'address': getattr(institution, 'address', '') or '',
+                'district': getattr(institution, 'district', '') or '',
+                'is_verified': getattr(institution, 'is_verified', True),
+            }
+
+        staff_data = None
+        if staff_profile:
+            staff_data = {
+                'id': str(staff_profile.id),
+                'employee_id': staff_profile.employee_id,
+                'staff_type': staff_profile.staff_type,
+                'designation': staff_profile.designation,
+                'rank_order': staff_profile.rank_order,
+                'employment_status': staff_profile.employment_status,
+                'institution_id': str(staff_profile.institution_id) if staff_profile.institution_id else None,
+                'department_id': staff_profile.department_id,
+            }
+
         return Response({
             'id': user.id,
             'name': full_name,
@@ -81,6 +128,14 @@ class UserProfileView(APIView):
             'email': user.email or "",
             'user_type': user.user_type,
             'role': role_data,
+            'institution_id': str(institution.id) if institution else None,
+            'institution_name': institution.name if institution else "",
+            'institution_details': institution_details,
+            'staff_profile': staff_data,
+            'staff_id': str(staff_profile.id) if staff_profile else None,
+            'is_academy_admin': is_academy_admin,
+            'is_staff': getattr(user, 'is_staff', False) or bool(staff_profile),
+            'is_superuser': user.is_superuser,
             'avatar_url': user.avatar_url or "",
             'assigned_group': user.assigned_group or "",
             'is_email_verified': user.is_email_verified,

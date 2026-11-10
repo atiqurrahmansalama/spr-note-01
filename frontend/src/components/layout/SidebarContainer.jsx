@@ -56,7 +56,7 @@ export default function SidebarContainer({
   const currentPath = propActivePath || location.pathname;
   const { t } = useTranslation('navigation');
 
-  const { isMultiTenantAdmin } = useTenant();
+  const { isMultiTenantAdmin, isAcademyAdmin } = useTenant();
   // Parent options are collapsed by default
   const [openSubMenus, setOpenSubMenus] = useState({});
 
@@ -75,9 +75,14 @@ export default function SidebarContainer({
   const { isSectionEnabled } = useFeatureControl();
 
   const currentUser = authStore.getUser() || {};
-  const dashboardRoleSlug = isMultiTenantAdmin || currentUser.is_superuser || currentUser.role === 'SUPER_ADMIN'
+  const isSuper = isMultiTenantAdmin || currentUser.is_superuser || currentUser.role === 'SUPER_ADMIN';
+  const isAcademyAdministrator = isSuper || isAcademyAdmin || ['ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'].includes(String(currentUser.role || currentUser.user_type || '').toUpperCase()) || currentUser.staff_profile?.staff_type === 'ADMIN';
+
+  const dashboardRoleSlug = isSuper
     ? 'super-admin'
-    : String(currentUser.role || currentUser.user_type || 'admin').trim().toLowerCase().replace(/[_\s]+/g, '-');
+    : isAcademyAdministrator
+    ? 'admin'
+    : String(currentUser.role || currentUser.user_type || 'teacher').trim().toLowerCase().replace(/[_\s]+/g, '-');
 
   const menuItems = [
     {

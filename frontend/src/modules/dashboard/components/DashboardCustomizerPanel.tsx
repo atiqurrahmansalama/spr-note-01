@@ -128,16 +128,31 @@ export default function DashboardCustomizerPanel({
 
   // Update widget-specific sub-settings with INSTANT LIVE SYNC
   const handleUpdateWidgetSettings = (widgetId: string, updatedSettings: Record<string, any>) => {
-    const nextLayout = draftLayout.map((i) => {
-      if (i.widgetId !== widgetId) return i;
-      return {
-        ...i,
-        settings: {
-          ...(i.settings || {}),
-          ...updatedSettings,
-        },
+    const existing = draftLayout.find((i) => i.widgetId === widgetId);
+    let nextLayout: DashboardLayoutItem[];
+    if (existing) {
+      nextLayout = draftLayout.map((i) => {
+        if (i.widgetId !== widgetId) return i;
+        return {
+          ...i,
+          isVisible: true,
+          settings: {
+            ...(i.settings || {}),
+            ...updatedSettings,
+          },
+        };
+      });
+    } else {
+      const widgetDef = WIDGET_REGISTRY[widgetId];
+      const newItem: DashboardLayoutItem = {
+        widgetId,
+        order: draftLayout.length + 1,
+        colSpan: widgetDef ? widgetDef.defaultColSpan : 4,
+        isVisible: true,
+        settings: updatedSettings,
       };
-    });
+      nextLayout = [...draftLayout, newItem];
+    }
     setDraftLayout(nextLayout);
     // Instant Live Dashboard Update & Persistence
     onSaveLayout(nextLayout, isSuperAdmin ? saveAsDefault : false, role);

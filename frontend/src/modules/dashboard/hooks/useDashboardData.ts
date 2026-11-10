@@ -9,6 +9,7 @@ import {
 } from '../../../stores';
 import { useTenant } from '../../../context/TenantContext';
 import { fetchWithAuth } from '../../../utils/authService';
+import { resolveAcademicEventsData } from '../../academy/calendar-events/calendarDataResolver';
 import type { AttendancePulseData, ScheduleItem, ActivityItem, CalendarEventItem } from '../types';
 
 export interface DashboardDataState {
@@ -187,30 +188,27 @@ export function useDashboardData(): DashboardDataState {
     ];
   }, []);
 
-  // 8. Upcoming Calendar Events from masterCalendarStore
+  // 8. Upcoming Calendar Events from masterCalendarStore (Derived via Canonical Domain Resolver)
   const upcomingEvents: CalendarEventItem[] = useMemo(() => {
     try {
       if (masterCalendarStore && typeof masterCalendarStore.getEvents === 'function') {
         const list = masterCalendarStore.getEvents(activeTenantId);
-        if (Array.isArray(list) && list.length > 0) {
-          return list.slice(0, 4).map((evt: any, idx: number) => ({
-            id: evt.id || `evt-${idx}`,
-            title: evt.title || evt.name || 'Academic Event',
-            date: evt.start_date || evt.date || new Date().toISOString(),
-            type: (evt.type || 'EVENT') as any,
-            impact: evt.impact || 'Campus Wide',
-            daysRemaining: Math.max(1, idx * 4 + 3),
+        const resolved = resolveAcademicEventsData(list, activeTenantId);
+        if (resolved.upcomingEvents && resolved.upcomingEvents.length > 0) {
+          return resolved.upcomingEvents.slice(0, 4).map((item) => ({
+            id: item.id,
+            title: item.title,
+            date: item.startDate,
+            type: (item.type || 'EVENT') as any,
+            impact: item.audience || 'Campus Wide',
+            daysRemaining: Math.max(0, item.daysRemaining),
           }));
         }
       }
     } catch {}
 
-    return [
-      { id: '1', title: 'Mid-Term Examination Board', date: '2026-09-22', type: 'EXAM', impact: 'All Classes', daysRemaining: 8 },
-      { id: '2', title: 'Staff Monthly Coordination Meeting', date: '2026-09-25', type: 'MEETING', impact: 'All Faculty', daysRemaining: 11 },
-      { id: '3', title: 'National Holiday (Campus Closed)', date: '2026-10-02', type: 'HOLIDAY', impact: 'General Holiday', daysRemaining: 18 },
-    ];
-  }, [activeTenantId]);
+    return [];
+  }, [activeTenantId, tenantTick]);
 
   // 9. Today's Timetable Schedule
   const scheduleItems: ScheduleItem[] = useMemo(() => [

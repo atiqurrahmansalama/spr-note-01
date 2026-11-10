@@ -335,7 +335,7 @@ export default function DashboardGridEngine({
 
           return (
             <div
-              key={layoutItem.widgetId}
+              key={`${layoutItem.widgetId}-${layoutItem.settings?.displayMode || 'def'}`}
               draggable={isEditMode && !isResizingThis}
               onDragStart={(e) => handleDragStart(e, index)}
               onDragOver={(e) => handleDragOver(e, index)}

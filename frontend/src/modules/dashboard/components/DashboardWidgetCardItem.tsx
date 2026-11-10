@@ -16,6 +16,9 @@ import {
   SparklesIcon,
   TrendingUpIcon,
   CalendarIcon,
+  GridIcon,
+  TimelineIcon,
+  ClockIcon,
 } from '../../../components/ui/Icons';
 
 export const CONFIGURABLE_WIDGET_IDS = new Set([
@@ -23,6 +26,8 @@ export const CONFIGURABLE_WIDGET_IDS = new Set([
   'recitation_trends',
   'quick_actions',
   'academic_calendar',
+  'working_hours',
+  'academic_events',
 ]);
 
 export interface DashboardWidgetCardItemProps {
@@ -390,6 +395,108 @@ export default function DashboardWidgetCardItem({
                     {cat.label}
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* 5. Working Hours & Shifts */}
+          {widgetDef.id === 'working_hours' && (
+            <div className="space-y-3 pt-1 text-xs">
+              <div className="font-bold theme-text-primary flex items-center justify-between pb-1 border-b theme-border">
+                <div className="flex items-center gap-1.5">
+                  <ClockIcon className="w-3.5 h-3.5 theme-accent" />
+                  <span>Display View Mode</span>
+                </div>
+                <span className="text-[10px] font-mono theme-text-secondary capitalize">
+                  {settings.displayMode || 'grid'} View
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdateSettings?.({ displayMode: 'grid' });
+                  }}
+                  disabled={disabled}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    (settings.displayMode || 'grid') === 'grid'
+                      ? 'theme-bg-accent theme-accent-text border-transparent shadow-xs'
+                      : 'theme-bg-sub theme-text-secondary border theme-border hover:theme-text-primary'
+                  }`}
+                >
+                  <GridIcon className="w-3.5 h-3.5" />
+                  <span>Grid (Month)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdateSettings?.({ displayMode: 'timeline' });
+                  }}
+                  disabled={disabled}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    (settings.displayMode || 'grid') === 'timeline'
+                      ? 'theme-bg-accent theme-accent-text border-transparent shadow-xs'
+                      : 'theme-bg-sub theme-text-secondary border theme-border hover:theme-text-primary'
+                  }`}
+                >
+                  <TimelineIcon className="w-3.5 h-3.5" />
+                  <span>Timeline (Hours)</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 6. Academic Events & Milestones */}
+          {widgetDef.id === 'academic_events' && (
+            <div className="space-y-3 pt-1 text-xs">
+              <div className="font-bold theme-text-primary flex items-center justify-between pb-1 border-b theme-border">
+                <div className="flex items-center gap-1.5">
+                  <CalendarIcon className="w-3.5 h-3.5 theme-accent" />
+                  <span>Display View Mode</span>
+                </div>
+                <span className="text-[10px] font-mono theme-text-secondary capitalize">
+                  {settings.displayMode || 'grid'} View
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdateSettings?.({ displayMode: 'grid' });
+                  }}
+                  disabled={disabled}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    (settings.displayMode || 'grid') === 'grid'
+                      ? 'theme-bg-accent theme-accent-text border-transparent shadow-xs'
+                      : 'theme-bg-sub theme-text-secondary border theme-border hover:theme-text-primary'
+                  }`}
+                >
+                  <GridIcon className="w-3.5 h-3.5" />
+                  <span>Grid (Month)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdateSettings?.({ displayMode: 'timeline' });
+                  }}
+                  disabled={disabled}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    (settings.displayMode || 'grid') === 'timeline'
+                      ? 'theme-bg-accent theme-accent-text border-transparent shadow-xs'
+                      : 'theme-bg-sub theme-text-secondary border theme-border hover:theme-text-primary'
+                  }`}
+                >
+                  <TimelineIcon className="w-3.5 h-3.5" />
+                  <span>Timeline (Hours)</span>
+                </button>
               </div>
             </div>
           )}

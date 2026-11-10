@@ -13,4 +13,7 @@ export { default as ResidentialOccupancyWidget } from './ResidentialOccupancyWid
 export { default as NoticeBoardWidget } from './NoticeBoardWidget';
 export { default as RecitationTrendsWidget } from './RecitationTrendsWidget';
 export { default as AcademicCalendarWidget } from './AcademicCalendarWidget';
+export { default as WorkingHoursWidget } from './WorkingHoursWidget';
+export { default as AcademicEventsWidget } from './AcademicEventsWidget';
+export { default as AgendaScheduleWidget } from './AgendaScheduleWidget';
 

@@ -60,6 +60,10 @@ export interface TenantContextState {
   institution: AcademicInstitution | null;
   branches: Branch[];
   activeBranchId: string | null;
+  isMultiTenantAdmin?: boolean;
+  isAcademyAdmin?: boolean;
+  isTenantAdmin?: boolean;
+  isAdmin?: boolean;
   isLoading: boolean;
   error: string | null;
 }

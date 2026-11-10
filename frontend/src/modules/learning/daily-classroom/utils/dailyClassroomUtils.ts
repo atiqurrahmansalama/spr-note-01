@@ -501,6 +501,10 @@ export function doesStudentMatchClass(student: any, targetClassId: string | numb
   if (!student) return false;
   const targetIdStr = String(targetClassId).trim();
 
+  // 0. Direct match if the passed item is a class object itself
+  if (student.id !== undefined && String(student.id).trim() === targetIdStr) return true;
+  if (student.classId !== undefined && String(student.classId).trim() === targetIdStr) return true;
+
   // 1. Direct or Equivalent Class ID match
   const equivalentIds = getEquivalentClassIds(targetClassId, classes);
   const stClsId = getClassId(student);

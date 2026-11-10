@@ -125,14 +125,53 @@ class GoogleOAuthExchangeView(APIView):
                 import logging
                 logging.getLogger('core').warning(f"UserSession creation warning: {sess_ex}")
 
-            if getattr(user, 'institution_id', None):
-                try:
-                    from core.services import ensure_institution_staff_profile
-                    ensure_institution_staff_profile(user)
-                except Exception:
-                    pass
+            try:
+                from core.services import sync_user_and_staff_roles
+                sync_user_and_staff_roles(user)
+                user.refresh_from_db()
+            except Exception as sync_ex:
+                import logging
+                logging.getLogger('core').warning(f"Google auth role sync warning: {sync_ex}")
 
             resolved_name = user.name or f"{user.first_name or ''} {user.last_name or ''}".strip() or user.phone_number
+
+            inst = getattr(user, 'institution', None)
+            staff_prof = getattr(user, 'staff_profile', None)
+
+            is_academy_admin = bool(
+                user.is_superuser or
+                (getattr(user, 'user_type', '') or '').upper() in ['ADMIN', 'SUPER_ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'] or
+                (staff_prof and staff_prof.staff_type == 'ADMIN')
+            )
+
+            institution_details = None
+            if inst:
+                institution_details = {
+                    'id': str(inst.id),
+                    'name': inst.name,
+                    'bangla_name': getattr(inst, 'bangla_name', '') or '',
+                    'code': getattr(inst, 'code', '') or '',
+                    'slug': getattr(inst, 'slug', '') or '',
+                    'logo_url': getattr(inst, 'logo_url', '') or '',
+                    'institution_type': getattr(inst, 'institution_type', '') or '',
+                    'address': getattr(inst, 'address', '') or '',
+                    'district': getattr(inst, 'district', '') or '',
+                    'is_verified': getattr(inst, 'is_verified', True),
+                }
+
+            staff_data = None
+            if staff_prof:
+                staff_data = {
+                    'id': str(staff_prof.id),
+                    'employee_id': staff_prof.employee_id,
+                    'staff_type': staff_prof.staff_type,
+                    'designation': staff_prof.designation,
+                    'rank_order': staff_prof.rank_order,
+                    'employment_status': staff_prof.employment_status,
+                    'institution_id': str(staff_prof.institution_id) if staff_prof.institution_id else None,
+                    'department_id': staff_prof.department_id,
+                }
+
             user_data = {
                 'id': user.id,
                 'name': resolved_name,
@@ -142,9 +181,14 @@ class GoogleOAuthExchangeView(APIView):
                 'first_name': user.first_name,
                 'last_name': user.last_name,
                 'user_type': user.user_type,
-                'is_staff': getattr(user, 'is_staff', False),
-                'institution_id': str(user.institution_id) if user.institution_id else None,
-                'staff_id': str(user.staff_profile.id) if hasattr(user, 'staff_profile') and user.staff_profile else None,
+                'is_staff': getattr(user, 'is_staff', False) or bool(staff_prof),
+                'institution_id': str(inst.id) if inst else None,
+                'institution_name': inst.name if inst else "",
+                'institution_details': institution_details,
+                'staff_profile': staff_data,
+                'staff_id': str(staff_prof.id) if staff_prof else None,
+                'is_academy_admin': is_academy_admin,
+                'is_superuser': user.is_superuser,
                 'role': user.user_type,
                 'avatar_url': user.avatar_url,
                 'is_email_verified': user.is_email_verified,

@@ -46,6 +46,113 @@ def assign_teacher_periods(teacher_id: str, assignments: List[Dict[str, Any]]) -
 
 
 @transaction.atomic
+def sync_user_and_staff_roles(user, institution=None):
+    """
+    Enterprise Bi-Directional Self-Healing and Role Synchronization:
+    1. If user lacks StaffProfile, searches for any orphaned StaffProfile matching user's phone, email, or name and links it.
+    2. If user is attached to a StaffProfile with an institution, ensures user.institution is populated.
+    3. If StaffProfile.staff_type == 'ADMIN', elevates user.user_type = 'ADMIN', user.is_staff = True, and assigns the ADMIN UserRole.
+    4. If user.user_type == 'ADMIN' and user has an institution, ensures their StaffProfile is aligned as staff_type='ADMIN' and designation='Academy Administrator'.
+    """
+    if not user:
+        return None
+
+    # Global Super Admins remain decoupled from institutional operational rosters
+    if user.is_superuser or (getattr(user, 'user_type', '') or '').upper() == 'SUPER_ADMIN':
+        return getattr(user, 'staff_profile', None)
+
+    from core.models.staff import StaffProfile
+    from core.models.iam import UserRole
+    from django.db.models import Q
+
+    staff_profile = getattr(user, 'staff_profile', None)
+
+    # Step 1: Auto-link orphaned staff profiles by user identity match
+    if not staff_profile:
+        inst = institution or getattr(user, 'institution', None)
+        lookup_q = Q(user__isnull=True)
+        id_filters = Q()
+
+        if user.phone_number:
+            id_filters |= Q(emergency_contact=user.phone_number) | Q(nid_no=user.phone_number)
+        if user.email:
+            id_filters |= Q(employee_id__iexact=user.email)
+        if user.name:
+            # Check by user's name if employee ID is ADM or matches
+            id_filters |= Q(designation__icontains='Admin')
+
+        matched_staff = None
+        if inst and id_filters:
+            matched_staff = StaffProfile.objects.filter(lookup_q & id_filters & Q(institution=inst)).first()
+        elif id_filters:
+            matched_staff = StaffProfile.objects.filter(lookup_q & id_filters).first()
+
+        # Fallback: If user is ADMIN and institution has unlinked admin staff
+        if not matched_staff and inst and (getattr(user, 'user_type', '') or '').upper() == 'ADMIN':
+            matched_staff = StaffProfile.objects.filter(institution=inst, staff_type='ADMIN', user__isnull=True).first()
+
+        if matched_staff:
+            matched_staff.user = user
+            matched_staff.save(update_fields=['user'])
+            staff_profile = matched_staff
+
+    # Step 2: Harmonize User and StaffProfile
+    user_updated_fields = set()
+    if staff_profile:
+        # A. Sync Institution
+        if staff_profile.institution and not user.institution_id:
+            user.institution = staff_profile.institution
+            user_updated_fields.add('institution')
+        elif user.institution and not staff_profile.institution_id:
+            staff_profile.institution = user.institution
+            staff_profile.save(update_fields=['institution'])
+
+        # B. Sync Admin Elevation
+        admin_role = UserRole.objects.filter(code__iexact='ADMIN').first()
+        if staff_profile.staff_type == 'ADMIN':
+            if (getattr(user, 'user_type', '') or '').upper() != 'ADMIN':
+                user.user_type = 'ADMIN'
+                user_updated_fields.add('user_type')
+            if not user.is_staff:
+                user.is_staff = True
+                user_updated_fields.add('is_staff')
+            if admin_role and user.role_id != admin_role.id:
+                user.role = admin_role
+                user_updated_fields.add('role')
+        elif (getattr(user, 'user_type', '') or '').upper() == 'ADMIN':
+            # User is ADMIN, elevate staff profile
+            sp_updated = set()
+            if staff_profile.staff_type != 'ADMIN':
+                staff_profile.staff_type = 'ADMIN'
+                sp_updated.add('staff_type')
+            if 'admin' not in staff_profile.designation.lower():
+                staff_profile.designation = 'Academy Administrator'
+                sp_updated.add('designation')
+            if staff_profile.rank_order != 1:
+                staff_profile.rank_order = 1
+                sp_updated.add('rank_order')
+            if sp_updated:
+                staff_profile.save(update_fields=list(sp_updated))
+
+            if not user.is_staff:
+                user.is_staff = True
+                user_updated_fields.add('is_staff')
+            if admin_role and user.role_id != admin_role.id:
+                user.role = admin_role
+                user_updated_fields.add('role')
+    else:
+        # User has no staff profile, but has institution and user_type='ADMIN'
+        inst = institution or getattr(user, 'institution', None)
+        if inst:
+            staff_profile = ensure_institution_staff_profile(user, inst)
+
+    if user_updated_fields:
+        user.save(update_fields=list(user_updated_fields))
+
+    return staff_profile
+
+
+@transaction.atomic
 def ensure_institution_staff_profile(user, institution=None):
     """
     Enterprise self-healing staff recruitment:
@@ -62,7 +169,14 @@ def ensure_institution_staff_profile(user, institution=None):
 
     inst = institution or getattr(user, 'institution', None)
     if not inst:
-        return None
+        # Check if user has an existing staff profile with institution
+        sp = getattr(user, 'staff_profile', None)
+        if sp and sp.institution:
+            inst = sp.institution
+            user.institution = inst
+            user.save(update_fields=['institution'])
+        else:
+            return None
 
     # 1. Enforce Django staff status for all institutional members
     if not user.is_staff:

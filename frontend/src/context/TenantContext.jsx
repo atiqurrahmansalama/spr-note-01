@@ -17,20 +17,33 @@ export function TenantProvider({ children }) {
     user && (user.is_superuser || (user.user_type && user.user_type.toUpperCase() === 'SUPER_ADMIN'))
   );
 
-  // Fetch institutions list if user is Super Admin or has multi-tenant permissions
+  const isAcademyAdmin = Boolean(
+    user && (
+      isMultiTenantAdmin ||
+      user.is_academy_admin ||
+      ['ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'].includes(String(user.user_type || '').toUpperCase()) ||
+      ['ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'].includes(String(user.role?.code || user.role || '').toUpperCase()) ||
+      ['ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'].includes(String(user.role_info?.code || '').toUpperCase()) ||
+      (user.staff_profile && user.staff_profile.staff_type === 'ADMIN')
+    )
+  );
+
+  const isTenantAdmin = isMultiTenantAdmin || isAcademyAdmin;
+  const isAdmin = isMultiTenantAdmin || isAcademyAdmin;
+
+  // Fetch institutions list for multi-tenant admins, academy admins, and institutional personnel
   const fetchInstitutionsList = useCallback(async () => {
-    if (!isMultiTenantAdmin) {
-      if (user?.institution_details) {
-        setCurrentInstitution(user.institution_details);
-      }
-      if (user?.institution_id) {
-        const instId = String(user.institution_id);
-        setActiveTenantId(instId);
-        try {
-          localStorage.setItem('active_tenant_id', instId);
-        } catch {}
-      }
-      return;
+    // Immediate optimistic hydration from user profile
+    if (user?.institution_details && !currentInstitution) {
+      setCurrentInstitution(user.institution_details);
+    }
+    if (user?.institution_id && !activeTenantId) {
+      const instId = String(user.institution_id);
+      setActiveTenantId(instId);
+      try {
+        localStorage.setItem('active_tenant_id', instId);
+        localStorage.setItem('spr_active_tenant_id', instId);
+      } catch {}
     }
 
     try {
@@ -39,21 +52,33 @@ export function TenantProvider({ children }) {
       const items = Array.isArray(data) ? data : (data.results || []);
       setInstitutions(items);
 
-      const savedTenantId = localStorage.getItem('active_tenant_id') || localStorage.getItem('spr_active_tenant_id');
+      const savedTenantId =
+        localStorage.getItem('active_tenant_id') ||
+        localStorage.getItem('spr_active_tenant_id') ||
+        user?.institution_id ||
+        user?.staff_profile?.institution_id;
+
       if (savedTenantId && savedTenantId !== 'ALL') {
         const found = items.find(i => String(i.id) === String(savedTenantId));
         if (found) {
           setCurrentInstitution(found);
-          setActiveTenantId(savedTenantId);
+          setActiveTenantId(String(savedTenantId));
           try {
-            localStorage.setItem('active_tenant_id', savedTenantId);
-            localStorage.setItem('spr_active_tenant_id', savedTenantId);
+            localStorage.setItem('active_tenant_id', String(savedTenantId));
+            localStorage.setItem('spr_active_tenant_id', String(savedTenantId));
           } catch {}
           return;
         }
       } else if (savedTenantId === 'ALL' && isMultiTenantAdmin) {
         setCurrentInstitution(null);
         setActiveTenantId('ALL');
+        return;
+      }
+
+      // If user profile has pre-resolved institution details, anchor to it
+      if (user?.institution_details) {
+        setCurrentInstitution(user.institution_details);
+        setActiveTenantId(String(user.institution_details.id));
         return;
       }
 
@@ -66,7 +91,8 @@ export function TenantProvider({ children }) {
           /darus/i.test(i.slug || '')
         );
         // Priority 2: User's explicitly assigned institution
-        const userInst = user?.institution_id ? items.find(i => String(i.id) === String(user.institution_id)) : null;
+        const targetInstId = user?.institution_id || user?.staff_profile?.institution_id;
+        const userInst = targetInstId ? items.find(i => String(i.id) === String(targetInstId)) : null;
         const target = preferredInst || userInst || items[0];
         setCurrentInstitution(target);
         setActiveTenantId(String(target.id));
@@ -77,10 +103,14 @@ export function TenantProvider({ children }) {
       }
     } catch (err) {
       console.error('[TenantProvider] Error loading institutions:', err);
+      if (user?.institution_details) {
+        setCurrentInstitution(user.institution_details);
+        setActiveTenantId(String(user.institution_details.id));
+      }
     } finally {
       setIsLoadingInstitutions(false);
     }
-  }, [isMultiTenantAdmin, user?.id, user?.institution_id]);
+  }, [isMultiTenantAdmin, isAcademyAdmin, user?.id, user?.institution_id, user?.institution_details, user?.staff_profile]);
 
   useEffect(() => {
     fetchInstitutionsList();
@@ -150,6 +180,9 @@ export function TenantProvider({ children }) {
       activeTenant: currentInstitution,
       activeTenantId: activeTenantId || (currentInstitution?.id ? String(currentInstitution.id) : 'default'),
       isMultiTenantAdmin,
+      isAcademyAdmin,
+      isTenantAdmin,
+      isAdmin,
       isLoadingInstitutions,
       switchInstitution,
       pendingSwitchInstitution,
@@ -163,6 +196,9 @@ export function TenantProvider({ children }) {
       currentInstitution,
       activeTenantId,
       isMultiTenantAdmin,
+      isAcademyAdmin,
+      isTenantAdmin,
+      isAdmin,
       isLoadingInstitutions,
       switchInstitution,
       pendingSwitchInstitution,
@@ -188,6 +224,9 @@ export function useTenant() {
       currentInstitution: null,
       activeTenantId: typeof localStorage !== 'undefined' ? (localStorage.getItem('active_tenant_id') || 'default') : 'default',
       isMultiTenantAdmin: false,
+      isAcademyAdmin: false,
+      isTenantAdmin: false,
+      isAdmin: false,
       isLoadingInstitutions: false,
       switchInstitution: () => {},
       pendingSwitchInstitution: null,

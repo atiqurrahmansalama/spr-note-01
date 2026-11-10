@@ -926,15 +926,19 @@ export default function DailyClassroomHubView({
   const [reportsSectionId, setReportsSectionId] = useState('');
 
   const reportsClassOptions = useMemo(() => {
-    let raw = (classes || []).map((c: any) => ({
+    const raw = (classes || []).map((c: any) => ({
       value: String(c.id),
       label: c.name || c.class_name,
       departmentId: c.department || c.department_id,
     }));
+    let filtered = raw;
     if (reportsDeptId) {
-      raw = raw.filter((c: any) => String(c.departmentId) === String(reportsDeptId));
+      const matched = raw.filter((c: any) => !c.departmentId || String(c.departmentId) === String(reportsDeptId));
+      if (matched.length > 0) {
+        filtered = matched;
+      }
     }
-    return [{ value: '', label: 'All Classes' }, ...raw];
+    return [{ value: '', label: 'All Classes' }, ...filtered];
   }, [classes, reportsDeptId]);
 
   const reportsSectionOptions = useMemo(() => {
