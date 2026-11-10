@@ -280,7 +280,9 @@ export default function TeacherUstadhDashboardView({
       actions: quickActions,
     },
     notice_board: {},
-    academic_calendar: {},
+    working_hours: {},
+    academic_events: {},
+    agenda_schedule: {},
     hifz_tracker: {},
   };
 

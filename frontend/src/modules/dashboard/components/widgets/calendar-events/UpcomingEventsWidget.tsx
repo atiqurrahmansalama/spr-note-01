@@ -1,7 +1,7 @@
 import React from 'react';
-import { useTranslation } from '../../../../i18n';
-import type { CalendarEventItem } from '../../types';
-import { CalendarIcon } from '../../../../components/ui/Icons';
+import { useTranslation } from '../../../../../i18n';
+import type { CalendarEventItem } from '../../../types';
+import { CalendarIcon } from '../../../../../components/ui/Icons';
 
 export interface UpcomingEventsWidgetProps {
   events: CalendarEventItem[];
@@ -26,7 +26,7 @@ export default function UpcomingEventsWidget({
   const { t, formatDate, formatNumber } = useTranslation('dashboard');
 
   return (
-    <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-3.5 select-none ${className}`}>
+    <div className={`p-5 rounded-3xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-3.5 select-none border-0 ${className}`}>
       <div className="flex items-center justify-between pb-1">
         <div className="flex items-center gap-2 min-w-0">
           <CalendarIcon className="w-4 h-4 text-[var(--accent-main)] shrink-0" />
@@ -61,7 +61,7 @@ export default function UpcomingEventsWidget({
             return (
               <div
                 key={evt.id}
-                className="p-3 rounded-xl theme-bg-sub/60 hover:theme-bg-sub transition-all flex items-center justify-between gap-3 text-left rtl:text-right"
+                className="p-3 rounded-2xl theme-bg-app hover:theme-bg-elevated/40 transition-all flex items-center justify-between gap-3 text-left rtl:text-right border-0"
               >
                 <div className="space-y-0.5 min-w-0">
                   <div className="text-xs font-bold theme-text-primary truncate">

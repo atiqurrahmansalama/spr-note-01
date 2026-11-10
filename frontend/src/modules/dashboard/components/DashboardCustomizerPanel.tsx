@@ -33,6 +33,30 @@ export interface DashboardCustomizerPanelProps {
   onClose: () => void;
 }
 
+/**
+ * Smoothly scrolls the main dashboard viewport to the affected widget and applies a gentle highlight pulse
+ */
+const scrollAndHighlightDashboardWidget = (widgetId: string) => {
+  const attemptScroll = (retryCount = 0) => {
+    const el = document.getElementById(`dashboard-widget-${widgetId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Temporary soft highlight animation (pure theme-friendly soft pulse)
+      el.classList.add('transition-all', 'duration-500');
+      const originalOutline = el.style.boxShadow;
+      el.style.boxShadow = '0 0 0 4px var(--accent-main, #6366f1)';
+      el.style.borderRadius = '1rem';
+      setTimeout(() => {
+        el.style.boxShadow = originalOutline;
+      }, 1500);
+    } else if (retryCount < 6) {
+      setTimeout(() => attemptScroll(retryCount + 1), 60);
+    }
+  };
+
+  setTimeout(() => attemptScroll(0), 50);
+};
+
 export default function DashboardCustomizerPanel({
   role,
   currentLayout,
@@ -99,7 +123,7 @@ export default function DashboardCustomizerPanel({
     [eligibleWidgets, allCategorizedWidgetIds]
   );
 
-  // Toggle widget visibility with INSTANT LIVE SYNC
+  // Toggle widget visibility with INSTANT LIVE SYNC & AUTO-SCROLL
   const handleToggleWidget = (widgetId: string) => {
     const widgetDef = WIDGET_REGISTRY[widgetId];
     if (widgetDef && !isWidgetFeaturePermitted(widgetDef, isFeatureEnabled)) {
@@ -108,9 +132,19 @@ export default function DashboardCustomizerPanel({
 
     const existing = draftLayout.find((i) => i.widgetId === widgetId);
     let nextLayout: DashboardLayoutItem[];
+    const isCurrentlyVisible = existing ? existing.isVisible !== false : false;
+    const willBeVisible = !isCurrentlyVisible;
+
     if (existing) {
+      if (!willBeVisible) {
+        // If turning OFF, immediately scroll to where the widget currently is so user sees the change!
+        const el = document.getElementById(`dashboard-widget-${widgetId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
       nextLayout = draftLayout.map((i) =>
-        i.widgetId === widgetId ? { ...i, isVisible: !i.isVisible } : i
+        i.widgetId === widgetId ? { ...i, isVisible: willBeVisible } : i
       );
     } else {
       const newItem: DashboardLayoutItem = {
@@ -124,9 +158,13 @@ export default function DashboardCustomizerPanel({
     setDraftLayout(nextLayout);
     // Instant Live Dashboard Update & Persistence
     onSaveLayout(nextLayout, isSuperAdmin ? saveAsDefault : false, role);
+
+    if (willBeVisible) {
+      scrollAndHighlightDashboardWidget(widgetId);
+    }
   };
 
-  // Update widget-specific sub-settings with INSTANT LIVE SYNC
+  // Update widget-specific sub-settings with INSTANT LIVE SYNC & AUTO-SCROLL
   const handleUpdateWidgetSettings = (widgetId: string, updatedSettings: Record<string, any>) => {
     const existing = draftLayout.find((i) => i.widgetId === widgetId);
     let nextLayout: DashboardLayoutItem[];
@@ -156,6 +194,7 @@ export default function DashboardCustomizerPanel({
     setDraftLayout(nextLayout);
     // Instant Live Dashboard Update & Persistence
     onSaveLayout(nextLayout, isSuperAdmin ? saveAsDefault : false, role);
+    scrollAndHighlightDashboardWidget(widgetId);
   };
 
   // Super Admin institutional default save toggle

@@ -97,7 +97,7 @@ export const AcademicEventCard: React.FC<AcademicEventCardProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center justify-between pt-3 mt-3 border-t theme-border/40 text-xs theme-text-secondary">
+      <div className="flex items-center justify-between pt-2.5 mt-2.5 border-0 text-xs theme-text-secondary">
         <div className="flex items-center gap-1.5 truncate">
           <CalendarIcon className="w-3.5 h-3.5 opacity-70 shrink-0" />
           <span className="truncate">{dateDisplay}</span>

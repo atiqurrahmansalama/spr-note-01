@@ -1,10 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../../../i18n';
-import KpiMetricsWidget from '../components/widgets/KpiMetricsWidget';
-import AcademicProgressWidget from '../components/widgets/AcademicProgressWidget';
-import TimetableScheduleWidget from '../components/widgets/TimetableScheduleWidget';
-import UpcomingEventsWidget from '../components/widgets/UpcomingEventsWidget';
+import {
+  KpiMetricsWidget,
+  AcademicProgressWidget,
+  TimetableScheduleWidget,
+  UpcomingEventsWidget,
+} from '../components/widgets';
 import type { DashboardMetric, ScheduleItem, CalendarEventItem } from '../types';
 import { 
   AcademicCapIcon, 

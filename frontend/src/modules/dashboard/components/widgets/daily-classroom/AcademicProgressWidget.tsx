@@ -1,6 +1,6 @@
 import React from 'react';
-import { useTranslation } from '../../../../i18n';
-import { AcademicCapIcon } from '../../../../components/ui/Icons';
+import { useTranslation } from '../../../../../i18n';
+import { AcademicCapIcon } from '../../../../../components/ui/Icons';
 
 export interface ProgressItem {
   id: string;

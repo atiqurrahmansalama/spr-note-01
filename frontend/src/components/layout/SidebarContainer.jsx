@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { auth as authStore } from "../../utils/localStore";
 import { useFeatureControl } from "../../context/FeatureControlContext";
 import { useTenant } from "../../context/TenantContext";
+import { useAuth } from "../../context/AuthContext";
 import { useTranslation } from "../../i18n";
 import { 
   DashboardIcon, 
@@ -74,7 +75,8 @@ export default function SidebarContainer({
 
   const { isSectionEnabled } = useFeatureControl();
 
-  const currentUser = authStore.getUser() || {};
+  const { user: authUser } = useAuth();
+  const currentUser = authUser || authStore.getUser() || {};
   const isSuper = isMultiTenantAdmin || currentUser.is_superuser || currentUser.role === 'SUPER_ADMIN';
   const isAcademyAdministrator = isSuper || isAcademyAdmin || ['ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'].includes(String(currentUser.role || currentUser.user_type || '').toUpperCase()) || currentUser.staff_profile?.staff_type === 'ADMIN';
 
@@ -345,6 +347,7 @@ export default function SidebarContainer({
       if (item.hasSub) {
         const visibleSubItems = item.subItems.filter((sub) => {
           if (sub.superAdminOnly && !isMultiTenantAdmin) return false;
+          if (isAcademyAdministrator && item.id === "Academy") return true;
           return isSectionEnabled(sub.key);
         });
         return { ...item, subItems: visibleSubItems };
@@ -355,7 +358,7 @@ export default function SidebarContainer({
       if (isMobileScreen && item.id === "Shortcuts") return false;
       
       const isVisible = isSectionEnabled(item.key);
-      if (!isVisible) return false;
+      if (!isVisible && !(isAcademyAdministrator && (item.id === "Dashboard" || item.id === "Academy"))) return false;
       
       if (item.hasSub && item.subItems.length === 0) return false;
       

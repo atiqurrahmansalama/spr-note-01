@@ -1,12 +1,12 @@
 import React from 'react';
-import { useTranslation } from '../../../../i18n';
+import { useTranslation } from '../../../../../i18n';
 import { 
   CloudIcon, 
   TelegramIcon, 
   WhatsappIcon, 
   BellIcon, 
   SparklesIcon,
-} from '../../../../components/ui/Icons';
+} from '../../../../../components/ui/Icons';
 
 export interface SystemGatewaysWidgetProps {
   onConfigureGateways?: () => void;

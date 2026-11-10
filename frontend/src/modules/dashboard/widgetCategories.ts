@@ -60,7 +60,7 @@ export const MODULE_CATEGORIES: ModuleCategoryDef[] = [
     title: 'Calendar & Institutional Events',
     moduleName: 'Calendar & Events',
     icon: CalendarIcon,
-    widgetIds: ['working_hours', 'academic_events', 'agenda_schedule', 'upcoming_events', 'academic_calendar'],
+    widgetIds: ['working_hours', 'academic_events', 'agenda_schedule'],
   },
   {
     id: 'STUDENT_ADMISSION',

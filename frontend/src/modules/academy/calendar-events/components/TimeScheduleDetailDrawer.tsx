@@ -85,10 +85,10 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
   return (
     <DrawerContainer padding="normal" spacing="normal">
       {/* Top Main Banner Card */}
-      <div className="p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3">
+      <div className="p-4 rounded-3xl theme-bg-surface border-0 shadow-xs space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${style.bg} border ${style.border}`}>
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${style.bg} border-0 shadow-xs`}>
               {isWorkingHours ? (
                 <TimerIcon className="w-5 h-5 theme-text-primary" />
               ) : (
@@ -100,10 +100,10 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
                 {event.title}
               </h3>
               <div className="flex items-center gap-2 mt-1">
-                <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-md ${style.bg} theme-text-primary border ${style.border}`}>
+                <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-md ${style.bg} theme-text-primary border-0 shadow-2xs`}>
                   {getEventDisplayType(event, activeTenantId)}
                 </span>
-                <span className="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-md theme-bg-sub border theme-border theme-text-secondary">
+                <span className="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-md theme-bg-sub border-0 shadow-2xs theme-text-secondary">
                   Audience: {event.audience || 'ALL'}
                 </span>
               </div>
@@ -112,20 +112,20 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
         </div>
 
         {event.description && (
-          <div className="p-3 rounded-xl theme-bg-sub/60 border theme-border text-xs theme-text-secondary leading-relaxed">
+          <div className="p-3 rounded-2xl theme-bg-app border-0 text-xs theme-text-secondary leading-relaxed shadow-xs">
             {event.description}
           </div>
         )}
       </div>
 
       {/* Schedule Info Grid */}
-      <div className="p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3.5 text-xs">
+      <div className="p-4 rounded-3xl theme-bg-surface border-0 shadow-xs space-y-3.5 text-xs">
         <h4 className="text-[11px] font-mono font-bold uppercase tracking-wider theme-text-secondary">
           Schedule & Timing Details
         </h4>
 
         {/* Time */}
-        <div className="flex items-center justify-between py-2 border-b theme-border">
+        <div className="flex items-center justify-between py-2 border-0">
           <span className="theme-text-secondary font-medium">Session Timing:</span>
           <span className="font-mono font-bold theme-text-primary">
             {isAllDay ? 'Full Day' : `${formatTime12(event.startTime)} – ${formatTime12(event.endTime)}`}
@@ -133,7 +133,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
         </div>
 
         {/* Date / Recurrence */}
-        <div className="flex items-center justify-between py-2 border-b theme-border">
+        <div className="flex items-center justify-between py-2 border-0">
           <span className="theme-text-secondary font-medium">Recurrence Pattern:</span>
           <span className="font-semibold theme-text-primary">
             {event.repeats ? 'Weekly Recurring' : 'Single Date'}
@@ -142,7 +142,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
 
         {/* Start Date */}
         {event.startDate && (
-          <div className="flex items-center justify-between py-2 border-b theme-border">
+          <div className="flex items-center justify-between py-2 border-0">
             <span className="theme-text-secondary font-medium">Effective Date:</span>
             <span className="font-mono font-medium theme-text-primary">{event.startDate}</span>
           </div>
@@ -150,13 +150,13 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
 
         {/* Repeat Days */}
         {event.repeats && Array.isArray(event.repeatDays) && event.repeatDays.length > 0 && (
-          <div className="py-2 border-b theme-border space-y-1.5">
+          <div className="py-2 border-0 space-y-1.5">
             <span className="theme-text-secondary font-medium block">Active Days:</span>
             <div className="flex flex-wrap gap-1.5">
               {event.repeatDays.map((d: number) => (
                 <span
                   key={d}
-                  className="px-2 py-0.5 rounded-lg text-[11px] font-semibold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20"
+                  className="px-2 py-0.5 rounded-lg text-[11px] font-semibold theme-bg-accent-soft theme-accent border-0 shadow-2xs"
                 >
                   {WEEKDAY_NAMES[d] || `Day ${d}`}
                 </span>
@@ -167,7 +167,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
 
         {/* Active System Impacts */}
         {Array.isArray(event.impacts) && event.impacts.length > 0 && (
-          <div className="py-2 border-b theme-border space-y-1.5">
+          <div className="py-2 border-0 space-y-1.5">
             <span className="theme-text-secondary font-medium block">Active System Impacts:</span>
             <div className="flex flex-wrap gap-1.5">
               {event.impacts.map((impactId: string) => {
@@ -175,7 +175,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
                 return (
                   <span
                     key={impactId}
-                    className="px-2 py-0.5 rounded-lg text-[11px] font-semibold theme-bg-sub border theme-border theme-text-primary flex items-center gap-1 shadow-2xs"
+                    className="px-2 py-0.5 rounded-lg text-[11px] font-semibold theme-bg-sub border-0 theme-text-primary flex items-center gap-1 shadow-2xs"
                   >
                     <span className="w-1.5 h-1.5 rounded-full theme-bg-accent" />
                     <span>{matched?.name || matched?.badge || impactId}</span>
@@ -187,16 +187,16 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
         )}
 
         {/* Priority Rank */}
-        <div className="flex items-center justify-between py-2 border-b theme-border">
+        <div className="flex items-center justify-between py-2 border-0">
           <span className="theme-text-secondary font-medium">Precedence Priority:</span>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-bold theme-bg-accent-soft theme-accent border-0 shadow-2xs">
             Rank {event.priorityRank || (event as any).rank || 1}
           </span>
         </div>
 
         {/* Timezone */}
         {event.timezone && (
-          <div className="flex items-center justify-between py-2 border-b theme-border">
+          <div className="flex items-center justify-between py-2 border-0">
             <span className="theme-text-secondary font-medium">Timezone:</span>
             <span className="font-mono text-xs theme-text-secondary">{event.timezone}</span>
           </div>
@@ -205,7 +205,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
 
       {/* Inline Delete Confirmation Block with CustomSelect Scope */}
       {!readOnly && isConfirmingDelete ? (
-        <div className="p-4 rounded-2xl theme-bg-sub border border-[var(--danger-main)]/25 space-y-3 animate-fade-in">
+        <div className="p-4 rounded-2xl bg-rose-500/10 dark:bg-rose-950/30 border-0 space-y-3 animate-fade-in shadow-xs">
           <div className="flex items-center gap-2">
             <TrashIcon className="w-4 h-4 theme-danger" />
             <h4 className="text-xs font-bold theme-text-primary">
@@ -235,11 +235,11 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
             </p>
           )}
 
-          <div className="flex items-center justify-end gap-2 pt-2 border-t theme-border">
+          <div className="flex items-center justify-end gap-2 pt-2 border-0">
             <button
               type="button"
               onClick={() => setIsConfirmingDelete(false)}
-              className="px-3.5 py-2 rounded-xl border theme-border hover:theme-bg-elevated theme-text-secondary text-xs font-semibold transition cursor-pointer"
+              className="px-3.5 py-2 rounded-xl border-0 theme-bg-sub hover:theme-bg-elevated theme-text-secondary text-xs font-semibold transition cursor-pointer"
             >
               Cancel
             </button>
@@ -254,7 +254,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
                   });
                 }
               }}
-              className="px-4 py-2 rounded-xl bg-[var(--danger-main)] hover:opacity-90 text-white font-bold text-xs shadow-sm transition cursor-pointer flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl bg-[var(--danger-main)] hover:opacity-90 text-white font-bold text-xs shadow-sm transition cursor-pointer flex items-center gap-1.5 border-0"
             >
               <TrashIcon className="w-3.5 h-3.5" />
               <span>Confirm Delete</span>
@@ -263,12 +263,12 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
         </div>
       ) : (
         /* Action Buttons (Read-Only shows only Close button) */
-        <div className={`pt-4 border-t theme-border flex items-center ${readOnly || (!onEdit && !onDelete) ? 'justify-end' : 'justify-between'} gap-2.5`}>
+        <div className={`pt-4 border-0 flex items-center ${readOnly || (!onEdit && !onDelete) ? 'justify-end' : 'justify-between'} gap-2.5`}>
           {!readOnly && onDelete && (
             <button
               type="button"
               onClick={() => setIsConfirmingDelete(true)}
-              className="px-3.5 py-2.5 rounded-xl border border-[var(--danger-main)]/30 theme-danger hover:theme-bg-danger-soft font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2.5 rounded-xl border-0 bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer"
             >
               <TrashIcon className="w-4 h-4" />
               <span>Delete</span>
@@ -280,7 +280,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-xl border theme-border hover:theme-bg-elevated theme-text-secondary font-semibold text-xs transition cursor-pointer"
+                className="px-4 py-2.5 rounded-xl border-0 theme-bg-sub hover:theme-bg-elevated theme-text-secondary font-semibold text-xs transition cursor-pointer"
               >
                 Close
               </button>
@@ -289,7 +289,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
               <button
                 type="button"
                 onClick={onEdit}
-                className="px-4 py-2.5 rounded-xl theme-bg-accent text-white font-bold text-xs shadow-md hover:opacity-90 active:scale-98 transition flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2.5 rounded-xl theme-bg-accent text-white font-bold text-xs shadow-md hover:opacity-90 active:scale-98 transition flex items-center gap-1.5 cursor-pointer border-0 ring-0"
               >
                 <EditIcon className="w-4 h-4" />
                 <span>Edit Schedule</span>

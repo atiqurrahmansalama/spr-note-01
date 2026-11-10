@@ -36,31 +36,31 @@ const WEEKDAY_NAMES_FULL = [
 ];
 
 export const EVENT_COLOR_MAP: Record<string, EventColorStyle> = {
-  emerald: { bg: "bg-emerald-500/10", border: "border-emerald-500/25", text: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500", hex: "#10b981" },
-  indigo: { bg: "bg-indigo-500/10", border: "border-indigo-500/25", text: "text-indigo-600 dark:text-indigo-400", dot: "bg-indigo-500", hex: "#6366f1" },
-  blue: { bg: "bg-blue-500/10", border: "border-blue-500/25", text: "text-blue-600 dark:text-blue-400", dot: "bg-blue-500", hex: "#3b82f6" },
-  sky: { bg: "bg-sky-500/10", border: "border-sky-500/25", text: "text-sky-600 dark:text-sky-400", dot: "bg-sky-500", hex: "#0ea5e9" },
-  cyan: { bg: "bg-cyan-500/10", border: "border-cyan-500/25", text: "text-cyan-600 dark:text-cyan-400", dot: "bg-cyan-500", hex: "#06b6d4" },
-  teal: { bg: "bg-teal-500/10", border: "border-teal-500/25", text: "text-teal-600 dark:text-teal-400", dot: "bg-teal-500", hex: "#14b8a6" },
-  violet: { bg: "bg-violet-500/10", border: "border-violet-500/25", text: "text-violet-600 dark:text-violet-400", dot: "bg-violet-500", hex: "#8b5cf6" },
-  purple: { bg: "bg-purple-500/10", border: "border-purple-500/25", text: "text-purple-600 dark:text-purple-400", dot: "bg-purple-500", hex: "#a855f7" },
-  fuchsia: { bg: "bg-fuchsia-500/10", border: "border-fuchsia-500/25", text: "text-fuchsia-600 dark:text-fuchsia-400", dot: "bg-fuchsia-500", hex: "#d946ef" },
-  rose: { bg: "bg-rose-500/10", border: "border-rose-500/25", text: "text-rose-600 dark:text-rose-400", dot: "bg-rose-500", hex: "#f43f5e" },
-  red: { bg: "bg-red-500/10", border: "border-red-500/25", text: "text-red-600 dark:text-red-400", dot: "bg-red-500", hex: "#ef4444" },
-  orange: { bg: "bg-orange-500/10", border: "border-orange-500/25", text: "text-orange-600 dark:text-orange-400", dot: "bg-orange-500", hex: "#f97316" },
-  amber: { bg: "bg-amber-500/10", border: "border-amber-500/25", text: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500", hex: "#f59e0b" },
-  lime: { bg: "bg-lime-500/10", border: "border-lime-500/25", text: "text-lime-600 dark:text-lime-400", dot: "bg-lime-500", hex: "#84cc16" },
-  slate: { bg: "bg-slate-500/10", border: "border-slate-500/25", text: "text-slate-600 dark:text-slate-400", dot: "bg-slate-500", hex: "#64748b" },
+  emerald: { bg: "bg-emerald-500/10", border: "border-0", text: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500", hex: "#10b981" },
+  indigo: { bg: "bg-indigo-500/10", border: "border-0", text: "text-indigo-600 dark:text-indigo-400", dot: "bg-indigo-500", hex: "#6366f1" },
+  blue: { bg: "bg-blue-500/10", border: "border-0", text: "text-blue-600 dark:text-blue-400", dot: "bg-blue-500", hex: "#3b82f6" },
+  sky: { bg: "bg-sky-500/10", border: "border-0", text: "text-sky-600 dark:text-sky-400", dot: "bg-sky-500", hex: "#0ea5e9" },
+  cyan: { bg: "bg-cyan-500/10", border: "border-0", text: "text-cyan-600 dark:text-cyan-400", dot: "bg-cyan-500", hex: "#06b6d4" },
+  teal: { bg: "bg-teal-500/10", border: "border-0", text: "text-teal-600 dark:text-teal-400", dot: "bg-teal-500", hex: "#14b8a6" },
+  violet: { bg: "bg-violet-500/10", border: "border-0", text: "text-violet-600 dark:text-violet-400", dot: "bg-violet-500", hex: "#8b5cf6" },
+  purple: { bg: "bg-purple-500/10", border: "border-0", text: "text-purple-600 dark:text-purple-400", dot: "bg-purple-500", hex: "#a855f7" },
+  fuchsia: { bg: "bg-fuchsia-500/10", border: "border-0", text: "text-fuchsia-600 dark:text-fuchsia-400", dot: "bg-fuchsia-500", hex: "#d946ef" },
+  rose: { bg: "bg-rose-500/10", border: "border-0", text: "text-rose-600 dark:text-rose-400", dot: "bg-rose-500", hex: "#f43f5e" },
+  red: { bg: "bg-red-500/10", border: "border-0", text: "text-red-600 dark:text-red-400", dot: "bg-red-500", hex: "#ef4444" },
+  orange: { bg: "bg-orange-500/10", border: "border-0", text: "text-orange-600 dark:text-orange-400", dot: "bg-orange-500", hex: "#f97316" },
+  amber: { bg: "bg-amber-500/10", border: "border-0", text: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500", hex: "#f59e0b" },
+  lime: { bg: "bg-lime-500/10", border: "border-0", text: "text-lime-600 dark:text-lime-400", dot: "bg-lime-500", hex: "#84cc16" },
+  slate: { bg: "bg-slate-500/10", border: "border-0", text: "text-slate-600 dark:text-slate-400", dot: "bg-slate-500", hex: "#64748b" },
   // Soft & Light Pastel Colors
-  mint: { bg: "bg-emerald-400/10", border: "border-emerald-400/25", text: "text-emerald-600 dark:text-emerald-300", dot: "bg-emerald-300", hex: "#6ee7b7" },
-  lavender: { bg: "bg-violet-400/10", border: "border-violet-400/25", text: "text-violet-600 dark:text-violet-300", dot: "bg-violet-300", hex: "#c4b5fd" },
-  peach: { bg: "bg-orange-400/10", border: "border-orange-400/25", text: "text-orange-600 dark:text-orange-300", dot: "bg-orange-300", hex: "#fdba74" },
-  coral: { bg: "bg-rose-400/10", border: "border-rose-400/25", text: "text-rose-600 dark:text-rose-300", dot: "bg-rose-300", hex: "#fca5a5" },
-  sage: { bg: "bg-green-400/10", border: "border-green-400/25", text: "text-green-600 dark:text-green-300", dot: "bg-green-300", hex: "#86efac" },
-  ice: { bg: "bg-sky-400/10", border: "border-sky-400/25", text: "text-sky-600 dark:text-sky-300", dot: "bg-sky-300", hex: "#7dd3fc" },
-  sand: { bg: "bg-slate-400/10", border: "border-slate-400/25", text: "text-slate-600 dark:text-slate-300", dot: "bg-slate-300", hex: "#cbd5e1" },
-  pink: { bg: "bg-pink-400/10", border: "border-pink-400/25", text: "text-pink-600 dark:text-pink-300", dot: "bg-pink-300", hex: "#f472b6" },
-  cream: { bg: "bg-amber-300/10", border: "border-amber-300/25", text: "text-amber-600 dark:text-amber-300", dot: "bg-amber-300", hex: "#fde68a" },
+  mint: { bg: "bg-emerald-400/10", border: "border-0", text: "text-emerald-600 dark:text-emerald-300", dot: "bg-emerald-300", hex: "#6ee7b7" },
+  lavender: { bg: "bg-violet-400/10", border: "border-0", text: "text-violet-600 dark:text-violet-300", dot: "bg-violet-300", hex: "#c4b5fd" },
+  peach: { bg: "bg-orange-400/10", border: "border-0", text: "text-orange-600 dark:text-orange-300", dot: "bg-orange-300", hex: "#fdba74" },
+  coral: { bg: "bg-rose-400/10", border: "border-0", text: "text-rose-600 dark:text-rose-300", dot: "bg-rose-300", hex: "#fca5a5" },
+  sage: { bg: "bg-green-400/10", border: "border-0", text: "text-green-600 dark:text-green-300", dot: "bg-green-300", hex: "#86efac" },
+  ice: { bg: "bg-sky-400/10", border: "border-0", text: "text-sky-600 dark:text-sky-300", dot: "bg-sky-300", hex: "#7dd3fc" },
+  sand: { bg: "bg-slate-400/10", border: "border-0", text: "text-slate-600 dark:text-slate-300", dot: "bg-slate-300", hex: "#cbd5e1" },
+  pink: { bg: "bg-pink-400/10", border: "border-0", text: "text-pink-600 dark:text-pink-300", dot: "bg-pink-300", hex: "#f472b6" },
+  cream: { bg: "bg-amber-300/10", border: "border-0", text: "text-amber-600 dark:text-amber-300", dot: "bg-amber-300", hex: "#fde68a" },
 };
 
 /**
@@ -840,7 +840,7 @@ export default function MasterTimeCalendar({
     <div className={`flex flex-col w-full min-w-0 @container ${className}`}>
       
       {/* ─── Single Unified Calendar Control Bar Card ──────────────────── */}
-      <div className="p-2.5 sm:p-3.5 rounded-2xl border theme-border theme-bg-surface shadow-xs flex flex-col @[720px]:flex-row items-stretch @[720px]:items-center justify-between gap-2.5 sm:gap-3 mb-4 w-full min-w-0">
+      <div className="p-3 sm:p-4 rounded-3xl border-0 theme-bg-surface shadow-xs flex flex-col @[720px]:flex-row items-stretch @[720px]:items-center justify-between gap-2.5 sm:gap-3 mb-4 w-full min-w-0">
         
         {/* Left Side: Month Navigator with Arrow Buttons & Hijri Date (Left-aligned on all screen sizes) */}
         {viewMode === "month" ? (
@@ -895,7 +895,7 @@ export default function MasterTimeCalendar({
             <h3 className="text-sm sm:text-base font-bold theme-text-primary tracking-tight">
               Upcoming Agenda & Schedules
             </h3>
-            <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
+            <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full theme-bg-accent-soft theme-accent border-0 shadow-2xs">
               {filteredEvents.length} items
             </span>
           </div>
@@ -943,15 +943,15 @@ export default function MasterTimeCalendar({
       </div>
 
       {/* ─── Calendar Main Content Area ─── */}
-      <div className="overflow-hidden rounded-2xl border theme-border theme-bg-surface shadow-xs w-full min-w-0">
+      <div className="overflow-hidden rounded-3xl border-0 theme-bg-surface shadow-xs w-full min-w-0">
         
         {/* ─── 1. Traditional 7-Column Month Grid View ─── */}
         {viewMode === "month" && displayMode === "grid" && (
           <div className="flex flex-col w-full min-w-0">
             {/* Weekday Header Columns (SUN to SAT) */}
-            <div className="grid grid-cols-7 border-b theme-border theme-bg-sub/60 text-center select-none shrink-0">
+            <div className="grid grid-cols-7 border-0 theme-bg-sub/40 text-center select-none shrink-0 py-1">
               {WEEKDAY_NAMES_SHORT.map((wd) => (
-                <div key={wd} className="py-1 @sm:py-2 text-[9px] @sm:text-[10px] @lg:text-xs font-bold tracking-wider uppercase border-r theme-border last:border-r-0 theme-text-secondary">
+                <div key={wd} className="py-1 text-[9px] @sm:text-[10px] @lg:text-xs font-bold tracking-wider uppercase border-0 theme-text-secondary">
                   {wd}
                 </div>
               ))}
@@ -966,7 +966,7 @@ export default function MasterTimeCalendar({
                 return (
                   <div
                     key={`week-${weekIdx}-${weekDays[0].dateStr}`}
-                    className="relative w-full border-b theme-border last:border-b-0"
+                    className="relative w-full border-0"
                   >
                     {/* Background 7-Day Columns Grid matching Weekday Header border */}
                     <div
@@ -994,7 +994,7 @@ export default function MasterTimeCalendar({
                                 handleOpenAddDrawer(cell.dateStr);
                               }
                             }}
-                            className={`border-r theme-border last:border-r-0 aspect-square @md:aspect-auto min-h-0 @md:min-h-[var(--week-min-h,88px)] w-full p-1 @sm:p-1.5 @xl:p-2 flex flex-col justify-between transition-colors cursor-pointer group select-none theme-bg-surface hover:theme-bg-sub/40 ${
+                            className={`border-0 aspect-square @md:aspect-auto min-h-0 @md:min-h-[var(--week-min-h,88px)] w-full p-1 @sm:p-1.5 @xl:p-2 flex flex-col justify-between transition-colors cursor-pointer group select-none theme-bg-surface hover:theme-bg-sub/40 rounded-lg ${
                               cell.isCurrentMonth ? "" : "opacity-40 hover:opacity-75"
                             }`}
                             title={dayEvents.length > 0 ? `${dayEvents.length} item(s) on ${cell.dateStr}. Click to view details.` : cell.dateStr}
@@ -1153,13 +1153,13 @@ export default function MasterTimeCalendar({
             <div className="p-1.5 @sm:p-3 @md:p-5 space-y-2 @sm:space-y-3.5 min-w-0">
               
               {/* Top Selected Day Date Header with Hijri Date */}
-              <div className="flex items-center justify-between gap-2 px-1 pb-1.5 border-b theme-border flex-wrap">
+              <div className="flex items-center justify-between gap-2 px-1 pb-2 border-0 flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs @sm:text-sm font-bold theme-text-primary">
                     {WEEKDAY_NAMES_FULL[selectedWeekday]}, {selectedDay} {MONTH_NAMES[viewMonth]} {viewYear}
                   </span>
                   {isHijriEnabled && (
-                    <span className="px-2 py-0.5 rounded-md text-[10px] @sm:text-[11px] font-mono font-bold theme-bg-accent-soft theme-accent border theme-border">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] @sm:text-[11px] font-mono font-bold theme-bg-accent-soft theme-accent border-0 shadow-2xs">
                       {getHijriDateString(selectedDateStr)}
                     </span>
                   )}
@@ -1171,8 +1171,8 @@ export default function MasterTimeCalendar({
 
               {/* Timeline Cards Container */}
               {selectedDayEvents.length === 0 ? (
-                <div className="p-6 @sm:p-10 text-center border theme-border rounded-xl @sm:rounded-2xl theme-bg-sub/30 my-2 flex flex-col items-center justify-center gap-2">
-                  <div className="p-2.5 rounded-xl theme-bg-surface border theme-border theme-text-secondary opacity-60 shadow-inner">
+                <div className="p-6 @sm:p-10 text-center border-0 rounded-2xl theme-bg-app shadow-xs my-2 flex flex-col items-center justify-center gap-2">
+                  <div className="p-2.5 rounded-xl theme-bg-surface border-0 theme-text-secondary opacity-60 shadow-xs">
                     <CalendarIcon className="w-5 h-5" />
                   </div>
                   <div>
@@ -1183,7 +1183,7 @@ export default function MasterTimeCalendar({
                     <button
                       type="button"
                       onClick={() => handleOpenAddDrawer(selectedDateStr)}
-                      className="mt-1 px-3 py-1.5 rounded-xl text-xs font-bold border theme-border theme-bg-surface hover:theme-bg-elevated theme-text-primary transition-all cursor-pointer shadow-xs"
+                      className="mt-1 px-3 py-1.5 rounded-xl text-xs font-bold border-0 theme-bg-surface hover:theme-bg-elevated theme-text-primary transition-all cursor-pointer shadow-xs"
                     >
                       + Add Schedule / Event
                     </button>
@@ -1213,16 +1213,16 @@ export default function MasterTimeCalendar({
 
                         {/* Timeline Spine Line & Dot Indicator */}
                         <div className="flex flex-col items-center self-stretch shrink-0 relative pt-2 @sm:pt-2.5">
-                          <div className={`w-1.5 h-1.5 @sm:w-2 @sm:h-2 rounded-full ${style.dot} ring-2 ring-transparent group-hover:scale-125 transition-transform z-10`} />
+                          <div className={`w-1.5 h-1.5 @sm:w-2 @sm:h-2 rounded-full ${style.dot} group-hover:scale-125 transition-transform z-10`} />
                           {idx < selectedDayEvents.length - 1 && (
-                            <div className="w-0.5 flex-1 bg-[var(--border-color,rgba(0,0,0,0.1))] mt-1" />
+                            <div className="w-0.5 flex-1 bg-current opacity-15 mt-1" />
                           )}
                         </div>
 
                         {/* Event Card (Maximum usable width) */}
                         <div
                           onClick={() => handleOpenEventDetail(evt, selectedDateStr)}
-                          className="flex-1 min-w-0 p-1.5 @sm:p-2.5 @md:p-3.5 rounded-xl @sm:rounded-2xl border theme-border theme-bg-surface hover:theme-bg-sub/50 transition-all duration-200 cursor-pointer shadow-2xs relative overflow-hidden flex items-center justify-between gap-1.5 @sm:gap-2.5"
+                          className="flex-1 min-w-0 p-2 @sm:p-3 @md:p-3.5 rounded-2xl border-0 theme-bg-surface hover:theme-bg-elevated/40 transition-all duration-200 cursor-pointer shadow-xs relative overflow-hidden flex items-center justify-between gap-1.5 @sm:gap-2.5"
                         >
                           {/* Left Accent Bar */}
                           <div className={`absolute left-0 top-0 bottom-0 w-1 @sm:w-1.5 ${style.dot}`} />
@@ -1273,7 +1273,7 @@ export default function MasterTimeCalendar({
         {viewMode === "list" && (
           <div className="p-3 @sm:p-4 space-y-2.5 @sm:space-y-3">
             {filteredEvents.length === 0 ? (
-              <div className="p-10 @sm:p-12 text-center text-xs theme-text-secondary border theme-border rounded-xl theme-bg-sub/30">
+              <div className="p-10 @sm:p-12 text-center text-xs theme-text-secondary border-0 rounded-2xl theme-bg-app shadow-xs">
                 No events or working hours matching the filter criteria.
               </div>
             ) : (
@@ -1285,14 +1285,14 @@ export default function MasterTimeCalendar({
                   <div
                     key={evt.id}
                     onClick={() => handleOpenEventDetail(evt)}
-                    className="p-3.5 @sm:p-4 rounded-xl border theme-border theme-bg-surface hover:theme-bg-sub/50 transition cursor-pointer flex flex-col @sm:flex-row items-start @sm:items-center justify-between gap-2.5 @sm:gap-4 shadow-xs"
+                    className="p-3.5 @sm:p-4 rounded-2xl border-0 theme-bg-surface hover:theme-bg-elevated/40 transition cursor-pointer flex flex-col @sm:flex-row items-start @sm:items-center justify-between gap-2.5 @sm:gap-4 shadow-xs"
                   >
                     <div className="flex items-start @sm:items-center gap-3 min-w-0 flex-1">
                       <div className={`w-2.5 h-2.5 @sm:w-3 @sm:h-3 rounded-full shrink-0 mt-1 @sm:mt-0 ${style.dot}`} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="text-xs @sm:text-sm font-bold theme-text-primary truncate">{evt.title}</h4>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${style.bg} ${style.text} ${style.border}`}>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border-0 ${style.bg} ${style.text}`}>
                             {getEventDisplayType(evt, activeTenantId)}
                           </span>
                         </div>
@@ -1303,7 +1303,7 @@ export default function MasterTimeCalendar({
                       </div>
                     </div>
 
-                    <div className="text-left @sm:text-right shrink-0 flex @sm:flex-col items-center @sm:items-end justify-between w-full @sm:w-auto pt-1 @sm:pt-0 border-t @sm:border-t-0 theme-border">
+                    <div className="text-left @sm:text-right shrink-0 flex @sm:flex-col items-center @sm:items-end justify-between w-full @sm:w-auto pt-1 @sm:pt-0 border-0">
                       {!isAllDay ? (
                         <div className={`font-mono font-bold text-xs ${style.text}`}>
                           {formatTime12(evt.startTime)} – {formatTime12(evt.endTime)}

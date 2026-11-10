@@ -6,7 +6,7 @@ import {
   ROLE_KPI_CARDS_CATALOG,
   type KpiCardCatalogItem,
 } from '../widgetRegistry';
-import { AVAILABLE_APP_SHORTCUTS } from './widgets/QuickActionsWidget';
+import { AVAILABLE_APP_SHORTCUTS } from './widgets';
 import CustomCheckbox from '../../../components/ui/CustomCheckbox';
 import { useFeatureControl } from '../../../context/FeatureControlContext';
 import {
@@ -25,7 +25,6 @@ export const CONFIGURABLE_WIDGET_IDS = new Set([
   'kpi_metrics',
   'recitation_trends',
   'quick_actions',
-  'academic_calendar',
   'working_hours',
   'academic_events',
 ]);
@@ -365,41 +364,7 @@ export default function DashboardWidgetCardItem({
             </div>
           )}
 
-          {/* 4. Master Academic Calendar */}
-          {widgetDef.id === 'academic_calendar' && (
-            <div className="space-y-3 pt-1 text-xs">
-              <div className="font-bold theme-text-primary flex items-center gap-1.5 pb-1 border-b theme-border">
-                <CalendarIcon className="w-3.5 h-3.5 theme-accent" />
-                <span>Default Calendar Category</span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-1.5 pt-1">
-                {[
-                  { id: 'ALL', label: 'All Entries' },
-                  { id: 'ACADEMIC_EVENT', label: 'Events' },
-                  { id: 'WORKING_HOURS', label: 'Shifts' },
-                ].map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() =>
-                      onUpdateSettings?.({ defaultCategory: cat.id })
-                    }
-                    disabled={disabled}
-                    className={`py-1.5 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                      (settings.defaultCategory || 'ALL') === cat.id
-                        ? 'theme-bg-accent theme-accent-text border-transparent shadow-xs'
-                        : 'theme-bg-sub theme-text-secondary border theme-border hover:theme-text-primary'
-                    }`}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 5. Working Hours & Shifts */}
+          {/* 4. Working Hours & Shifts */}
           {widgetDef.id === 'working_hours' && (
             <div className="space-y-3 pt-1 text-xs">
               <div className="font-bold theme-text-primary flex items-center justify-between pb-1 border-b theme-border">

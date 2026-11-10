@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from '../../../../i18n';
-import type { DashboardQuickAction } from '../../types';
-import { useFeatureControl } from '../../../../context/FeatureControlContext';
+import { useTranslation } from '../../../../../i18n';
+import type { DashboardQuickAction } from '../../../types';
+import { useFeatureControl } from '../../../../../context/FeatureControlContext';
 import {
   SparklesIcon,
   BookOpenIcon,
@@ -14,7 +14,7 @@ import {
   TeacherIcon,
   BuildingOfficeIcon,
   PlusIcon,
-} from '../../../../components/ui/Icons';
+} from '../../../../../components/ui/Icons';
 
 export interface AppShortcutItem {
   id: string;

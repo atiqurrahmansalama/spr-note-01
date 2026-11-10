@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useTranslation } from '../../../../i18n';
-import type { DashboardMetric } from '../../types';
+import { useTranslation } from '../../../../../i18n';
+import type { DashboardMetric } from '../../../types';
 
 export interface KpiMetricsWidgetProps {
   metrics?: DashboardMetric[];

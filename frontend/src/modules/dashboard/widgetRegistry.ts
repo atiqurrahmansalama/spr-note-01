@@ -15,7 +15,6 @@ import {
   ResidentialOccupancyWidget,
   NoticeBoardWidget,
   RecitationTrendsWidget,
-  AcademicCalendarWidget,
   WorkingHoursWidget,
   AcademicEventsWidget,
   AgendaScheduleWidget,
@@ -204,18 +203,6 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     requiredFeatureKey: 'academy_calendar_events',
     component: UpcomingEventsWidget,
   },
-  academic_calendar: {
-    id: 'academic_calendar',
-    title: 'Academic Calendar & Schedule (Master)',
-    description: 'Interactive monthly/agenda view of academic events, working hours, and shifts from Calendar & Events.',
-    category: 'CALENDAR',
-    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STAFF', 'STUDENT', 'GUARDIAN'],
-    defaultColSpan: 4,
-    minColSpan: 2,
-    maxColSpan: 4,
-    requiredFeatureKey: 'academy_calendar_events',
-    component: AcademicCalendarWidget,
-  },
   working_hours: {
     id: 'working_hours',
     title: 'Working Hours & Shifts',
@@ -345,7 +332,7 @@ export const DEFAULT_ROLE_LAYOUTS: Record<string, DashboardLayoutItem[]> = {
     { widgetId: 'attendance_pulse', order: 3, colSpan: 2, isVisible: true },
     { widgetId: 'timetable_schedule', order: 4, colSpan: 2, isVisible: true },
     { widgetId: 'notice_board', order: 5, colSpan: 2, isVisible: true },
-    { widgetId: 'upcoming_events', order: 6, colSpan: 4, isVisible: true },
+    { widgetId: 'academic_events', order: 6, colSpan: 4, isVisible: true },
   ],
   GUARDIAN: [
     { widgetId: 'kpi_metrics', order: 1, colSpan: 4, isVisible: true },
@@ -353,7 +340,7 @@ export const DEFAULT_ROLE_LAYOUTS: Record<string, DashboardLayoutItem[]> = {
     { widgetId: 'attendance_pulse', order: 3, colSpan: 2, isVisible: true },
     { widgetId: 'finance_overview', order: 4, colSpan: 2, isVisible: true },
     { widgetId: 'notice_board', order: 5, colSpan: 2, isVisible: true },
-    { widgetId: 'upcoming_events', order: 6, colSpan: 4, isVisible: true },
+    { widgetId: 'academic_events', order: 6, colSpan: 4, isVisible: true },
   ],
 };
 
@@ -514,8 +501,8 @@ export function getSavedLayout(tenantId: string, role: DashboardRole, userId?: s
   const roleTemplateKey = `spr_dashboard_template_${tenantId || 'default'}_${role}_v1`;
 
   const normalizeLayoutItems = (items: any[]): DashboardLayoutItem[] => {
-    // 1. Remove legacy monolithic academic_calendar widget
-    let filtered = items.filter((i) => i && i.widgetId !== 'academic_calendar');
+    // 1. Remove legacy monolithic academic_calendar and upcoming_events widgets
+    let filtered = items.filter((i) => i && i.widgetId !== 'academic_calendar' && i.widgetId !== 'upcoming_events');
 
     // 2. Ensure separated widgets (working_hours, academic_events, agenda_schedule) exist for roles
     const hasWorkingHours = filtered.some((i) => i.widgetId === 'working_hours');

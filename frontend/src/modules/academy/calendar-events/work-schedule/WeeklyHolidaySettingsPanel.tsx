@@ -12,6 +12,7 @@ import {
   SaveIcon,
   ClockIcon,
   ShieldCheckIcon,
+  CheckIcon,
 } from "../../../../components/ui/Icons";
 import CustomCheckbox from "../../../../components/ui/CustomCheckbox";
 
@@ -123,7 +124,7 @@ export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProp
   return (
     <div className="w-full space-y-6 animate-fade-in text-left">
       {/* ─── Top Header Card ────────────────────────────────────────── */}
-      <div className="p-4 sm:p-5 rounded-2xl border theme-border theme-bg-surface shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 min-w-0">
+      <div className="p-4 sm:p-5 rounded-3xl border-0 theme-bg-surface shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 min-w-0">
         <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
           <div className="p-2.5 rounded-xl theme-bg-accent-soft theme-accent shrink-0 mt-0.5 sm:mt-0 shadow-inner">
             <CalendarIcon className="w-5 h-5" />
@@ -133,7 +134,7 @@ export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProp
               <h2 className="text-base sm:text-lg font-bold theme-text-primary tracking-tight">
                 Weekly Institutional Holiday &amp; Weekend Schedule
               </h2>
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
+              <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full theme-bg-accent-soft theme-accent border-0 shadow-2xs">
                 {config.weekendDays.length === 1
                   ? "1 Day Weekend"
                   : `${config.weekendDays.length} Days Weekend`}
@@ -151,7 +152,7 @@ export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProp
             <button
               type="button"
               onClick={() => setConfig(savedConfig)}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold theme-bg-sub border theme-border theme-text-secondary hover:theme-text-primary transition cursor-pointer flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold theme-bg-sub border-0 theme-text-secondary hover:theme-bg-elevated hover:theme-text-primary transition cursor-pointer flex items-center gap-1.5"
             >
               <RefreshIcon className="w-3.5 h-3.5" />
               <span>Cancel</span>
@@ -162,10 +163,10 @@ export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProp
             type="button"
             onClick={handleSave}
             disabled={!hasChanges || isSaving}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 shadow-xs ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 shadow-xs border-0 ${
               hasChanges
                 ? "theme-bg-accent text-white hover:opacity-90"
-                : "opacity-50 cursor-not-allowed theme-bg-sub theme-text-secondary border theme-border"
+                : "opacity-50 cursor-not-allowed theme-bg-sub theme-text-secondary"
             }`}
           >
             <SaveIcon className="w-3.5 h-3.5" />
@@ -175,8 +176,8 @@ export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProp
       </div>
 
       {/* ─── Card 1: Day Selection ─────────────────── */}
-      <div className="p-5 sm:p-6 rounded-2xl border theme-border theme-bg-surface shadow-xs space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b theme-border">
+      <div className="p-5 sm:p-6 rounded-3xl border-0 theme-bg-surface shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-0">
           <div>
             <h3 className="text-sm sm:text-base font-bold theme-text-primary flex items-center gap-2">
               <ClockIcon className="w-4 h-4 theme-accent" />
@@ -186,7 +187,7 @@ export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProp
               Click individual day badges to toggle weekly holiday days and active academic working days for your institution.
             </p>
           </div>
-          <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg theme-bg-sub border theme-border theme-text-secondary self-start sm:self-auto">
+          <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full theme-bg-sub border-0 shadow-2xs theme-text-secondary self-start sm:self-auto">
             {config.weekendDays.length} of 7 Days Holiday
           </span>
         </div>
@@ -201,18 +202,25 @@ export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProp
                 key={wDay.code}
                 type="button"
                 onClick={() => handleToggleDay(wDay.code)}
-                className={`p-3.5 rounded-2xl border text-center transition cursor-pointer flex flex-col items-center justify-center gap-1.5 shadow-2xs ${
+                className={`p-3.5 rounded-2xl border-0 text-center transition cursor-pointer flex flex-col items-center justify-center gap-2 shadow-xs relative ${
                   isHoliday
-                    ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)] ring-1 ring-[var(--accent-main)]/20"
-                    : "theme-bg-sub/50 border theme-border theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated"
+                    ? "bg-[var(--accent-main)]/15 dark:bg-[var(--accent-main)]/25 border-0 ring-0"
+                    : "theme-bg-app hover:theme-bg-elevated/40 border-0 text-secondary hover:theme-text-primary"
                 }`}
               >
-                <span className="text-sm font-bold">{wDay.label}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold theme-text-primary">{wDay.label}</span>
+                  {isHoliday && (
+                    <div className="w-4 h-4 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center shadow-xs shrink-0">
+                      <CheckIcon className="w-2.5 h-2.5 stroke-[3]" />
+                    </div>
+                  )}
+                </div>
                 <span
-                  className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                  className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border-0 ${
                     isHoliday
                       ? "theme-bg-accent text-white"
-                      : "theme-bg-surface theme-text-secondary border theme-border"
+                      : "theme-bg-surface theme-text-secondary shadow-2xs"
                   }`}
                 >
                   {isHoliday ? "Holiday" : "Academic Day"}
@@ -224,8 +232,8 @@ export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProp
       </div>
 
       {/* ─── Card 2: Impact Policies & Summary ────────────────────────── */}
-      <div className="p-5 sm:p-6 rounded-2xl border theme-border theme-bg-surface shadow-xs space-y-5">
-        <div className="pb-4 border-b theme-border">
+      <div className="p-5 sm:p-6 rounded-3xl border-0 theme-bg-surface shadow-xs space-y-5">
+        <div className="pb-2 border-0">
           <h3 className="text-sm sm:text-base font-bold theme-text-primary flex items-center gap-2">
             <ShieldCheckIcon className="w-4 h-4 theme-accent" />
             <span>Institutional Rules &amp; Breakdown</span>
@@ -237,7 +245,7 @@ export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProp
 
         {/* Policy Options */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 rounded-2xl theme-bg-sub/40 border theme-border space-y-2">
+          <div className="p-4 rounded-2xl theme-bg-app border-0 shadow-xs space-y-2">
             <CustomCheckbox
               label="Affects Class Timetables & Daily Routines"
               checked={Boolean(config.affectsTimetable)}
@@ -250,7 +258,7 @@ export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProp
             </p>
           </div>
 
-          <div className="p-4 rounded-2xl theme-bg-sub/40 border theme-border space-y-2">
+          <div className="p-4 rounded-2xl theme-bg-app border-0 shadow-xs space-y-2">
             <CustomCheckbox
               label="Auto-Excuse in Class & Staff Attendance (Event Calendar Sync)"
               checked={Boolean(config.affectsAttendance)}
@@ -265,7 +273,7 @@ export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProp
         </div>
 
         {/* Live Breakdown Banner */}
-        <div className="p-4 rounded-2xl theme-bg-sub/60 border theme-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="p-4 rounded-2xl theme-bg-app border-0 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
               Active Academic Week Summary
@@ -285,7 +293,7 @@ export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProp
           <button
             type="button"
             onClick={handleReset}
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold theme-bg-surface border theme-border theme-text-secondary hover:theme-text-primary transition cursor-pointer self-start sm:self-auto shrink-0"
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold theme-bg-surface border-0 shadow-xs theme-text-secondary hover:theme-bg-elevated hover:theme-text-primary transition cursor-pointer self-start sm:self-auto shrink-0"
           >
             Reset to Friday Default
           </button>

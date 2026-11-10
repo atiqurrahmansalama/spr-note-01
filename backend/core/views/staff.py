@@ -94,10 +94,20 @@ class StaffProfileViewSet(viewsets.ModelViewSet):
         if tenant_id:
             base_qs = base_qs.filter(institution_id=tenant_id)
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
-            if user.institution_id:
-                base_qs = base_qs.filter(institution_id=user.institution_id)
-            elif hasattr(user, 'staff_profile') and user.staff_profile and user.staff_profile.institution_id:
-                base_qs = base_qs.filter(institution_id=user.staff_profile.institution_id)
+            target_inst_id = user.institution_id
+            if not target_inst_id and hasattr(user, 'staff_profile') and user.staff_profile:
+                target_inst_id = user.staff_profile.institution_id
+            if not target_inst_id:
+                sp = StaffProfile.objects.filter(user=user).first()
+                if sp and sp.institution_id:
+                    target_inst_id = sp.institution_id
+            if target_inst_id:
+                base_qs = base_qs.filter(institution_id=target_inst_id)
+            elif getattr(user, 'user_type', '').upper() in ['ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL']:
+                from core.models import AcademicInstitution
+                primary = AcademicInstitution.objects.filter(is_deleted=False).first()
+                if primary:
+                    base_qs = base_qs.filter(institution_id=primary.id)
             else:
                 base_qs = base_qs.filter(user=user)
 
@@ -223,13 +233,11 @@ class TeacherAssignmentViewSet(viewsets.ModelViewSet):
         )
 
         tenant_id = get_scoped_tenant_id(self.request)
-        if tenant_id:
-            base_qs = base_qs.filter(teacher__institution_id=tenant_id)
+        target_inst_id = tenant_id or user.institution_id or getattr(getattr(user, 'staff_profile', None), 'institution_id', None)
+        if target_inst_id:
+            base_qs = base_qs.filter(teacher__institution_id=target_inst_id)
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
-            if user.institution_id:
-                base_qs = base_qs.filter(teacher__institution_id=user.institution_id)
-            else:
-                base_qs = base_qs.filter(teacher__user=user)
+            base_qs = base_qs.filter(teacher__user=user)
 
         teacher_id = self.request.query_params.get('teacher')
         if teacher_id:
@@ -289,13 +297,11 @@ class GeneralStaffDutyViewSet(viewsets.ModelViewSet):
         base_qs = GeneralStaffDuty.objects.select_related('staff__user', 'staff__institution')
 
         tenant_id = get_scoped_tenant_id(self.request)
-        if tenant_id:
-            base_qs = base_qs.filter(staff__institution_id=tenant_id)
+        target_inst_id = tenant_id or user.institution_id or getattr(getattr(user, 'staff_profile', None), 'institution_id', None)
+        if target_inst_id:
+            base_qs = base_qs.filter(staff__institution_id=target_inst_id)
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
-            if user.institution_id:
-                base_qs = base_qs.filter(staff__institution_id=user.institution_id)
-            else:
-                base_qs = base_qs.filter(staff__user=user)
+            base_qs = base_qs.filter(staff__user=user)
 
         staff_id = self.request.query_params.get('staff')
         if staff_id:
@@ -340,13 +346,11 @@ class StaffAttendanceViewSet(viewsets.ModelViewSet):
         )
 
         tenant_id = get_scoped_tenant_id(self.request)
-        if tenant_id:
-            base_qs = base_qs.filter(staff__institution_id=tenant_id)
+        target_inst_id = tenant_id or user.institution_id or getattr(getattr(user, 'staff_profile', None), 'institution_id', None)
+        if target_inst_id:
+            base_qs = base_qs.filter(staff__institution_id=target_inst_id)
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
-            if user.institution_id:
-                base_qs = base_qs.filter(staff__institution_id=user.institution_id)
-            else:
-                base_qs = base_qs.filter(staff__user=user)
+            base_qs = base_qs.filter(staff__user=user)
 
         date_val = self.request.query_params.get('date')
         if date_val:
@@ -443,13 +447,11 @@ class StaffLeaveRequestViewSet(viewsets.ModelViewSet):
         base_qs = StaffLeaveRequest.objects.select_related('staff__user', 'staff__institution', 'approved_by')
 
         tenant_id = get_scoped_tenant_id(self.request)
-        if tenant_id:
-            base_qs = base_qs.filter(staff__institution_id=tenant_id)
+        target_inst_id = tenant_id or user.institution_id or getattr(getattr(user, 'staff_profile', None), 'institution_id', None)
+        if target_inst_id:
+            base_qs = base_qs.filter(staff__institution_id=target_inst_id)
         elif not (user.is_superuser or getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN'):
-            if user.institution_id:
-                base_qs = base_qs.filter(staff__institution_id=user.institution_id)
-            else:
-                base_qs = base_qs.filter(staff__user=user)
+            base_qs = base_qs.filter(staff__user=user)
 
         staff_id = self.request.query_params.get('staff')
         if staff_id:

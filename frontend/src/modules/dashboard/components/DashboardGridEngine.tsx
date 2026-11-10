@@ -77,8 +77,8 @@ export default function DashboardGridEngine({
   widgetPropsMap = {},
 }: DashboardGridEngineProps) {
   const gridRef = useRef<HTMLDivElement>(null);
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
+  const [dragOverWidgetId, setDragOverWidgetId] = useState<string | null>(null);
 
   // Active border-drag resizing state
   const [resizing, setResizing] = useState<{
@@ -152,36 +152,44 @@ export default function DashboardGridEngine({
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  // Drag and drop handlers
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    setDraggedIndex(index);
+  // Drag and drop handlers by unique widgetId (immune to filtered display arrays)
+  const handleDragStart = (e: React.DragEvent, widgetId: string) => {
+    setDraggedWidgetId(widgetId);
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', String(index));
+    e.dataTransfer.setData('text/plain', widgetId);
   };
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
+  const handleDragOver = (e: React.DragEvent, widgetId: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    if (dragOverIndex !== index) {
-      setDragOverIndex(index);
+    if (dragOverWidgetId !== widgetId) {
+      setDragOverWidgetId(widgetId);
     }
   };
 
   const handleDragEnd = () => {
-    setDraggedIndex(null);
-    setDragOverIndex(null);
+    setDraggedWidgetId(null);
+    setDragOverWidgetId(null);
   };
 
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+  const handleDrop = (e: React.DragEvent, targetWidgetId: string) => {
     e.preventDefault();
-    if (draggedIndex === null || draggedIndex === dropIndex) {
+    if (!draggedWidgetId || draggedWidgetId === targetWidgetId) {
+      handleDragEnd();
+      return;
+    }
+
+    const fromIndex = items.findIndex((item) => item.widgetId === draggedWidgetId);
+    const toIndex = items.findIndex((item) => item.widgetId === targetWidgetId);
+
+    if (fromIndex === -1 || toIndex === -1) {
       handleDragEnd();
       return;
     }
 
     const newItems = [...items];
-    const [movedItem] = newItems.splice(draggedIndex, 1);
-    newItems.splice(dropIndex, 0, movedItem);
+    const [movedItem] = newItems.splice(fromIndex, 1);
+    newItems.splice(toIndex, 0, movedItem);
 
     // Re-assign sequential order ranks
     const reordered = newItems.map((item, idx) => ({
@@ -193,15 +201,24 @@ export default function DashboardGridEngine({
     handleDragEnd();
   };
 
-  // Move up/down single-step helper (touch-friendly)
-  const handleMoveStep = (index: number, direction: 'UP' | 'DOWN') => {
-    const targetIndex = direction === 'UP' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= items.length) return;
+  // Move up/down step helper based on widgetId and displayed sequence
+  const handleMoveStep = (widgetId: string, direction: 'UP' | 'DOWN') => {
+    const currentDisplayIdx = displayItems.findIndex((i) => i.widgetId === widgetId);
+    if (currentDisplayIdx === -1) return;
+
+    const targetDisplayIdx = direction === 'UP' ? currentDisplayIdx - 1 : currentDisplayIdx + 1;
+    if (targetDisplayIdx < 0 || targetDisplayIdx >= displayItems.length) return;
+
+    const targetWidgetId = displayItems[targetDisplayIdx].widgetId;
+    const fromIndex = items.findIndex((i) => i.widgetId === widgetId);
+    const toIndex = items.findIndex((i) => i.widgetId === targetWidgetId);
+
+    if (fromIndex === -1 || toIndex === -1) return;
 
     const newItems = [...items];
-    const temp = newItems[index];
-    newItems[index] = newItems[targetIndex];
-    newItems[targetIndex] = temp;
+    const temp = newItems[fromIndex];
+    newItems[fromIndex] = newItems[toIndex];
+    newItems[toIndex] = temp;
 
     const reordered = newItems.map((item, idx) => ({
       ...item,
@@ -282,7 +299,7 @@ export default function DashboardGridEngine({
   return (
     <div className="space-y-6 w-full min-w-0">
       {displayItems.length === 0 ? (
-        <div className="p-8 sm:p-12 rounded-3xl theme-bg-surface border-2 border-dashed theme-border text-center flex flex-col items-center justify-center space-y-4 max-w-xl mx-auto my-8 animate-fade-in">
+        <div className="p-8 sm:p-12 rounded-3xl theme-bg-surface shadow-xs border-0 text-center flex flex-col items-center justify-center space-y-4 max-w-xl mx-auto my-8 animate-fade-in">
           <div className="w-16 h-16 rounded-2xl theme-bg-accent-soft text-[var(--accent-main)] flex items-center justify-center">
             <ShieldCheckIcon className="w-8 h-8" />
           </div>
@@ -299,7 +316,7 @@ export default function DashboardGridEngine({
               <button
                 type="button"
                 onClick={onOpenWidgetCatalog}
-                className="px-4 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition-all cursor-pointer flex items-center gap-2"
+                className="px-4 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition-all cursor-pointer flex items-center gap-2 border-0 ring-0"
               >
                 <Squares2X2Icon className="w-4 h-4" />
                 <span>Open Workspace Customizer</span>
@@ -326,8 +343,8 @@ export default function DashboardGridEngine({
             onReorderMetrics: (order: string[]) => handleReorderWidgetMetrics(layoutItem.widgetId, order),
           };
           const isHidden = layoutItem.isVisible === false;
-          const isDraggingThis = draggedIndex === index;
-          const isDragOverThis = dragOverIndex === index;
+          const isDraggingThis = draggedWidgetId === layoutItem.widgetId;
+          const isDragOverThis = dragOverWidgetId === layoutItem.widgetId;
           const isResizingThis = resizing?.widgetId === layoutItem.widgetId;
           const currentSpan = isResizingThis
             ? resizing.previewSpan
@@ -336,15 +353,17 @@ export default function DashboardGridEngine({
           return (
             <div
               key={`${layoutItem.widgetId}-${layoutItem.settings?.displayMode || 'def'}`}
+              id={`dashboard-widget-${layoutItem.widgetId}`}
+              data-widget-id={layoutItem.widgetId}
               draggable={isEditMode && !isResizingThis}
-              onDragStart={(e) => handleDragStart(e, index)}
-              onDragOver={(e) => handleDragOver(e, index)}
+              onDragStart={(e) => handleDragStart(e, layoutItem.widgetId)}
+              onDragOver={(e) => handleDragOver(e, layoutItem.widgetId)}
               onDragEnd={handleDragEnd}
-              onDrop={(e) => handleDrop(e, index)}
+              onDrop={(e) => handleDrop(e, layoutItem.widgetId)}
               className={`${getColSpanClass(currentSpan)} min-w-0 h-full flex flex-col transition-all duration-150 relative group/card ${
                 isDraggingThis ? 'opacity-40 scale-[0.98]' : 'opacity-100'
-              } ${isDragOverThis ? 'ring-2 ring-[var(--accent-main)] ring-offset-2 rounded-2xl' : ''} ${
-                isResizingThis ? 'ring-2 ring-[var(--accent-main)] shadow-xl z-30' : ''
+              } ${isDragOverThis ? 'bg-[var(--accent-main)]/10 rounded-3xl' : ''} ${
+                isResizingThis ? 'shadow-xl z-30' : ''
               }`}
             >
               {/* Right Border Interactive Drag Handle (Drag to resize 1 to 4 cols) */}
@@ -368,7 +387,7 @@ export default function DashboardGridEngine({
 
               {/* Edit Mode Customization Overlay & Action Bar */}
               {isEditMode && (
-                <div className="mb-2 p-2 rounded-xl theme-bg-surface shadow-xs flex items-center justify-between gap-2 z-10 select-none animate-fade-in">
+                <div className="mb-2 p-2 rounded-xl theme-bg-surface shadow-xs flex items-center justify-between gap-2 z-10 select-none animate-fade-in border-0">
                   {/* Left: Drag Handle & Widget Title */}
                   <div className="flex items-center gap-2 min-w-0 cursor-grab active:cursor-grabbing">
                     <GripVerticalIcon className="w-4 h-4 theme-text-secondary shrink-0" />
@@ -392,7 +411,7 @@ export default function DashboardGridEngine({
                           widgetDef.maxColSpan || 4
                         )
                       }
-                      className="px-2 py-1 rounded-lg text-[10px] font-bold theme-bg-sub hover:theme-bg-elevated theme-text-primary transition-all cursor-pointer flex items-center gap-1"
+                      className="px-2 py-1 rounded-lg text-[10px] font-bold theme-bg-sub hover:theme-bg-elevated theme-text-primary transition-all cursor-pointer flex items-center gap-1 border-0"
                       title="Toggle Width (1-Col, 2-Col, 3-Col, Full Width)"
                     >
                       <Squares2X2Icon className="w-3 h-3 theme-accent" />
@@ -403,8 +422,8 @@ export default function DashboardGridEngine({
                     <button
                       type="button"
                       disabled={index === 0}
-                      onClick={() => handleMoveStep(index, 'UP')}
-                      className="p-1 rounded-lg theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary disabled:opacity-40 cursor-pointer"
+                      onClick={() => handleMoveStep(layoutItem.widgetId, 'UP')}
+                      className="p-1 rounded-lg theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary disabled:opacity-40 cursor-pointer border-0"
                       title="Move Up"
                     >
                       <ArrowUpIcon className="w-3 h-3" />
@@ -412,9 +431,9 @@ export default function DashboardGridEngine({
 
                     <button
                       type="button"
-                      disabled={index === items.length - 1}
-                      onClick={() => handleMoveStep(index, 'DOWN')}
-                      className="p-1 rounded-lg theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary disabled:opacity-40 cursor-pointer"
+                      disabled={index === displayItems.length - 1}
+                      onClick={() => handleMoveStep(layoutItem.widgetId, 'DOWN')}
+                      className="p-1 rounded-lg theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary disabled:opacity-40 cursor-pointer border-0"
                       title="Move Down"
                     >
                       <ArrowDownIcon className="w-3 h-3" />
@@ -424,7 +443,7 @@ export default function DashboardGridEngine({
                     <button
                       type="button"
                       onClick={() => handleToggleVisibility(layoutItem.widgetId)}
-                      className={`p-1 rounded-lg transition-all cursor-pointer ${
+                      className={`p-1 rounded-lg transition-all cursor-pointer border-0 ${
                         isHidden
                           ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
                           : 'theme-bg-sub theme-text-secondary hover:theme-text-primary'
@@ -451,7 +470,7 @@ export default function DashboardGridEngine({
 
       {/* Edit Mode Bottom Helper & Add Widget Launchpad */}
       {isEditMode && onOpenWidgetCatalog && (
-        <div className="p-4 rounded-2xl theme-bg-surface border-2 border-dashed theme-border flex flex-col sm:flex-row items-center justify-between gap-3 animate-fade-in text-center sm:text-left">
+        <div className="p-4 rounded-2xl theme-bg-surface shadow-xs border-0 flex flex-col sm:flex-row items-center justify-between gap-3 animate-fade-in text-center sm:text-left">
           <div className="space-y-0.5">
             <h4 className="text-sm font-bold theme-text-primary">
               Customize Your Workspace Layout
@@ -464,7 +483,7 @@ export default function DashboardGridEngine({
           <button
             type="button"
             onClick={onOpenWidgetCatalog}
-            className="px-4 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition-all cursor-pointer flex items-center gap-2 shrink-0"
+            className="px-4 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition-all cursor-pointer flex items-center gap-2 shrink-0 border-0 ring-0"
           >
             <PlusIcon className="w-4 h-4" />
             <span>Add More Widgets</span>

@@ -143,7 +143,7 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs sm:text-sm font-semibold rounded-2xl border theme-border theme-bg-sub hover:theme-bg-elevated transition focus:outline-none focus:border-[var(--accent-main)] focus:ring-1 focus:ring-[var(--accent-main)] cursor-pointer"
+        className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs sm:text-sm font-semibold rounded-2xl border-0 theme-bg-sub hover:theme-bg-elevated transition focus:outline-none cursor-pointer shadow-xs"
       >
         <span className={value ? "font-medium font-mono theme-text-primary" : "theme-text-secondary"}>
           {value ? formatTime12(value) : placeholder}
@@ -152,7 +152,7 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1.5 z-50 p-2 rounded-xl theme-bg-surface border theme-border shadow-xl animate-fade-in flex gap-1.5 w-48">
+        <div className="absolute left-0 top-full mt-1.5 z-50 p-2 rounded-2xl theme-bg-surface border-0 shadow-xl animate-fade-in flex gap-1.5 w-48">
           {/* Hours Column */}
           <div className="flex-1 max-h-40 overflow-y-auto scrollbar-none space-y-0.5">
             {hoursList.map((h) => (
@@ -163,7 +163,7 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
                   setSelHour(h);
                   commitTime(h, selMinute, selPeriod);
                 }}
-                className={`w-full py-1 text-xs rounded-md font-mono transition text-center cursor-pointer ${
+                className={`w-full py-1 text-xs rounded-md font-mono transition text-center cursor-pointer border-0 ${
                   selHour === h
                     ? "theme-bg-accent text-white font-bold"
                     : "hover:theme-bg-elevated theme-text-primary"
@@ -175,7 +175,7 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
           </div>
 
           {/* Minutes Column (5 min step) */}
-          <div className="flex-1 max-h-40 overflow-y-auto scrollbar-none px-1 space-y-0.5 border-l theme-border">
+          <div className="flex-1 max-h-40 overflow-y-auto scrollbar-none px-1 space-y-0.5 border-0">
             {minutesList.map((m) => (
               <button
                 key={m}
@@ -184,7 +184,7 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
                   setSelMinute(m);
                   commitTime(selHour, m, selPeriod);
                 }}
-                className={`w-full py-1 text-xs rounded-md font-mono transition text-center cursor-pointer ${
+                className={`w-full py-1 text-xs rounded-md font-mono transition text-center cursor-pointer border-0 ${
                   selMinute === m
                     ? "theme-bg-accent text-white font-bold"
                     : "hover:theme-bg-elevated theme-text-primary"
@@ -196,7 +196,7 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
           </div>
 
           {/* AM/PM Column */}
-          <div className="w-11 max-h-40 overflow-y-auto scrollbar-none pl-1 space-y-1 border-l theme-border flex flex-col justify-center">
+          <div className="w-11 max-h-40 overflow-y-auto scrollbar-none pl-1 space-y-1 border-0 flex flex-col justify-center">
             {["am", "pm"].map((p) => (
               <button
                 key={p}
@@ -298,7 +298,7 @@ export function UntilWhenPicker({
       <button
         type="button"
         onClick={handleToggle}
-        className="w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 rounded-2xl theme-bg-sub border theme-border theme-text-primary text-xs sm:text-sm font-semibold hover:theme-bg-elevated focus:outline-none focus:border-[var(--accent-main)] focus:ring-1 focus:ring-[var(--accent-main)] transition-all duration-200 cursor-pointer select-none shadow-2xs"
+        className="w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 rounded-2xl theme-bg-sub border-0 theme-text-primary text-xs sm:text-sm font-semibold hover:theme-bg-elevated focus:outline-none transition-all duration-200 cursor-pointer select-none shadow-xs"
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {until === "DATE" ? (
@@ -317,13 +317,13 @@ export function UntilWhenPicker({
 
       {/* Menu Dropdown when choosing between Ongoing and Specific Date */}
       {isMenuOpen && (
-        <div className="absolute z-50 right-0 left-0 mt-1.5 p-1.5 theme-bg-surface border theme-border rounded-2xl shadow-2xl space-y-1 animate-fade-in select-none">
+        <div className="absolute z-50 right-0 left-0 mt-1.5 p-1.5 theme-bg-surface border-0 rounded-2xl shadow-xl space-y-1 animate-fade-in select-none">
           <button
             type="button"
             onClick={handleSelectOngoing}
-            className={`w-full text-left px-3 py-2 text-xs rounded-xl transition flex items-center justify-between cursor-pointer ${
+            className={`w-full text-left px-3 py-2 text-xs rounded-xl transition flex items-center justify-between cursor-pointer border-0 ${
               until === "ONGOING"
-                ? "theme-bg-accent-soft theme-accent font-bold"
+                ? "bg-[var(--accent-main)]/15 theme-accent font-bold"
                 : "hover:theme-bg-elevated theme-text-primary"
             }`}
           >
@@ -334,9 +334,9 @@ export function UntilWhenPicker({
           <button
             type="button"
             onClick={handleSelectSpecificDate}
-            className={`w-full text-left px-3 py-2 text-xs rounded-xl transition flex items-center justify-between cursor-pointer ${
+            className={`w-full text-left px-3 py-2 text-xs rounded-xl transition flex items-center justify-between cursor-pointer border-0 ${
               until === "DATE"
-                ? "theme-bg-accent-soft theme-accent font-bold"
+                ? "bg-[var(--accent-main)]/15 theme-accent font-bold"
                 : "hover:theme-bg-elevated theme-text-primary"
             }`}
           >
@@ -350,7 +350,7 @@ export function UntilWhenPicker({
 
       {/* Calendar Picker Popup (Directly below Until when?) */}
       {isCalendarOpen && (
-        <div className="absolute z-50 right-0 mt-1.5 w-72 p-4 theme-bg-surface border theme-border rounded-2xl shadow-2xl space-y-3 animate-fade-in select-none">
+        <div className="absolute z-50 right-0 mt-1.5 w-72 p-4 theme-bg-surface border-0 rounded-2xl shadow-xl space-y-3 animate-fade-in select-none">
           <ReusableCalendar
             isInline={true}
             selectedDate={untilDate || startDate || new Date().toISOString().split("T")[0]}
@@ -361,7 +361,7 @@ export function UntilWhenPicker({
               setIsCalendarOpen(false);
             }}
           />
-          <div className="pt-2 border-t theme-border flex items-center justify-between text-xs">
+          <div className="pt-2 border-0 flex items-center justify-between text-xs">
             <button
               type="button"
               onClick={handleSelectOngoing}
@@ -418,15 +418,15 @@ export function EventColorPickerDropdown({ value, onChange }) {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl border transition cursor-pointer text-left focus:outline-none ${
+        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl border-0 transition cursor-pointer text-left focus:outline-none shadow-xs ${
           isOpen
-            ? "theme-border border-[var(--accent-main)] theme-bg-sub shadow-xs"
-            : "theme-border theme-bg-sub hover:border-[var(--accent-main)]/50"
+            ? "bg-[var(--accent-main)]/15 theme-bg-sub"
+            : "theme-bg-sub hover:theme-bg-elevated"
         }`}
       >
         <div className="flex items-center gap-2.5 min-w-0">
           <span
-            className="w-4 h-4 rounded-full shrink-0 shadow-xs border border-white/20"
+            className="w-4 h-4 rounded-full shrink-0 shadow-xs border-0"
             style={{ backgroundColor: selectedColor.hex }}
           />
           <span className="text-xs font-semibold theme-text-primary truncate">
@@ -437,7 +437,7 @@ export function EventColorPickerDropdown({ value, onChange }) {
           </span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0 ml-2">
-          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-surface border theme-border theme-text-secondary">
+          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-surface border-0 theme-text-secondary shadow-2xs">
             {isOpen ? "Close" : "Change"}
           </span>
           <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary" />
@@ -446,7 +446,7 @@ export function EventColorPickerDropdown({ value, onChange }) {
 
       {/* Expanded Color Palette with Color Names */}
       {isOpen && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-1.5 p-3 rounded-2xl theme-bg-surface border theme-border shadow-2xl space-y-3 animate-fade-in max-h-72 overflow-y-auto">
+        <div className="absolute z-50 left-0 right-0 top-full mt-1.5 p-3 rounded-2xl theme-bg-surface border-0 shadow-2xl space-y-3 animate-fade-in max-h-72 overflow-y-auto">
           {/* Soft & Light Pastel Colors */}
           <div>
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider theme-text-secondary block mb-1.5 px-0.5">
@@ -463,14 +463,14 @@ export function EventColorPickerDropdown({ value, onChange }) {
                       onChange(col.id);
                       setIsOpen(false);
                     }}
-                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-left transition cursor-pointer ${
+                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border-0 text-left transition cursor-pointer ${
                       isSelected
-                        ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/60 font-bold shadow-xs"
-                        : "theme-bg-sub/40 hover:theme-bg-sub border-transparent hover:border theme-border theme-text-primary"
+                        ? "bg-[var(--accent-main)]/15 theme-accent font-bold shadow-xs"
+                        : "theme-bg-app hover:theme-bg-elevated/40 theme-text-primary"
                     }`}
                   >
                     <span
-                      className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs border border-white/20"
+                      className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs border-0"
                       style={{ backgroundColor: col.hex }}
                     />
                     <span className="text-[11px] font-medium truncate flex-1">{col.label}</span>
@@ -482,7 +482,7 @@ export function EventColorPickerDropdown({ value, onChange }) {
           </div>
 
           {/* Standard Vibrant Colors */}
-          <div className="pt-2 border-t theme-border">
+          <div className="pt-2 border-0">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider theme-text-secondary block mb-1.5 px-0.5">
               Standard Vibrant
             </span>
@@ -497,14 +497,14 @@ export function EventColorPickerDropdown({ value, onChange }) {
                       onChange(col.id);
                       setIsOpen(false);
                     }}
-                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-left transition cursor-pointer ${
+                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border-0 text-left transition cursor-pointer ${
                       isSelected
-                        ? "theme-bg-accent-soft theme-accent border-[var(--accent-main)]/60 font-bold shadow-xs"
-                        : "theme-bg-sub/40 hover:theme-bg-sub border-transparent hover:border theme-border theme-text-primary"
+                        ? "bg-[var(--accent-main)]/15 theme-accent font-bold shadow-xs"
+                        : "theme-bg-app hover:theme-bg-elevated/40 theme-text-primary"
                     }`}
                   >
                     <span
-                      className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs border border-white/20"
+                      className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs border-0"
                       style={{ backgroundColor: col.hex }}
                     />
                     <span className="text-[11px] font-medium truncate flex-1">{col.label}</span>
@@ -1058,7 +1058,7 @@ export default function TimeScheduleDrawerForm({
       <form id={formId} onSubmit={handleSubmit} className="space-y-6 pt-2 @container">
         {/* ─── 1. Schedule Information Section ─── */}
         <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b theme-border">
+          <div className="flex items-center gap-2 pb-1.5 border-0">
             <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
               Schedule Information
             </h4>
@@ -1173,7 +1173,7 @@ export default function TimeScheduleDrawerForm({
 
         {/* ─── 2. Timing & Recurrence Section ─── */}
         <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b theme-border">
+          <div className="flex items-center gap-2 pb-1.5 border-0">
             <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
               Date & Timing
             </h4>
@@ -1201,7 +1201,7 @@ export default function TimeScheduleDrawerForm({
           </div>
 
           {/* All Day Toggle Switch */}
-          <div className="flex items-center justify-between p-3 rounded-xl border theme-border theme-bg-sub/50">
+          <div className="flex items-center justify-between p-3.5 rounded-2xl border-0 theme-bg-app shadow-xs">
             <div>
               <div className="text-xs font-bold theme-text-primary">All day</div>
             </div>
@@ -1237,7 +1237,7 @@ export default function TimeScheduleDrawerForm({
           )}
 
           {/* Repeats Toggle Switch (Matches All Day Toggle Design) */}
-          <div className="flex items-center justify-between p-3 rounded-xl border theme-border theme-bg-sub/50">
+          <div className="flex items-center justify-between p-3.5 rounded-2xl border-0 theme-bg-app shadow-xs">
             <div>
               <div className="text-xs font-bold theme-text-primary">Repeats</div>
             </div>
@@ -1270,10 +1270,10 @@ export default function TimeScheduleDrawerForm({
                         key={item.day}
                         type="button"
                         onClick={() => toggleRepeatDay(item.day)}
-                        className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full text-xs font-bold flex items-center justify-center transition cursor-pointer select-none ${
+                        className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full text-xs font-bold flex items-center justify-center transition cursor-pointer select-none border-0 ${
                           isSelected
                             ? "theme-bg-accent text-white shadow-sm"
-                            : "theme-bg-sub border theme-border theme-text-secondary hover:theme-text-primary"
+                            : "theme-bg-sub/60 theme-text-secondary hover:theme-bg-elevated/40 hover:theme-text-primary"
                         }`}
                         title={item.name}
                       >
@@ -1300,7 +1300,7 @@ export default function TimeScheduleDrawerForm({
 
         {/* ─── 3. Visual Styling Section ─── */}
         <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b theme-border">
+          <div className="flex items-center gap-2 pb-1.5 border-0">
             <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
               Visual Appearance
             </h4>
@@ -1328,19 +1328,19 @@ export default function TimeScheduleDrawerForm({
         )}
 
         {/* Bottom Action Buttons (Normal scrolling with content, not sticky) */}
-        <div className="pt-4 border-t theme-border flex items-center justify-end gap-2.5">
+        <div className="pt-4 border-0 flex items-center justify-end gap-2.5">
           {onCancel && (
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2.5 rounded-xl border theme-border hover:theme-bg-elevated theme-text-secondary text-sm font-semibold transition cursor-pointer"
+              className="px-4 py-2.5 rounded-xl border-0 theme-bg-sub hover:theme-bg-elevated theme-text-secondary text-sm font-semibold transition cursor-pointer"
             >
               Cancel
             </button>
           )}
           <button
             type="submit"
-            className="flex-1 py-2.5 rounded-xl theme-bg-accent text-white font-bold text-sm uppercase tracking-wider shadow-md hover:opacity-90 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer"
+            className="flex-1 py-2.5 rounded-xl theme-bg-accent text-white font-bold text-sm uppercase tracking-wider shadow-md hover:opacity-90 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer border-0 ring-0"
           >
             <SaveIcon className="w-4 h-4" />
             <span>SAVE</span>

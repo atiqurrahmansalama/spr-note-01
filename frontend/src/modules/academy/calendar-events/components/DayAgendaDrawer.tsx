@@ -207,7 +207,7 @@ export const DayAgendaDrawer: React.FC<DayAgendaDrawerProps> = ({
 
       {/* Prominent Class Off / Holiday Notification Banner */}
       {isOffDay && (
-        <div className="p-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 dark:bg-rose-950/30 flex items-start gap-3 shadow-xs animate-fade-in text-left">
+        <div className="p-4 rounded-2xl border-0 bg-rose-500/15 dark:bg-rose-950/40 flex items-start gap-3 shadow-xs animate-fade-in text-left">
           <div className="p-2 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 shrink-0">
             <AlertTriangleIcon className="w-5 h-5" />
           </div>
@@ -216,7 +216,7 @@ export const DayAgendaDrawer: React.FC<DayAgendaDrawerProps> = ({
               <h4 className="text-sm font-bold text-rose-600 dark:text-rose-400">
                 Class Attendance is Closed / Off
               </h4>
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/30">
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-600 dark:text-rose-300 border-0">
                 Class Off
               </span>
             </div>
@@ -229,8 +229,8 @@ export const DayAgendaDrawer: React.FC<DayAgendaDrawerProps> = ({
 
       {/* Events Worklist & Centered Empty State */}
       {sortedEvents.length === 0 ? (
-        <div className="p-8 sm:p-12 flex flex-col items-center justify-center text-center rounded-3xl theme-bg-surface border theme-border shadow-xs space-y-4 my-2 w-full">
-          <div className="w-14 h-14 rounded-2xl theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 flex items-center justify-center shrink-0 shadow-xs">
+        <div className="p-8 sm:p-12 flex flex-col items-center justify-center text-center rounded-3xl theme-bg-surface border-0 shadow-xs space-y-4 my-2 w-full">
+          <div className="w-14 h-14 rounded-2xl theme-bg-accent-soft theme-accent border-0 flex items-center justify-center shrink-0 shadow-xs">
             <CalendarIcon className="w-7 h-7" />
           </div>
           <div className="max-w-xs sm:max-w-sm mx-auto space-y-1.5 text-center flex flex-col items-center">
@@ -258,7 +258,7 @@ export const DayAgendaDrawer: React.FC<DayAgendaDrawerProps> = ({
                 <div
                   key={evt.id}
                   onClick={() => setSelectedEventId(evt.id)}
-                  className={`p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer hover:shadow-sm ${style.bg} ${style.border}`}
+                  className={`p-3.5 sm:p-4 rounded-2xl border-0 transition-all cursor-pointer hover:shadow-sm shadow-xs ${style.bg}`}
                 >
                   <div className="flex items-start justify-between gap-2.5">
                     <div className="space-y-1.5 min-w-0 flex-1">
@@ -270,20 +270,20 @@ export const DayAgendaDrawer: React.FC<DayAgendaDrawerProps> = ({
                       </div>
 
                       <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent border-0">
                           Rank {rankVal}
                         </span>
 
-                        <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md theme-bg-surface border theme-border theme-text-primary">
+                        <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md theme-bg-surface border-0 shadow-2xs theme-text-primary">
                           {isAllDay ? 'Full Day' : `${formatTime12(evt.startTime)} – ${formatTime12(evt.endTime)}`}
                         </span>
 
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-sub border theme-border theme-text-secondary">
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-sub border-0 theme-text-secondary">
                           {getEventDisplayType(evt)}
                         </span>
 
                         {evt.audience && (
-                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-sub border theme-border theme-text-secondary">
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-sub border-0 theme-text-secondary">
                             Audience: {evt.audience}
                           </span>
                         )}

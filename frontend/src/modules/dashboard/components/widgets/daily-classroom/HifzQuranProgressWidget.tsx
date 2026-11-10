@@ -1,7 +1,7 @@
 import React from 'react';
-import { useTranslation } from '../../../../i18n';
-import type { HifzProgressData } from '../../types';
-import { BookOpenIcon, CheckCircleIcon, SparklesIcon } from '../../../../components/ui/Icons';
+import { useTranslation } from '../../../../../i18n';
+import type { HifzProgressData } from '../../../types';
+import { BookOpenIcon, CheckCircleIcon, SparklesIcon } from '../../../../../components/ui/Icons';
 
 export interface HifzQuranProgressWidgetProps {
   data?: HifzProgressData;

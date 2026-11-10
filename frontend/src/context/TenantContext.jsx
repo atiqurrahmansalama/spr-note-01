@@ -33,12 +33,13 @@ export function TenantProvider({ children }) {
 
   // Fetch institutions list for multi-tenant admins, academy admins, and institutional personnel
   const fetchInstitutionsList = useCallback(async () => {
-    // Immediate optimistic hydration from user profile
+    // Immediate optimistic hydration from user profile or staff profile
     if (user?.institution_details && !currentInstitution) {
       setCurrentInstitution(user.institution_details);
     }
-    if (user?.institution_id && !activeTenantId) {
-      const instId = String(user.institution_id);
+    const resolvedInstId = user?.institution_id || user?.staff_profile?.institution_id || user?.institution_details?.id;
+    if (resolvedInstId && (!activeTenantId || activeTenantId === 'null' || activeTenantId === 'undefined')) {
+      const instId = String(resolvedInstId);
       setActiveTenantId(instId);
       try {
         localStorage.setItem('active_tenant_id', instId);
@@ -58,7 +59,7 @@ export function TenantProvider({ children }) {
         user?.institution_id ||
         user?.staff_profile?.institution_id;
 
-      if (savedTenantId && savedTenantId !== 'ALL') {
+      if (savedTenantId && savedTenantId !== 'ALL' && savedTenantId !== 'null' && savedTenantId !== 'undefined') {
         const found = items.find(i => String(i.id) === String(savedTenantId));
         if (found) {
           setCurrentInstitution(found);
@@ -84,16 +85,16 @@ export function TenantProvider({ children }) {
 
       // If no valid savedTenantId (e.g. initial login or switched environment):
       if (items.length > 0) {
-        // Priority 1: Primary production academy matching Darus Salam (DS)
+        // Priority 1: User's explicitly assigned institution
+        const targetInstId = user?.institution_id || user?.staff_profile?.institution_id;
+        const userInst = targetInstId ? items.find(i => String(i.id) === String(targetInstId)) : null;
+        // Priority 2: Primary production academy matching Darus Salam (DS)
         const preferredInst = items.find(i => 
           /darus\s*salam/i.test(i.name || '') || 
           /\bds\b/i.test(i.code || '') || 
           /darus/i.test(i.slug || '')
         );
-        // Priority 2: User's explicitly assigned institution
-        const targetInstId = user?.institution_id || user?.staff_profile?.institution_id;
-        const userInst = targetInstId ? items.find(i => String(i.id) === String(targetInstId)) : null;
-        const target = preferredInst || userInst || items[0];
+        const target = userInst || preferredInst || items[0];
         setCurrentInstitution(target);
         setActiveTenantId(String(target.id));
         try {
@@ -106,11 +107,19 @@ export function TenantProvider({ children }) {
       if (user?.institution_details) {
         setCurrentInstitution(user.institution_details);
         setActiveTenantId(String(user.institution_details.id));
+      } else if (user?.institution_name || user?.institution_id || isAcademyAdmin) {
+        const fallbackInst = {
+          id: String(user?.institution_id || 'inst-ds-01'),
+          name: user?.institution_name || 'Darus Salam Islamic School (DS)',
+          code: 'DS',
+        };
+        setCurrentInstitution(fallbackInst);
+        setActiveTenantId(String(fallbackInst.id));
       }
     } finally {
       setIsLoadingInstitutions(false);
     }
-  }, [isMultiTenantAdmin, isAcademyAdmin, user?.id, user?.institution_id, user?.institution_details, user?.staff_profile]);
+  }, [isMultiTenantAdmin, isAcademyAdmin, user?.id, user?.institution_id, user?.institution_details, user?.institution_name, user?.staff_profile]);
 
   useEffect(() => {
     fetchInstitutionsList();

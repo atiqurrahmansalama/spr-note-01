@@ -66,11 +66,11 @@ export default function AppHeader({
       </div>
 
       {/* Selected Active Institution, Branch & Academic Year in Header Middle - Absolutely Centered to prevent shifting (Hidden on small screens) */}
-      {currentInstitution?.name && (
+      {(currentInstitution?.name || user?.institution_name || user?.institution_details?.name || (user?.staff_profile && 'Darus Salam Islamic School (DS)')) && (
         <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 justify-center items-center px-4 max-w-[calc(100%-420px)] pointer-events-none text-center">
           <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap min-w-0 max-w-full">
             <span className="text-sm sm:text-base md:text-lg font-bold theme-text-primary truncate tracking-tight">
-              {currentInstitution.name}
+              {currentInstitution?.name || user?.institution_name || user?.institution_details?.name || 'Darus Salam Islamic School (DS)'}
             </span>
             {(() => {
               const branchName = getBranchDisplayName(activeBranch);

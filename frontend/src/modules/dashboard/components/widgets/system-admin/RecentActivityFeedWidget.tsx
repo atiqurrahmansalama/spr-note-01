@@ -1,13 +1,13 @@
 import React from 'react';
-import { useTranslation } from '../../../../i18n';
-import type { ActivityItem } from '../../types';
+import { useTranslation } from '../../../../../i18n';
+import type { ActivityItem } from '../../../types';
 import { 
   BellIcon, 
   StudentIcon, 
   AttendanceIcon, 
   AcademicCapIcon, 
   ShieldCheckIcon,
-} from '../../../../components/ui/Icons';
+} from '../../../../../components/ui/Icons';
 
 export interface RecentActivityFeedWidgetProps {
   activities: ActivityItem[];

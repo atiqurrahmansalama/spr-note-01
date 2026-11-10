@@ -1,15 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AgendaTaskRow } from '../../../academy/calendar-events';
-import { resolveAgendaScheduleData } from '../../../academy/calendar-events/calendarDataResolver';
+import { AgendaTaskRow } from '../../../../academy/calendar-events';
+import { resolveAgendaScheduleData } from '../../../../academy/calendar-events/calendarDataResolver';
 import {
   ClockIcon,
   PlusIcon,
   CalendarIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-} from '../../../../components/ui/Icons';
-import useDashboardCalendarSync from '../../hooks/useDashboardCalendarSync';
+} from '../../../../../components/ui/Icons';
+import useDashboardCalendarSync from '../../../hooks/useDashboardCalendarSync';
 
 export interface AgendaScheduleWidgetProps {
   title?: string;
@@ -162,48 +162,6 @@ export default function AgendaScheduleWidget({
             }}
             className="px-2 py-1 rounded-xl text-xs theme-bg-surface theme-text-primary border-0 cursor-pointer focus:outline-none"
           />
-        </div>
-      </div>
-
-      {/* KPI Metric Summary Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 shrink-0">
-        {/* Total Items for Target Date */}
-        <div className="p-3 rounded-2xl theme-bg-app border-0 flex items-center gap-2.5 min-w-0">
-          <div className="w-2 h-2 rounded-full shrink-0 bg-purple-500" />
-          <div className="min-w-0 flex-1">
-            <span className="text-[10px] font-semibold uppercase tracking-wider theme-text-secondary block truncate">
-              Daily Agenda
-            </span>
-            <span className="text-xs font-bold theme-text-primary truncate block">
-              {resolved.totalItemsCount} Scheduled Items
-            </span>
-          </div>
-        </div>
-
-        {/* Active Now */}
-        <div className="p-3 rounded-2xl theme-bg-app border-0 flex items-center gap-2.5 min-w-0">
-          <div className="w-2 h-2 rounded-full shrink-0 bg-emerald-500 animate-pulse" />
-          <div className="min-w-0 flex-1">
-            <span className="text-[10px] font-semibold uppercase tracking-wider theme-text-secondary block truncate">
-              Ongoing Now
-            </span>
-            <span className="text-xs font-bold theme-text-primary truncate block">
-              {resolved.activeNowCount} Active Now
-            </span>
-          </div>
-        </div>
-
-        {/* Completed Items */}
-        <div className="p-3 rounded-2xl theme-bg-app border-0 flex items-center gap-2.5 min-w-0">
-          <div className="w-2 h-2 rounded-full shrink-0 bg-sky-500" />
-          <div className="min-w-0 flex-1">
-            <span className="text-[10px] font-semibold uppercase tracking-wider theme-text-secondary block truncate">
-              Completed
-            </span>
-            <span className="text-xs font-bold theme-text-primary truncate block">
-              {resolved.completedCount} Elapsed Items
-            </span>
-          </div>
         </div>
       </div>
 

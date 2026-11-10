@@ -57,7 +57,7 @@ export const ProfileHeroCard: React.FC<ProfileHeroCardProps> = ({
         user.institution_name ||
         user.campus ||
         user.branch ||
-        ''
+        (user.staff_profile?.institution_id || user.is_academy_admin ? 'Darus Salam Islamic School (DS)' : '')
       );
 
   return (

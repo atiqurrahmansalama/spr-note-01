@@ -165,7 +165,9 @@ export default function SuperAdminDashboardView({
     system_gateways: {},
     finance_overview: {},
     notice_board: {},
-    academic_calendar: {},
+    working_hours: {},
+    academic_events: {},
+    agenda_schedule: {},
   };
 
   return (
