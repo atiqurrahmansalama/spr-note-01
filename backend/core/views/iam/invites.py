@@ -77,9 +77,18 @@ class PublicInviteClaimView(APIView):
 
             user.role = invite.target_role
             role_code = invite.target_role.code.upper()
-            if role_code in ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'GUARDIAN']:
-                user.user_type = role_code
+            user.user_type = role_code
+            if role_code in ['ADMIN', 'SUPER_ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL']:
+                user.is_staff = True
+            if not user.institution_id and getattr(invite.created_by, 'institution_id', None):
+                user.institution_id = invite.created_by.institution_id
             user.save()
+
+            try:
+                from core.services import sync_user_and_staff_roles
+                sync_user_and_staff_roles(user)
+            except Exception:
+                pass
 
             invite.used_count += 1
             invite.save()

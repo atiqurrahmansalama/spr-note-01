@@ -133,16 +133,15 @@ class GoogleOAuthExchangeView(APIView):
                 import logging
                 logging.getLogger('core').warning(f"Google auth role sync warning: {sync_ex}")
 
+            from core.services import build_user_role_payload, is_user_academy_admin
+            role_data = build_user_role_payload(user)
+
             resolved_name = user.name or f"{user.first_name or ''} {user.last_name or ''}".strip() or user.phone_number
 
             inst = getattr(user, 'institution', None)
             staff_prof = getattr(user, 'staff_profile', None)
 
-            is_academy_admin = bool(
-                user.is_superuser or
-                (getattr(user, 'user_type', '') or '').upper() in ['ADMIN', 'SUPER_ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'] or
-                (staff_prof and staff_prof.staff_type == 'ADMIN')
-            )
+            is_academy_admin = is_user_academy_admin(user)
 
             institution_details = None
             if inst:
@@ -189,7 +188,11 @@ class GoogleOAuthExchangeView(APIView):
                 'staff_id': str(staff_prof.id) if staff_prof else None,
                 'is_academy_admin': is_academy_admin,
                 'is_superuser': user.is_superuser,
-                'role': user.user_type,
+                'role': role_data,
+                'role_info': role_data,
+                'role_id': role_data.get('id'),
+                'role_code': role_data.get('code'),
+                'role_name': role_data.get('name'),
                 'avatar_url': user.avatar_url,
                 'is_email_verified': user.is_email_verified,
                 'auth_provider': user.auth_provider,

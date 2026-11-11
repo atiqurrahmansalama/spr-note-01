@@ -744,3 +744,167 @@ export function getTomorrowDate(baseDate?: string): string {
     return '';
   }
 }
+
+export interface SectionHierarchyFilterParams {
+  sections?: any[];
+  classes?: any[];
+  departments?: any[];
+  selectedClassId?: string;
+  selectedDepartmentId?: string;
+}
+
+export interface BuildSectionSelectOptionsParams extends SectionHierarchyFilterParams {
+  selectedSectionId?: string;
+  includeAllOption?: boolean;
+  allLabel?: string;
+}
+
+/**
+ * Extracts normalized active section records from student records as an offline fallback
+ * using relational FK IDs only (zero hardcoded name filtering).
+ */
+export function harvestSectionsFromStudents(students: any[] = []): any[] {
+  const byId = new Map<string, any>();
+
+  (students || []).forEach((st: any) => {
+    if (!st || typeof st !== 'object') return;
+    const secId = getSectionId(st);
+    const secName = String(
+      st?.section_name ||
+      st?.student_section_name ||
+      (typeof st?.section === 'object' ? st.section?.section_name || st.section?.name : '') ||
+      ''
+    ).trim();
+
+    if (!secId || !secName || byId.has(secId)) return;
+
+    byId.set(secId, {
+      id: secId,
+      section_name: secName,
+      name: secName,
+      student_class: getClassId(st) || undefined,
+      student_class_name: st?.student_class_name || st?.class_name || undefined,
+      department: getDepartmentId(st) || undefined,
+      is_active: true,
+      is_deleted: false,
+    });
+  });
+
+  return Array.from(byId.values());
+}
+
+/**
+ * Merges multiple section data sources cleanly, prioritizing live API records first
+ * while retaining any unique cached/harvested active records by normalized section ID.
+ */
+export function mergeEffectiveSections(...sources: any[][]): any[] {
+  const merged: any[] = [];
+  const seenIds = new Set<string>();
+
+  sources.forEach((sourceList) => {
+    if (!Array.isArray(sourceList)) return;
+    sourceList.forEach((sec: any) => {
+      if (!sec || sec?.is_deleted || sec?.is_active === false) return;
+      const idStr = sec?.id != null ? String(sec.id).trim() : '';
+      const nameStr = String(sec?.section_name || sec?.name || '').trim();
+      if (!idStr || !nameStr || seenIds.has(idStr)) return;
+      seenIds.add(idStr);
+      merged.push(sec);
+    });
+  });
+
+  return merged;
+}
+
+/**
+ * Resolves sections for the selected class/department using relational FK IDs.
+ * Never-Hide Guarantee: if scoping produces 0 matches, falls back to all active institutional sections.
+ */
+export function filterSectionsForHierarchy({
+  sections = [],
+  classes = [],
+  departments = [],
+  selectedClassId = '',
+  selectedDepartmentId = '',
+}: SectionHierarchyFilterParams): any[] {
+  const activeSections = (sections || []).filter(
+    (s: any) => s && !s.is_deleted && s.is_active !== false && s.id != null && String(s.section_name || s.name || '').trim() !== ''
+  );
+  if (activeSections.length === 0) return [];
+
+  const cleanClassId = String(selectedClassId || '').trim();
+  const cleanDeptId = String(selectedDepartmentId || '').trim();
+
+  if (cleanClassId && cleanClassId.toUpperCase() !== 'ALL') {
+    const equivClassIds = getEquivalentClassIds(cleanClassId, classes);
+    const byClass = activeSections.filter((sec: any) => {
+      const secClassId = getClassId(sec);
+      return Boolean(secClassId && equivClassIds.has(secClassId));
+    });
+    if (byClass.length > 0) return byClass;
+  }
+
+  if (cleanDeptId && cleanDeptId.toUpperCase() !== 'ALL') {
+    const byDept = activeSections.filter((sec: any) =>
+      doesLessonMatchDepartment(sec, cleanDeptId, departments, classes)
+    );
+    if (byDept.length > 0) return byDept;
+  }
+
+  return activeSections;
+}
+
+/**
+ * Builds deduplicated select options for section dropdowns.
+ * Keeps real active options visible at all times and omits synthetic "All Sections" when includeAllOption is false.
+ */
+export function buildSectionSelectOptions({
+  sections = [],
+  classes = [],
+  departments = [],
+  selectedClassId = '',
+  selectedDepartmentId = '',
+  selectedSectionId = '',
+  includeAllOption = false,
+  allLabel = 'All Sections',
+}: BuildSectionSelectOptionsParams): Array<{ value: string; label: string; [key: string]: any }> {
+  const scoped = filterSectionsForHierarchy({
+    sections,
+    classes,
+    departments,
+    selectedClassId,
+    selectedDepartmentId,
+  });
+
+  const opts: Array<{ value: string; label: string; [key: string]: any }> = includeAllOption
+    ? [{ value: '', label: allLabel }]
+    : [];
+  const seenValues = new Set<string>();
+
+  const pushSection = (sec: any) => {
+    const valStr = sec?.id != null ? String(sec.id).trim() : '';
+    const labelStr = String(sec?.section_name || sec?.name || '').trim();
+    if (!valStr || !labelStr || valStr.toUpperCase() === 'ALL' || seenValues.has(valStr)) return;
+    seenValues.add(valStr);
+    opts.push({
+      value: valStr,
+      label: labelStr,
+      student_class: getClassId(sec) || undefined,
+      student_class_name: sec?.student_class_name || undefined,
+      department: getDepartmentId(sec) || undefined,
+    });
+  };
+
+  scoped.forEach(pushSection);
+
+  // Preserve active selection so the select display never blanks even across class switches
+  const cleanSelectedId = String(selectedSectionId || '').trim();
+  if (cleanSelectedId && cleanSelectedId.toUpperCase() !== 'ALL' && !seenValues.has(cleanSelectedId)) {
+    const matchedSelected = (sections || []).find((s: any) => String(s?.id) === cleanSelectedId);
+    if (matchedSelected) {
+      pushSection(matchedSelected);
+    }
+  }
+
+  return opts;
+}

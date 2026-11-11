@@ -137,6 +137,7 @@ export interface DailyProgressFilterProps {
   onSectionChange?: (val: string) => void;
   sectionSelectOptions?: Array<{ label: string; value: string; [key: string]: any }>;
   hasSectionsForClass?: boolean;
+  allowAllSections?: boolean;
   onBatchHierarchyChange?: (params: { departmentId?: string; classId?: string; sectionId?: string }) => void;
   setAcademicFilters?: (params: { departmentId?: string; classId?: string; sectionId?: string }) => void;
   [key: string]: any;

@@ -20,6 +20,8 @@ export interface StaffOperatorDashboardViewProps {
   onOpenWidgetCatalog?: () => void;
   layoutItems?: DashboardLayoutItem[];
   onUpdateLayout?: (newItems: DashboardLayoutItem[]) => void;
+  isFeatureEnabled?: (featureKey?: string) => boolean;
+  isSuperAdmin?: boolean;
 }
 
 export default function StaffOperatorDashboardView({
@@ -28,6 +30,8 @@ export default function StaffOperatorDashboardView({
   onOpenWidgetCatalog,
   layoutItems: propLayoutItems,
   onUpdateLayout,
+  isFeatureEnabled,
+  isSuperAdmin = false,
 }: StaffOperatorDashboardViewProps) {
   const { t, formatNumber } = useTranslation('dashboard');
   const navigate = useNavigate();
@@ -160,6 +164,8 @@ export default function StaffOperatorDashboardView({
       onUpdateItems={handleUpdateLayout}
       onOpenWidgetCatalog={onOpenWidgetCatalog}
       widgetPropsMap={widgetPropsMap}
+      isFeatureEnabled={isFeatureEnabled}
+      isSuperAdmin={isSuperAdmin}
     />
   );
 }

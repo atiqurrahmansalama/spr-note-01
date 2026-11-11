@@ -9,11 +9,13 @@ import {
 } from './components';
 import { useStaffOnboardingForm } from './hooks/useStaffOnboardingForm';
 import { useStaffTranslation } from '../locales';
+import type { StaffOnboardingPayload } from '../types';
 
 interface StaffOnboardingWizardProps {
   initialData?: any;
   tokenMeta?: any;
   isPublic?: boolean;
+  onFormDataChange?: (data: StaffOnboardingPayload) => void;
   onCompleted?: (result: any) => void;
   onCancel?: () => void;
 }
@@ -22,6 +24,7 @@ export const StaffOnboardingWizard: React.FC<StaffOnboardingWizardProps> = ({
   initialData,
   tokenMeta,
   isPublic,
+  onFormDataChange,
   onCompleted,
   onCancel,
 }) => {
@@ -49,11 +52,12 @@ export const StaffOnboardingWizard: React.FC<StaffOnboardingWizardProps> = ({
     initialData,
     tokenMeta,
     isPublic,
+    onFormDataChange,
     onCompleted,
   });
 
   return (
-    <div className="w-full select-none text-left space-y-6">
+    <div className="w-full select-none text-start space-y-6">
       {/* 1. Stepper Progress Bar */}
       <div className="pb-2">
         <Stepper
@@ -156,7 +160,9 @@ export const StaffOnboardingWizard: React.FC<StaffOnboardingWizardProps> = ({
                 disabled={isSubmitting}
                 className="px-7 py-2.5 rounded-2xl theme-bg-accent theme-accent-text hover:opacity-95 text-xs font-bold transition cursor-pointer shadow-xs active:scale-98 border-0 disabled:opacity-50"
               >
-                {isSubmitting ? t('submitting', 'Submitting Registration...') : t('submitOnboarding', 'Complete Onboarding')}
+                {isSubmitting
+                  ? t('submitting', 'Submitting Registration...')
+                  : t('submitOnboarding', 'Complete Onboarding')}
               </button>
             )}
           </div>

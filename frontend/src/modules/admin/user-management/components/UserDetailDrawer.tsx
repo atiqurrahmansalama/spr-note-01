@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUserTranslation } from '../hooks/useUserTranslation';
 import { useToast } from '../../../../context/ToastContext';
 import {
@@ -12,6 +13,7 @@ import {
   CheckCircleIcon,
   CloseIcon,
   LogOutIcon,
+  ExternalLinkIcon,
 } from '../../../../components/ui/Icons';
 import { DrawerContainer } from '../../../../components/layout';
 import { UserRecord, UserRole } from '../types';
@@ -37,6 +39,7 @@ export const UserDetailDrawer: React.FC<UserDetailDrawerProps> = ({
   onRevokeSessions,
   onClose,
 }) => {
+  const navigate = useNavigate();
   const { t, formatDate } = useUserTranslation();
   const { showToast } = useToast();
   const [copied, setCopied] = useState<boolean>(false);
@@ -58,11 +61,9 @@ export const UserDetailDrawer: React.FC<UserDetailDrawerProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const perms = roleObj?.action_permissions || {};
-
   return (
     <DrawerContainer padding="none" spacing="normal">
-      <div className="space-y-6 pt-2 text-left">
+      <div className="space-y-6 pt-2 text-left rtl:text-right">
         {/* Profile Identity Hero Card */}
         <div className="p-4 rounded-2xl theme-bg-sub border theme-border flex items-start gap-4">
           <div className="relative shrink-0">
@@ -226,7 +227,7 @@ export const UserDetailDrawer: React.FC<UserDetailDrawerProps> = ({
             </h4>
           </div>
 
-          <div className="p-3.5 rounded-2xl theme-bg-sub/50 border theme-border space-y-2 text-xs">
+          <div className="p-3.5 rounded-2xl theme-bg-app border-0 space-y-2 text-xs">
             <div className="flex items-center justify-between">
               <span className="theme-text-secondary">Role Name:</span>
               <span className="font-bold theme-text-primary">{roleName}</span>
@@ -235,54 +236,42 @@ export const UserDetailDrawer: React.FC<UserDetailDrawerProps> = ({
               <span className="theme-text-secondary">Role Code:</span>
               <span className="font-mono theme-accent">{roleObj?.code || user.user_type || '—'}</span>
             </div>
-            {roleObj?.hierarchy_level !== undefined && (
-              <div className="flex items-center justify-between">
-                <span className="theme-text-secondary">Hierarchy Level:</span>
-                <span className="font-mono theme-text-primary">{roleObj.hierarchy_level}</span>
-              </div>
-            )}
             {roleObj?.description && (
-              <p className="text-[11px] theme-text-secondary pt-1 border-t theme-border leading-relaxed">
+              <p className="text-[11px] theme-text-secondary pt-1 leading-relaxed">
                 {roleObj.description}
               </p>
             )}
           </div>
         </div>
 
-        {/* Section 3: Action Permissions Checklist */}
+        {/* Section 3: Feature & Module Control Access */}
         <div className="space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b theme-border">
+          <div className="flex items-center gap-2 pb-1">
             <KeyIcon className="w-4 h-4 theme-accent" />
             <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
-              Assigned Permissions
+              {t('drawers.featureControlSection', 'Feature & Module Control')}
             </h4>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-            {[
-              { key: 'can_manage_users', label: 'Manage Users & Roles' },
-              { key: 'can_create_student', label: 'Create Students' },
-              { key: 'can_edit_student', label: 'Edit Students' },
-              { key: 'can_export_reports', label: 'Export Reports' },
-              { key: 'can_delete_report', label: 'Delete Reports' },
-            ].map((p) => {
-              const hasPerm = Boolean(perms[p.key]);
-              return (
-                <div
-                  key={p.key}
-                  className={`p-2.5 rounded-xl border flex items-center gap-2 ${
-                    hasPerm
-                      ? 'theme-bg-accent-soft/30 border theme-border theme-text-primary font-medium'
-                      : 'theme-bg-sub/30 border-transparent theme-text-secondary opacity-60'
-                  }`}
-                >
-                  <CheckCircleIcon
-                    className={`w-4 h-4 shrink-0 ${hasPerm ? 'theme-accent' : 'opacity-40'}`}
-                  />
-                  <span className="text-[11px] truncate">{p.label}</span>
-                </div>
-              );
-            })}
+          <div className="p-4 rounded-2xl theme-bg-app border-0 space-y-3">
+            <p className="text-xs theme-text-secondary leading-relaxed">
+              {t(
+                'drawers.featureControlUserNotice',
+                'Role permissions and user-specific access overrides are configured centrally inside App Management -> Feature & Module Control.'
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                navigate(`/section-control?tab=user&user=${encodeURIComponent(String(user.id))}`);
+              }}
+              className="w-full py-2.5 px-4 rounded-xl theme-bg-accent theme-accent-text hover:opacity-90 text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-2 border-0"
+            >
+              <ShieldCheckIcon className="w-4 h-4" />
+              <span>{t('drawers.manageUserOverrides', 'Configure User Overrides')}</span>
+              <ExternalLinkIcon className="w-3.5 h-3.5 opacity-80" />
+            </button>
           </div>
         </div>
 
@@ -291,7 +280,7 @@ export const UserDetailDrawer: React.FC<UserDetailDrawerProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2.5 rounded-xl theme-bg-sub border theme-border hover:theme-bg-elevated text-xs font-bold theme-text-primary transition cursor-pointer"
+            className="w-full py-2.5 rounded-xl theme-bg-app border-0 hover:theme-bg-elevated text-xs font-bold theme-text-primary transition cursor-pointer"
           >
             Close Details
           </button>

@@ -1,5 +1,7 @@
 import React from 'react';
 import type { DashboardRole, WidgetDefinition, DashboardLayoutItem } from './types';
+import { fetchWithAuth } from '../../utils/authService';
+import { normalizeRoleCode } from '../../utils/roleUtils';
 import {
   KpiMetricsWidget,
   AttendancePulseWidget,
@@ -8,7 +10,6 @@ import {
   QuickActionsWidget,
   RecentActivityFeedWidget,
   SystemGatewaysWidget,
-  UpcomingEventsWidget,
   HifzQuranProgressWidget,
   FinanceCollectionWidget,
   AdmissionPipelineWidget,
@@ -80,6 +81,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 4,
     minColSpan: 2,
     maxColSpan: 4,
+    widgetFeatureKey: 'dashboard_widget_recitation_trends',
     requiredFeatureKey: 'progress_management',
     component: RecitationTrendsWidget,
   },
@@ -92,6 +94,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 4,
     minColSpan: 2,
     maxColSpan: 4,
+    widgetFeatureKey: 'dashboard_widget_kpi_metrics',
     requiredFeatureKey: 'nav_dashboard',
     component: KpiMetricsWidget,
   },
@@ -104,6 +107,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 2,
     minColSpan: 1,
     maxColSpan: 3,
+    widgetFeatureKey: 'dashboard_widget_attendance_pulse',
     requiredFeatureKey: 'monthly_attendance_matrix',
     component: AttendancePulseWidget,
   },
@@ -116,6 +120,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 2,
     minColSpan: 1,
     maxColSpan: 4,
+    widgetFeatureKey: 'dashboard_widget_hifz_tracker',
     requiredFeatureKey: 'progress_management',
     component: HifzQuranProgressWidget,
   },
@@ -128,6 +133,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 2,
     minColSpan: 1,
     maxColSpan: 4,
+    widgetFeatureKey: 'dashboard_widget_academic_progress',
     requiredFeatureKey: 'lesson_management',
     component: AcademicProgressWidget,
   },
@@ -140,6 +146,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 2,
     minColSpan: 1,
     maxColSpan: 3,
+    widgetFeatureKey: 'dashboard_widget_timetable_schedule',
     requiredFeatureKey: 'class_period_slots',
     component: TimetableScheduleWidget,
   },
@@ -152,6 +159,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 2,
     minColSpan: 1,
     maxColSpan: 3,
+    widgetFeatureKey: 'dashboard_widget_finance_overview',
     requiredFeatureKey: 'nav_finance',
     component: FinanceCollectionWidget,
   },
@@ -164,6 +172,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 2,
     minColSpan: 1,
     maxColSpan: 4,
+    widgetFeatureKey: 'dashboard_widget_admission_pipeline',
     requiredFeatureKey: 'student_admission',
     component: AdmissionPipelineWidget,
   },
@@ -176,6 +185,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 2,
     minColSpan: 1,
     maxColSpan: 3,
+    widgetFeatureKey: 'dashboard_widget_residential_occupancy',
     requiredFeatureKey: 'residential_quarters',
     component: ResidentialOccupancyWidget,
   },
@@ -188,20 +198,9 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 2,
     minColSpan: 1,
     maxColSpan: 3,
+    widgetFeatureKey: 'dashboard_widget_notice_board',
     requiredFeatureKey: 'notification_management',
     component: NoticeBoardWidget,
-  },
-  upcoming_events: {
-    id: 'upcoming_events',
-    title: 'Upcoming Academic & Islamic Calendar Events',
-    description: 'Countdown to examinations, holidays, and institutional parent-teacher meetings.',
-    category: 'CALENDAR',
-    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STAFF', 'STUDENT', 'GUARDIAN'],
-    defaultColSpan: 2,
-    minColSpan: 1,
-    maxColSpan: 3,
-    requiredFeatureKey: 'academy_calendar_events',
-    component: UpcomingEventsWidget,
   },
   working_hours: {
     id: 'working_hours',
@@ -212,6 +211,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 4,
     minColSpan: 2,
     maxColSpan: 4,
+    widgetFeatureKey: 'dashboard_widget_working_hours',
     requiredFeatureKey: 'academy_calendar_events',
     component: WorkingHoursWidget,
   },
@@ -224,6 +224,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 4,
     minColSpan: 2,
     maxColSpan: 4,
+    widgetFeatureKey: 'dashboard_widget_academic_events',
     requiredFeatureKey: 'academy_calendar_events',
     component: AcademicEventsWidget,
   },
@@ -236,6 +237,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 2,
     minColSpan: 1,
     maxColSpan: 4,
+    widgetFeatureKey: 'dashboard_widget_agenda_schedule',
     requiredFeatureKey: 'academy_calendar_events',
     component: AgendaScheduleWidget,
   },
@@ -248,6 +250,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 2,
     minColSpan: 1,
     maxColSpan: 3,
+    widgetFeatureKey: 'dashboard_widget_recent_activity',
     requiredFeatureKey: 'app_activity_analytics',
     component: RecentActivityFeedWidget,
   },
@@ -260,6 +263,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 2,
     minColSpan: 1,
     maxColSpan: 4,
+    widgetFeatureKey: 'dashboard_widget_system_gateways',
     requiredFeatureKey: 'app_section_control',
     component: SystemGatewaysWidget,
   },
@@ -272,6 +276,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     defaultColSpan: 4,
     minColSpan: 2,
     maxColSpan: 4,
+    widgetFeatureKey: 'dashboard_widget_quick_actions',
     requiredFeatureKey: 'nav_dashboard',
     component: QuickActionsWidget,
   },
@@ -344,141 +349,100 @@ export const DEFAULT_ROLE_LAYOUTS: Record<string, DashboardLayoutItem[]> = {
   ],
 };
 
-const GOVERNANCE_STORAGE_PREFIX = 'spr_widget_governance_v1';
+function dispatchDashboardSyncEvents(detail: Record<string, any> = {}): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('spr_dashboard_layout_updated', { detail }));
+}
 
-export function getWidgetGovernanceStorageKey(academyScope?: string): string {
-  return `${GOVERNANCE_STORAGE_PREFIX}_${academyScope || 'GLOBAL'}`;
+async function pushDashboardConfigPayload(payload: Record<string, any>, tenantId?: string): Promise<void> {
+  const qs = tenantId && tenantId !== 'GLOBAL' ? `?tenant_id=${encodeURIComponent(tenantId)}` : '';
+  const candidateUrls = [`/api/v1/dashboard/config/${qs}`, `/api/dashboard/config/${qs}`];
+  for (const url of candidateUrls) {
+    try {
+      const res = await fetchWithAuth(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) return;
+      if (res.status === 403 || res.status === 400) return;
+    } catch {
+      // Try next endpoint alias
+    }
+  }
 }
 
 /**
- * Returns dynamic widget-role entitlements mapping (widgetId -> allowedRoles).
- * Checks specific academy override first, then institutional global standard,
- * falling back to default allowedRoles defined in WIDGET_REGISTRY.
+ * Synchronizes institutional dashboard workspace templates (`role_templates`)
+ * from the backend PostgreSQL database into the local offline-first store.
  */
-export function getWidgetRoleEntitlements(academyScope?: string): Record<string, string[]> {
-  try {
-    if (academyScope && academyScope !== 'GLOBAL') {
-      const academyRaw = localStorage.getItem(getWidgetGovernanceStorageKey(academyScope));
-      if (academyRaw) {
-        const parsed = JSON.parse(academyRaw);
-        if (parsed && typeof parsed === 'object') return parsed;
+export async function syncDashboardConfigFromCloud(tenantId?: string): Promise<boolean> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return false;
+
+  const qs =
+    tenantId && tenantId !== 'ALL' && tenantId !== 'GLOBAL' && tenantId !== 'default'
+      ? `?tenant_id=${encodeURIComponent(tenantId)}&_t=${Date.now()}`
+      : `?_t=${Date.now()}`;
+  const candidateUrls = [`/api/v1/dashboard/config/${qs}`, `/api/dashboard/config/${qs}`];
+
+  for (const url of candidateUrls) {
+    try {
+      const res = await fetchWithAuth(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+      let changed = false;
+
+      const resolvedTid = data.tenant_id || tenantId || 'default';
+      if (data.role_templates && typeof data.role_templates === 'object') {
+        Object.entries(data.role_templates).forEach(([roleCode, items]) => {
+          const cleanCode = normalizeRoleCode(roleCode);
+          if (cleanCode && Array.isArray(items) && items.length > 0) {
+            const tplKey = `spr_dashboard_template_${resolvedTid}_${cleanCode}_v1`;
+            const tplStr = JSON.stringify(items);
+            if (localStorage.getItem(tplKey) !== tplStr) {
+              localStorage.setItem(tplKey, tplStr);
+              changed = true;
+            }
+          }
+        });
       }
-    }
-    const globalRaw = localStorage.getItem(getWidgetGovernanceStorageKey('GLOBAL'));
-    if (globalRaw) {
-      const parsed = JSON.parse(globalRaw);
-      if (parsed && typeof parsed === 'object') return parsed;
-    }
-  } catch {}
 
-  // Fallback: build default mapping from WIDGET_REGISTRY
-  const defaults: Record<string, string[]> = {};
-  Object.values(WIDGET_REGISTRY).forEach((w) => {
-    defaults[w.id] = [...w.allowedRoles];
-  });
-  return defaults;
-}
-
-/**
- * Persists customized widget-role permissions for a specific academy override scope.
- */
-export function saveWidgetRoleEntitlements(
-  academyScope: string,
-  entitlements: Record<string, string[]>
-): void {
-  try {
-    const scopeToSave = academyScope === 'ALL' ? 'GLOBAL' : (academyScope || 'GLOBAL');
-    const key = getWidgetGovernanceStorageKey(scopeToSave);
-    localStorage.setItem(key, JSON.stringify(entitlements));
-    if (academyScope === 'ALL') {
-      localStorage.setItem(getWidgetGovernanceStorageKey('ALL'), JSON.stringify(entitlements));
+      if (changed) {
+        dispatchDashboardSyncEvents({ tenantId: resolvedTid, source: 'cloud' });
+      }
+      return true;
+    } catch {
+      // Try fallback alias
     }
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('spr_dashboard_governance_updated', {
-          detail: { academyScope, entitlements },
-        })
-      );
-      window.dispatchEvent(new CustomEvent('spr_dashboard_layout_updated', { detail: { academyScope } }));
-    }
-  } catch (err) {
-    console.warn('Dashboard: Failed to save widget governance:', err);
   }
-}
-
-/**
- * Reset widget permissions back to system defaults for a scope.
- */
-export function resetWidgetRoleEntitlements(academyScope: string): void {
-  try {
-    const key = getWidgetGovernanceStorageKey(academyScope || 'GLOBAL');
-    localStorage.removeItem(key);
-    if (academyScope === 'ALL') {
-      localStorage.removeItem(getWidgetGovernanceStorageKey('ALL'));
-      localStorage.removeItem(getWidgetGovernanceStorageKey('GLOBAL'));
-    }
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('spr_dashboard_governance_updated', {
-          detail: { academyScope },
-        })
-      );
-      window.dispatchEvent(new CustomEvent('spr_dashboard_layout_updated', { detail: { academyScope } }));
-    }
-  } catch {}
-}
-
-/**
- * Checks whether a widget is permitted for a specific role and academy scope.
- */
-export function isWidgetPermittedForRole(
-  widgetId: string,
-  role: DashboardRole,
-  academyScope?: string
-): boolean {
-  const entitlements = getWidgetRoleEntitlements(academyScope);
-  const allowed = entitlements[widgetId];
-  if (Array.isArray(allowed)) {
-    const target = String(role || '').toUpperCase();
-    return allowed.some((r) => {
-      const u = String(r).toUpperCase();
-      return u === target || u === 'ALL' || u === 'ALL_ROLES';
-    });
-  }
-  const def = WIDGET_REGISTRY[widgetId];
-  if (!def) return false;
-  return def.allowedRoles.includes(role);
-}
-
-/**
- * Returns all widget definitions eligible for a given role and academy scope.
- */
-export function getWidgetsForRole(role: DashboardRole, academyScope?: string): WidgetDefinition[] {
-  return Object.values(WIDGET_REGISTRY).filter((widget) =>
-    isWidgetPermittedForRole(widget.id, role, academyScope)
-  );
+  return false;
 }
 
 /**
  * Checks whether a widget is permitted under the active Feature & Module Control configuration.
+ * Evaluates both the widget-level feature flag (`dashboard_widget_*`) and parent module key.
  */
 export function isWidgetFeaturePermitted(
   widgetDef: WidgetDefinition | undefined,
   isFeatureEnabled: (featureKey?: string) => boolean
 ): boolean {
   if (!widgetDef) return false;
-  if (!widgetDef.requiredFeatureKey) return true;
-  return isFeatureEnabled(widgetDef.requiredFeatureKey);
+  if (widgetDef.widgetFeatureKey && !isFeatureEnabled(widgetDef.widgetFeatureKey)) {
+    return false;
+  }
+  if (widgetDef.requiredFeatureKey && !isFeatureEnabled(widgetDef.requiredFeatureKey)) {
+    return false;
+  }
+  return true;
 }
 
 /**
- * Returns all widget definitions eligible for a given role and permitted by Feature Control.
+ * Returns all widget definitions permitted by App Management -> Feature & Module Control.
  */
 export function getAvailableWidgets(
-  role: DashboardRole,
   isFeatureEnabled: (featureKey?: string) => boolean
 ): WidgetDefinition[] {
-  return getWidgetsForRole(role).filter((w) => isWidgetFeaturePermitted(w, isFeatureEnabled));
+  return Object.values(WIDGET_REGISTRY).filter((w) => isWidgetFeaturePermitted(w, isFeatureEnabled));
 }
 
 /**
@@ -488,7 +452,8 @@ export function getKpiCardsForRole(
   role: DashboardRole,
   isFeatureEnabled?: (featureKey?: string) => boolean
 ): KpiCardCatalogItem[] {
-  const cards = ROLE_KPI_CARDS_CATALOG[role] || ROLE_KPI_CARDS_CATALOG.ADMIN || [];
+  const roleCode = normalizeRoleCode(role) || 'ADMIN';
+  const cards = ROLE_KPI_CARDS_CATALOG[roleCode] || ROLE_KPI_CARDS_CATALOG.ADMIN || [];
   if (!isFeatureEnabled) return cards;
   return cards.filter((card) => !card.requiredFeatureKey || isFeatureEnabled(card.requiredFeatureKey));
 }
@@ -497,12 +462,14 @@ export function getKpiCardsForRole(
  * Get layout items for a given role from localStorage or fallback to defaults.
  */
 export function getSavedLayout(tenantId: string, role: DashboardRole, userId?: string): DashboardLayoutItem[] {
-  const userKey = `spr_dashboard_layout_${tenantId || 'default'}_${role}_${userId || 'anon'}_v1`;
-  const roleTemplateKey = `spr_dashboard_template_${tenantId || 'default'}_${role}_v1`;
+  const roleCode = normalizeRoleCode(role) || 'ADMIN';
+  const userKey = `spr_dashboard_layout_${tenantId || 'default'}_${roleCode}_${userId || 'anon'}_v1`;
+  const roleTemplateKey = `spr_dashboard_template_${tenantId || 'default'}_${roleCode}_v1`;
+  const globalTemplateKey = `spr_dashboard_template_GLOBAL_${roleCode}_v1`;
 
   const normalizeLayoutItems = (items: any[]): DashboardLayoutItem[] => {
     // 1. Remove legacy monolithic academic_calendar and upcoming_events widgets
-    let filtered = items.filter((i) => i && i.widgetId !== 'academic_calendar' && i.widgetId !== 'upcoming_events');
+    const filtered = items.filter((i) => i && i.widgetId !== 'academic_calendar' && i.widgetId !== 'upcoming_events');
 
     // 2. Ensure separated widgets (working_hours, academic_events, agenda_schedule) exist for roles
     const hasWorkingHours = filtered.some((i) => i.widgetId === 'working_hours');
@@ -548,18 +515,14 @@ export function getSavedLayout(tenantId: string, role: DashboardRole, userId?: s
   };
 
   try {
-    let raw = localStorage.getItem(userKey);
-    if (!raw && userId) {
-      raw = localStorage.getItem(`spr_dashboard_layout_${tenantId || 'default'}_${role}_anon_v1`);
-    }
-
+    const raw = localStorage.getItem(userKey);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
         return normalizeLayoutItems(parsed);
       }
     }
-    const templateSaved = localStorage.getItem(roleTemplateKey);
+    const templateSaved = localStorage.getItem(roleTemplateKey) || localStorage.getItem(globalTemplateKey);
     if (templateSaved) {
       const parsed = JSON.parse(templateSaved);
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -570,11 +533,11 @@ export function getSavedLayout(tenantId: string, role: DashboardRole, userId?: s
     console.warn('Dashboard: Failed to load layout from storage:', err);
   }
 
-  return DEFAULT_ROLE_LAYOUTS[role] || DEFAULT_ROLE_LAYOUTS.ADMIN;
+  return DEFAULT_ROLE_LAYOUTS[roleCode] || DEFAULT_ROLE_LAYOUTS.ADMIN;
 }
 
 /**
- * Persist user customized layout to tenant-scoped storage.
+ * Persist user customized layout to tenant-scoped storage and optionally promote as institutional role template.
  */
 export function saveLayout(
   tenantId: string,
@@ -583,21 +546,30 @@ export function saveLayout(
   userId?: string,
   saveAsRoleDefault = false
 ): void {
-  const userKey = `spr_dashboard_layout_${tenantId || 'default'}_${role}_${userId || 'anon'}_v1`;
-  const roleTemplateKey = `spr_dashboard_template_${tenantId || 'default'}_${role}_v1`;
+  const roleCode = normalizeRoleCode(role) || 'ADMIN';
+  const userKey = `spr_dashboard_layout_${tenantId || 'default'}_${roleCode}_${userId || 'anon'}_v1`;
+  const roleTemplateKey = `spr_dashboard_template_${tenantId || 'default'}_${roleCode}_v1`;
 
   try {
     localStorage.setItem(userKey, JSON.stringify(items));
-    if (userId) {
-      localStorage.setItem(`spr_dashboard_layout_${tenantId || 'default'}_${role}_anon_v1`, JSON.stringify(items));
-    }
     if (saveAsRoleDefault) {
       localStorage.setItem(roleTemplateKey, JSON.stringify(items));
+      pushDashboardConfigPayload(
+        {
+          role_template: {
+            role: roleCode,
+            items,
+            scope: tenantId && tenantId !== 'ALL' && tenantId !== 'GLOBAL' && tenantId !== 'default' ? 'tenant' : 'global',
+          },
+          tenant_id: tenantId,
+        },
+        tenantId
+      ).catch(() => {});
     }
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('spr_dashboard_layout_updated', {
-          detail: { role, tenantId, items },
+          detail: { role: roleCode, tenantId, items },
         })
       );
     }
@@ -607,16 +579,22 @@ export function saveLayout(
 }
 
 /**
- * Reset layout back to institutional default.
+ * Reset layout back to institutional default or baseline.
  */
 export function resetLayout(tenantId: string, role: DashboardRole, userId?: string): DashboardLayoutItem[] {
-  const userKey = `spr_dashboard_layout_${tenantId || 'default'}_${role}_${userId || 'anon'}_v1`;
+  const roleCode = normalizeRoleCode(role) || 'ADMIN';
+  const userKey = `spr_dashboard_layout_${tenantId || 'default'}_${roleCode}_${userId || 'anon'}_v1`;
+  const roleTemplateKey = `spr_dashboard_template_${tenantId || 'default'}_${roleCode}_v1`;
   try {
     localStorage.removeItem(userKey);
-    if (userId) {
-      localStorage.removeItem(`spr_dashboard_layout_${tenantId || 'default'}_${role}_anon_v1`);
+    const templateSaved = localStorage.getItem(roleTemplateKey) || localStorage.getItem(`spr_dashboard_template_GLOBAL_${roleCode}_v1`);
+    if (templateSaved) {
+      const parsed = JSON.parse(templateSaved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
     }
   } catch {}
-  return DEFAULT_ROLE_LAYOUTS[role] || DEFAULT_ROLE_LAYOUTS.ADMIN;
+  return DEFAULT_ROLE_LAYOUTS[roleCode] || DEFAULT_ROLE_LAYOUTS.ADMIN;
 }
 

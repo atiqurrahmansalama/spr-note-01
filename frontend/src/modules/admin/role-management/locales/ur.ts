@@ -1,6 +1,6 @@
 export const ur = {
   title: 'کردار اور رسائی کا انتظام',
-  subtitle: 'سسٹم کے اختیارات، کارروائی کے اجازت نامے اور کسٹم کرداروں کی تشکیل کریں',
+  subtitle: 'ادارے کے کردار بنائیں اور منظم کریں؛ تمام اختیارات فیچر اور ماڈیول کنٹرول سے ترتیب دیں',
   totalRolesBadge: '{{count}} کل کردار',
 
   // Metrics
@@ -16,33 +16,27 @@ export const ur = {
   allTypes: 'تمام کردار کی اقسام',
   typeSystem: 'سسٹم سے محفوظ',
   typeCustom: 'کسٹم کردار',
-  allLevels: 'تمام اختیارات کے درجات',
-  levelSuperAdmin: 'سطح 1 (سپر ایڈمن)',
-  levelAdmin: 'سطح 2 (ایڈمن)',
-  levelStaff: 'سطح 3-4 (عملہ)',
-  levelTeacher: 'سطح 5 (استاد)',
-  levelGuardian: 'سطح 10 (سرپرست)',
 
   // Columns & Labels
   roleName: 'کردار کا نام',
   roleCode: 'کردار کا کوڈ',
-  hierarchyRank: 'اختیار کی سطح',
-  levelBadge: 'سطح {{level}}',
   assignedUsers: 'صارفین',
   protection: 'حیثیت',
   protected: 'محفوظ',
   configurable: 'قابل ترتیب',
   googleDefault: 'گوگل ڈیفالٹ',
   actions: 'کارروائیاں',
-  permissionsSummary: '{{count}} اجازت نامے',
+  featureControlNotice:
+    'اس کردار کے لیے تمام ماڈیولز، صفحات اور ڈیش بورڈ ویجٹس کی اجازتیں ایپ مینجمنٹ -> فیچر اور ماڈیول کنٹرول کے اندر مرکزی طور پر منظم کی جاتی ہیں۔',
+  manageInFeatureControl: 'فیچر کنٹرول میں رسائی کا انتظام کریں',
 
   // Action Buttons
   createRole: 'کردار بنائیں',
-  createRoleSubtitle: 'مخصوص اجازت ناموں کے ساتھ نیا کسٹم کردار بنائیں',
+  createRoleSubtitle: 'ادارہ جاتی رسائی کے لیے نیا کسٹم کردار بنائیں',
   editRole: 'کردار میں ترمیم کریں',
   cloneRole: 'کردار کی نقل بنائیں',
   deleteRole: 'کردار حذف کریں',
-  viewDetails: 'اجازت نامے دیکھیں',
+  viewDetails: 'تفصیلات دیکھیں',
   setGoogleDefault: 'گوگل ڈیفالٹ مقرر کریں',
   exportCsv: 'سی ایس وی برآمد کریں',
 
@@ -50,9 +44,9 @@ export const ur = {
   drawers: {
     createTitle: 'کسٹم کردار بنائیں',
     editTitle: 'کردار میں ترمیم: {{name}}',
-    detailsTitle: 'کردار کا پروفائل اور اجازت نامے: {{name}}',
+    detailsTitle: 'کردار کا پروفائل: {{name}}',
     basicInfoSection: 'بنیادی معلومات',
-    permissionsSection: 'کارروائی کی اجازت کا میٹرکس',
+    featureControlSection: 'فیچر اور ماڈیول کنٹرول',
   },
 
   // Form Fields
@@ -63,25 +57,6 @@ export const ur = {
     codePlaceholder: 'مثال: SENIOR_USTADH',
     description: 'کردار کی تفصیل',
     descriptionPlaceholder: 'اس کردار کے دائرہ کار کی مختصر تفصیل لکھیں...',
-    hierarchyLevel: 'اختیار کا درجہ (1 - 10)',
-    hierarchyHelp: 'کم نمبر = زیادہ اختیار (1 = سپر ایڈمن، 2 = ایڈمن، 5 = استاد، 10 = سرپرست)۔',
-    levelHighest: 'سطح 1 (سب سے زیادہ)',
-    levelMedium: 'سطح 5 (درمیانہ)',
-    levelLowest: 'سطح 10 (سب سے کم)',
-  },
-
-  // Permissions
-  permissions: {
-    can_create_student: 'طلباء بنائیں',
-    can_create_student_desc: 'نئے طلباء کے ریکارڈ بنانے کی اجازت دیں',
-    can_edit_student: 'طلباء میں ترمیم',
-    can_edit_student_desc: 'طلباء کی تفصیلات میں ترمیم کرنے کی اجازت دیں',
-    can_delete_report: 'رپورٹیں حذف کریں',
-    can_delete_report_desc: 'روزانہ تشخیص کے نوٹس حذف کرنے کی اجازت دیں',
-    can_export_reports: 'ڈیٹا برآمد کریں',
-    can_export_reports_desc: 'پی ڈی ایف/ایکسل میں رپورٹ برآمد کرنے کی اجازت دیں',
-    can_manage_users: 'صارفین کا انتظام',
-    can_manage_users_desc: 'صارفین بنانے اور تفویض کرنے کی اجازت دیں',
   },
 
   // Modals

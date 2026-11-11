@@ -24,6 +24,7 @@ export interface DailyClassroomFilterProps {
   departmentLabel?: string;
   departmentPlaceholder?: string;
 
+  allowAllClasses?: boolean;
   selectedClassId?: string;
   onClassChange?: (val: any) => void;
   classSelectOptions?: Array<{ value: string; label: string; [key: string]: any }>;
@@ -31,6 +32,7 @@ export interface DailyClassroomFilterProps {
   classPlaceholder?: string;
 
   hasSectionsForClass?: boolean;
+  allowAllSections?: boolean;
   selectedSectionId?: string;
   onSectionChange?: (val: any) => void;
   sectionSelectOptions?: Array<{ value: string; label: string; [key: string]: any }>;
@@ -117,6 +119,7 @@ export interface DailyClassroomFilterControlsProps {
   departmentPlaceholder?: string;
 
   // Class configuration
+  allowAllClasses?: boolean;
   selectedClassId?: string;
   onClassChange?: (val: any) => void;
   classSelectOptions?: Array<{ value: string; label: string; [key: string]: any }>;
@@ -125,6 +128,7 @@ export interface DailyClassroomFilterControlsProps {
 
   // Section configuration
   hasSectionsForClass?: boolean;
+  allowAllSections?: boolean;
   selectedSectionId?: string;
   onSectionChange?: (val: any) => void;
   sectionSelectOptions?: Array<{ value: string; label: string; [key: string]: any }>;
@@ -198,6 +202,7 @@ export default function DailyClassroomFilterControls({
   departmentPlaceholder = filterProps?.departmentPlaceholder ?? 'Select Department...',
 
   // Class
+  allowAllClasses = filterProps?.allowAllClasses ?? true,
   selectedClassId = filterProps?.selectedClassId ?? '',
   onClassChange = filterProps?.onClassChange,
   classSelectOptions = filterProps?.classSelectOptions ?? [],
@@ -206,6 +211,7 @@ export default function DailyClassroomFilterControls({
 
   // Section
   hasSectionsForClass = filterProps?.hasSectionsForClass ?? true,
+  allowAllSections = filterProps?.allowAllSections ?? true,
   selectedSectionId = filterProps?.selectedSectionId ?? '',
   onSectionChange = filterProps?.onSectionChange,
   sectionSelectOptions = filterProps?.sectionSelectOptions ?? [],
@@ -245,8 +251,17 @@ export default function DailyClassroomFilterControls({
     return fromData?.name || '';
   }, [selectedDepartmentId, departmentSelectOptions, academicData.departments]);
 
+  const isSyntheticAllOption = (opt: any) => {
+    const valStr = String(opt?.value ?? opt?.id ?? '').trim();
+    const lblStr = String(opt?.label ?? opt?.name ?? '').trim().toLowerCase();
+    return valStr === '' || valStr.toUpperCase() === 'ALL' || lblStr.startsWith('all ');
+  };
+
   const effectiveClassOptions = useMemo(() => {
     let opts = Array.isArray(classSelectOptions) ? [...classSelectOptions] : [];
+    if (!allowAllClasses) {
+      opts = opts.filter((opt) => !isSyntheticAllOption(opt));
+    }
 
     // Ensure active selectedClassId is always represented so CustomSelect never displays blank
     if (selectedClassId && selectedClassId !== 'ALL' && selectedClassId !== '') {
@@ -258,11 +273,11 @@ export default function DailyClassroomFilterControls({
       }
     }
 
-    if (opts.length === 0) {
+    if (opts.length === 0 && allowAllClasses) {
       return [{ value: '', label: 'All Classes' }];
     }
     return opts;
-  }, [classSelectOptions, selectedClassId, academicData.classes]);
+  }, [classSelectOptions, allowAllClasses, selectedClassId, academicData.classes]);
 
   const activeClassLabel = useMemo(() => {
     if (!selectedClassId || selectedClassId === 'ALL') return '';
@@ -273,11 +288,23 @@ export default function DailyClassroomFilterControls({
   }, [selectedClassId, effectiveClassOptions, academicData.classes]);
 
   const effectiveSectionOptions = useMemo(() => {
-    if (Array.isArray(sectionSelectOptions) && sectionSelectOptions.length > 0) {
-      return sectionSelectOptions;
+    const rawOpts = Array.isArray(sectionSelectOptions) ? sectionSelectOptions : [];
+    if (!allowAllSections) {
+      return rawOpts.filter((opt) => !isSyntheticAllOption(opt));
+    }
+    if (rawOpts.length > 0) {
+      return rawOpts;
     }
     return [{ value: '', label: 'All Sections' }];
-  }, [sectionSelectOptions]);
+  }, [sectionSelectOptions, allowAllSections]);
+
+  const effectiveTeacherOptions = useMemo(() => {
+    const rawOpts = Array.isArray(teacherSelectOptions) ? teacherSelectOptions : [];
+    if (!allowAllTeachers) {
+      return rawOpts.filter((opt) => !isSyntheticAllOption(opt));
+    }
+    return rawOpts;
+  }, [teacherSelectOptions, allowAllTeachers]);
 
   const activeSectionLabel = useMemo(() => {
     if (!selectedSectionId || selectedSectionId === 'ALL') return '';
@@ -397,11 +424,11 @@ export default function DailyClassroomFilterControls({
         {teacherControl ? (
           teacherControl
         ) : hasTeachers ? (
-          teacherSelectOptions.length > 0 ? (
+          effectiveTeacherOptions.length > 0 ? (
             <CustomSelect
               label={teacherLabel}
               placeholder={teacherPlaceholder}
-              options={teacherSelectOptions}
+              options={effectiveTeacherOptions}
               value={selectedTeacherId}
               onChange={onTeacherChange}
               size="md"

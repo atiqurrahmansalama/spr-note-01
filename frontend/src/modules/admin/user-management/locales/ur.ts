@@ -74,6 +74,10 @@ export const ur = {
     contactAuthSection: 'رابطہ اور اسناد',
     roleSection: 'کردار کی تفویض',
     securitySection: 'سیکیورٹی اسناد',
+    featureControlSection: 'فیچر اور ماڈیول کنٹرول',
+    featureControlUserNotice:
+      'کردار کی اجازتیں اور صارف کی مخصوص تبدیلیاں ایپ مینجمنٹ -> فیچر اور ماڈیول کنٹرول کے اندر مرکزی طور پر ترتیب دی جاتی ہیں۔',
+    manageUserOverrides: 'صارف کی تخصیصات ترتیب دیں',
   },
 
   // Form Fields

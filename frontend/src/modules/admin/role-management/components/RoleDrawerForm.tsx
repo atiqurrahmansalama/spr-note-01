@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useToast } from '../../../../context/ToastContext';
 import { useRoleTranslation } from '../hooks/useRoleTranslation';
 import {
@@ -8,7 +8,7 @@ import {
 import CustomInput from '../../../../components/ui/CustomInput';
 import { DrawerContainer, DrawerSection, DrawerFooter } from '../../../../components/layout';
 import { useRoleActions } from '../hooks/useRoleActions';
-import { RoleRecord, RoleFormData, ActionPermissions } from '../types';
+import { RoleRecord, RoleFormData } from '../types';
 
 export interface RoleDrawerFormProps {
   role?: RoleRecord | null;
@@ -32,23 +32,11 @@ export const RoleDrawerForm: React.FC<RoleDrawerFormProps> = ({
 
   const { submitting, createRole, updateRole } = useRoleActions(onSaved);
 
-  const initialPermissions: ActionPermissions = useMemo(() => {
-    return {
-      can_create_student: role?.action_permissions?.can_create_student ?? true,
-      can_edit_student: role?.action_permissions?.can_edit_student ?? true,
-      can_delete_report: role?.action_permissions?.can_delete_report ?? false,
-      can_export_reports: role?.action_permissions?.can_export_reports ?? true,
-      can_manage_users: role?.action_permissions?.can_manage_users ?? false,
-    };
-  }, [role]);
-
   const [formData, setFormData] = useState<RoleFormData>({
     name: role?.name || '',
     code: role?.code || '',
     description: role?.description || '',
-    hierarchy_level: role?.hierarchy_level ?? 5,
     color_theme: role?.color_theme || 'blue',
-    action_permissions: initialPermissions,
   });
 
   const getInputValue = (valOrEvent: any): string => {

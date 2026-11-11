@@ -26,7 +26,9 @@ import {
   attendanceFilters,
   attendanceTimingPolicyStore,
   periodCategoriesStore,
+  auth as authStore,
 } from '@/utils/localStore';
+import { isUserAcademyAdmin } from '@/utils/roleUtils';
 import {
   cycleStatusWithinAllowed,
 } from '@/utils/attendanceTimingEngine';
@@ -40,9 +42,11 @@ export default function ClassAttendanceView({
   onStudentClick,
 }: ClassAttendanceViewProps) {
   const { showToast } = useToast();
-  const { activeTenantId, isMultiTenantAdmin } = useTenant();
+  const { activeTenantId, isMultiTenantAdmin, isAcademyAdmin } = useTenant();
 
   const userProfile = useMemo(() => {
+    const authUser = authStore.getUser();
+    if (authUser && typeof authUser === 'object') return authUser;
     try {
       const raw = localStorage.getItem('spr_user_profile');
       return raw ? JSON.parse(raw) : {};
@@ -51,14 +55,7 @@ export default function ClassAttendanceView({
     }
   }, []);
 
-  const isAdmin = Boolean(
-    isMultiTenantAdmin ||
-    userProfile.is_superuser ||
-    userProfile.user_type === 'SUPER_ADMIN' ||
-    userProfile.user_type === 'ADMIN' ||
-    userProfile.role_code === 'ADMIN' ||
-    userProfile.role_code === 'PRINCIPAL'
-  );
+  const isAdmin = isUserAcademyAdmin(userProfile, isMultiTenantAdmin, isAcademyAdmin);
 
   // Timing Policy state & live store sync
   const [timingPolicy, setTimingPolicy] = useState(() => attendanceTimingPolicyStore.getPolicy(activeTenantId));

@@ -121,21 +121,9 @@ export const RoleTable: React.FC<RoleTableProps> = ({
       header: t('roleCode', 'Role Code'),
       headerClassName: 'min-w-[150px]',
       render: (role) => (
-        <span className="theme-bg-sub border theme-border font-mono text-xs px-2.5 py-1 rounded-lg inline-block theme-text-secondary">
+        <span className="theme-bg-app font-mono text-xs px-2.5 py-1 rounded-lg inline-block theme-text-secondary">
           {role.code}
         </span>
-      ),
-    },
-    {
-      key: 'hierarchy_level',
-      header: t('hierarchyRank', 'Authority Level'),
-      headerClassName: 'min-w-[140px] text-center',
-      render: (role) => (
-        <div className="text-center">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold theme-bg-accent-soft theme-accent border theme-border">
-            {t('levelBadge', 'Level {{level}}', { level: formatNumber(role.hierarchy_level) })}
-          </span>
-        </div>
       ),
     },
     {

@@ -16,8 +16,24 @@ export const HARD_DEFAULTS: Record<string, boolean> = {
   actionButtons: true,
   pdfExport: true,
 
-  // 1. Dashboard
+  // 1. Dashboard & Child Widgets
   nav_dashboard: true,
+  dashboard_widget_kpi_metrics: true,
+  dashboard_widget_quick_actions: true,
+  dashboard_widget_attendance_pulse: true,
+  dashboard_widget_recitation_trends: true,
+  dashboard_widget_hifz_tracker: true,
+  dashboard_widget_academic_progress: true,
+  dashboard_widget_timetable_schedule: true,
+  dashboard_widget_working_hours: true,
+  dashboard_widget_academic_events: true,
+  dashboard_widget_agenda_schedule: true,
+  dashboard_widget_admission_pipeline: true,
+  dashboard_widget_finance_overview: true,
+  dashboard_widget_residential_occupancy: true,
+  dashboard_widget_notice_board: true,
+  dashboard_widget_recent_activity: true,
+  dashboard_widget_system_gateways: true,
 
   // 2. Academy Structure
   nav_institution: true,
@@ -156,6 +172,7 @@ export interface FeatureControlContextType {
   isSectionEnabled: (sectionKey?: string) => boolean;
   getFeatureOrigin: (featureKey?: string) => string;
   refetchConfig: () => Promise<void>;
+  fetchPreviewFlagsForRole: (previewRole: string, tenantId?: string | null) => Promise<Record<string, boolean> | null>;
 }
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -167,6 +184,7 @@ const FeatureControlContext = createContext<FeatureControlContextType>({
   isSectionEnabled: (_sectionKey?: string) => true,
   getFeatureOrigin: (_featureKey?: string) => "GLOBAL",
   refetchConfig: async () => {},
+  fetchPreviewFlagsForRole: async () => null,
 });
 
 export function FeatureControlProvider({ children }: { children: React.ReactNode }) {
@@ -323,6 +341,45 @@ export function FeatureControlProvider({ children }: { children: React.ReactNode
     [origins]
   );
 
+  // Super Admin role preview helper: resolves evaluated flags for another role under Feature & Module Control
+  const fetchPreviewFlagsForRole = useCallback(
+    async (previewRole: string, tenantId?: string | null): Promise<Record<string, boolean> | null> => {
+      const cleanRole = String(previewRole || "").trim().toUpperCase();
+      if (!cleanRole) return null;
+      const params = new URLSearchParams({
+        preview_role: cleanRole,
+        _t: String(Date.now()),
+      });
+      if (tenantId && tenantId !== "ALL" && tenantId !== "GLOBAL" && tenantId !== "default") {
+        params.set("preview_tenant_id", String(tenantId));
+      }
+      const candidatePaths = [
+        `/api/v1/section-control/evaluate/?${params.toString()}`,
+        `/api/v1/control-panel/evaluated-config/?${params.toString()}`,
+      ];
+      for (const path of candidatePaths) {
+        try {
+          const res = await fetchWithAuth(path);
+          if (res.ok) {
+            const data = await res.json();
+            const flags = data?.flags || data?.config;
+            if (flags && typeof flags === "object") {
+              return flags;
+            }
+          }
+        } catch {
+          // Try next endpoint alias
+        }
+      }
+      return null;
+    },
+    []
+  );
+
+  const stableRefetchConfig = useCallback(() => {
+    return fetchEvaluatedConfig(userId);
+  }, [fetchEvaluatedConfig, userId]);
+
   const contextValue = useMemo<FeatureControlContextType>(
     () => ({
       config,
@@ -331,7 +388,8 @@ export function FeatureControlProvider({ children }: { children: React.ReactNode
       isFeatureEnabled,
       isSectionEnabled: isFeatureEnabled,
       getFeatureOrigin,
-      refetchConfig: () => fetchEvaluatedConfig(userId),
+      refetchConfig: stableRefetchConfig,
+      fetchPreviewFlagsForRole,
     }),
     [
       config,
@@ -339,8 +397,8 @@ export function FeatureControlProvider({ children }: { children: React.ReactNode
       loading,
       isFeatureEnabled,
       getFeatureOrigin,
-      fetchEvaluatedConfig,
-      userId,
+      stableRefetchConfig,
+      fetchPreviewFlagsForRole,
     ]
   );
 

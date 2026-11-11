@@ -5,7 +5,12 @@ and backward-compatible legacy service functions.
 """
 
 # 1. Modular Enterprise Domain Services
-from .auth_service import seed_system_roles_11_tier, create_security_session
+from .auth_service import (
+    seed_system_roles_11_tier,
+    create_security_session,
+    build_user_role_payload,
+    is_user_academy_admin,
+)
 from .tenant_service import provision_new_institution, update_tenant_taxonomy
 from .student_service import register_student, promote_student_class
 from .staff_service import onboard_staff_member, assign_teacher_periods, ensure_institution_staff_profile, sync_user_and_staff_roles

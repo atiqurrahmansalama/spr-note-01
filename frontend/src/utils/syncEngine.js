@@ -780,10 +780,11 @@ if (typeof window !== "undefined") {
 export const syncLocalStudentsToBackend = async () => {
   if (!navigator.onLine) return;
   try {
-    const res = await fetchWithAuth("/students/");
+    const res = await fetchWithAuth("/api/v1/students/?page_size=500&all=true");
     if (res.ok) {
       const raw = await res.json();
-      const apiStudents = (Array.isArray(raw) ? raw : []).map((s) => {
+      const rawList = Array.isArray(raw) ? raw : Array.isArray(raw?.results) ? raw.results : [];
+      const apiStudents = rawList.map((s) => {
         const subVal =
           typeof s === "object" && typeof s?.section_name === "string" && s.section_name
             ? s.section_name
@@ -839,7 +840,7 @@ export const syncLocalStudentsToBackend = async () => {
         if (!name || !name.trim()) continue;
 
         try {
-          const postRes = await fetchWithAuth("/students/", {
+          const postRes = await fetchWithAuth("/api/v1/students/", {
             method: "POST",
             body: JSON.stringify({ name: name.trim(), group: group }),
           });
@@ -869,7 +870,7 @@ export const syncSessionsAndComments = async () => {
 
     for (const session of localOnlySessions) {
       try {
-        const res = await fetchWithAuth("/sessions/", {
+        const res = await fetchWithAuth("/api/v1/sessions/", {
           method: "POST",
           body: JSON.stringify({ name: session.name }),
         });
@@ -894,7 +895,7 @@ export const syncSessionsAndComments = async () => {
 
   // 4c. Sync Comment Templates
   try {
-    const res = await fetchWithAuth("/messages/?category=report_builder_comments");
+    const res = await fetchWithAuth("/api/v1/messages/?category=report_builder_comments");
     if (res.ok) {
       const localComments = commentStore.getAll();
       const localOnlyComments = (Array.isArray(localComments) ? localComments : []).filter((c) => {
@@ -908,7 +909,7 @@ export const syncSessionsAndComments = async () => {
         const commentText = typeof commentItem === "object" ? commentItem.text : String(commentItem);
         if (!commentText) continue;
         try {
-          const postRes = await fetchWithAuth("/messages/", {
+          const postRes = await fetchWithAuth("/api/v1/messages/", {
             method: "POST",
             body: JSON.stringify({ text: commentText, category: "report_builder_comments" }),
           });

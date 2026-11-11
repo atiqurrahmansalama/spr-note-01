@@ -95,9 +95,15 @@ def sync_user_and_staff_roles(user, institution=None):
         elif id_filters:
             matched_staff = StaffProfile.objects.filter(lookup_q & id_filters).first()
 
-        # Fallback 1: If user is ADMIN or primary admin, link with unlinked admin staff
-        if not matched_staff and (is_primary_admin or (getattr(user, 'user_type', '') or '').upper() == 'ADMIN'):
-            matched_staff = StaffProfile.objects.filter(staff_type='ADMIN', user__isnull=True).first()
+        # Fallback 1: If user is ADMIN, link with unlinked admin staff scoped to their institution first
+        role_code_upper = (getattr(getattr(user, 'role', None), 'code', '') or '').upper()
+        user_type_upper = (getattr(user, 'user_type', '') or '').upper()
+        is_admin_identity = is_primary_admin or user_type_upper in ['ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'] or role_code_upper in ['ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL']
+        if not matched_staff and is_admin_identity:
+            if inst:
+                matched_staff = StaffProfile.objects.filter(institution=inst, staff_type='ADMIN', user__isnull=True).first()
+            if not matched_staff:
+                matched_staff = StaffProfile.objects.filter(staff_type='ADMIN', user__isnull=True).first()
 
         # Fallback 2: Precision linking if staff profile exists for primary admin
         if not matched_staff and is_primary_admin:
@@ -133,16 +139,20 @@ def sync_user_and_staff_roles(user, institution=None):
         staff_profile.institution = user.institution
         staff_profile.save(update_fields=['institution'])
 
-    # Ensure admin role elevation
+    # Ensure admin role elevation across StaffProfile, User.user_type, and User.role FK
     admin_role = UserRole.objects.filter(code__iexact='ADMIN').first()
-    if (staff_profile and staff_profile.staff_type == 'ADMIN') or (getattr(user, 'user_type', '') or '').upper() == 'ADMIN':
-        if (getattr(user, 'user_type', '') or '').upper() != 'ADMIN':
-            user.user_type = 'ADMIN'
+    role_code_upper = (getattr(getattr(user, 'role', None), 'code', '') or '').upper()
+    user_type_upper = (getattr(user, 'user_type', '') or '').upper()
+    admin_codes = ('ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL')
+    if (staff_profile and staff_profile.staff_type == 'ADMIN') or user_type_upper in admin_codes or role_code_upper in admin_codes:
+        target_admin_code = role_code_upper if role_code_upper in admin_codes else (user_type_upper if user_type_upper in admin_codes else 'ADMIN')
+        if user_type_upper != target_admin_code:
+            user.user_type = target_admin_code
             user_updated_fields.add('user_type')
         if not user.is_staff:
             user.is_staff = True
             user_updated_fields.add('is_staff')
-        if admin_role and user.role_id != admin_role.id:
+        if role_code_upper not in admin_codes and admin_role and user.role_id != admin_role.id:
             user.role = admin_role
             user_updated_fields.add('role')
 
@@ -151,7 +161,7 @@ def sync_user_and_staff_roles(user, institution=None):
             if staff_profile.staff_type != 'ADMIN':
                 staff_profile.staff_type = 'ADMIN'
                 sp_updated.add('staff_type')
-            if 'admin' not in staff_profile.designation.lower():
+            if 'admin' not in (staff_profile.designation or '').lower():
                 staff_profile.designation = 'Academy Administrator'
                 sp_updated.add('designation')
             if staff_profile.rank_order != 1:
@@ -159,8 +169,11 @@ def sync_user_and_staff_roles(user, institution=None):
                 sp_updated.add('rank_order')
             if sp_updated:
                 staff_profile.save(update_fields=list(sp_updated))
+        else:
+            inst = institution or getattr(user, 'institution', None)
+            if inst:
+                staff_profile = ensure_institution_staff_profile(user, inst)
     else:
-        # User has no staff profile, but has institution and user_type='ADMIN'
         inst = institution or getattr(user, 'institution', None)
         if inst:
             staff_profile = ensure_institution_staff_profile(user, inst)

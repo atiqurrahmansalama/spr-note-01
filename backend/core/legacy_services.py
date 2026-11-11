@@ -160,7 +160,7 @@ def sync_feature_registry_to_db():
             )
             cat_map[item["category"]] = cat_obj
 
-        AppSection.objects.update_or_create(
+        sec_obj, created = AppSection.objects.get_or_create(
             section_key=item["key"],
             defaults={
                 "category": cat_obj,
@@ -172,6 +172,23 @@ def sync_feature_registry_to_db():
                 "order": item["sort_order"],
             }
         )
+        if not created:
+            # Update structural & descriptive metadata without overwriting customized Global Default toggles
+            changed_fields = []
+            updates_map = {
+                "category": cat_obj,
+                "title": item["label"],
+                "description": item["description"],
+                "is_parent": item["is_parent"],
+                "parent_key": item["parent_key"],
+                "order": item["sort_order"],
+            }
+            for field_name, new_val in updates_map.items():
+                if getattr(sec_obj, field_name) != new_val:
+                    setattr(sec_obj, field_name, new_val)
+                    changed_fields.append(field_name)
+            if changed_fields:
+                sec_obj.save(update_fields=changed_fields)
 
     # Delete any AppSection rows in database that are NOT in FEATURE_REGISTRY
     AppSection.objects.exclude(section_key__in=registry_keys).delete()
@@ -184,13 +201,14 @@ def sync_feature_registry_to_db():
 # 2. 4-Tier Section Control & Feature Flagging Evaluation Engine
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-def evaluate_section_config_for_user(user=None):
+def evaluate_section_config_for_user(user=None, preview_role=None, preview_tenant_id=None):
     """
     Computes resolved section control flags using strict 4-Tier Precedence:
     Tier 1 (Highest): User Specific Override
     Tier 2: Assigned Student Group Override
     Tier 3: User Role Permission Override
-    Tier 4 (Lowest): Global Default Config
+    Tier 4: Academy Override
+    Tier 5 (Lowest): Global Default Config
 
     And applies One-Way Top-Down Cascading rule:
     If a parent section is OFF, all its children are forced OFF.
@@ -205,7 +223,8 @@ def evaluate_section_config_for_user(user=None):
     from .feature_registry import FEATURE_REGISTRY
     registry_keys = {item["key"] for item in FEATURE_REGISTRY}
     db_keys = set(AppSection.objects.values_list('section_key', flat=True))
-    if not registry_keys.issubset(db_keys):
+    needs_dashboard_parent_upgrade = AppSection.objects.filter(section_key='nav_dashboard', is_parent=False).exists()
+    if not registry_keys.issubset(db_keys) or needs_dashboard_parent_upgrade:
         sync_feature_registry_to_db()
 
     sections = AppSection.objects.all().select_related('category')
@@ -218,7 +237,26 @@ def evaluate_section_config_for_user(user=None):
     role_overrides = {}
     academy_overrides = {}
 
-    if user and user.is_authenticated:
+    normalized_preview_role = str(preview_role or '').upper().strip() or None
+    normalized_preview_tenant = str(preview_tenant_id or '').strip() or None
+    if normalized_preview_tenant and normalized_preview_tenant.upper() in ('ALL', 'GLOBAL', 'DEFAULT', 'NONE', 'NULL', 'UNDEFINED'):
+        normalized_preview_tenant = None
+
+    if normalized_preview_role:
+        role_overrides = {
+            o.section.section_key: o.is_enabled
+            for o in RoleSectionPermission.objects.filter(role__iexact=normalized_preview_role).select_related('section')
+        }
+        target_inst_id = normalized_preview_tenant or (getattr(user, 'institution_id', None) if user and user.is_authenticated else None)
+        if target_inst_id:
+            try:
+                academy_overrides = {
+                    o.section.section_key: o.is_enabled
+                    for o in AcademySectionOverride.objects.filter(institution_id=target_inst_id).select_related('section')
+                }
+            except Exception as e:
+                logger.warning(f"Could not load preview AcademySectionOverride: {e}")
+    elif user and user.is_authenticated:
         # Tier 1: User Overrides
         user_overrides = {
             o.section.section_key: o.is_enabled
@@ -253,17 +291,22 @@ def evaluate_section_config_for_user(user=None):
                 role_overrides[o.section.section_key] = o.is_enabled
 
         # Tier 4: Academy Overrides
-        if getattr(user, 'institution_id', None):
+        target_inst_id = normalized_preview_tenant or getattr(user, 'institution_id', None)
+        if not target_inst_id and staff_prof and getattr(staff_prof, 'institution_id', None):
+            target_inst_id = staff_prof.institution_id
+        if target_inst_id:
             try:
                 academy_overrides = {
                     o.section.section_key: o.is_enabled
-                    for o in AcademySectionOverride.objects.filter(institution_id=user.institution_id).select_related('section')
+                    for o in AcademySectionOverride.objects.filter(institution_id=target_inst_id).select_related('section')
                 }
             except Exception as e:
                 logger.warning(f"Could not load AcademySectionOverride: {e}")
                 academy_overrides = {}
 
-    # 4-Tier Resolution Evaluation (Independent of hierarchy first)
+    has_active_subject = bool(normalized_preview_role or (user and user.is_authenticated))
+
+    # Resolution Evaluation (Independent of hierarchy first)
     for sec in sections:
         key = sec.section_key
         global_val = sec.is_globally_enabled
@@ -271,16 +314,16 @@ def evaluate_section_config_for_user(user=None):
         if not global_val:
             resolved_raw[key] = False
             origins[key] = "GLOBAL"
-        elif user and user.is_authenticated and key in user_overrides:
+        elif has_active_subject and key in user_overrides:
             resolved_raw[key] = user_overrides[key]
             origins[key] = "USER"
-        elif user and user.is_authenticated and key in group_overrides:
+        elif has_active_subject and key in group_overrides:
             resolved_raw[key] = group_overrides[key]
             origins[key] = "GROUP"
-        elif user and user.is_authenticated and key in role_overrides:
+        elif has_active_subject and key in role_overrides:
             resolved_raw[key] = role_overrides[key]
             origins[key] = "ROLE"
-        elif user and user.is_authenticated and key in academy_overrides:
+        elif has_active_subject and key in academy_overrides:
             resolved_raw[key] = academy_overrides[key]
             origins[key] = "ACADEMY"
         else:
@@ -322,45 +365,60 @@ def evaluate_section_config_for_user(user=None):
     return resolved, origins
 
 
-def get_resolved_feature_flags_for_user(user=None):
+def get_resolved_feature_flags_for_user(user=None, preview_role=None, preview_tenant_id=None):
     """
     Convenience wrapper used by DRF permission classes and middleware.
-    Enforces Super Admin bypass and default-deny fallback.
+    Enforces Super Admin bypass (unless explicitly previewing another role) and default-deny fallback.
     """
-    flags, origins = evaluate_section_config_for_user(user)
+    flags, origins = evaluate_section_config_for_user(
+        user,
+        preview_role=preview_role,
+        preview_tenant_id=preview_tenant_id,
+    )
 
     # Test runner compatibility bypass: enables legacy tests to pass
     import sys
     from django.conf import settings
     is_testing = 'test' in sys.argv or 'test_coverage' in sys.argv
     strict_mode = getattr(settings, 'STRICT_FEATURE_FLAGS', False)
-    if is_testing and not strict_mode:
+    if is_testing and not strict_mode and not preview_role:
         for k in list(flags.keys()):
             flags[k] = True
         return flags, origins
 
+    normalized_preview_role = str(preview_role or '').upper().strip()
     is_super_admin = False
-    if user and user.is_authenticated:
+    if normalized_preview_role:
+        is_super_admin = (normalized_preview_role == 'SUPER_ADMIN')
+    elif user and user.is_authenticated:
         if getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser:
             is_super_admin = True
 
     from .feature_registry import FEATURE_REGISTRY
     if is_super_admin:
+        # Keep Super Admin bypass on navigation, modules, and API controls so access to system settings is never lost,
+        # while allowing dashboard_widget_* UI cards to honor explicit Feature & Module Control toggles.
         for item in FEATURE_REGISTRY:
-            flags[item["key"]] = True
-            origins[item["key"]] = "SUPER_ADMIN_BYPASS"
+            key = item["key"]
+            if key.startswith("dashboard_widget_"):
+                if origins.get(key) == "PARENT_DISABLED (nav_dashboard)":
+                    flags[key] = True
+                    origins[key] = "SUPER_ADMIN_BYPASS"
+                elif key not in flags:
+                    flags[key] = item.get("default_enabled", True)
+                    origins[key] = "REGISTRY_DEFAULT"
+            else:
+                flags[key] = True
+                origins[key] = "SUPER_ADMIN_BYPASS"
         for k in list(flags.keys()):
-            flags[k] = True
+            if not str(k).startswith("dashboard_widget_"):
+                flags[k] = True
     else:
         for item in FEATURE_REGISTRY:
             key = item["key"]
             default_val = item.get("default_enabled", True)
-            # If the key is not in flags or was denied solely due to hierarchy fallback, ensure default_enabled applies
-            if key not in flags or origins.get(key) in ("FALLBACK_DENY", "GLOBAL"):
-                if default_val:
-                    flags[key] = True
-                    origins[key] = "REGISTRY_DEFAULT"
-            elif key not in flags:
+            # Only apply registry default when missing from DB or unconfigured fallback-deny; never override explicit GLOBAL=False
+            if key not in flags or origins.get(key) == "FALLBACK_DENY":
                 flags[key] = default_val
                 origins[key] = "REGISTRY_DEFAULT" if default_val else "FALLBACK_DENY"
 

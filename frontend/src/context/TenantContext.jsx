@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { getInstitutions } from '../api/institutions';
 import { useAuth } from './AuthContext';
+import { isUserSuperAdmin, isUserAcademyAdmin } from '../utils/roleUtils';
 
 const TenantContext = createContext(null);
 
@@ -13,20 +14,9 @@ export function TenantProvider({ children }) {
   const [currentInstitution, setCurrentInstitution] = useState(null);
   const [isLoadingInstitutions, setIsLoadingInstitutions] = useState(false);
 
-  const isMultiTenantAdmin = Boolean(
-    user && (user.is_superuser || (user.user_type && user.user_type.toUpperCase() === 'SUPER_ADMIN'))
-  );
+  const isMultiTenantAdmin = isUserSuperAdmin(user);
 
-  const isAcademyAdmin = Boolean(
-    user && (
-      isMultiTenantAdmin ||
-      user.is_academy_admin ||
-      ['ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'].includes(String(user.user_type || '').toUpperCase()) ||
-      ['ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'].includes(String(user.role?.code || user.role || '').toUpperCase()) ||
-      ['ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'].includes(String(user.role_info?.code || '').toUpperCase()) ||
-      (user.staff_profile && user.staff_profile.staff_type === 'ADMIN')
-    )
-  );
+  const isAcademyAdmin = isUserAcademyAdmin(user, isMultiTenantAdmin);
 
   const isTenantAdmin = isMultiTenantAdmin || isAcademyAdmin;
   const isAdmin = isMultiTenantAdmin || isAcademyAdmin;

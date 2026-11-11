@@ -3,7 +3,6 @@ import { getOrdinalPeriodLabel } from '@/stores';
 import {
   extractPeriodOrder,
   resolvePeriodTime,
-  getClassId,
   doesLessonMatchDepartment,
   doesLessonMatchClass,
   doesLessonMatchSection,
@@ -11,6 +10,10 @@ import {
   doesStudentMatchDepartment,
   doesStudentMatchSection,
   isLessonInSlot,
+  harvestSectionsFromStudents,
+  mergeEffectiveSections,
+  filterSectionsForHierarchy,
+  buildSectionSelectOptions,
 } from '../utils/dailyClassroomUtils';
 
 export interface UseDailyClassroomFiltersParams {
@@ -133,61 +136,35 @@ export default function useDailyClassroomFilters({
            (classes || []).find((c) => (c.name || c.class_name || '').toLowerCase().trim() === String(effectiveClassId).toLowerCase()) || null;
   }, [classes, effectiveClassId]);
 
-  const filteredSectionsForClass = useMemo(() => {
-    let list = sections || [];
-    if (effectiveClassId) {
-      const matched = list.filter((s) => doesStudentMatchClass(s, effectiveClassId, classes));
-      if (matched.length > 0) {
-        list = matched;
-      } else if (selectedDepartmentId) {
-        const validClassIds = new Set(filteredClassList.map((c) => String(c.id)));
-        const deptMatched = list.filter((s) => {
-          const sClsId = getClassId(s);
-          return validClassIds.has(sClsId) || doesLessonMatchDepartment(s, selectedDepartmentId, departments, classes);
-        });
-        if (deptMatched.length > 0) {
-          list = deptMatched;
-        }
-      }
-    } else if (selectedDepartmentId) {
-      const validClassIds = new Set(filteredClassList.map((c) => String(c.id)));
-      const deptMatched = list.filter((s) => {
-        const sClsId = getClassId(s);
-        return validClassIds.has(sClsId) || doesLessonMatchDepartment(s, selectedDepartmentId, departments, classes);
-      });
-      if (deptMatched.length > 0) {
-        list = deptMatched;
-      }
-    }
+  const effectiveMergedSections = useMemo(() => {
+    const harvested = harvestSectionsFromStudents(students);
+    return mergeEffectiveSections(sections, [], harvested);
+  }, [sections, students]);
 
-    const seenSecNames = new Set<string>();
-    const cleanSecList: any[] = [];
-    list.forEach((s) => {
-      const name = (s.section_name || s.name || `Section ${s.id}`).trim();
-      const lower = name.toLowerCase();
-      if (lower === 'general group' || lower === 'general') return;
-      if (name && !seenSecNames.has(lower)) {
-        seenSecNames.add(lower);
-        cleanSecList.push(s);
-      }
+  const filteredSectionsForClass = useMemo(() => {
+    return filterSectionsForHierarchy({
+      sections: effectiveMergedSections,
+      classes,
+      departments,
+      selectedClassId: effectiveClassId || '',
+      selectedDepartmentId: selectedDepartmentId || '',
     });
-    return cleanSecList;
-  }, [sections, classes, effectiveClassId, selectedDepartmentId, filteredClassList, departments]);
+  }, [effectiveMergedSections, classes, departments, effectiveClassId, selectedDepartmentId]);
 
   const hasSectionsForClass = true;
 
   const sectionSelectOptions = useMemo(() => {
-    const opts: Array<{ value: string; label: string }> = [
-      { value: '', label: 'All Sections' },
-    ];
-    filteredSectionsForClass.forEach((s) => {
-      opts.push({
-        value: String(s.id),
-        label: s.section_name || s.name || `Section ${s.id}`,
-      });
+    return buildSectionSelectOptions({
+      sections: effectiveMergedSections,
+      classes,
+      departments,
+      selectedClassId: effectiveClassId || '',
+      selectedDepartmentId: selectedDepartmentId || '',
+      selectedSectionId: selectedSectionId || '',
+      includeAllOption: true,
+      allLabel: 'All Sections',
     });
-    return opts;
-  }, [filteredSectionsForClass]);
+  }, [effectiveMergedSections, classes, departments, effectiveClassId, selectedDepartmentId, selectedSectionId]);
 
   // ── Dynamic Routine Period Slots ──
 

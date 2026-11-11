@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { DashboardLayoutItem, DashboardRole, WidgetColSpan } from '../types';
-import { WIDGET_REGISTRY, isWidgetPermittedForRole } from '../widgetRegistry';
+import { WIDGET_REGISTRY, isWidgetFeaturePermitted } from '../widgetRegistry';
 import { useFeatureControl } from '../../../context/FeatureControlContext';
-import { useTenant } from '../../../context/TenantContext';
+import { normalizeRoleCode } from '../../../utils/roleUtils';
 import { 
   GripVerticalIcon, 
   EyeIcon, 
@@ -21,6 +22,8 @@ export interface DashboardGridEngineProps {
   onUpdateItems: (newItems: DashboardLayoutItem[]) => void;
   onOpenWidgetCatalog?: () => void;
   widgetPropsMap?: Record<string, any>;
+  isFeatureEnabled?: (featureKey?: string) => boolean;
+  isSuperAdmin?: boolean;
 }
 
 interface WidgetErrorBoundaryProps {
@@ -75,7 +78,10 @@ export default function DashboardGridEngine({
   onUpdateItems,
   onOpenWidgetCatalog,
   widgetPropsMap = {},
+  isFeatureEnabled: isFeatureEnabledOverride,
+  isSuperAdmin = false,
 }: DashboardGridEngineProps) {
+  const navigate = useNavigate();
   const gridRef = useRef<HTMLDivElement>(null);
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
   const [dragOverWidgetId, setDragOverWidgetId] = useState<string | null>(null);
@@ -263,17 +269,14 @@ export default function DashboardGridEngine({
     onUpdateItems(updated);
   };
 
-  const { isFeatureEnabled } = useFeatureControl();
-  const { activeTenantId } = useTenant();
+  const { isFeatureEnabled: contextIsFeatureEnabled } = useFeatureControl();
+  const effectiveIsFeatureEnabled = isFeatureEnabledOverride || contextIsFeatureEnabled;
 
-  // Filter display items: always suppress widgets whose source module is disabled in Feature Control or revoked in Widget Governance
+  // Filter display items strictly via Feature & Module Control (`dashboard_widget_*` and parent module flags)
   const displayItems = items.filter((item) => {
     const def = WIDGET_REGISTRY[item.widgetId];
     if (!def) return false;
-    if (def.requiredFeatureKey && !isFeatureEnabled(def.requiredFeatureKey)) {
-      return false;
-    }
-    if (!isWidgetPermittedForRole(item.widgetId, role, activeTenantId)) {
+    if (!isWidgetFeaturePermitted(def, effectiveIsFeatureEnabled)) {
       return false;
     }
     if (!isEditMode && item.isVisible === false) {
@@ -305,22 +308,34 @@ export default function DashboardGridEngine({
           </div>
           <div className="space-y-1.5">
             <h3 className="text-base font-bold theme-text-primary">
-              No Widgets Permitted for this Role
+              No Widgets Permitted for this Workspace
             </h3>
             <p className="text-xs theme-text-secondary max-w-md leading-relaxed">
-              No dashboard widgets are currently enabled for &quot;{String(role).replace(/_/g, ' ')}&quot; in this workspace. Configure widget entitlements via Widget Role &amp; Academy Governance, or customize this workspace layout.
+              No dashboard widgets are currently enabled for &quot;{(normalizeRoleCode(role) || 'USER').replace(/_/g, ' ')}&quot; under App Management &rarr; Feature &amp; Module Control, or all widgets are hidden in Workspace Customizer.
             </p>
           </div>
-          {onOpenWidgetCatalog && (
-            <div className="pt-2 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={onOpenWidgetCatalog}
-                className="px-4 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition-all cursor-pointer flex items-center gap-2 border-0 ring-0"
-              >
-                <Squares2X2Icon className="w-4 h-4" />
-                <span>Open Workspace Customizer</span>
-              </button>
+          {(onOpenWidgetCatalog || isSuperAdmin) && (
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+              {onOpenWidgetCatalog && (
+                <button
+                  type="button"
+                  onClick={onOpenWidgetCatalog}
+                  className="px-4 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition-all cursor-pointer flex items-center gap-2 border-0 ring-0"
+                >
+                  <Squares2X2Icon className="w-4 h-4" />
+                  <span>Open Workspace Customizer</span>
+                </button>
+              )}
+              {isSuperAdmin && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/section-control')}
+                  className="px-4 py-2 rounded-xl theme-bg-app hover:theme-bg-sub theme-text-primary text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-2 border-0 ring-0"
+                >
+                  <ShieldCheckIcon className="w-4 h-4" />
+                  <span>Configure in Feature Control</span>
+                </button>
+              )}
             </div>
           )}
         </div>

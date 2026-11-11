@@ -92,19 +92,19 @@ class ClassSectionViewSet(viewsets.ModelViewSet):
             qs = qs.none()
 
         dept_id = self.request.query_params.get('department')
-        if dept_id and dept_id != 'ALL':
+        if dept_id and str(dept_id).upper() != 'ALL':
             qs = qs.filter(student_class__department_id=dept_id)
 
         class_id = self.request.query_params.get('class') or self.request.query_params.get('student_class')
-        if class_id and class_id != 'ALL':
+        if class_id and str(class_id).upper() != 'ALL':
             qs = qs.filter(student_class_id=class_id)
 
         branch_id = self.request.query_params.get('branch')
-        if branch_id and branch_id != 'ALL':
+        if branch_id and str(branch_id).upper() != 'ALL':
             qs = qs.filter(branch_id=branch_id)
 
         section_type = self.request.query_params.get('section_type')
-        if section_type and section_type != 'ALL':
+        if section_type and str(section_type).upper() != 'ALL':
             qs = qs.filter(section_type=section_type)
 
         search = self.request.query_params.get('search')
@@ -474,7 +474,28 @@ class SessionViewSet(viewsets.ModelViewSet):
         if getattr(user, 'user_type', '').upper() == 'SUPER_ADMIN' or user.is_superuser:
             return self.queryset.all()
 
-        return self.queryset.filter(created_by=user)
+        tenant_id = get_scoped_tenant_id(self.request)
+        if tenant_id:
+            return self.queryset.filter(
+                Q(created_by__institution_id=tenant_id) |
+                Q(created_by__staff_profile__institution_id=tenant_id) |
+                Q(created_by__isnull=True) |
+                Q(created_by__institution__isnull=True)
+            ).distinct()
+
+        return self.queryset.filter(
+            Q(created_by=user) |
+            Q(created_by__isnull=True) |
+            Q(created_by__institution__isnull=True)
+        ).distinct()
+
+    def create(self, request, *args, **kwargs):
+        raw_name = str(request.data.get('name', '')).strip()
+        if raw_name:
+            existing = self.get_queryset().filter(name__iexact=raw_name).first()
+            if existing:
+                return Response(self.get_serializer(existing).data, status=status.HTTP_200_OK)
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)

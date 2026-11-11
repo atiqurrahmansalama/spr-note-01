@@ -74,6 +74,10 @@ export const bn = {
     contactAuthSection: 'যোগাযোগ ও প্রমাণপত্র',
     roleSection: 'ভূমিকা নির্ধারণ',
     securitySection: 'নিরাপত্তা প্রমাণপত্র',
+    featureControlSection: 'ফিচার ও মডিউল কন্ট্রোল',
+    featureControlUserNotice:
+      'ভূমিকার অনুমতি এবং নির্দিষ্ট ব্যবহারকারীর ওভাররাইডসমূহ অ্যাপ ম্যানেজমেন্টের ফিচার ও মডিউল কন্ট্রোল থেকে কেন্দ্রীয়ভাবে নির্ধারিত হয়।',
+    manageUserOverrides: 'ইউজার ওভাররাইড কনফিগার করুন',
   },
 
   // Form Fields

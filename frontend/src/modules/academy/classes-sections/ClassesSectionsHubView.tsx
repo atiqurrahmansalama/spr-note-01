@@ -22,6 +22,7 @@ import { useRightSidebar } from '../../../context/RightSidebarContext';
 import { useFeatureControl } from '../../../context/FeatureControlContext';
 import { useTenant } from '../../../context/TenantContext';
 import { useAuth } from '../../../context/AuthContext';
+import { isUserSuperAdmin } from '../../../utils/roleUtils';
 import { ClassManagementView } from './classes';
 import { SectionManagementView } from './sections';
 import { GroupManagementView } from './groups';
@@ -47,12 +48,7 @@ export default function ClassesSectionsHubView() {
   const rawTab = urlTab || pathTab || (isSectionDrawer ? 'sections' : isGroupDrawer ? 'groups' : 'classes');
 
   // Super Admin detection across roles, superuser flag, or tenant admin status
-  const isSuperAdmin = Boolean(
-    isMultiTenantAdmin ||
-    user?.is_superuser ||
-    (user?.user_type && user.user_type.toUpperCase() === 'SUPER_ADMIN') ||
-    user?.role === 'SUPER_ADMIN'
-  );
+  const isSuperAdmin = isUserSuperAdmin(user, isMultiTenantAdmin);
 
   // Tenant-scoped initial metrics retrieval for instant, zero-flicker load
   const tenantCacheKey = `spr_classes_metrics_${activeTenantId || 'default'}_v1`;

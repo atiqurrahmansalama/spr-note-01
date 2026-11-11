@@ -8,6 +8,8 @@ export interface RoleDashboardViewProps {
   onOpenWidgetCatalog?: () => void;
   layoutItems?: DashboardLayoutItem[];
   onUpdateLayout?: (newItems: DashboardLayoutItem[]) => void;
+  isFeatureEnabled?: (featureKey?: string) => boolean;
+  isSuperAdmin?: boolean;
 }
 
 export interface DashboardMetric {
@@ -163,6 +165,7 @@ export interface WidgetDefinition {
   defaultColSpan: WidgetColSpan;
   minColSpan?: WidgetColSpan;
   maxColSpan?: WidgetColSpan;
+  widgetFeatureKey: string;
   requiredFeatureKey?: string;
   component: React.ComponentType<any>;
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../../context/ToastContext';
 import { multiAccount, auth as authStore } from '../../../utils/localStore';
+import { extractRoleName } from '../../../utils/roleUtils';
 import { fetchWithAuth } from '../../../utils/authService';
 import {
   CheckIcon,
@@ -205,7 +206,7 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
                 accUser.username ||
                 'User Account';
 
-              const rawRole = accUser.role?.name || accUser.role || 'Teacher';
+              const rawRole = extractRoleName(accUser);
 
               return (
                 <div

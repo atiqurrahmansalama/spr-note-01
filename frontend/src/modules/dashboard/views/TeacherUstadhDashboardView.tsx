@@ -28,6 +28,8 @@ export interface TeacherUstadhDashboardViewProps {
   onOpenWidgetCatalog?: () => void;
   layoutItems?: DashboardLayoutItem[];
   onUpdateLayout?: (newItems: DashboardLayoutItem[]) => void;
+  isFeatureEnabled?: (featureKey?: string) => boolean;
+  isSuperAdmin?: boolean;
 }
 
 export default function TeacherUstadhDashboardView({
@@ -36,6 +38,8 @@ export default function TeacherUstadhDashboardView({
   onOpenWidgetCatalog,
   layoutItems: propLayoutItems,
   onUpdateLayout,
+  isFeatureEnabled,
+  isSuperAdmin = false,
 }: TeacherUstadhDashboardViewProps) {
   const { t, formatNumber } = useTranslation('dashboard');
   const navigate = useNavigate();
@@ -294,6 +298,8 @@ export default function TeacherUstadhDashboardView({
       onUpdateItems={handleUpdateLayout}
       onOpenWidgetCatalog={onOpenWidgetCatalog}
       widgetPropsMap={widgetPropsMap}
+      isFeatureEnabled={isFeatureEnabled}
+      isSuperAdmin={isSuperAdmin}
     />
   );
 }

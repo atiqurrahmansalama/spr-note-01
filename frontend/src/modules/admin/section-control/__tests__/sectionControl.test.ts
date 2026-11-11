@@ -26,6 +26,8 @@ const arKeys = flattenKeys(ar).sort();
 const urKeys = flattenKeys(ur).sort();
 
 assert.strictEqual(enKeys.length > 0, true, 'English locale must contain keys');
+assert.ok((en as any).badges?.dashboardWidgetsSubheader, 'dashboardWidgetsSubheader key must exist');
+assert.ok((en as any).badges?.widgetsCount, 'widgetsCount key must exist');
 assert.deepStrictEqual(bnKeys, enKeys, 'Bengali keys must match English keys 100%');
 assert.deepStrictEqual(arKeys, enKeys, 'Arabic keys must match English keys 100%');
 assert.deepStrictEqual(urKeys, enKeys, 'Urdu keys must match English keys 100%');

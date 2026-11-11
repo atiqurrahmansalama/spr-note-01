@@ -33,23 +33,23 @@ export const StaffOnboardingSuccess: React.FC<StaffOnboardingSuccessProps> = ({
           {t('onboardingSuccessTitle', 'Staff Member Successfully Onboarded!')}
         </h3>
         <p className="text-xs theme-text-secondary mt-1">
-          Official employee profile registered with ID{' '}
+          {t('registeredWithIdPrefix', 'Official employee profile registered with ID')}{' '}
           <span className="font-mono font-bold theme-accent">{empId}</span>
         </p>
       </div>
 
-      <div className="p-4 rounded-2xl theme-bg-app text-xs text-left space-y-2.5 border-0">
-        <div className="flex justify-between">
-          <span className="theme-text-secondary">Name:</span>
-          <span className="font-bold theme-text-primary">{staffName}</span>
+      <div className="p-4 rounded-2xl theme-bg-app text-xs text-start space-y-2.5 border-0">
+        <div className="flex justify-between gap-3">
+          <span className="theme-text-secondary">{t('labelName', 'Name')}:</span>
+          <span className="font-bold theme-text-primary text-end">{staffName}</span>
         </div>
-        <div className="flex justify-between">
-          <span className="theme-text-secondary">Designation:</span>
-          <span className="font-bold theme-accent">{designation}</span>
+        <div className="flex justify-between gap-3">
+          <span className="theme-text-secondary">{t('labelDesignation', 'Designation')}:</span>
+          <span className="font-bold theme-accent text-end">{designation}</span>
         </div>
-        <div className="flex justify-between">
-          <span className="theme-text-secondary">Staff Category:</span>
-          <span className="font-medium theme-text-primary">{role}</span>
+        <div className="flex justify-between gap-3">
+          <span className="theme-text-secondary">{t('labelStaffCategory', 'Staff Category')}:</span>
+          <span className="font-medium theme-text-primary text-end">{role}</span>
         </div>
       </div>
 
@@ -81,4 +81,3 @@ export const StaffOnboardingSuccess: React.FC<StaffOnboardingSuccessProps> = ({
     </div>
   );
 };
-

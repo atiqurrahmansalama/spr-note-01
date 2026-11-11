@@ -54,6 +54,43 @@ function notifySubscribers(tenantId, data) {
 }
 
 /**
+ * Safely unpacks an HTTP/API Promise.allSettled result without ever wiping persistent tenant caches
+ * on transient non-2xx HTTP responses (e.g. 401 token race, 429 throttle, or 500 server blip).
+ */
+async function resolveSettledList(settledRes, cacheKey, filterFn = (x) => !x?.is_deleted, previousMemoryList = []) {
+  const readFallback = () => {
+    const cached = readJSON(cacheKey, []);
+    if (Array.isArray(cached) && cached.length > 0) return cached;
+    return Array.isArray(previousMemoryList) ? previousMemoryList : [];
+  };
+
+  if (!settledRes || settledRes.status !== 'fulfilled') {
+    return { items: readFallback(), ok: false };
+  }
+
+  let raw = settledRes.value;
+  if (raw && typeof raw.json === 'function') {
+    if (!raw.ok) {
+      return { items: readFallback(), ok: false };
+    }
+    try {
+      raw = await raw.json();
+    } catch {
+      return { items: readFallback(), ok: false };
+    }
+  }
+
+  const parsedList = Array.isArray(raw) ? raw : Array.isArray(raw?.results) ? raw.results : null;
+  if (!parsedList) {
+    return { items: readFallback(), ok: false };
+  }
+
+  const cleanItems = parsedList.filter(filterFn);
+  writeJSON(cacheKey, cleanItems);
+  return { items: cleanItems, ok: true };
+}
+
+/**
  * Centralized async fetcher with in-flight deduplication.
  */
 async function fetchAcademicHierarchy(tenantId, force = false) {
@@ -72,6 +109,7 @@ async function fetchAcademicHierarchy(tenantId, force = false) {
   const fetchPromise = (async () => {
     try {
       const localYears = academicYearsStore.getAcademicYears(tenantId);
+      const prevSnap = memoryCache.get(tenantId) || {};
 
       const [branchRes, deptRes, clsRes, secRes, grpRes, stuRes, perRes, staffRes] = await Promise.allSettled([
         getBranches ? getBranches({ type: 'ALL' }) : Promise.resolve([]),
@@ -84,128 +122,40 @@ async function fetchAcademicHierarchy(tenantId, force = false) {
         fetchWithAuth('/api/v1/staff/?page_size=500&all=true'),
       ]);
 
-      // 1. Branches
-      let branches = [];
-      if (branchRes.status === 'fulfilled') {
-        const val = branchRes.value;
-        branches = (Array.isArray(val) ? val : val?.results || []).filter((b) => !b.is_deleted);
-        writeJSON(`spr_branches_cache_${tenantId}`, branches);
-      } else {
-        branches = readJSON(`spr_branches_cache_${tenantId}`, []);
-      }
+      const notDeleted = (item) => !item?.is_deleted;
+      const activeStaffFilter = (item) => !item?.is_deleted && item?.is_active !== false;
 
-      // 2. Departments
-      let departments = [];
-      if (deptRes.status === 'fulfilled') {
-        let data = deptRes.value;
-        if (data && typeof data.json === 'function') {
-          data = data.ok ? await data.json() : [];
-        }
-        departments = (Array.isArray(data) ? data : data?.results || []).filter((d) => !d.is_deleted);
-        writeJSON(`spr_departments_cache_${tenantId}`, departments);
-      } else {
-        departments = readJSON(`spr_departments_cache_${tenantId}`, []);
-      }
+      const [branchesR, deptsR, classesR, sectionsR, groupsR, studentsR, periodsR, staffR] = await Promise.all([
+        resolveSettledList(branchRes, `spr_branches_cache_${tenantId}`, notDeleted, prevSnap.branches),
+        resolveSettledList(deptRes, `spr_departments_cache_${tenantId}`, notDeleted, prevSnap.departments),
+        resolveSettledList(clsRes, `spr_classes_cache_${tenantId}`, notDeleted, prevSnap.classes),
+        resolveSettledList(secRes, `spr_sections_cache_${tenantId}`, notDeleted, prevSnap.sections),
+        resolveSettledList(grpRes, `spr_groups_cache_${tenantId}`, notDeleted, prevSnap.groups),
+        resolveSettledList(stuRes, `spr_students_cache_${tenantId}`, notDeleted, prevSnap.students),
+        resolveSettledList(perRes, `spr_period_slots_cache_${tenantId}`, notDeleted, prevSnap.periodSlots),
+        resolveSettledList(staffRes, `spr_staff_cache_${tenantId}`, activeStaffFilter, prevSnap.staff),
+      ]);
 
-      // 3. Classes
-      let classes = [];
-      if (clsRes.status === 'fulfilled') {
-        let data = clsRes.value;
-        if (data && typeof data.json === 'function') {
-          data = data.ok ? await data.json() : [];
-        }
-        classes = (Array.isArray(data) ? data : data?.results || []).filter((c) => !c.is_deleted);
-        writeJSON(`spr_classes_cache_${tenantId}`, classes);
-      } else {
-        classes = readJSON(`spr_classes_cache_${tenantId}`, []);
-      }
-
-      // 4. Sections
-      let sections = [];
-      if (secRes.status === 'fulfilled') {
-        let data = secRes.value;
-        if (data && typeof data.json === 'function') {
-          data = data.ok ? await data.json() : [];
-        }
-        sections = (Array.isArray(data) ? data : data?.results || []).filter((s) => !s.is_deleted);
-        writeJSON(`spr_sections_cache_${tenantId}`, sections);
-      } else {
-        sections = readJSON(`spr_sections_cache_${tenantId}`, []);
-      }
-
-      // 5. Groups
-      let groups = [];
-      if (grpRes.status === 'fulfilled') {
-        let data = grpRes.value;
-        if (data && typeof data.json === 'function') {
-          data = data.ok ? await data.json() : [];
-        }
-        groups = (Array.isArray(data) ? data : data?.results || []).filter((g) => !g.is_deleted);
-        writeJSON(`spr_groups_cache_${tenantId}`, groups);
-      } else {
-        groups = readJSON(`spr_groups_cache_${tenantId}`, []);
-      }
-
-      // 6. Students
-      let students = [];
-      if (stuRes.status === 'fulfilled') {
-        let data = stuRes.value;
-        if (data && typeof data.json === 'function') {
-          data = data.ok ? await data.json() : [];
-        }
-        students = (Array.isArray(data) ? data : data?.results || []).filter((st) => !st.is_deleted);
-        writeJSON(`spr_students_cache_${tenantId}`, students);
-      } else {
-        students = readJSON(`spr_students_cache_${tenantId}`, []);
-      }
-
-      // 7. Periods
-      let periodSlots = [];
-      if (perRes.status === 'fulfilled') {
-        let data = perRes.value;
-        if (data && typeof data.json === 'function') {
-          data = data.ok ? await data.json() : [];
-        }
-        periodSlots = (Array.isArray(data) ? data : data?.results || []).filter((p) => !p.is_deleted);
-        writeJSON(`spr_period_slots_cache_${tenantId}`, periodSlots);
-      } else {
-        periodSlots = readJSON(`spr_period_slots_cache_${tenantId}`, []);
-      }
-
-      // 8. Staff & Teachers
-      let staff = [];
-      let teachers = [];
-      if (staffRes.status === 'fulfilled') {
-        let data = staffRes.value;
-        if (data && typeof data.json === 'function') {
-          data = data.ok ? await data.json() : [];
-        }
-        const list = Array.isArray(data) ? data : data?.results || [];
-        staff = list.filter((s) => !s.is_deleted && s.is_active !== false);
-        writeJSON(`spr_staff_cache_${tenantId}`, staff);
-        const teaching = staff.filter((s) => s.staff_type === 'TEACHING' || !s.staff_type);
-        teachers = teaching.length > 0 ? teaching : staff;
-      } else {
-        staff = readJSON(`spr_staff_cache_${tenantId}`, []);
-        const teaching = staff.filter((s) => s.staff_type === 'TEACHING' || !s.staff_type);
-        teachers = teaching.length > 0 ? teaching : staff;
-      }
+      const teaching = staffR.items.filter((s) => s.staff_type === 'TEACHING' || !s.staff_type);
+      const teachers = teaching.length > 0 ? teaching : staffR.items;
 
       const snapshot = {
-        branches,
+        branches: branchesR.items,
         academicYears: localYears,
-        departments,
-        classes,
-        sections,
-        groups,
-        students,
-        periodSlots,
+        departments: deptsR.items,
+        classes: classesR.items,
+        sections: sectionsR.items,
+        groups: groupsR.items,
+        students: studentsR.items,
+        periodSlots: periodsR.items,
         teachers,
-        staff,
+        staff: staffR.items,
       };
 
       memoryCache.set(tenantId, snapshot);
-      lastFetchTimestamps.set(tenantId, Date.now());
+      if (deptsR.ok && classesR.ok && sectionsR.ok && studentsR.ok) {
+        lastFetchTimestamps.set(tenantId, Date.now());
+      }
       notifySubscribers(tenantId, snapshot);
       return snapshot;
     } catch (err) {

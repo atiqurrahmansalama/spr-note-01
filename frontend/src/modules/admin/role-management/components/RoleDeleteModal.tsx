@@ -54,7 +54,7 @@ export const RoleDeleteModal: React.FC<RoleDeleteModalProps> = ({
         </div>
 
         {/* Role Identity Details */}
-        <div className="p-3 rounded-xl theme-bg-sub border theme-border space-y-1.5 text-xs font-mono">
+        <div className="p-3 rounded-xl theme-bg-app border-0 space-y-1.5 text-xs font-mono">
           <div className="flex justify-between">
             <span className="theme-text-secondary">Role Name:</span>
             <span className="font-bold theme-text-primary">{role.name}</span>
@@ -62,10 +62,6 @@ export const RoleDeleteModal: React.FC<RoleDeleteModalProps> = ({
           <div className="flex justify-between">
             <span className="theme-text-secondary">Role Code:</span>
             <span className="theme-accent font-semibold">{role.code}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="theme-text-secondary">Authority Level:</span>
-            <span className="theme-text-primary">Level {formatNumber(role.hierarchy_level)}</span>
           </div>
           <div className="flex justify-between">
             <span className="theme-text-secondary">Assigned Users:</span>

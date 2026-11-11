@@ -12,6 +12,7 @@ export interface SectionItem {
   section_key: string;
   title: string;
   description?: string;
+  widget_group?: string;
   is_enabled?: boolean;
   effective_enabled: boolean;
   inheritance_origin?: InheritanceOrigin;

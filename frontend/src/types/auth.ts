@@ -18,34 +18,14 @@ export type DefaultRoleCode =
 
 export type RoleCode = DefaultRoleCode | (string & {});
 
-export interface RoleActionPermission {
-  id?: string;
-  roleId: string;
-  canCreateStudent: boolean;
-  canEditStudent: boolean;
-  canDeleteStudent: boolean;
-  canEnterMarks: boolean;
-  canPublishResults: boolean;
-  canManageAttendance: boolean;
-  canManageTeachers: boolean;
-  canManageClasses: boolean;
-  canManageBilling: boolean;
-  canExportReports: boolean;
-  canManageUsers: boolean;
-  canViewAuditLogs: boolean;
-  customPermissions?: Record<string, boolean>;
-}
-
 export interface UserRole {
   id: string;
   code: RoleCode;
   name: string;
   description?: string;
-  hierarchyLevel: number;
   colorTheme?: string;
   isSystemRole: boolean;
   institutionId?: string | null;
-  permissions?: RoleActionPermission;
   createdAt?: string;
   updatedAt?: string;
 }

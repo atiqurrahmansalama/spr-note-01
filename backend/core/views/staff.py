@@ -652,7 +652,7 @@ class StaffOnboardingApplyView(APIView):
                         phone_number=phone,
                         gender=data.get('gender', 'MALE'),
                         institution=institution,
-                        user_type='STAFF_TEACHER' if data.get('staff_type') == 'TEACHING' else 'STAFF_GENERAL'
+                        user_type='TEACHER' if data.get('staff_type') == 'TEACHING' else 'STAFF'
                     )
                     # Set temporary secure password
                     import secrets
@@ -660,9 +660,73 @@ class StaffOnboardingApplyView(APIView):
                     user.set_password(temp_pwd)
                     user.save()
 
+            staff_type = data.get('staff_type') or (token_obj.staff_type if token_obj else 'TEACHING')
+
+            # Sync authenticated candidate profile (especially Google OAuth candidates who enter with placeholder phone / GUARDIAN default)
+            if user:
+                user_update_fields = []
+                submitted_name = (data.get('name') or '').strip()
+                submitted_phone = (data.get('phone_number') or '').strip()
+                submitted_email = (data.get('email') or '').strip()
+                submitted_photo = (data.get('photo_url') or '').strip()
+
+                if not user.institution_id and institution:
+                    user.institution = institution
+                    user_update_fields.append('institution')
+
+                if submitted_name and not (user.name or '').strip():
+                    user.name = submitted_name
+                    user_update_fields.append('name')
+                    if not (user.first_name or '').strip():
+                        parts = submitted_name.split(None, 1)
+                        user.first_name = parts[0]
+                        user_update_fields.append('first_name')
+                        if len(parts) > 1 and not (user.last_name or '').strip():
+                            user.last_name = parts[1]
+                            user_update_fields.append('last_name')
+
+                current_phone = (user.phone_number or '').strip()
+                if submitted_phone and (not current_phone or current_phone.startswith('g_') or current_phone.startswith('user_')):
+                    if not User.objects.filter(phone_number=submitted_phone).exclude(pk=user.pk).exists():
+                        user.phone_number = submitted_phone
+                        user_update_fields.append('phone_number')
+
+                if submitted_email and not (user.email or '').strip():
+                    if not User.objects.filter(email__iexact=submitted_email).exclude(pk=user.pk).exists():
+                        user.email = submitted_email
+                        user_update_fields.append('email')
+
+                if submitted_photo.startswith(('http://', 'https://')) and not (user.avatar_url or '').strip():
+                    user.avatar_url = submitted_photo
+                    user_update_fields.append('avatar_url')
+
+                # Upgrade newly auto-provisioned public Google/default candidate accounts to Teacher/Staff,
+                # while strictly preserving existing privileged Admin/Super Admin roles.
+                protected_roles = {'SUPER_ADMIN', 'ADMIN', 'PRINCIPAL', 'DIRECTOR', 'HEADMASTER'}
+                current_role_code = (getattr(getattr(user, 'role', None), 'code', '') or '').strip().upper()
+                current_user_type = (user.user_type or '').strip().upper()
+                if (
+                    not user.is_superuser
+                    and current_role_code not in protected_roles
+                    and current_user_type not in protected_roles
+                    and current_user_type in ('', 'GUARDIAN', 'USER', 'STUDENT')
+                ):
+                    target_role_code = 'TEACHER' if staff_type == 'TEACHING' else 'STAFF'
+                    target_role_name = 'Teacher' if staff_type == 'TEACHING' else 'Staff'
+                    target_role, _ = UserRole.objects.get_or_create(
+                        code=target_role_code,
+                        defaults={'name': target_role_name, 'is_system_role': False},
+                    )
+                    user.user_type = target_role_code
+                    user.role = target_role
+                    user.is_staff = True
+                    user_update_fields.extend(['user_type', 'role', 'is_staff'])
+
+                if user_update_fields:
+                    user.save(update_fields=list(dict.fromkeys(user_update_fields)))
+
             # 2. Generate Employee ID
             from core.services import StaffOnboardingService
-            staff_type = data.get('staff_type') or (token_obj.staff_type if token_obj else 'TEACHING')
             emp_id = StaffOnboardingService.generate_employee_id(institution, staff_type)
 
             # 3. Create StaffProfile

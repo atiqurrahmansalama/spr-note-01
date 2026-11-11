@@ -74,6 +74,10 @@ export const en = {
     contactAuthSection: 'Contact & Credentials',
     roleSection: 'Role Assignment',
     securitySection: 'Security Credentials',
+    featureControlSection: 'Feature & Module Control',
+    featureControlUserNotice:
+      'Role permissions and user-specific access overrides are configured centrally inside App Management -> Feature & Module Control.',
+    manageUserOverrides: 'Configure User Overrides',
   },
 
   // Form Fields

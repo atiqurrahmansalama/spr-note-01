@@ -28,7 +28,9 @@ import {
   masterCalendarStore,
   attendanceTimingPolicyStore,
   academicYearsStore,
+  auth as authStore,
 } from '../../utils/localStore';
+import { isUserAcademyAdmin } from '../../utils/roleUtils';
 import { getHijriDateString, getCurrentHijriMonthRange } from '../../utils/hijriUtils';
 import { getEventColors, DayAgendaDrawer, TimeScheduleDrawerForm } from '../academy/calendar-events';
 import { useToast } from '../../context/ToastContext';
@@ -79,12 +81,14 @@ export default function ResidentialAttendanceView({
   onStudentClick,
 } = {}) {
   const { showToast } = useToast();
-  const { activeTenantId, isMultiTenantAdmin } = useTenant();
+  const { activeTenantId, isMultiTenantAdmin, isAcademyAdmin } = useTenant();
   const { openRightSidebar, closeRightSidebar, openDrawer } = useRightSidebar();
   // Global Academic Session — bounds from active year/semester selected globally
   const { activeYear, activeSemester } = useAcademicSession();
 
   const userProfile = useMemo(() => {
+    const authUser = authStore.getUser();
+    if (authUser && typeof authUser === 'object') return authUser;
     try {
       const raw = localStorage.getItem('spr_user_profile');
       return raw ? JSON.parse(raw) : {};
@@ -92,14 +96,7 @@ export default function ResidentialAttendanceView({
       return {};
     }
   }, []);
-  const isAdmin = Boolean(
-    isMultiTenantAdmin ||
-    userProfile.is_superuser ||
-    userProfile.user_type === 'SUPER_ADMIN' ||
-    userProfile.user_type === 'ADMIN' ||
-    userProfile.role_code === 'ADMIN' ||
-    userProfile.role_code === 'PRINCIPAL'
-  );
+  const isAdmin = isUserAcademyAdmin(userProfile, isMultiTenantAdmin, isAcademyAdmin);
 
   const [timingPolicy, setTimingPolicy] = useState(() => attendanceTimingPolicyStore.getPolicy(activeTenantId));
 

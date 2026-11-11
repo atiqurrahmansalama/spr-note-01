@@ -40,6 +40,7 @@ export interface DashboardWidgetCardItemProps {
   settings?: Record<string, any>;
   onUpdateSettings?: (updatedSettings: Record<string, any>) => void;
   isSuperAdmin?: boolean;
+  isFeatureEnabledOverride?: (featureKey?: string) => boolean;
   onNavigateToFeatureControl?: () => void;
   disabled?: boolean;
 }
@@ -55,10 +56,12 @@ export default function DashboardWidgetCardItem({
   settings = {},
   onUpdateSettings,
   isSuperAdmin = false,
+  isFeatureEnabledOverride,
   onNavigateToFeatureControl,
   disabled = false,
 }: DashboardWidgetCardItemProps) {
-  const { isFeatureEnabled } = useFeatureControl();
+  const { isFeatureEnabled: contextIsFeatureEnabled } = useFeatureControl();
+  const isFeatureEnabled = isFeatureEnabledOverride || contextIsFeatureEnabled;
 
   const isFeaturePermitted = isWidgetFeaturePermitted(widgetDef, isFeatureEnabled);
   const isFeatureBlocked = !isFeaturePermitted;

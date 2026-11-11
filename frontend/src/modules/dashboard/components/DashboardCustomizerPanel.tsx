@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { DashboardRole, DashboardLayoutItem, WidgetDefinition } from '../types';
 import { 
-  getWidgetsForRole, 
+  getAvailableWidgets, 
   WIDGET_REGISTRY, 
   isWidgetFeaturePermitted, 
   resetLayout 
@@ -15,7 +15,7 @@ import CustomCheckbox from '../../../components/ui/CustomCheckbox';
 import { useRoleManagement } from '../../admin/role-management/hooks/useRoleManagement';
 import { useTenant } from '../../../context/TenantContext';
 import { useFeatureControl } from '../../../context/FeatureControlContext';
-import { useRightSidebar } from '../../../context/RightSidebarContext';
+import { normalizeRoleCode } from '../../../utils/roleUtils';
 import {
   CheckCircleIcon,
   RefreshIcon,
@@ -30,6 +30,7 @@ export interface DashboardCustomizerPanelProps {
   onSaveLayout: (newLayout: DashboardLayoutItem[], saveAsRoleDefault?: boolean, targetRole?: DashboardRole) => void;
   onResetLayout: (targetRole?: DashboardRole) => void;
   isSuperAdmin: boolean;
+  isFeatureEnabledOverride?: (featureKey?: string) => boolean;
   onClose: () => void;
 }
 
@@ -63,6 +64,7 @@ export default function DashboardCustomizerPanel({
   onSaveLayout,
   onResetLayout,
   isSuperAdmin,
+  isFeatureEnabledOverride,
   onClose,
 }: DashboardCustomizerPanelProps) {
   const [draftLayout, setDraftLayout] = useState<DashboardLayoutItem[]>(currentLayout);
@@ -71,8 +73,8 @@ export default function DashboardCustomizerPanel({
   const navigate = useNavigate();
   const { roles = [] } = useRoleManagement();
   const { activeTenantId } = useTenant();
-  const { isFeatureEnabled } = useFeatureControl();
-  const { openDrawer } = useRightSidebar();
+  const { isFeatureEnabled: contextIsFeatureEnabled } = useFeatureControl();
+  const effectiveIsFeatureEnabled = isFeatureEnabledOverride || contextIsFeatureEnabled;
 
   const [saveAsDefault, setSaveAsDefault] = useState<boolean>(() => {
     try {
@@ -83,35 +85,24 @@ export default function DashboardCustomizerPanel({
     }
   });
 
-  // Re-sync eligible widgets when widget governance permissions are saved
-  const [governanceTick, setGovernanceTick] = useState(0);
-  useEffect(() => {
-    const handleGovUpdate = () => setGovernanceTick((t) => t + 1);
-    window.addEventListener('spr_dashboard_governance_updated', handleGovUpdate);
-    return () => window.removeEventListener('spr_dashboard_governance_updated', handleGovUpdate);
-  }, []);
-
   // Sync draftLayout whenever currentLayout changes externally
   useEffect(() => {
     setDraftLayout(currentLayout);
   }, [currentLayout]);
 
-  // Resolve active role details
+  // Resolve active role details safely
+  const normalizedRoleCode = normalizeRoleCode(role) || 'ADMIN';
   const roleRecord = useMemo(
-    () => roles.find((r) => r.code?.toUpperCase() === String(role).toUpperCase()),
-    [roles, role]
+    () => roles.find((r) => r.code?.toUpperCase() === normalizedRoleCode),
+    [roles, normalizedRoleCode]
   );
-  const roleDisplayName = roleRecord?.name || String(role).replace(/_/g, ' ');
+  const roleDisplayName = roleRecord?.name || normalizedRoleCode.replace(/_/g, ' ');
 
-  // Filter eligible widgets according to role governance entitlements and Feature Control permissions
-  const eligibleWidgets = useMemo(() => {
-    const roleWidgets = getWidgetsForRole(role, activeTenantId);
-    if (isSuperAdmin) {
-      return roleWidgets;
-    }
-    // Regular users: strictly exclude widgets whose source feature is disabled
-    return roleWidgets.filter((w) => isWidgetFeaturePermitted(w, isFeatureEnabled));
-  }, [role, activeTenantId, isSuperAdmin, isFeatureEnabled, governanceTick]);
+  // Filter eligible widgets strictly via Feature & Module Control (`dashboard_widget_*` & module flags)
+  const eligibleWidgets = useMemo(
+    () => getAvailableWidgets(effectiveIsFeatureEnabled),
+    [effectiveIsFeatureEnabled]
+  );
 
   const allCategorizedWidgetIds = useMemo(
     () => new Set(MODULE_CATEGORIES.flatMap((s) => s.widgetIds)),
@@ -126,7 +117,7 @@ export default function DashboardCustomizerPanel({
   // Toggle widget visibility with INSTANT LIVE SYNC & AUTO-SCROLL
   const handleToggleWidget = (widgetId: string) => {
     const widgetDef = WIDGET_REGISTRY[widgetId];
-    if (widgetDef && !isWidgetFeaturePermitted(widgetDef, isFeatureEnabled)) {
+    if (widgetDef && !isWidgetFeaturePermitted(widgetDef, effectiveIsFeatureEnabled)) {
       return;
     }
 
@@ -233,6 +224,7 @@ export default function DashboardCustomizerPanel({
           handleUpdateWidgetSettings(widgetDef.id, newSettings)
         }
         isSuperAdmin={isSuperAdmin}
+        isFeatureEnabledOverride={effectiveIsFeatureEnabled}
         onNavigateToFeatureControl={() => {
           onClose();
           navigate('/section-control');
@@ -246,7 +238,7 @@ export default function DashboardCustomizerPanel({
       padding="none"
       className="space-y-6 pt-2 pb-16 @container text-left rtl:text-right"
       footer={
-        <div className="p-3.5 rounded-2xl border theme-border theme-bg-surface shadow-md flex flex-col gap-3">
+        <div className="p-3.5 rounded-2xl border-0 ring-0 theme-bg-surface shadow-md flex flex-col gap-3">
           {/* Canonical CustomCheckbox for Super Admin Default Layout Save */}
           {isSuperAdmin && (
             <div className="pb-1">
@@ -283,7 +275,7 @@ export default function DashboardCustomizerPanel({
       }
     >
       {/* 1. Top Description Banner with Reset Defaults Action Button */}
-      <div className="p-3.5 sm:p-4 rounded-2xl theme-bg-sub/50 border theme-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="p-3.5 sm:p-4 rounded-2xl theme-bg-app border-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-8 h-8 rounded-xl theme-bg-accent-soft text-[var(--accent-main)] flex items-center justify-center shrink-0">
             <AdjustmentsHorizontalIcon className="w-4 h-4" />
@@ -312,7 +304,7 @@ export default function DashboardCustomizerPanel({
 
       {/* 2. Module-Wise Categorized Sections or Empty State */}
       {eligibleWidgets.length === 0 ? (
-        <div className="p-8 rounded-2xl theme-bg-sub/40 border-2 border-dashed theme-border text-center flex flex-col items-center justify-center space-y-3 my-4 animate-fade-in">
+        <div className="p-8 rounded-2xl theme-bg-app border-0 text-center flex flex-col items-center justify-center space-y-3 my-4 animate-fade-in">
           <div className="w-12 h-12 rounded-2xl theme-bg-accent-soft text-[var(--accent-main)] flex items-center justify-center">
             <ShieldCheckIcon className="w-6 h-6" />
           </div>
@@ -321,7 +313,7 @@ export default function DashboardCustomizerPanel({
               No Widgets Permitted for {roleDisplayName}
             </div>
             <p className="text-[11px] theme-text-secondary max-w-xs leading-relaxed">
-              No widgets are currently granted to this role in the Governance Matrix. Enable widgets in Widget Role &amp; Academy Governance to make them customizable here.
+              No widgets are currently enabled for this role under App Management &rarr; Feature &amp; Module Control. Enable widgets there to customize them here.
             </p>
           </div>
           {isSuperAdmin && (
@@ -330,10 +322,13 @@ export default function DashboardCustomizerPanel({
               variant="secondary"
               size="xs"
               icon={ShieldCheckIcon}
-              onClick={() => openDrawer('widget-governance')}
+              onClick={() => {
+                onClose();
+                navigate('/section-control');
+              }}
               className="mt-2 rounded-xl"
             >
-              Configure Widget Governance
+              Configure in Feature Control
             </CustomButton>
           )}
         </div>
@@ -351,7 +346,7 @@ export default function DashboardCustomizerPanel({
             return (
               <div key={moduleCat.id} className="space-y-3">
                 {/* Clean Module Section Header */}
-                <div className="flex items-center justify-between pb-2 border-b theme-border">
+                <div className="flex items-center justify-between pb-1.5">
                   <div className="flex items-center gap-2 min-w-0">
                     <ModuleIcon className="w-4 h-4 theme-accent shrink-0" />
                     <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary truncate">
@@ -374,7 +369,7 @@ export default function DashboardCustomizerPanel({
           {/* Safeguard: Uncategorized Widgets Section */}
           {uncategorizedWidgets.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b theme-border">
+              <div className="flex items-center justify-between pb-1.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <SparklesIcon className="w-4 h-4 theme-accent shrink-0" />
                   <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary truncate">

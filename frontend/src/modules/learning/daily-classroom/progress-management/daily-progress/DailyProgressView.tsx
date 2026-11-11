@@ -14,6 +14,7 @@ import { useTenant } from "@/context/TenantContext";
 import { useFont } from "@/context/useFont";
 import { useUndoRedo } from "@/context/useUndoRedo";
 import { useFeatureControl } from "@/context/FeatureControlContext";
+import { useAcademicData } from "@/hooks/useAcademicData";
 import DailyClassroomFilterControls from "../../components/DailyClassroomFilterControls";
 import SegmentedSwitch from "@/components/ui/SegmentedSwitch";
 import { getClassroomTodayDate } from "@/constants/calendarConstants";
@@ -198,6 +199,73 @@ export default function DailyProgressView({
     setSelectedStudentId,
     setGroupName,
   });
+
+  const { teachers: academicTeachers = [], staff: academicStaff = [] } = useAcademicData() || {};
+
+  const { teacherSelectOptions, effectiveSelectedTeacherId } = useMemo(() => {
+    const opts: Array<{ value: string; label: string; rawName: string; raw?: any }> = [];
+    const seenIds = new Set<string>();
+    const activeList = [...(academicTeachers || []), ...(academicStaff || [])].filter(
+      (t: any) => t && !t.is_deleted && t.is_active !== false
+    );
+
+    activeList.forEach((t: any) => {
+      const val = String(t.user ?? t.user_id ?? t.id ?? "").trim();
+      if (!val || seenIds.has(val)) return;
+      const baseName = String(
+        t.name_en ||
+        t.user_name ||
+        t.name ||
+        t.full_name ||
+        t.employee_id ||
+        (t.user_phone ? `Teacher (${t.user_phone})` : "")
+      ).trim();
+      if (!baseName) return;
+      const designation = String(t.designation || "").trim();
+      seenIds.add(val);
+      opts.push({
+        value: val,
+        label: designation ? `${baseName} (${designation})` : baseName,
+        rawName: baseName,
+        raw: t,
+      });
+    });
+
+    if (defaultTeacherId && !seenIds.has(String(defaultTeacherId))) {
+      seenIds.add(String(defaultTeacherId));
+      const fallbackName = (defaultTeacherName || "Current User").trim();
+      opts.unshift({
+        value: String(defaultTeacherId),
+        label: fallbackName,
+        rawName: fallbackName,
+      });
+    }
+
+    let resolvedVal = String(selectedTeacherId || defaultTeacherId || "").trim();
+    if (resolvedVal.toUpperCase() === "ALL") {
+      resolvedVal = String(defaultTeacherId || "").trim();
+    }
+
+    if (resolvedVal && !seenIds.has(resolvedVal)) {
+      const matchedByStaffId = activeList.find((t: any) => String(t.id ?? "") === resolvedVal);
+      const canonicalVal = matchedByStaffId
+        ? String(matchedByStaffId.user ?? matchedByStaffId.user_id ?? matchedByStaffId.id ?? "").trim()
+        : "";
+      if (canonicalVal && seenIds.has(canonicalVal)) {
+        resolvedVal = canonicalVal;
+      } else {
+        const display = (selectedTeacherName || defaultTeacherName || `Teacher ${resolvedVal}`).trim();
+        seenIds.add(resolvedVal);
+        opts.unshift({
+          value: resolvedVal,
+          label: display,
+          rawName: display,
+        });
+      }
+    }
+
+    return { teacherSelectOptions: opts, effectiveSelectedTeacherId: resolvedVal };
+  }, [academicTeachers, academicStaff, defaultTeacherId, defaultTeacherName, selectedTeacherId, selectedTeacherName]);
 
   const studentInputRef = useRef<HTMLInputElement>(null);
 
@@ -526,12 +594,16 @@ export default function DailyProgressView({
           selectedDepartmentId,
           onDepartmentChange: handleDepartmentChange,
           departmentSelectOptions,
+          allowAllClasses: false,
           selectedClassId,
           onClassChange: handleClassChange,
           classSelectOptions,
           selectedSectionId,
           onSectionChange: handleSectionChange,
           sectionSelectOptions,
+          allowAllSections: false,
+          allowAllTeachers: false,
+          teacherSelectOptions,
           defaultExpanded: false,
           expanded: isFilterExpanded,
           onToggleExpanded: handleToggleFilterExpanded,
@@ -549,22 +621,29 @@ export default function DailyProgressView({
         selectedDepartmentId={selectedDepartmentId}
         onDepartmentChange={handleDepartmentChange}
         departmentSelectOptions={departmentSelectOptions}
+        allowAllClasses={false}
         selectedClassId={selectedClassId}
         onClassChange={handleClassChange}
         classSelectOptions={classSelectOptions}
         hasSectionsForClass={hasSectionsForClass}
+        allowAllSections={false}
         selectedSectionId={selectedSectionId}
         onSectionChange={handleSectionChange}
         sectionSelectOptions={sectionSelectOptions}
         hasTeachers={true}
         allowAllTeachers={false}
-        selectedTeacherId={selectedTeacherId || defaultTeacherId}
+        teacherSelectOptions={teacherSelectOptions}
+        selectedTeacherId={effectiveSelectedTeacherId}
         onTeacherChange={(tId: any, tObj?: any) => {
-          const nextId = tId && tId !== 'ALL' ? String(tId) : defaultTeacherId;
+          const nextId = tId && String(tId).toUpperCase() !== 'ALL' ? String(tId) : defaultTeacherId;
           setSelectedTeacherId(nextId);
-          if (tObj) {
-            setSelectedTeacherName(tObj.name_en || tObj.name || tObj.user_name || defaultTeacherName || "");
-          } else if (!tId || tId === 'ALL') {
+          const matchedOpt = teacherSelectOptions.find((o) => String(o.value) === String(nextId));
+          const resolvedObj = tObj?.raw || tObj || matchedOpt?.raw;
+          if (matchedOpt?.rawName) {
+            setSelectedTeacherName(matchedOpt.rawName);
+          } else if (resolvedObj) {
+            setSelectedTeacherName(resolvedObj.name_en || resolvedObj.user_name || resolvedObj.name || resolvedObj.full_name || defaultTeacherName || "");
+          } else {
             setSelectedTeacherName(defaultTeacherName || "");
           }
         }}

@@ -4,24 +4,13 @@
  * Strict TypeScript interfaces for Users, Roles, Sessions, Filters, and Operations.
  */
 
-export interface ActionPermissions {
-  can_create_student?: boolean;
-  can_edit_student?: boolean;
-  can_delete_report?: boolean;
-  can_export_reports?: boolean;
-  can_manage_users?: boolean;
-  [key: string]: boolean | undefined;
-}
-
 export interface UserRole {
   id?: number | string | null;
   name: string;
   code: string;
   description?: string;
-  hierarchy_level?: number;
   color_theme?: string;
   is_system_role?: boolean;
-  action_permissions?: ActionPermissions;
 }
 
 export interface UserRecord {

@@ -19,6 +19,8 @@ import type { CalendarEvent, CalendarCategory, CalendarDisplayMode, DeleteEventO
 
 export interface EventColorStyle {
   bg: string;
+  solidBg: string;
+  solidText: string;
   border: string;
   text: string;
   dot: string;
@@ -36,31 +38,31 @@ const WEEKDAY_NAMES_FULL = [
 ];
 
 export const EVENT_COLOR_MAP: Record<string, EventColorStyle> = {
-  emerald: { bg: "bg-emerald-500/15 dark:bg-emerald-500/20", border: "border-0", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500", hex: "#10b981" },
-  indigo: { bg: "bg-indigo-500/15 dark:bg-indigo-500/20", border: "border-0", text: "text-indigo-700 dark:text-indigo-300", dot: "bg-indigo-500", hex: "#6366f1" },
-  blue: { bg: "bg-blue-500/15 dark:bg-blue-500/20", border: "border-0", text: "text-blue-700 dark:text-blue-300", dot: "bg-blue-500", hex: "#3b82f6" },
-  sky: { bg: "bg-sky-500/15 dark:bg-sky-500/20", border: "border-0", text: "text-sky-700 dark:text-sky-300", dot: "bg-sky-500", hex: "#0ea5e9" },
-  cyan: { bg: "bg-cyan-500/15 dark:bg-cyan-500/20", border: "border-0", text: "text-cyan-700 dark:text-cyan-300", dot: "bg-cyan-500", hex: "#06b6d4" },
-  teal: { bg: "bg-teal-500/15 dark:bg-teal-500/20", border: "border-0", text: "text-teal-700 dark:text-teal-300", dot: "bg-teal-500", hex: "#14b8a6" },
-  violet: { bg: "bg-violet-500/15 dark:bg-violet-500/20", border: "border-0", text: "text-violet-700 dark:text-violet-300", dot: "bg-violet-500", hex: "#8b5cf6" },
-  purple: { bg: "bg-purple-500/15 dark:bg-purple-500/20", border: "border-0", text: "text-purple-700 dark:text-purple-300", dot: "bg-purple-500", hex: "#a855f7" },
-  fuchsia: { bg: "bg-fuchsia-500/15 dark:bg-fuchsia-500/20", border: "border-0", text: "text-fuchsia-700 dark:text-fuchsia-300", dot: "bg-fuchsia-500", hex: "#d946ef" },
-  rose: { bg: "bg-rose-500/15 dark:bg-rose-500/20", border: "border-0", text: "text-rose-700 dark:text-rose-300", dot: "bg-rose-500", hex: "#f43f5e" },
-  red: { bg: "bg-red-500/15 dark:bg-red-500/20", border: "border-0", text: "text-red-700 dark:text-red-300", dot: "bg-red-500", hex: "#ef4444" },
-  orange: { bg: "bg-orange-500/15 dark:bg-orange-500/20", border: "border-0", text: "text-orange-700 dark:text-orange-300", dot: "bg-orange-500", hex: "#f97316" },
-  amber: { bg: "bg-amber-500/15 dark:bg-amber-500/20", border: "border-0", text: "text-amber-700 dark:text-amber-300", dot: "bg-amber-500", hex: "#f59e0b" },
-  lime: { bg: "bg-lime-500/15 dark:bg-lime-500/20", border: "border-0", text: "text-lime-700 dark:text-lime-300", dot: "bg-lime-500", hex: "#84cc16" },
-  slate: { bg: "bg-slate-500/15 dark:bg-slate-500/20", border: "border-0", text: "text-slate-700 dark:text-slate-300", dot: "bg-slate-500", hex: "#64748b" },
+  emerald: { bg: "bg-emerald-500/15 dark:bg-emerald-500/20", solidBg: "bg-emerald-500", solidText: "text-white", border: "border-0", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500", hex: "#10b981" },
+  indigo: { bg: "bg-indigo-500/15 dark:bg-indigo-500/20", solidBg: "bg-indigo-500", solidText: "text-white", border: "border-0", text: "text-indigo-700 dark:text-indigo-300", dot: "bg-indigo-500", hex: "#6366f1" },
+  blue: { bg: "bg-blue-500/15 dark:bg-blue-500/20", solidBg: "bg-blue-500", solidText: "text-white", border: "border-0", text: "text-blue-700 dark:text-blue-300", dot: "bg-blue-500", hex: "#3b82f6" },
+  sky: { bg: "bg-sky-500/15 dark:bg-sky-500/20", solidBg: "bg-sky-500", solidText: "text-white", border: "border-0", text: "text-sky-700 dark:text-sky-300", dot: "bg-sky-500", hex: "#0ea5e9" },
+  cyan: { bg: "bg-cyan-500/15 dark:bg-cyan-500/20", solidBg: "bg-cyan-500", solidText: "text-white", border: "border-0", text: "text-cyan-700 dark:text-cyan-300", dot: "bg-cyan-500", hex: "#06b6d4" },
+  teal: { bg: "bg-teal-500/15 dark:bg-teal-500/20", solidBg: "bg-teal-500", solidText: "text-white", border: "border-0", text: "text-teal-700 dark:text-teal-300", dot: "bg-teal-500", hex: "#14b8a6" },
+  violet: { bg: "bg-violet-500/15 dark:bg-violet-500/20", solidBg: "bg-violet-500", solidText: "text-white", border: "border-0", text: "text-violet-700 dark:text-violet-300", dot: "bg-violet-500", hex: "#8b5cf6" },
+  purple: { bg: "bg-purple-500/15 dark:bg-purple-500/20", solidBg: "bg-purple-500", solidText: "text-white", border: "border-0", text: "text-purple-700 dark:text-purple-300", dot: "bg-purple-500", hex: "#a855f7" },
+  fuchsia: { bg: "bg-fuchsia-500/15 dark:bg-fuchsia-500/20", solidBg: "bg-fuchsia-500", solidText: "text-white", border: "border-0", text: "text-fuchsia-700 dark:text-fuchsia-300", dot: "bg-fuchsia-500", hex: "#d946ef" },
+  rose: { bg: "bg-rose-500/15 dark:bg-rose-500/20", solidBg: "bg-rose-500", solidText: "text-white", border: "border-0", text: "text-rose-700 dark:text-rose-300", dot: "bg-rose-500", hex: "#f43f5e" },
+  red: { bg: "bg-red-500/15 dark:bg-red-500/20", solidBg: "bg-red-500", solidText: "text-white", border: "border-0", text: "text-red-700 dark:text-red-300", dot: "bg-red-500", hex: "#ef4444" },
+  orange: { bg: "bg-orange-500/15 dark:bg-orange-500/20", solidBg: "bg-orange-500", solidText: "text-white", border: "border-0", text: "text-orange-700 dark:text-orange-300", dot: "bg-orange-500", hex: "#f97316" },
+  amber: { bg: "bg-amber-500/15 dark:bg-amber-500/20", solidBg: "bg-amber-500", solidText: "text-slate-950", border: "border-0", text: "text-amber-700 dark:text-amber-300", dot: "bg-amber-500", hex: "#f59e0b" },
+  lime: { bg: "bg-lime-500/15 dark:bg-lime-500/20", solidBg: "bg-lime-500", solidText: "text-slate-950", border: "border-0", text: "text-lime-700 dark:text-lime-300", dot: "bg-lime-500", hex: "#84cc16" },
+  slate: { bg: "bg-slate-500/15 dark:bg-slate-500/20", solidBg: "bg-slate-600", solidText: "text-white", border: "border-0", text: "text-slate-700 dark:text-slate-300", dot: "bg-slate-500", hex: "#64748b" },
   // Soft & Light Pastel Colors
-  mint: { bg: "bg-emerald-400/15 dark:bg-emerald-400/20", border: "border-0", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-400", hex: "#6ee7b7" },
-  lavender: { bg: "bg-violet-400/15 dark:bg-violet-400/20", border: "border-0", text: "text-violet-700 dark:text-violet-300", dot: "bg-violet-400", hex: "#c4b5fd" },
-  peach: { bg: "bg-orange-400/15 dark:bg-orange-400/20", border: "border-0", text: "text-orange-700 dark:text-orange-300", dot: "bg-orange-400", hex: "#fdba74" },
-  coral: { bg: "bg-rose-400/15 dark:bg-rose-400/20", border: "border-0", text: "text-rose-700 dark:text-rose-300", dot: "bg-rose-400", hex: "#fca5a5" },
-  sage: { bg: "bg-green-400/15 dark:bg-green-400/20", border: "border-0", text: "text-green-700 dark:text-green-300", dot: "bg-green-400", hex: "#86efac" },
-  ice: { bg: "bg-sky-400/15 dark:bg-sky-400/20", border: "border-0", text: "text-sky-700 dark:text-sky-300", dot: "bg-sky-400", hex: "#7dd3fc" },
-  sand: { bg: "bg-slate-400/15 dark:bg-slate-400/20", border: "border-0", text: "text-slate-700 dark:text-slate-300", dot: "bg-slate-400", hex: "#cbd5e1" },
-  pink: { bg: "bg-pink-400/15 dark:bg-pink-400/20", border: "border-0", text: "text-pink-700 dark:text-pink-300", dot: "bg-pink-400", hex: "#f472b6" },
-  cream: { bg: "bg-amber-300/20 dark:bg-amber-300/20", border: "border-0", text: "text-amber-700 dark:text-amber-300", dot: "bg-amber-400", hex: "#fde68a" },
+  mint: { bg: "bg-emerald-400/15 dark:bg-emerald-400/20", solidBg: "bg-emerald-300", solidText: "text-emerald-950", border: "border-0", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-400", hex: "#6ee7b7" },
+  lavender: { bg: "bg-violet-400/15 dark:bg-violet-400/20", solidBg: "bg-violet-300", solidText: "text-violet-950", border: "border-0", text: "text-violet-700 dark:text-violet-300", dot: "bg-violet-400", hex: "#c4b5fd" },
+  peach: { bg: "bg-orange-400/15 dark:bg-orange-400/20", solidBg: "bg-orange-300", solidText: "text-orange-950", border: "border-0", text: "text-orange-700 dark:text-orange-300", dot: "bg-orange-400", hex: "#fdba74" },
+  coral: { bg: "bg-rose-400/15 dark:bg-rose-400/20", solidBg: "bg-rose-300", solidText: "text-rose-950", border: "border-0", text: "text-rose-700 dark:text-rose-300", dot: "bg-rose-400", hex: "#fca5a5" },
+  sage: { bg: "bg-green-400/15 dark:bg-green-400/20", solidBg: "bg-green-300", solidText: "text-green-950", border: "border-0", text: "text-green-700 dark:text-green-300", dot: "bg-green-400", hex: "#86efac" },
+  ice: { bg: "bg-sky-400/15 dark:bg-sky-400/20", solidBg: "bg-sky-300", solidText: "text-sky-950", border: "border-0", text: "text-sky-700 dark:text-sky-300", dot: "bg-sky-400", hex: "#7dd3fc" },
+  sand: { bg: "bg-slate-400/15 dark:bg-slate-400/20", solidBg: "bg-slate-300", solidText: "text-slate-900", border: "border-0", text: "text-slate-700 dark:text-slate-300", dot: "bg-slate-400", hex: "#cbd5e1" },
+  pink: { bg: "bg-pink-400/15 dark:bg-pink-400/20", solidBg: "bg-pink-400", solidText: "text-white", border: "border-0", text: "text-pink-700 dark:text-pink-300", dot: "bg-pink-400", hex: "#f472b6" },
+  cream: { bg: "bg-amber-300/20 dark:bg-amber-300/20", solidBg: "bg-amber-200", solidText: "text-amber-950", border: "border-0", text: "text-amber-700 dark:text-amber-300", dot: "bg-amber-400", hex: "#fde68a" },
 };
 
 /**
@@ -161,6 +163,8 @@ export function getEventColors(evt?: CalendarEvent | null, tenantId?: string): E
   if (isWorkingHours) {
     const res: EventColorStyle = {
       bg: "theme-bg-accent-soft",
+      solidBg: "theme-bg-accent",
+      solidText: "theme-accent-text",
       border: "border-[var(--accent-main)]/20",
       text: "theme-text-primary",
       dot: "theme-bg-accent",
@@ -860,7 +864,7 @@ export default function MasterTimeCalendar({
               <div className="flex items-center gap-1.5 flex-nowrap">
                 <IconButton
                   icon={ChevronLeftIcon}
-                  variant={navControlVariant}
+                  variant="ghost"
                   size="xs"
                   onClick={handlePrevMonth}
                   title="Previous Month"
@@ -873,7 +877,7 @@ export default function MasterTimeCalendar({
 
                 <IconButton
                   icon={ChevronRightIcon}
-                  variant={navControlVariant}
+                  variant="ghost"
                   size="xs"
                   onClick={handleNextMonth}
                   title="Next Month"
@@ -1107,7 +1111,7 @@ export default function MasterTimeCalendar({
                               gridColumn: `${startCol} / span ${span}`,
                               gridRow: row,
                             }}
-                            className={`h-[22px] px-2 py-0.5 text-[10px] font-semibold truncate transition-all cursor-pointer select-none pointer-events-auto flex items-center shadow-2xs ${style.bg} ${style.text} hover:opacity-90 ${edgeClasses}`}
+                            className={`h-[22px] px-2 py-0.5 text-[10px] font-semibold truncate transition-all cursor-pointer select-none pointer-events-auto flex items-center shadow-2xs ${style.solidBg} ${style.solidText} hover:brightness-105 ${edgeClasses}`}
                             title={`${evt.title}${!isAllDay ? ` (${formatTime12(evt.startTime)} - ${formatTime12(evt.endTime)})` : " (Full Day)"}${isMultiDay ? " (Multi-day Event)" : ""}`}
                           >
                             {/* Title rendered ONCE across the entire spanned width */}
@@ -1284,11 +1288,8 @@ export default function MasterTimeCalendar({
                             </div>
                           </div>
 
-                          {/* Right Avatar Badge & Chevron */}
-                          <div className="flex items-center gap-1 @sm:gap-2 shrink-0">
-                            <div className={`w-6 h-6 @sm:w-8 @sm:h-8 rounded-full flex items-center justify-center font-bold font-mono text-[9px] @sm:text-xs ${style.bg} ${style.text} shadow-2xs`}>
-                              {(evt.audience || "ALL").slice(0, 2).toUpperCase()}
-                            </div>
+                          {/* Right Chevron */}
+                          <div className="flex items-center shrink-0">
                             <ChevronRightIcon className="w-3 h-3 @sm:w-4 @sm:h-4 theme-text-secondary group-hover:translate-x-0.5 transition-transform" />
                           </div>
                         </div>

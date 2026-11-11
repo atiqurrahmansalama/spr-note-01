@@ -1,6 +1,11 @@
 import { useMemo } from "react";
 import { readJSON } from "@/stores/coreStore";
-import { getClassId, getSectionId, getDepartmentId } from "@/modules/learning/daily-classroom/utils/dailyClassroomUtils";
+import {
+  getClassId,
+  getDepartmentId,
+  harvestSectionsFromStudents,
+  mergeEffectiveSections,
+} from "@/modules/learning/daily-classroom/utils/dailyClassroomUtils";
 
 interface AcademicHierarchyFallbackParams {
   classes: any[];
@@ -28,7 +33,7 @@ export function useEffectiveAcademicHierarchy({
 }: AcademicHierarchyFallbackParams): EffectiveAcademicData {
   const tenantKey = activeTenantId || "default";
 
-  // 1. Effective Sections Resolution (Memory -> Scoped Cache -> Student Harvesting)
+  // 1. Effective Sections Resolution (Memory -> Scoped Cache -> Student Harvesting Merge)
   const cachedSections = useMemo(() => {
     try {
       const localSecs = readJSON(`spr_sections_cache_${tenantKey}`, []);
@@ -40,28 +45,11 @@ export function useEffectiveAcademicHierarchy({
 
   const harvestedSections = useMemo(() => {
     const combinedStudents = [...(academicStudents || []), ...(studentDatabase || [])];
-    const seenSecIds = new Set<string>();
-    const harvested: any[] = [];
-    combinedStudents.forEach((st: any) => {
-      const sId = st?.student_section || st?.section_id || st?.section;
-      const sName = st?.section_name || st?.student_section_name || (typeof st?.sub === "string" ? st.sub : null);
-      if (sId && !seenSecIds.has(String(sId))) {
-        seenSecIds.add(String(sId));
-        harvested.push({
-          id: sId,
-          section_name: sName || `Section ${sId}`,
-          name: sName || `Section ${sId}`,
-          student_class: st?.student_class || st?.class_id || st?.academic_class,
-        });
-      }
-    });
-    return harvested;
+    return harvestSectionsFromStudents(combinedStudents);
   }, [academicStudents, studentDatabase]);
 
   const effectiveSections = useMemo(() => {
-    if (Array.isArray(sections) && sections.length > 0) return sections;
-    if (cachedSections.length > 0) return cachedSections;
-    return harvestedSections;
+    return mergeEffectiveSections(sections, cachedSections, harvestedSections);
   }, [sections, cachedSections, harvestedSections]);
 
   // 2. Effective Classes Resolution (Memory -> Scoped Cache -> Student Harvesting)
@@ -105,4 +93,3 @@ export function useEffectiveAcademicHierarchy({
     effectiveSections,
   };
 }
-

@@ -229,12 +229,11 @@ export function useRoleActions(onRefresh?: () => void) {
   const exportRolesCsv = useCallback(
     (rolesToExport: RoleRecord[]) => {
       try {
-        const headers = ['ID', 'Name', 'Code', 'Hierarchy Level', 'Users', 'Protected', 'Description'];
+        const headers = ['ID', 'Name', 'Code', 'Users', 'Protected', 'Description'];
         const rows = rolesToExport.map((r) => [
           r.id,
           `"${(r.name || '').replace(/"/g, '""')}"`,
           r.code,
-          r.hierarchy_level,
           r.user_count || 0,
           r.code === 'SUPER_ADMIN' ? 'YES' : 'NO',
           `"${(r.description || '').replace(/"/g, '""')}"`,

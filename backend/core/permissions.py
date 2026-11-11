@@ -1,5 +1,5 @@
 import logging
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 logger = logging.getLogger(__name__)
 
@@ -16,11 +16,43 @@ class IsAdminUserRole(BasePermission):
 class HasSectionAccess(BasePermission):
     """
     DRF Permission Class to block unauthorized API execution if a section is disabled for that user.
-    Enforces strict default-deny (defaulting to False).
+    Enforces strict default-deny (defaulting to False), while permitting read-only (SAFE_METHODS)
+    institutional directory lookups for users authorized in classroom/academic/operational modules.
     Usage on DRF APIViews:
         permission_classes = [IsAuthenticated, HasSectionAccess]
         required_section_key = 'pdfExport'
     """
+    _ACADEMIC_LOOKUP_CONSUMERS = (
+        'nav_academic_studies',
+        'monthly_attendance_matrix',
+        'lesson_management',
+        'lesson_tab_daily_lessons',
+        'lesson_tab_assessments',
+        'lesson_tab_analytics',
+        'progress_management',
+        'progress_tab_daily_progress',
+        'progress_tab_reports',
+        'nav_examinations',
+        'exam_schedules',
+        'exam_hall_logistics',
+        'exam_tabulation',
+    )
+    _SHARED_READ_LOOKUP_KEYS = {
+        'student_classes': ('student_classes', 'student_roster', 'student_admission', *_ACADEMIC_LOOKUP_CONSUMERS),
+        'student_groups': ('student_groups', 'student_classes', 'student_roster', *_ACADEMIC_LOOKUP_CONSUMERS),
+        'student_roster': ('student_roster', 'student_admission', *_ACADEMIC_LOOKUP_CONSUMERS),
+        'class_sections': ('class_sections', 'classes_tab_sections', 'student_classes', *_ACADEMIC_LOOKUP_CONSUMERS),
+        'staff_management': (
+            'staff_management',
+            'staff_roster',
+            'nav_staff_management',
+            'staff_daily_attendance',
+            'staff_attendance',
+            'staff_leaves',
+            *_ACADEMIC_LOOKUP_CONSUMERS,
+        ),
+    }
+
     def has_permission(self, request, view):
         section_key = getattr(view, 'required_section_key', None)
         if not section_key:
@@ -44,6 +76,17 @@ class HasSectionAccess(BasePermission):
         except Exception as err:
             logger.warning(f"[HasSectionAccess] Error evaluating feature flags: {err}")
             return True
+
+        # Shared dropdown lookup access on safe GET/list/retrieve requests so classroom modules
+        # remain populated even when admin CRUD pages (Classes/Roster/Staff) are disabled for a role.
+        if (
+            request.method in SAFE_METHODS
+            and getattr(view, 'action', None) in (None, 'list', 'retrieve')
+            and isinstance(section_key, str)
+        ):
+            read_keys = getattr(view, 'read_lookup_section_keys', None) or self._SHARED_READ_LOOKUP_KEYS.get(section_key)
+            if read_keys and any(flags.get(k, False) for k in read_keys):
+                return True
         
         if isinstance(section_key, (list, tuple, set)):
             return any(flags.get(k, False) for k in section_key)
@@ -100,10 +143,20 @@ class IsOwnerOrSuperAdmin(BasePermission):
             obj_inst_id = getattr(obj.department, 'institution_id', None)
         if not obj_inst_id and hasattr(obj, 'student') and obj.student:
             obj_inst_id = getattr(obj.student, 'institution_id', None)
+        if not obj_inst_id and hasattr(obj, 'created_by') and obj.created_by:
+            obj_inst_id = getattr(obj.created_by, 'institution_id', None)
+            if not obj_inst_id and getattr(obj.created_by, 'staff_profile', None):
+                obj_inst_id = getattr(obj.created_by.staff_profile, 'institution_id', None)
 
         user_inst_id = getattr(request.user, 'institution_id', None)
         if obj_inst_id and user_inst_id and str(obj_inst_id) == str(user_inst_id):
             return True
+
+        # Shared platform templates (created without an institution, e.g. global Session defaults) are read-accessible
+        if request.method in SAFE_METHODS and hasattr(obj, 'created_by') and not hasattr(obj, 'institution_id'):
+            creator = getattr(obj, 'created_by', None)
+            if creator is None or getattr(creator, 'institution_id', None) is None:
+                return True
 
         # Check direct ownership field
         owner = getattr(obj, 'created_by', None) or getattr(obj, 'user', None) or getattr(obj, 'owner', None)

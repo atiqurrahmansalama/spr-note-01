@@ -5,6 +5,7 @@ import { useFeatureControl } from "../../context/FeatureControlContext";
 import { useTenant } from "../../context/TenantContext";
 import { useAuth } from "../../context/AuthContext";
 import { useTranslation } from "../../i18n";
+import { extractRoleCode, isUserSuperAdmin, isUserAcademyAdmin } from "../../utils/roleUtils";
 import { 
   DashboardIcon, 
   AppearanceIcon, 
@@ -76,15 +77,16 @@ export default function SidebarContainer({
   const { isSectionEnabled } = useFeatureControl();
 
   const { user: authUser } = useAuth();
-  const currentUser = authUser || authStore.getUser() || {};
-  const isSuper = isMultiTenantAdmin || currentUser.is_superuser || currentUser.role === 'SUPER_ADMIN';
-  const isAcademyAdministrator = isSuper || isAcademyAdmin || ['ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'].includes(String(currentUser.role || currentUser.user_type || '').toUpperCase()) || currentUser.staff_profile?.staff_type === 'ADMIN';
+  const currentUser = (authUser && typeof authUser === 'object' ? authUser : null) || authStore.getUser() || {};
+  const isSuper = isUserSuperAdmin(currentUser, isMultiTenantAdmin);
+  const isAcademyAdministrator = isUserAcademyAdmin(currentUser, isMultiTenantAdmin, isAcademyAdmin);
 
+  const resolvedCode = extractRoleCode(currentUser);
   const dashboardRoleSlug = isSuper
     ? 'super-admin'
-    : isAcademyAdministrator
-    ? 'admin'
-    : String(currentUser.role || currentUser.user_type || 'teacher').trim().toLowerCase().replace(/[_\s]+/g, '-');
+    : (resolvedCode || (isAcademyAdministrator ? 'ADMIN' : 'TEACHER'))
+        .toLowerCase()
+        .replace(/[_\s]+/g, '-');
 
   const menuItems = [
     {

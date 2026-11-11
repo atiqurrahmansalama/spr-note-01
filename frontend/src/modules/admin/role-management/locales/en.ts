@@ -1,6 +1,6 @@
 export const en = {
   title: 'Role & Access Control',
-  subtitle: 'Configure system authority levels, action permissions, and custom role definitions',
+  subtitle: 'Create and organize institutional roles; configure permissions in Feature & Module Control',
   totalRolesBadge: '{{count}} Total Roles',
 
   // Metrics
@@ -16,33 +16,27 @@ export const en = {
   allTypes: 'All Role Types',
   typeSystem: 'System Protected',
   typeCustom: 'Custom Roles',
-  allLevels: 'All Authority Levels',
-  levelSuperAdmin: 'Level 1 (Super Admin)',
-  levelAdmin: 'Level 2 (Admin)',
-  levelStaff: 'Level 3-4 (Staff)',
-  levelTeacher: 'Level 5 (Teacher)',
-  levelGuardian: 'Level 10 (Guardian)',
 
   // Columns & Labels
   roleName: 'Role Name',
   roleCode: 'Role Code',
-  hierarchyRank: 'Authority Level',
-  levelBadge: 'Level {{level}}',
   assignedUsers: 'Users',
   protection: 'Status',
   protected: 'Protected',
   configurable: 'Configurable',
   googleDefault: 'Google Default',
   actions: 'Actions',
-  permissionsSummary: '{{count}} Permissions',
+  featureControlNotice:
+    'All module, page, and dashboard widget permissions for this role are governed centrally inside App Management -> Feature & Module Control.',
+  manageInFeatureControl: 'Manage Access in Feature Control',
 
   // Action Buttons
   createRole: 'Create Role',
-  createRoleSubtitle: 'Define a new custom role with specific permissions',
+  createRoleSubtitle: 'Define a new custom role for institutional access control',
   editRole: 'Edit Role',
   cloneRole: 'Clone Role',
   deleteRole: 'Delete Role',
-  viewDetails: 'View Permissions',
+  viewDetails: 'View Details',
   setGoogleDefault: 'Set as Google Default',
   exportCsv: 'Export CSV',
 
@@ -50,9 +44,9 @@ export const en = {
   drawers: {
     createTitle: 'Create Custom Role',
     editTitle: 'Edit Role: {{name}}',
-    detailsTitle: 'Role Profile & Permissions: {{name}}',
+    detailsTitle: 'Role Profile: {{name}}',
     basicInfoSection: 'Basic Information',
-    permissionsSection: 'Action Permissions Matrix',
+    featureControlSection: 'Feature & Module Control',
   },
 
   // Form Fields
@@ -63,25 +57,6 @@ export const en = {
     codePlaceholder: 'e.g. SENIOR_USTADH',
     description: 'Role Description',
     descriptionPlaceholder: 'Briefly describe the operational scope for this role...',
-    hierarchyLevel: 'Authority Hierarchy Rank (1 - 10)',
-    hierarchyHelp: 'Lower number = Higher authority (1 = Super Admin, 2 = Admin, 5 = Teacher, 10 = Guardian).',
-    levelHighest: 'Level 1 (Highest)',
-    levelMedium: 'Level 5 (Medium)',
-    levelLowest: 'Level 10 (Lowest)',
-  },
-
-  // Permissions
-  permissions: {
-    can_create_student: 'Create Students',
-    can_create_student_desc: 'Allow creating new student records',
-    can_edit_student: 'Edit Students',
-    can_edit_student_desc: 'Allow editing student details',
-    can_delete_report: 'Delete Reports',
-    can_delete_report_desc: 'Allow deleting daily evaluation notes',
-    can_export_reports: 'Export Data',
-    can_export_reports_desc: 'Allow exporting reports to PDF/Excel',
-    can_manage_users: 'Manage Users',
-    can_manage_users_desc: 'Allow creating and provisioning users',
   },
 
   // Modals

@@ -72,6 +72,8 @@ export const bn = {
     categoryKey: 'ক্যাটাগরি কি: {{key}}',
     keyLabel: 'কি: {{key}}',
     subModules: 'সাব-মডিউল',
+    dashboardWidgetsSubheader: 'ড্যাশবোর্ড উইজেটসমূহ',
+    widgetsCount: '{{count}} টি উইজেট',
   },
 
   audit: {

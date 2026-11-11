@@ -10,61 +10,29 @@ const DEFAULT_SYSTEM_ROLES: RoleRecord[] = [
     id: 1,
     name: 'Super Administrator',
     code: 'SUPER_ADMIN',
-    hierarchy_level: 1,
-    description: 'Full system access & section control',
+    description: 'Full system access & feature control',
     is_system_role: true,
-    action_permissions: {
-      can_create_student: true,
-      can_edit_student: true,
-      can_delete_report: true,
-      can_export_reports: true,
-      can_manage_users: true,
-    },
   },
   {
     id: 2,
     name: 'Administrator',
     code: 'ADMIN',
-    hierarchy_level: 2,
-    description: 'Institute admin with user & report controls',
+    description: 'Institute admin profile governed via Feature & Module Control',
     is_system_role: false,
-    action_permissions: {
-      can_create_student: true,
-      can_edit_student: true,
-      can_delete_report: true,
-      can_export_reports: true,
-      can_manage_users: true,
-    },
   },
   {
     id: 3,
     name: 'Hifz Teacher / Ustadh',
     code: 'TEACHER',
-    hierarchy_level: 5,
     description: 'Evaluates daily Sabaq, Sabqi & Amukhta',
     is_system_role: false,
-    action_permissions: {
-      can_create_student: true,
-      can_edit_student: true,
-      can_delete_report: false,
-      can_export_reports: true,
-      can_manage_users: false,
-    },
   },
   {
     id: 4,
     name: 'Guardian / Parent',
     code: 'GUARDIAN',
-    hierarchy_level: 10,
     description: 'View student progress reports & copy cards',
     is_system_role: false,
-    action_permissions: {
-      can_create_student: false,
-      can_edit_student: false,
-      can_delete_report: false,
-      can_export_reports: true,
-      can_manage_users: false,
-    },
   },
 ];
 
@@ -102,7 +70,6 @@ export const useRoleManagement = () => {
   const [filters, setFilters] = useState<RoleFilters>({
     searchQuery: '',
     typeFilter: 'ALL',
-    hierarchyFilter: 'ALL',
   });
 
   // Candidate API fetcher for resilience
@@ -163,7 +130,6 @@ export const useRoleManagement = () => {
     setFilters({
       searchQuery: '',
       typeFilter: 'ALL',
-      hierarchyFilter: 'ALL',
     });
   }, []);
 
@@ -171,8 +137,7 @@ export const useRoleManagement = () => {
     () =>
       Boolean(
         filters.searchQuery.trim() ||
-          filters.typeFilter !== 'ALL' ||
-          filters.hierarchyFilter !== 'ALL'
+          filters.typeFilter !== 'ALL'
       ),
     [filters]
   );
@@ -196,13 +161,6 @@ export const useRoleManagement = () => {
       } else if (filters.typeFilter === 'CUSTOM') {
         const isSystem = Boolean(role.code === 'SUPER_ADMIN');
         if (isSystem) return false;
-      }
-
-      // Hierarchy rank filter
-      if (filters.hierarchyFilter !== 'ALL') {
-        if (String(role.hierarchy_level) !== String(filters.hierarchyFilter)) {
-          return false;
-        }
       }
 
       return true;

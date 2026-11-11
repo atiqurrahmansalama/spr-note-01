@@ -72,6 +72,8 @@ export const en = {
     categoryKey: 'Category Key: {{key}}',
     keyLabel: 'Key: {{key}}',
     subModules: 'Sub-modules',
+    dashboardWidgetsSubheader: 'Dashboard Widgets',
+    widgetsCount: '{{count}} widgets',
   },
 
   audit: {

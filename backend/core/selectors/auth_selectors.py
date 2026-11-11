@@ -23,5 +23,5 @@ def get_active_security_sessions(user_id: str) -> QuerySet:
 
 
 def get_user_roles_tree() -> QuerySet:
-    """Retrieve all system default roles and custom roles ordered by hierarchy level."""
-    return UserRole.objects.prefetch_related('action_permissions').all().order_by('hierarchy_level')
+    """Retrieve all system default roles and custom roles."""
+    return UserRole.objects.all().order_by('-is_system_role', 'id', 'name')

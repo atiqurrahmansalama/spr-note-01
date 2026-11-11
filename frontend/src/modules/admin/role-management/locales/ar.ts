@@ -1,6 +1,6 @@
 export const ar = {
   title: 'إدارة الأدوار وصلاحيات الوصول',
-  subtitle: 'تكوين مستويات الصلاحيات وأذونات الإجراءات وتعريف الأدوار المخصصة',
+  subtitle: 'إنشاء وتنظيم الأدوار المؤسسية؛ وإدارة جميع الصلاحيات عبر التحكم بالميزات والوحدات',
   totalRolesBadge: '{{count}} إجمالي الأدوار',
 
   // Metrics
@@ -16,33 +16,27 @@ export const ar = {
   allTypes: 'جميع أنواع الأدوار',
   typeSystem: 'محمي بواسطة النظام',
   typeCustom: 'أدوار مخصصة',
-  allLevels: 'جميع مستويات الصلاحية',
-  levelSuperAdmin: 'المستوى 1 (مدير فائق)',
-  levelAdmin: 'المستوى 2 (مدير)',
-  levelStaff: 'المستوى 3-4 (موظفون)',
-  levelTeacher: 'المستوى 5 (معلم)',
-  levelGuardian: 'المستوى 10 (ولي أمر)',
 
   // Columns & Labels
   roleName: 'اسم الدور',
   roleCode: 'رمز الدور',
-  hierarchyRank: 'مستوى الصلاحية',
-  levelBadge: 'المستوى {{level}}',
   assignedUsers: 'المستخدمون',
   protection: 'الحالة',
   protected: 'محمي',
   configurable: 'قابل للتعديل',
   googleDefault: 'افتراضي جوجل',
   actions: 'الإجراءات',
-  permissionsSummary: '{{count}} صلاحيات',
+  featureControlNotice:
+    'تُدار جميع صلاحيات الوحدات والصفحات وعناصر لوحة التحكم لهذا الدور مركزياً من خلال إدارة التطبيقات -> التحكم بالميزات والوحدات.',
+  manageInFeatureControl: 'إدارة الصلاحيات في التحكم بالميزات',
 
   // Action Buttons
   createRole: 'إنشاء دور',
-  createRoleSubtitle: 'تعريف دور مخصص جديد مع أذونات محددة',
+  createRoleSubtitle: 'تعريف دور مخصص جديد للتحكم في الوصول المؤسسي',
   editRole: 'تعديل الدور',
   cloneRole: 'استنساخ الدور',
   deleteRole: 'حذف الدور',
-  viewDetails: 'عرض الصلاحيات',
+  viewDetails: 'عرض التفاصيل',
   setGoogleDefault: 'تعيين كافتراضي لجوجل',
   exportCsv: 'تصدير CSV',
 
@@ -50,9 +44,9 @@ export const ar = {
   drawers: {
     createTitle: 'إنشاء دور مخصص',
     editTitle: 'تعديل الدور: {{name}}',
-    detailsTitle: 'ملف الدور والصلاحيات: {{name}}',
+    detailsTitle: 'ملف الدور: {{name}}',
     basicInfoSection: 'المعلومات الأساسية',
-    permissionsSection: 'مصفوفة أذونات الإجراءات',
+    featureControlSection: 'التحكم بالميزات والوحدات',
   },
 
   // Form Fields
@@ -63,25 +57,6 @@ export const ar = {
     codePlaceholder: 'مثال: SENIOR_USTADH',
     description: 'وصف الدور',
     descriptionPlaceholder: 'صف باختصار نطاق العمل لهذا الدور...',
-    hierarchyLevel: 'رتبة التسلسل الهرمي للصلاحية (1 - 10)',
-    hierarchyHelp: 'الرقم الأقل = صلاحية أعلى (1 = مدير فائق، 2 = مدير، 5 = معلم، 10 = ولي أمر).',
-    levelHighest: 'المستوى 1 (الأعلى)',
-    levelMedium: 'المستوى 5 (متوسط)',
-    levelLowest: 'المستوى 10 (الأدنى)',
-  },
-
-  // Permissions
-  permissions: {
-    can_create_student: 'إنشاء الطلاب',
-    can_create_student_desc: 'السماح بإنشاء سجلات طلاب جديدة',
-    can_edit_student: 'تعديل الطلاب',
-    can_edit_student_desc: 'السماح بتعديل بيانات الطالب',
-    can_delete_report: 'حذف التقارير',
-    can_delete_report_desc: 'السماح بحذف ملاحظات التقييم اليومية',
-    can_export_reports: 'تصدير البيانات',
-    can_export_reports_desc: 'السماح بتصدير التقارير إلى PDF أو Excel',
-    can_manage_users: 'إدارة المستخدمين',
-    can_manage_users_desc: 'السماح بإنشاء المستخدمين وتعيينهم',
   },
 
   // Modals

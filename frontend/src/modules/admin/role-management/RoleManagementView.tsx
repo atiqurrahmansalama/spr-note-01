@@ -81,18 +81,6 @@ export const RoleManagementView: React.FC<RoleManagementViewProps> = ({
     [t]
   );
 
-  const hierarchyOptions = useMemo(
-    () => [
-      { value: 'ALL', label: t('allLevels', 'All Authority Levels') },
-      { value: '1', label: t('levelSuperAdmin', 'Level 1 (Super Admin)') },
-      { value: '2', label: t('levelAdmin', 'Level 2 (Admin)') },
-      { value: '3', label: t('levelStaff', 'Level 3-4 (Staff)') },
-      { value: '5', label: t('levelTeacher', 'Level 5 (Teacher)') },
-      { value: '10', label: t('levelGuardian', 'Level 10 (Guardian)') },
-    ],
-    [t]
-  );
-
   // Universal Drawer Registrations
   useDrawerRegistration(
     'role',
@@ -168,7 +156,7 @@ export const RoleManagementView: React.FC<RoleManagementViewProps> = ({
           }
           subtitle={t(
             'subtitle',
-            'Configure system authority levels, action permissions, and custom role definitions'
+            'Create and organize institutional roles; configure permissions in Feature & Module Control'
           )}
           actions={
             <div className="flex items-center gap-2">
@@ -211,23 +199,13 @@ export const RoleManagementView: React.FC<RoleManagementViewProps> = ({
         onRefresh={handleRefreshAll}
         loading={loading}
         filterElement={
-          <>
-            <CustomSelect
-              value={filters.typeFilter}
-              options={typeOptions}
-              onChange={(val) => updateFilters({ typeFilter: val as RoleTypeFilter })}
-              size="md"
-              className="w-full sm:w-44"
-            />
-
-            <CustomSelect
-              value={filters.hierarchyFilter}
-              options={hierarchyOptions}
-              onChange={(val) => updateFilters({ hierarchyFilter: val })}
-              size="md"
-              className="w-full sm:w-48"
-            />
-          </>
+          <CustomSelect
+            value={filters.typeFilter}
+            options={typeOptions}
+            onChange={(val) => updateFilters({ typeFilter: val as RoleTypeFilter })}
+            size="md"
+            className="w-full sm:w-44"
+          />
         }
         actions={
           <button

@@ -19,6 +19,8 @@ export interface GuardianDashboardViewProps {
   onOpenWidgetCatalog?: () => void;
   layoutItems?: DashboardLayoutItem[];
   onUpdateLayout?: (newItems: DashboardLayoutItem[]) => void;
+  isFeatureEnabled?: (featureKey?: string) => boolean;
+  isSuperAdmin?: boolean;
 }
 
 export default function GuardianDashboardView({
@@ -27,6 +29,8 @@ export default function GuardianDashboardView({
   onOpenWidgetCatalog,
   layoutItems: propLayoutItems,
   onUpdateLayout,
+  isFeatureEnabled,
+  isSuperAdmin = false,
 }: GuardianDashboardViewProps) {
   const { t, formatNumber } = useTranslation('dashboard');
   const { activeTenantId } = useTenant();
@@ -161,6 +165,8 @@ export default function GuardianDashboardView({
         onUpdateItems={handleUpdateLayout}
         onOpenWidgetCatalog={onOpenWidgetCatalog}
         widgetPropsMap={widgetPropsMap}
+        isFeatureEnabled={isFeatureEnabled}
+        isSuperAdmin={isSuperAdmin}
       />
     </div>
   );

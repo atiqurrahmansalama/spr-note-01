@@ -9,7 +9,8 @@ import AdminAttendanceDrawer from '../../components/common/AdminAttendanceDrawer
 import ScheduleTimelineDrawer from '../../components/common/ScheduleTimelineDrawer';
 import useAttendanceDateManager from '../attendance/hooks/useAttendanceDateManager';
 import { getTeacherAttendanceMatrix, bulkMarkStudentAttendance } from '../../api/attendance';
-import { attendanceTimingPolicyStore } from '../../utils/localStore';
+import { attendanceTimingPolicyStore, auth as authStore } from '../../utils/localStore';
+import { isUserAcademyAdmin } from '../../utils/roleUtils';
 import { getAttendanceCellTimingState } from '../../utils/attendanceTimingEngine';
 import { DayAgendaDrawer, TimeScheduleDrawerForm } from '../academy/calendar-events';
 
@@ -85,11 +86,13 @@ export interface TeacherMatrixData {
  * Multi-period schedule slots per teacher form dedicated sub-rows.
  */
 export default function TeacherAttendanceView() {
-  const { activeTenantId, isMultiTenantAdmin } = useTenant();
+  const { activeTenantId, isMultiTenantAdmin, isAcademyAdmin } = useTenant();
   const { showToast } = useToast();
   const { openRightSidebar, closeRightSidebar } = useRightSidebar();
 
   const userProfile = useMemo(() => {
+    const authUser = authStore.getUser();
+    if (authUser && typeof authUser === 'object') return authUser;
     try {
       const raw = localStorage.getItem('spr_user_profile');
       return raw ? JSON.parse(raw) : {};
@@ -97,14 +100,7 @@ export default function TeacherAttendanceView() {
       return {};
     }
   }, []);
-  const isAdmin = Boolean(
-    isMultiTenantAdmin ||
-    userProfile.is_superuser ||
-    userProfile.user_type === 'SUPER_ADMIN' ||
-    userProfile.user_type === 'ADMIN' ||
-    userProfile.role_code === 'ADMIN' ||
-    userProfile.role_code === 'PRINCIPAL'
-  );
+  const isAdmin = isUserAcademyAdmin(userProfile, isMultiTenantAdmin, isAcademyAdmin);
 
   // Unified Date Management Hook
   const {

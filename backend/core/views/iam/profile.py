@@ -47,37 +47,8 @@ class UserProfileView(APIView):
             import logging
             logging.getLogger('core').warning(f"Self-healing role sync warning on profile GET: {sync_err}")
 
-        role_data = None
-        if user.role:
-            perms_obj = getattr(user.role, 'action_permissions', None)
-            perms_dict = {
-                'can_create_student': perms_obj.can_create_student,
-                'can_edit_student': perms_obj.can_edit_student,
-                'can_delete_report': perms_obj.can_delete_report,
-                'can_export_reports': perms_obj.can_export_reports,
-                'can_manage_users': perms_obj.can_manage_users,
-            } if perms_obj else {}
-            role_data = {
-                'id': user.role.id,
-                'name': user.role.name,
-                'code': user.role.code,
-                'description': user.role.description,
-                'hierarchy_level': user.role.hierarchy_level,
-                'color_theme': user.role.color_theme,
-                'is_system_role': user.role.is_system_role,
-                'action_permissions': perms_dict,
-            }
-        else:
-            role_data = {
-                'id': None,
-                'name': user.get_user_type_display() if hasattr(user, 'get_user_type_display') else user.user_type,
-                'code': user.user_type,
-                'description': '',
-                'hierarchy_level': 5,
-                'color_theme': 'purple' if user.user_type == 'GUARDIAN' else 'blue',
-                'is_system_role': False,
-                'action_permissions': {},
-            }
+        from core.services import build_user_role_payload, is_user_academy_admin
+        role_data = build_user_role_payload(user)
 
         full_name = user.name or f"{user.first_name or ''} {user.last_name or ''}".strip()
 
@@ -85,11 +56,7 @@ class UserProfileView(APIView):
         institution = getattr(user, 'institution', None)
         staff_profile = getattr(user, 'staff_profile', None)
 
-        is_academy_admin = bool(
-            user.is_superuser or
-            (getattr(user, 'user_type', '') or '').upper() in ['ADMIN', 'SUPER_ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'] or
-            (staff_profile and staff_profile.staff_type == 'ADMIN')
-        )
+        is_academy_admin = is_user_academy_admin(user)
 
         institution_details = None
         if institution:
@@ -128,6 +95,10 @@ class UserProfileView(APIView):
             'email': user.email or "",
             'user_type': user.user_type,
             'role': role_data,
+            'role_info': role_data,
+            'role_id': role_data.get('id'),
+            'role_code': role_data.get('code'),
+            'role_name': role_data.get('name'),
             'institution_id': str(institution.id) if institution else None,
             'institution_name': institution.name if institution else "",
             'institution_details': institution_details,

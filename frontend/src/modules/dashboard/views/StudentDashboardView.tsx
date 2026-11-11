@@ -18,6 +18,8 @@ export interface StudentDashboardViewProps {
   onOpenWidgetCatalog?: () => void;
   layoutItems?: DashboardLayoutItem[];
   onUpdateLayout?: (newItems: DashboardLayoutItem[]) => void;
+  isFeatureEnabled?: (featureKey?: string) => boolean;
+  isSuperAdmin?: boolean;
 }
 
 export default function StudentDashboardView({
@@ -26,6 +28,8 @@ export default function StudentDashboardView({
   onOpenWidgetCatalog,
   layoutItems: propLayoutItems,
   onUpdateLayout,
+  isFeatureEnabled,
+  isSuperAdmin = false,
 }: StudentDashboardViewProps) {
   const { t, formatNumber } = useTranslation('dashboard');
   const { activeTenantId } = useTenant();
@@ -122,6 +126,8 @@ export default function StudentDashboardView({
       onUpdateItems={handleUpdateLayout}
       onOpenWidgetCatalog={onOpenWidgetCatalog}
       widgetPropsMap={widgetPropsMap}
+      isFeatureEnabled={isFeatureEnabled}
+      isSuperAdmin={isSuperAdmin}
     />
   );
 }

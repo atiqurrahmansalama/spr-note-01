@@ -113,34 +113,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         if hasattr(self.user, 'guardian_profile'):
             guardian_data = GuardianProfileSerializer(self.user.guardian_profile).data
 
-        role_obj = getattr(self.user, 'role', None)
-        if role_obj:
-            perms_obj = getattr(role_obj, 'action_permissions', None)
-            perms_dict = {
-                'can_create_student': perms_obj.can_create_student,
-                'can_edit_student': perms_obj.can_edit_student,
-                'can_delete_report': perms_obj.can_delete_report,
-                'can_export_reports': perms_obj.can_export_reports,
-                'can_manage_users': perms_obj.can_manage_users,
-            } if perms_obj else {}
-            role_data = {
-                'id': role_obj.id,
-                'name': role_obj.name,
-                'code': role_obj.code,
-                'description': role_obj.description,
-                'hierarchy_level': role_obj.hierarchy_level,
-                'color_theme': role_obj.color_theme,
-                'is_system_role': role_obj.is_system_role,
-                'action_permissions': perms_dict,
-            }
-        else:
-            role_data = {
-                'id': None,
-                'name': self.user.get_user_type_display() if hasattr(self.user, 'get_user_type_display') else self.user.user_type,
-                'code': self.user.user_type,
-                'color_theme': 'purple' if self.user.user_type == 'GUARDIAN' else 'blue',
-            }
-
         # Self-healing: Enforce staff enrollment, role synchronization, and profile for any institutional member
         try:
             from core.services import sync_user_and_staff_roles
@@ -149,16 +121,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         except Exception:
             pass
 
+        from core.services import build_user_role_payload, is_user_academy_admin
+        role_data = build_user_role_payload(self.user)
+
         resolved_name = self.user.name or f"{self.user.first_name or ''} {self.user.last_name or ''}".strip() or self.user.phone_number
 
         inst = getattr(self.user, 'institution', None)
         staff_prof = getattr(self.user, 'staff_profile', None)
 
-        is_academy_admin = bool(
-            self.user.is_superuser or
-            (getattr(self.user, 'user_type', '') or '').upper() in ['ADMIN', 'SUPER_ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL'] or
-            (staff_prof and staff_prof.staff_type == 'ADMIN')
-        )
+        is_academy_admin = is_user_academy_admin(self.user)
 
         institution_details = None
         if inst:
@@ -208,6 +179,9 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'is_superuser': self.user.is_superuser,
             'role': role_data,
             'role_info': role_data,
+            'role_id': role_data.get('id'),
+            'role_code': role_data.get('code'),
+            'role_name': role_data.get('name'),
             'avatar_url': self.user.avatar_url,
             'is_email_verified': getattr(self.user, 'is_email_verified', False),
             'auth_provider': getattr(self.user, 'auth_provider', 'email'),
@@ -284,20 +258,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     new_password = serializers.CharField(write_only=True, min_length=8)
 
 
-class RoleActionPermissionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = RoleActionPermission
-        fields = [
-            'can_create_student',
-            'can_edit_student',
-            'can_delete_report',
-            'can_export_reports',
-            'can_manage_users',
-        ]
-
-
 class UserRoleSerializer(serializers.ModelSerializer):
-    action_permissions = RoleActionPermissionSerializer(required=False)
     user_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -307,12 +268,10 @@ class UserRoleSerializer(serializers.ModelSerializer):
             'name',
             'code',
             'description',
-            'hierarchy_level',
             'color_theme',
             'is_system_role',
             'created_at',
             'user_count',
-            'action_permissions',
         ]
         read_only_fields = ['id', 'created_at', 'user_count']
 
@@ -325,27 +284,14 @@ class UserRoleSerializer(serializers.ModelSerializer):
         return val
 
     def create(self, validated_data):
-        permissions_data = validated_data.pop('action_permissions', None)
-        role = UserRole.objects.create(**validated_data)
-        if permissions_data:
-            RoleActionPermission.objects.create(role=role, **permissions_data)
-        else:
-            RoleActionPermission.objects.create(role=role)
-        return role
+        return UserRole.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
-        permissions_data = validated_data.pop('action_permissions', None)
         for attr, value in validated_data.items():
             if attr == 'code' and instance.is_system_role:
                 continue
             setattr(instance, attr, value)
         instance.save()
-
-        if permissions_data is not None:
-            perm_obj, _ = RoleActionPermission.objects.get_or_create(role=instance)
-            for p_attr, p_val in permissions_data.items():
-                setattr(perm_obj, p_attr, p_val)
-            perm_obj.save()
         return instance
 
 
@@ -394,35 +340,8 @@ class UserAdminSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(OpenApiTypes.OBJECT)
     def get_role(self, obj):
-        if obj.role:
-            perms_obj = getattr(obj.role, 'action_permissions', None)
-            perms_dict = {
-                'can_create_student': perms_obj.can_create_student,
-                'can_edit_student': perms_obj.can_edit_student,
-                'can_delete_report': perms_obj.can_delete_report,
-                'can_export_reports': perms_obj.can_export_reports,
-                'can_manage_users': perms_obj.can_manage_users,
-            } if perms_obj else {}
-            return {
-                'id': obj.role.id,
-                'name': obj.role.name,
-                'code': obj.role.code,
-                'description': obj.role.description,
-                'hierarchy_level': obj.role.hierarchy_level,
-                'color_theme': obj.role.color_theme,
-                'is_system_role': obj.role.is_system_role,
-                'action_permissions': perms_dict,
-            }
-        return {
-            'id': None,
-            'name': obj.get_user_type_display() if hasattr(obj, 'get_user_type_display') else obj.user_type,
-            'code': obj.user_type,
-            'description': '',
-            'hierarchy_level': 5,
-            'color_theme': 'purple' if obj.user_type == 'GUARDIAN' else 'blue',
-            'is_system_role': False,
-            'action_permissions': {},
-        }
+        from core.services import build_user_role_payload
+        return build_user_role_payload(obj)
 
     @extend_schema_field(OpenApiTypes.OBJECT)
     def get_role_info(self, obj):

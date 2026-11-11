@@ -1150,15 +1150,18 @@ export function useReportForm() {
     });
 
     try {
+      const unpackList = (raw: any): any[] =>
+        Array.isArray(raw) ? raw : Array.isArray(raw?.results) ? raw.results : [];
+
       const [studentsSettled, sessionsSettled, messagesSettled] = await Promise.allSettled([
-        fetchWithAuth("/students/"),
-        fetchWithAuth("/sessions/"),
-        fetchWithAuth("/messages/?category=report_builder_comments"),
+        fetchWithAuth("/api/v1/students/?page_size=500&all=true"),
+        fetchWithAuth("/api/v1/sessions/?page_size=200"),
+        fetchWithAuth("/api/v1/messages/?category=report_builder_comments&page_size=200"),
       ]);
 
       if (studentsSettled.status === "fulfilled" && studentsSettled.value.ok) {
-        const rawStudents = await studentsSettled.value.json();
-        const apiStudents = (Array.isArray(rawStudents) ? rawStudents : []).map((s: any) => ({
+        const rawStudents = unpackList(await studentsSettled.value.json());
+        const apiStudents = rawStudents.map((s: any) => ({
           ...(typeof s === "object" ? s : {}),
           id: typeof s === "object" ? s.id : null,
           label: typeof s === "object" ? (s.name_en || s.name || s.student_name || s.label || String(s)) : String(s),
@@ -1172,8 +1175,8 @@ export function useReportForm() {
       }
 
       if (sessionsSettled.status === "fulfilled" && sessionsSettled.value.ok) {
-        const rawSessions = await sessionsSettled.value.json();
-        const apiSessions = (Array.isArray(rawSessions) ? rawSessions : []).map((s: any) => ({
+        const rawSessions = unpackList(await sessionsSettled.value.json());
+        const apiSessions = rawSessions.map((s: any) => ({
           id: typeof s === "object" ? (s.id || s.name) : String(s),
           name: typeof s === "object" ? (s.name || s.session_name || s.label || String(s)) : String(s),
         }));
@@ -1182,8 +1185,8 @@ export function useReportForm() {
       }
 
       if (messagesSettled.status === "fulfilled" && messagesSettled.value.ok) {
-        const rawMessages = await messagesSettled.value.json();
-        const apiComments = (Array.isArray(rawMessages) ? rawMessages : [])
+        const rawMessages = unpackList(await messagesSettled.value.json());
+        const apiComments = rawMessages
           .map((m: any) => (typeof m === "object" ? { id: m.id, text: m.text || m.comment || "" } : { text: String(m) }))
           .filter((c: any) => Boolean(c.text && c.text.trim()));
         const mergedComments = mergeComments(apiComments, commentStore.getAll());

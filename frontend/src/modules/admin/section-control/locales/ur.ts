@@ -72,6 +72,8 @@ export const ur = {
     categoryKey: 'زمرہ کلید: {{key}}',
     keyLabel: 'کلید: {{key}}',
     subModules: 'ذیلی ماڈیولز',
+    dashboardWidgetsSubheader: 'ڈیش بورڈ وجیٹس',
+    widgetsCount: '{{count}} وجیٹس',
   },
 
   audit: {

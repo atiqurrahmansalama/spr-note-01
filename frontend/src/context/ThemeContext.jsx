@@ -51,6 +51,16 @@ export function ThemeProvider({ children }) {
     document.body.setAttribute("data-mode", effectiveMode);
     document.documentElement.setAttribute("data-mode-preference", modeId);
     document.body.setAttribute("data-mode-preference", modeId);
+    document.documentElement.style.colorScheme = effectiveMode;
+
+    // Sync color-scheme meta tag for native browser controls & scrollbars
+    let colorSchemeMeta = document.querySelector('meta[name="color-scheme"]');
+    if (!colorSchemeMeta) {
+      colorSchemeMeta = document.createElement("meta");
+      colorSchemeMeta.setAttribute("name", "color-scheme");
+      document.head.appendChild(colorSchemeMeta);
+    }
+    colorSchemeMeta.setAttribute("content", modeId === "system" ? "light dark" : effectiveMode);
   }, [modeId, effectiveMode]);
 
   const cycleMode = useCallback(() => {

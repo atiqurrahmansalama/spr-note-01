@@ -3,10 +3,9 @@ import { useTranslation } from '../../../i18n';
 import type { DashboardRole } from '../types';
 import ActionMenu, { ActionMenuItem } from '../../../components/ui/ActionMenu';
 import { useRoleManagement } from '../../admin/role-management/hooks/useRoleManagement';
+import { normalizeRoleCode } from '../../../utils/roleUtils';
 import { 
-  SparklesIcon, 
   CalendarIcon, 
-  ChevronIcon, 
   AcademicCapIcon, 
   TeacherIcon, 
   GroupsIcon, 
@@ -15,7 +14,6 @@ import {
   AdjustmentsHorizontalIcon,
   CheckCircleIcon,
   UserIcon,
-  Squares2X2Icon,
   MoreVerticalIcon,
   GripVerticalIcon,
 } from '../../../components/ui/Icons';
@@ -31,19 +29,18 @@ export interface DashboardHeaderProps {
   isEditMode?: boolean;
   onToggleEditMode?: () => void;
   onOpenCustomizerDrawer?: () => void;
-  onOpenGovernanceDrawer?: () => void;
 }
 
 /**
- * Dynamically resolves the visual icon for a role based on its code or hierarchy level.
+ * Dynamically resolves the visual icon for a role based on its canonical code.
  */
-export function getRoleIcon(code: string, hierarchyLevel?: number): React.ComponentType<{ className?: string }> {
+export function getRoleIcon(code: string): React.ComponentType<{ className?: string }> {
   const c = String(code || '').toUpperCase();
   if (c.includes('SUPER')) return ShieldCheckIcon;
-  if (c.includes('TEACHER') || c.includes('USTADH') || hierarchyLevel === 5) return TeacherIcon;
-  if (c.includes('STAFF') || c.includes('OPERAT') || c.includes('HOSTEL') || hierarchyLevel === 6) return GroupsIcon;
-  if (c.includes('STUDENT') || hierarchyLevel === 9) return AcademicCapIcon;
-  if (c.includes('GUARDIAN') || c.includes('PARENT') || hierarchyLevel === 10) return UserIcon;
+  if (c.includes('TEACHER') || c.includes('USTADH')) return TeacherIcon;
+  if (c.includes('STAFF') || c.includes('OPERAT') || c.includes('HOSTEL')) return GroupsIcon;
+  if (c.includes('STUDENT')) return AcademicCapIcon;
+  if (c.includes('GUARDIAN') || c.includes('PARENT')) return UserIcon;
   return BuildingOfficeIcon;
 }
 
@@ -58,7 +55,6 @@ export default function DashboardHeader({
   isEditMode = false,
   onToggleEditMode,
   onOpenCustomizerDrawer,
-  onOpenGovernanceDrawer,
 }: DashboardHeaderProps) {
   const { t, formatDate } = useTranslation('dashboard');
   // Dynamic roles from /role-management
@@ -77,27 +73,29 @@ export default function DashboardHeader({
   }
 
   // Active role details derived dynamically from role-management
+  const normalizedEffectiveRole = normalizeRoleCode(effectiveRole) || 'ADMIN';
   const activeRoleRecord = useMemo(
-    () => roles.find((r) => r.code?.toUpperCase() === String(effectiveRole).toUpperCase()),
-    [roles, effectiveRole]
+    () => roles.find((r) => normalizeRoleCode(r.code) === normalizedEffectiveRole),
+    [roles, normalizedEffectiveRole]
   );
-  const currentRoleName = activeRoleRecord?.name || String(effectiveRole).replace(/_/g, ' ');
-  const ActiveRoleIcon = getRoleIcon(effectiveRole, activeRoleRecord?.hierarchy_level);
+  const currentRoleName = activeRoleRecord?.name || normalizedEffectiveRole.replace(/_/g, ' ');
+  const ActiveRoleIcon = getRoleIcon(normalizedEffectiveRole);
 
   // Role switch menu items generated dynamically from role-management
   const roleMenuItems = useMemo<ActionMenuItem[]>(() => {
     return roles.map((r) => {
-      const isCurrent = r.code?.toUpperCase() === String(effectiveRole).toUpperCase();
-      const OptIcon = getRoleIcon(r.code, r.hierarchy_level);
+      const normalizedItemCode = normalizeRoleCode(r.code);
+      const isCurrent = normalizedItemCode === normalizedEffectiveRole;
+      const OptIcon = getRoleIcon(normalizedItemCode);
 
       return {
         label: r.name,
         icon: OptIcon,
-        onClick: () => onRoleChange?.(r.code as DashboardRole),
+        onClick: () => onRoleChange?.((normalizedItemCode || r.code) as DashboardRole),
         badge: isCurrent ? 'Active' : undefined,
       };
     });
-  }, [roles, effectiveRole, onRoleChange]);
+  }, [roles, normalizedEffectiveRole, onRoleChange]);
 
   const managementMenuItems = useMemo<ActionMenuItem[]>(() => {
     const list: ActionMenuItem[] = [];
@@ -119,15 +117,8 @@ export default function DashboardHeader({
         onClick: onOpenCustomizerDrawer,
       });
     }
-    if (onOpenGovernanceDrawer && isSuperAdmin) {
-      list.push({
-        label: t('widgetGovernance', 'Widget Role & Academy Scopes'),
-        icon: ShieldCheckIcon,
-        onClick: onOpenGovernanceDrawer,
-      });
-    }
     return list;
-  }, [isEditMode, onToggleEditMode, onOpenCustomizerDrawer, onOpenGovernanceDrawer, isSuperAdmin, t]);
+  }, [isEditMode, onToggleEditMode, onOpenCustomizerDrawer, isSuperAdmin, t]);
 
   return (
     <div className="w-full flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-1 select-none">

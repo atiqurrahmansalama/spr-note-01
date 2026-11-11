@@ -122,6 +122,7 @@ from .views import (
     EmailTemplateTestSendView,
     AppVersionCheckView,
     AppReleaseViewSet,
+    DashboardWorkspaceConfigView,
     StaffProfileViewSet,
     SystemHealthDiagnosticsView,
     EnterpriseComplianceDataExportView,
@@ -446,6 +447,10 @@ urlpatterns = [
     # Enterprise Version Handshake & Release Gating Endpoints
     path('api/v1/system/version/', AppVersionCheckView.as_view(), name='system_version_check'),
     path('api/system/version/', AppVersionCheckView.as_view(), name='system_version_check_alias'),
+
+    # Dashboard Widget Governance & Institutional Role Layout Config
+    path('api/v1/dashboard/config/', DashboardWorkspaceConfigView.as_view(), name='dashboard_workspace_config_v1'),
+    path('api/dashboard/config/', DashboardWorkspaceConfigView.as_view(), name='dashboard_workspace_config_alias'),
 
     path('api/v1/', include(router.urls)),
     path('api/', include(router.urls)),

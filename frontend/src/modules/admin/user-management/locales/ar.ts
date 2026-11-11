@@ -74,6 +74,10 @@ export const ar = {
     contactAuthSection: 'الاتصال والمصادقة',
     roleSection: 'تعيين الدور',
     securitySection: 'بيانات الأمان',
+    featureControlSection: 'التحكم بالميزات والوحدات',
+    featureControlUserNotice:
+      'تُدار صلاحيات الدور وتخصيصات المستخدم مركزياً من خلال إدارة التطبيقات -> التحكم بالميزات والوحدات.',
+    manageUserOverrides: 'تكوين تخصيصات المستخدم',
   },
 
   // Form Fields

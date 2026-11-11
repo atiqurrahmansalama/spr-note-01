@@ -8,6 +8,7 @@ import {
 import IconButton from '../../../components/ui/IconButton';
 import { useTranslation } from '../../../i18n';
 import { useTenant } from '../../../context/TenantContext';
+import { extractRoleName } from '../../../utils/roleUtils';
 import type { UserProfile } from '../types';
 
 interface ProfileHeroCardProps {
@@ -36,11 +37,7 @@ export const ProfileHeroCard: React.FC<ProfileHeroCardProps> = ({
   const avatarInitial = fullName.charAt(0).toUpperCase();
 
   // Clean role format (e.g. 'SUPER_ADMIN' -> 'Super Admin', or 'Academy Administrator')
-  const rawRole =
-    user.staff_profile?.designation ||
-    (typeof user.role === 'string'
-      ? user.role
-      : user.role?.name || user.role_info?.name || user.user_type || 'Teacher');
+  const rawRole = user.staff_profile?.designation || extractRoleName(user);
 
   const roleName = rawRole
     .replace(/_/g, ' ')

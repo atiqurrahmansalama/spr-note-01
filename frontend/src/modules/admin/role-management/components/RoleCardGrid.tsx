@@ -87,13 +87,9 @@ export const RoleCardGrid: React.FC<RoleCardGridProps> = ({
   const renderCard = (role: RoleRecord) => {
     const isProtected = role.code === 'SUPER_ADMIN';
 
-    // Count enabled permissions
-    const perms = role.action_permissions || {};
-    const enabledPermsCount = Object.values(perms).filter(Boolean).length;
-
     return (
-      <div className="theme-bg-surface border theme-border rounded-2xl p-4 sm:p-5 shadow-xs transition-all space-y-4 hover:shadow-md text-left">
-        {/* Card Top: Title, Hierarchy Level & Action Menu */}
+      <div className="theme-bg-surface border-0 rounded-2xl p-4 sm:p-5 shadow-xs transition-all space-y-4 hover:shadow-md text-left">
+        {/* Card Top: Title & Action Menu */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
@@ -105,18 +101,15 @@ export const RoleCardGrid: React.FC<RoleCardGridProps> = ({
                 {role.name}
               </button>
               {role.is_google_default && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-sky-500/10 text-sky-500 dark:text-sky-400 border border-sky-500/20">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-sky-500/10 text-sky-500 dark:text-sky-400">
                   {t('googleDefault', 'Google Default')}
                 </span>
               )}
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs theme-text-secondary theme-bg-sub border theme-border px-2 py-0.5 rounded-md">
+              <span className="font-mono text-xs theme-text-secondary theme-bg-app px-2 py-0.5 rounded-md">
                 {role.code}
-              </span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-mono font-semibold theme-bg-accent-soft theme-accent border theme-border">
-                {t('levelBadge', 'Level {{level}}', { level: formatNumber(role.hierarchy_level) })}
               </span>
             </div>
           </div>
@@ -132,7 +125,7 @@ export const RoleCardGrid: React.FC<RoleCardGridProps> = ({
         </p>
 
         {/* Card Footer: Users & Status */}
-        <div className="pt-3 border-t theme-border flex items-center justify-between text-xs">
+        <div className="pt-2 flex items-center justify-between text-xs">
           <div className="flex items-center gap-1.5 font-mono theme-text-secondary">
             <UsersIcon className="w-3.5 h-3.5 opacity-70" />
             <span>
@@ -141,18 +134,13 @@ export const RoleCardGrid: React.FC<RoleCardGridProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono theme-text-secondary">
-              {t('permissionsSummary', '{{count}} Permissions', {
-                count: formatNumber(enabledPermsCount),
-              })}
-            </span>
             {isProtected ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 border border-emerald-500/20">
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 dark:text-emerald-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span>{t('protected', 'Protected')}</span>
               </span>
             ) : (
-              <span className="inline-flex items-center text-[10px] font-mono px-2 py-0.5 rounded-md theme-bg-sub theme-text-secondary border theme-border">
+              <span className="inline-flex items-center text-[10px] font-mono px-2 py-0.5 rounded-md theme-bg-app theme-text-secondary">
                 {t('configurable', 'Configurable')}
               </span>
             )}

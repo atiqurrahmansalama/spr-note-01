@@ -8,5 +8,7 @@ export { default as SidebarScreenBlockView } from './SidebarScreenBlockView';
 export { default as NotificationBellDropdown } from './NotificationBellDropdown';
 export { default as NotificationCenterDrawer } from './NotificationCenterDrawer';
 export { default as NotificationDetailDrawer } from './NotificationDetailDrawer';
+export { default as PortalTopUtilityBar } from './PortalTopUtilityBar';
+export { default as PublicPortalShell } from './PublicPortalShell';
 export * from './routeMeta';
 export * from './hooks';

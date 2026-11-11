@@ -23,6 +23,8 @@ export interface SuperAdminDashboardViewProps {
   onOpenWidgetCatalog?: () => void;
   layoutItems?: DashboardLayoutItem[];
   onUpdateLayout?: (newItems: DashboardLayoutItem[]) => void;
+  isFeatureEnabled?: (featureKey?: string) => boolean;
+  isSuperAdmin?: boolean;
 }
 
 export default function SuperAdminDashboardView({
@@ -31,6 +33,8 @@ export default function SuperAdminDashboardView({
   onOpenWidgetCatalog,
   layoutItems: propLayoutItems,
   onUpdateLayout,
+  isFeatureEnabled,
+  isSuperAdmin = true,
 }: SuperAdminDashboardViewProps) {
   const { t, formatNumber } = useTranslation('dashboard');
   const navigate = useNavigate();
@@ -178,6 +182,8 @@ export default function SuperAdminDashboardView({
       onUpdateItems={handleUpdateLayout}
       onOpenWidgetCatalog={onOpenWidgetCatalog}
       widgetPropsMap={widgetPropsMap}
+      isFeatureEnabled={isFeatureEnabled}
+      isSuperAdmin={isSuperAdmin}
     />
   );
 }

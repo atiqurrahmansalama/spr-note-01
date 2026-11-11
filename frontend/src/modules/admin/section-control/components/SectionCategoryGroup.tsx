@@ -3,6 +3,44 @@ import SectionToggleCard from './SectionToggleCard';
 import { useSectionTranslation } from '../hooks/useSectionTranslation';
 import { SectionCategory, SectionItem } from '../types';
 
+const WIDGET_GROUP_FALLBACKS: Record<string, string> = {
+  dashboard_widget_kpi_metrics: 'Executive & KPI Analytics',
+  dashboard_widget_quick_actions: 'Executive & KPI Analytics',
+  dashboard_widget_attendance_pulse: 'Class Attendance & Presence',
+  dashboard_widget_recitation_trends: 'Daily Classroom & Hifz Progress',
+  dashboard_widget_hifz_tracker: 'Daily Classroom & Hifz Progress',
+  dashboard_widget_academic_progress: 'Daily Classroom & Hifz Progress',
+  dashboard_widget_timetable_schedule: 'Routine & Period Timetable',
+  dashboard_widget_working_hours: 'Calendar & Institutional Events',
+  dashboard_widget_academic_events: 'Calendar & Institutional Events',
+  dashboard_widget_agenda_schedule: 'Calendar & Institutional Events',
+  dashboard_widget_admission_pipeline: 'Operations, Finance & Notices',
+  dashboard_widget_finance_overview: 'Operations, Finance & Notices',
+  dashboard_widget_residential_occupancy: 'Operations, Finance & Notices',
+  dashboard_widget_notice_board: 'Operations, Finance & Notices',
+  dashboard_widget_recent_activity: 'System Health & Audit Trail',
+  dashboard_widget_system_gateways: 'System Health & Audit Trail',
+};
+
+function groupChildrenWithSubHeaders(children: SectionItem[]): Array<{ groupTitle: string; items: SectionItem[] }> {
+  const groups: Array<{ groupTitle: string; items: SectionItem[] }> = [];
+  const map = new Map<string, SectionItem[]>();
+
+  for (const child of children) {
+    const groupTitle =
+      child.widget_group ||
+      WIDGET_GROUP_FALLBACKS[child.section_key] ||
+      'General';
+    if (!map.has(groupTitle)) {
+      const bucket: SectionItem[] = [];
+      map.set(groupTitle, bucket);
+      groups.push({ groupTitle, items: bucket });
+    }
+    map.get(groupTitle)!.push(child);
+  }
+  return groups;
+}
+
 export interface SectionCategoryGroupProps {
   category: SectionCategory;
   modifiedFlags: Record<string, boolean>;
@@ -68,6 +106,17 @@ const SectionTreeNode: React.FC<SectionTreeNodeProps> = ({
 
   // Expanded if search matches descendant or user clicked to expand
   const isExpanded = childMatchesSearch || Boolean(expandedMap[section.section_key]);
+  const { t, formatNumber } = useSectionTranslation();
+  const hasGroupedWidgets = Boolean(
+    hasChildren &&
+      (section.section_key === 'nav_dashboard' ||
+        section.children?.some((c) => c.widget_group || c.section_key.startsWith('dashboard_widget_')))
+  );
+
+  const visibleChildren =
+    searchFilter.trim() && section.children
+      ? section.children.filter((c) => matchesSearchRecursive(c, searchFilter))
+      : section.children || [];
 
   const borderClass =
     depth === 1
@@ -97,21 +146,63 @@ const SectionTreeNode: React.FC<SectionTreeNodeProps> = ({
       {/* Render subordinate children recursively */}
       {hasChildren && isExpanded && (
         <div
-          className={`pl-3 sm:pl-4 border-l-2 ${borderClass} space-y-1.5 mt-1 ml-3 animate-in fade-in slide-in-from-top-1 duration-200`}
+          className={`pl-3 sm:pl-4 border-l-2 ${borderClass} space-y-2 mt-1.5 ml-3 animate-in fade-in slide-in-from-top-1 duration-200`}
         >
-          {section.children!.map((child) => (
-            <SectionTreeNode
-              key={child.id || child.section_key}
-              section={child}
-              depth={depth + 1}
-              parentActive={parentActive && isEnabled}
-              modifiedFlags={modifiedFlags}
-              searchFilter={searchFilter}
-              expandedMap={expandedMap}
-              onToggleExpand={onToggleExpand}
-              onToggle={onToggle}
-            />
-          ))}
+          {hasGroupedWidgets ? (
+            <div className="space-y-3 pt-1">
+              {/* Primary Sub-Header making Dashboard Widgets clearly distinct under Dashboard */}
+              <div className="flex items-center justify-between gap-2 px-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider theme-text-primary">
+                  {t('badges.dashboardWidgetsSubheader', 'Dashboard Widgets')}
+                </span>
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full theme-bg-sub theme-text-secondary">
+                  {t('badges.widgetsCount', '{{count}} widgets', {
+                    count: formatNumber(visibleChildren.length),
+                  })}
+                </span>
+              </div>
+
+              {/* Modular Widget Group Sub-Headers */}
+              {groupChildrenWithSubHeaders(visibleChildren).map((group) => (
+                <div key={group.groupTitle} className="space-y-1.5">
+                  <div className="px-1 pt-0.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary opacity-85 block">
+                      {group.groupTitle}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {group.items.map((child) => (
+                      <SectionTreeNode
+                        key={child.id || child.section_key}
+                        section={child}
+                        depth={depth + 1}
+                        parentActive={parentActive && isEnabled}
+                        modifiedFlags={modifiedFlags}
+                        searchFilter={searchFilter}
+                        expandedMap={expandedMap}
+                        onToggleExpand={onToggleExpand}
+                        onToggle={onToggle}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            visibleChildren.map((child) => (
+              <SectionTreeNode
+                key={child.id || child.section_key}
+                section={child}
+                depth={depth + 1}
+                parentActive={parentActive && isEnabled}
+                modifiedFlags={modifiedFlags}
+                searchFilter={searchFilter}
+                expandedMap={expandedMap}
+                onToggleExpand={onToggleExpand}
+                onToggle={onToggle}
+              />
+            ))
+          )}
         </div>
       )}
     </div>

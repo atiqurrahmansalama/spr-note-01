@@ -10,7 +10,9 @@ import ScheduleTimelineDrawer from '../../components/common/ScheduleTimelineDraw
 import useAttendanceDateManager from '../attendance/hooks/useAttendanceDateManager';
 import {
   attendanceTimingPolicyStore,
+  auth as authStore,
 } from '../../utils/localStore';
+import { isUserAcademyAdmin } from '../../utils/roleUtils';
 import { DayAgendaDrawer, TimeScheduleDrawerForm } from '../academy/calendar-events';
 import {
   getAttendanceCellTimingState,
@@ -39,11 +41,13 @@ import { PageContainer } from '../../components/layout';
  * Powered by universal AttendanceMatrixTable and useAttendanceDateManager.
  */
 export default function StaffDailyAttendanceView() {
-  const { activeTenantId, isMultiTenantAdmin } = useTenant();
+  const { activeTenantId, isMultiTenantAdmin, isAcademyAdmin } = useTenant();
   const { showToast } = useToast();
   const { openRightSidebar, closeRightSidebar } = useRightSidebar();
 
   const userProfile = useMemo(() => {
+    const authUser = authStore.getUser();
+    if (authUser && typeof authUser === 'object') return authUser;
     try {
       const raw = localStorage.getItem('spr_user_profile');
       return raw ? JSON.parse(raw) : {};
@@ -51,14 +55,7 @@ export default function StaffDailyAttendanceView() {
       return {};
     }
   }, []);
-  const isAdmin = Boolean(
-    isMultiTenantAdmin ||
-    userProfile.is_superuser ||
-    userProfile.user_type === 'SUPER_ADMIN' ||
-    userProfile.user_type === 'ADMIN' ||
-    userProfile.role_code === 'ADMIN' ||
-    userProfile.role_code === 'PRINCIPAL'
-  );
+  const isAdmin = isUserAcademyAdmin(userProfile, isMultiTenantAdmin, isAcademyAdmin);
 
   const [timingPolicy, setTimingPolicy] = useState(() => attendanceTimingPolicyStore.getPolicy(activeTenantId));
 

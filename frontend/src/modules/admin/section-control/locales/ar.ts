@@ -72,6 +72,8 @@ export const ar = {
     categoryKey: 'مفتاح الفئة: {{key}}',
     keyLabel: 'المفتاح: {{key}}',
     subModules: 'وحدات فرعية',
+    dashboardWidgetsSubheader: 'أدوات لوحة التحكم',
+    widgetsCount: '{{count}} أدوات',
   },
 
   audit: {

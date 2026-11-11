@@ -52,8 +52,8 @@ export default function StudentAssessmentDrawer({
   const [curriculumBooks, setCurriculumBooks] = useState<any[]>([]);
   useEffect(() => {
     try {
-      const items = curriculumStore.getCurriculumItems(tenantId);
-      setCurriculumBooks(items || []);
+      const items = curriculumStore?.getItems?.(tenantId) || [];
+      setCurriculumBooks(Array.isArray(items) ? items : []);
     } catch {}
   }, [tenantId]);
 

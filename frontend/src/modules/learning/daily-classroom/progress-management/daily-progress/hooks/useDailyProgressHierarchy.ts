@@ -2,9 +2,8 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useAcademicData } from "@/hooks/useAcademicData";
 import { useTenant } from "@/context/TenantContext";
 import {
-  doesStudentMatchDepartment,
+  buildSectionSelectOptions,
   doesLessonMatchDepartment,
-  doesStudentMatchClass,
   getClassId,
   getDepartmentId,
 } from "@/modules/learning/daily-classroom/utils/dailyClassroomUtils";
@@ -115,8 +114,14 @@ export function useDailyProgressHierarchy({
   }, [localDeptId, localClassId, localSectionId]);
 
   // ── Cascading Props vs Local State Resolution ──────────────────────────────
-  const selectedDepartmentId =
-    filterProps?.selectedDepartmentId !== undefined ? filterProps.selectedDepartmentId : localDeptId;
+  const normalizeScopeVal = (v: any) => {
+    const s = String(v ?? "").trim();
+    return s && s.toUpperCase() !== "ALL" ? s : "";
+  };
+
+  const selectedDepartmentId = normalizeScopeVal(
+    filterProps?.selectedDepartmentId !== undefined ? filterProps.selectedDepartmentId : localDeptId
+  );
   const rawOnDepartmentChange =
     filterProps?.onDepartmentChange ||
     ((val: string) => {
@@ -126,20 +131,22 @@ export function useDailyProgressHierarchy({
     });
 
   const departmentSelectOptions = useMemo(() => {
+    const activeDepts = (departments || []).filter((d: any) => d && !d.is_deleted && d.is_active !== false);
     const raw =
-      filterProps?.departmentSelectOptions ||
-      (departments || []).map((d: any) => ({
-        value: String(d.id),
-        label: d.name || d.department_name || `Department ${d.id}`,
-      }));
-    return raw.filter((opt: any) => opt.value !== "" && opt.value !== "ALL" && !opt.label?.toLowerCase().startsWith("all "));
-  }, [filterProps?.departmentSelectOptions, departments]);
+      activeDepts.length > 0
+        ? activeDepts.map((d: any) => ({
+            value: String(d.id),
+            label: d.name || d.department_name || `Department ${d.id}`,
+          }))
+        : (filterProps?.departmentSelectOptions || []);
+    return raw.filter((opt: any) => opt?.value && String(opt.value).toUpperCase() !== "ALL" && !opt.label?.toLowerCase().startsWith("all "));
+  }, [departments, filterProps?.departmentSelectOptions]);
 
-  const hasDepartments =
-    filterProps?.hasDepartments !== undefined ? filterProps.hasDepartments : departments && departments.length > 0;
+  const hasDepartments = departmentSelectOptions.length > 0;
 
-  const selectedClassId =
-    filterProps?.selectedClassId !== undefined ? filterProps.selectedClassId : localClassId;
+  const selectedClassId = normalizeScopeVal(
+    filterProps?.selectedClassId !== undefined ? filterProps.selectedClassId : localClassId
+  );
   const rawOnClassChange =
     filterProps?.onClassChange ||
     ((val: string) => {
@@ -148,10 +155,11 @@ export function useDailyProgressHierarchy({
     });
 
   const classSelectOptions = useMemo(() => {
-    let candidateClasses = effectiveClasses;
+    const activeClasses = (effectiveClasses || []).filter((c: any) => c && !c.is_deleted && c.is_active !== false);
+    let candidateClasses = activeClasses;
     if (selectedDepartmentId) {
-      const matched = effectiveClasses.filter((c: any) =>
-        doesLessonMatchDepartment(c, selectedDepartmentId, departments, effectiveClasses)
+      const matched = activeClasses.filter((c: any) =>
+        doesLessonMatchDepartment(c, selectedDepartmentId, departments, activeClasses)
       );
       if (matched.length > 0) {
         candidateClasses = matched;
@@ -163,16 +171,14 @@ export function useDailyProgressHierarchy({
       label: c.name || c.class_name || `Class ${c.id}`,
     }));
 
-    if (filterProps?.classSelectOptions && filterProps.classSelectOptions.length > 0) {
-      const cleaned = filterProps.classSelectOptions
-        .filter((opt: any) => opt && opt.value !== "" && opt.value !== "ALL" && !opt.label?.toLowerCase().startsWith("all "))
+    // Only use parent filterProps options as fallback if local academic classes haven't loaded yet
+    if (candidateOptions.length === 0 && filterProps?.classSelectOptions && filterProps.classSelectOptions.length > 0) {
+      candidateOptions = filterProps.classSelectOptions
+        .filter((opt: any) => opt && opt.value !== "" && String(opt.value).toUpperCase() !== "ALL" && !opt.label?.toLowerCase().startsWith("all "))
         .map((opt: any) => ({
           value: String(opt.value ?? opt.id),
           label: opt.label || opt.name || `Class ${opt.value}`,
         }));
-      if (cleaned.length > 0) {
-        candidateOptions = cleaned;
-      }
     }
 
     const cleanList: Array<{ value: string; label: string }> = [];
@@ -205,8 +211,12 @@ export function useDailyProgressHierarchy({
     selectedClassId,
   ]);
 
-  const selectedSectionId =
+  const rawSelectedSectionId =
     filterProps?.selectedSectionId !== undefined ? filterProps.selectedSectionId : localSectionId;
+  const selectedSectionId =
+    rawSelectedSectionId && String(rawSelectedSectionId).trim().toUpperCase() !== "ALL"
+      ? String(rawSelectedSectionId).trim()
+      : "";
   const rawOnSectionChange = filterProps?.onSectionChange || setLocalSectionId;
 
   // Sync academic hierarchy when an existing report is loaded for editing
@@ -251,78 +261,25 @@ export function useDailyProgressHierarchy({
   }, [rawOnDepartmentChange, rawOnClassChange, rawOnSectionChange]);
 
   const sectionSelectOptions = useMemo(() => {
-    let candidateOptions: Array<{ value: string; label: string }> = [];
-
-    if (filterProps?.sectionSelectOptions && filterProps.sectionSelectOptions.length > 0) {
-      candidateOptions = filterProps.sectionSelectOptions.map((o: any) => ({
-        value: String(o.value ?? o.id ?? ""),
-        label: String(o.label ?? o.name ?? o.section_name ?? `Section ${o.value}`),
-      }));
-    } else {
-      let filtered = effectiveSections;
-      if (selectedClassId) {
-        const classMatched = effectiveSections.filter((s: any) => doesStudentMatchClass(s, selectedClassId, effectiveClasses));
-        if (classMatched.length > 0) {
-          filtered = classMatched;
-        } else if (selectedDepartmentId) {
-          const deptMatched = effectiveSections.filter((s: any) => doesStudentMatchDepartment(s, selectedDepartmentId, departments, effectiveClasses));
-          if (deptMatched.length > 0) {
-            filtered = deptMatched;
-          }
-        }
-      } else if (selectedDepartmentId) {
-        const deptMatched = effectiveSections.filter((s: any) => doesStudentMatchDepartment(s, selectedDepartmentId, departments, effectiveClasses));
-        if (deptMatched.length > 0) {
-          filtered = deptMatched;
-        }
-      }
-
-      candidateOptions = filtered.map((s: any) => ({
-        value: String(s.id),
-        label: s.section_name || s.name || `Section ${s.id}`,
-      }));
-    }
-
-    const cleanList: Array<{ value: string; label: string }> = [];
-    const seen = new Set<string>();
-
-    candidateOptions.forEach((opt: any) => {
-      if (!opt) return;
-      const valStr = String(opt.value ?? "").trim();
-      const lblStr = String(opt.label ?? "").trim();
-      const lower = lblStr.toLowerCase();
-      if (lower === "general group" || lower === "general") return;
-      if (valStr === "" || lower === "all sections" || lower.startsWith("all ")) return;
-
-      const key = `${valStr}___${lower}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        cleanList.push({ value: valStr, label: lblStr });
-      }
+    return buildSectionSelectOptions({
+      sections: effectiveSections,
+      classes: effectiveClasses,
+      departments,
+      selectedClassId: selectedClassId || "",
+      selectedDepartmentId: selectedDepartmentId || "",
+      selectedSectionId: selectedSectionId || "",
+      includeAllOption: false,
     });
-
-    return [{ value: "", label: "All Sections" }, ...cleanList];
   }, [
-    filterProps?.sectionSelectOptions,
     effectiveSections,
     selectedClassId,
     selectedDepartmentId,
+    selectedSectionId,
     effectiveClasses,
     departments,
   ]);
 
   const hasSectionsForClass = true;
-
-  // Clear section if it was accidentally set to General Group
-  useEffect(() => {
-    if (localSectionId) {
-      const sec = (effectiveSections || []).find((s: any) => String(s.id) === String(localSectionId));
-      const secName = (sec?.section_name || sec?.name || "").toLowerCase().trim();
-      if (secName === "general group" || secName === "general") {
-        setLocalSectionId("");
-      }
-    }
-  }, [localSectionId, effectiveSections]);
 
   const updateHierarchy = (deptId: string, clsId: string, secId: string) => {
     const finalDept = deptId || "";

@@ -1,6 +1,6 @@
 export const bn = {
   title: 'ভূমিকা ও অ্যাক্সেস নিয়ন্ত্রণ',
-  subtitle: 'সিস্টেম কর্তৃত্বের স্তর, কর্মের অনুমতি এবং কাস্টম ভূমিকা কনফিগার করুন',
+  subtitle: 'প্রতিষ্ঠানের ভূমিকা তৈরি ও পরিচালনা করুন; সমস্ত অনুমতি ফিচার ও মডিউল কন্ট্রোল থেকে নির্ধারণ করুন',
   totalRolesBadge: '{{count}} মোট ভূমিকা',
 
   // Metrics
@@ -16,33 +16,27 @@ export const bn = {
   allTypes: 'সকল ভূমিকার ধরন',
   typeSystem: 'সিস্টেম সুরক্ষিত',
   typeCustom: 'কাস্টম ভূমিকা',
-  allLevels: 'সকল কর্তৃত্বের স্তর',
-  levelSuperAdmin: 'লেভেল ১ (সুপার অ্যাডমিন)',
-  levelAdmin: 'লেভেল ২ (অ্যাডমিন)',
-  levelStaff: 'লেভেল ৩-৪ (স্টাফ)',
-  levelTeacher: 'লেভেল ৫ (শিক্ষক)',
-  levelGuardian: 'লেভেল ১০ (অভিভাবক)',
 
   // Columns & Labels
   roleName: 'ভূমিকার নাম',
   roleCode: 'ভূমিকা কোড',
-  hierarchyRank: 'কর্তৃত্বের স্তর',
-  levelBadge: 'লেভেল {{level}}',
   assignedUsers: 'ব্যবহারকারী',
   protection: 'স্ট্যাটাস',
   protected: 'সুরক্ষিত',
   configurable: 'পরিবর্তনযোগ্য',
   googleDefault: 'গুগল ডিফল্ট',
   actions: 'পদক্ষেপ',
-  permissionsSummary: '{{count}}টি অনুমতি',
+  featureControlNotice:
+    'এই ভূমিকার সকল মডিউল, পেজ এবং ড্যাশবোর্ড উইজেটের অনুমতি অ্যাপ ম্যানেজমেন্টের ফিচার ও মডিউল কন্ট্রোল থেকে এককভাবে পরিচালিত হয়।',
+  manageInFeatureControl: 'ফিচার কন্ট্রোলে অ্যাক্সেস নির্ধারণ করুন',
 
   // Action Buttons
   createRole: 'ভূমিকা তৈরি করুন',
-  createRoleSubtitle: 'নির্দিষ্ট অনুমতি সহ একটি নতুন কাস্টম ভূমিকা সংজ্ঞায়িত করুন',
+  createRoleSubtitle: 'প্রতিষ্ঠানিক অ্যাক্সেসের জন্য একটি নতুন কাস্টম ভূমিকা সংজ্ঞায়িত করুন',
   editRole: 'ভূমিকা সম্পাদনা',
   cloneRole: 'ভূমিকা ক্লোন করুন',
   deleteRole: 'ভূমিকা মুছুন',
-  viewDetails: 'অনুমতিসমূহ দেখুন',
+  viewDetails: 'বিস্তারিত দেখুন',
   setGoogleDefault: 'গুগল ডিফল্ট নির্ধারণ করুন',
   exportCsv: 'সিএসভি এক্সপোর্ট',
 
@@ -50,9 +44,9 @@ export const bn = {
   drawers: {
     createTitle: 'কাস্টম ভূমিকা তৈরি করুন',
     editTitle: 'ভূমিকা সম্পাদনা: {{name}}',
-    detailsTitle: 'ভূমিকা প্রোফাইল ও অনুমতি: {{name}}',
+    detailsTitle: 'ভূমিকা প্রোফাইল: {{name}}',
     basicInfoSection: 'মৌলিক তথ্য',
-    permissionsSection: 'অ্যাকশন পারমিশন ম্যাট্রিক্স',
+    featureControlSection: 'ফিচার ও মডিউল কন্ট্রোল',
   },
 
   // Form Fields
@@ -63,25 +57,6 @@ export const bn = {
     codePlaceholder: 'যেমন: SENIOR_USTADH',
     description: 'ভূমিকার বিবরণ',
     descriptionPlaceholder: 'এই ভূমিকার কর্মক্ষেত্রের সংক্ষিপ্ত বিবরণ লিখুন...',
-    hierarchyLevel: 'কর্তৃত্বের অনুক্রম র্যাংক (১ - ১০)',
-    hierarchyHelp: 'ছোট সংখ্যা = উচ্চ কর্তৃত্ব (১ = সুপার অ্যাডমিন, ২ = অ্যাডমিন, ৫ = শিক্ষক, ১০ = অভিভাবক)।',
-    levelHighest: 'লেভেল ১ (সর্বোচ্চ)',
-    levelMedium: 'লেভেল ৫ (মাঝারি)',
-    levelLowest: 'লেভেল ১০ (সর্বনিম্ন)',
-  },
-
-  // Permissions
-  permissions: {
-    can_create_student: 'শিক্ষার্থী তৈরি',
-    can_create_student_desc: 'নতুন শিক্ষার্থী রেকর্ড তৈরি করার অনুমতি দিন',
-    can_edit_student: 'শিক্ষার্থী সম্পাদনা',
-    can_edit_student_desc: 'শিক্ষার্থীর তথ্য সম্পাদনা করার অনুমতি দিন',
-    can_delete_report: 'রিপোর্ট মুছে ফেলা',
-    can_delete_report_desc: 'দৈনিক মূল্যায়ন নোট মুছে ফেলার অনুমতি দিন',
-    can_export_reports: 'ডেটা এক্সপোর্ট',
-    can_export_reports_desc: 'পিডিএফ/এক্সেলে রিপোর্ট এক্সপোর্ট করার অনুমতি দিন',
-    can_manage_users: 'ব্যবহারকারী পরিচালনা',
-    can_manage_users_desc: 'ব্যবহারকারী তৈরি ও পরিচালনা করার অনুমতি দিন',
   },
 
   // Modals
