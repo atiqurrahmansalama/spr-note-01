@@ -152,7 +152,7 @@ export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProp
             <button
               type="button"
               onClick={() => setConfig(savedConfig)}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold theme-bg-sub border-0 theme-text-secondary hover:theme-bg-elevated hover:theme-text-primary transition cursor-pointer flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold theme-bg-app border-0 theme-text-secondary hover:theme-bg-elevated/60 hover:theme-text-primary transition cursor-pointer flex items-center gap-1.5"
             >
               <RefreshIcon className="w-3.5 h-3.5" />
               <span>Cancel</span>
@@ -166,7 +166,7 @@ export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProp
             className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 shadow-xs border-0 ${
               hasChanges
                 ? "theme-bg-accent text-white hover:opacity-90"
-                : "opacity-50 cursor-not-allowed theme-bg-sub theme-text-secondary"
+                : "opacity-50 cursor-not-allowed theme-bg-app theme-text-secondary"
             }`}
           >
             <SaveIcon className="w-3.5 h-3.5" />
@@ -187,7 +187,7 @@ export const WeeklyHolidaySettingsPanel: React.FC<WeeklyHolidaySettingsPanelProp
               Click individual day badges to toggle weekly holiday days and active academic working days for your institution.
             </p>
           </div>
-          <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full theme-bg-sub border-0 shadow-2xs theme-text-secondary self-start sm:self-auto">
+          <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full theme-bg-app border-0 shadow-2xs theme-text-secondary self-start sm:self-auto">
             {config.weekendDays.length} of 7 Days Holiday
           </span>
         </div>

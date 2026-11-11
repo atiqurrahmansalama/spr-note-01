@@ -29,7 +29,7 @@ export interface ActionMenuProps {
   label?: React.ReactNode;
   disabled?: boolean;
   size?: 'xs' | 'sm' | 'md' | 'lg' | string;
-  variant?: 'default' | 'sub' | 'surface' | 'primary' | 'ghost' | string;
+  variant?: 'default' | 'sub' | 'surface' | 'app' | 'card' | 'primary' | 'ghost' | string;
   showChevron?: boolean;
   ariaLabel?: string;
   header?: React.ReactNode;
@@ -243,6 +243,10 @@ export default function ActionMenu({
       ? 'border border-transparent bg-transparent hover:theme-bg-sub theme-accent shadow-none'
       : variant === 'primary'
       ? 'border border-transparent theme-bg-accent theme-accent-text hover:opacity-95 shadow-xs'
+      : variant === 'app'
+      ? 'border-0 theme-bg-app hover:theme-bg-elevated/60 theme-text-secondary hover:theme-text-primary shadow-2xs'
+      : variant === 'card'
+      ? 'border-0 theme-bg-surface hover:theme-bg-elevated/60 theme-text-secondary hover:theme-text-primary shadow-2xs'
       : variant === 'surface'
       ? 'theme-bg-surface hover:theme-bg-sub/60 border theme-border theme-text-secondary hover:theme-text-primary shadow-2xs'
       : variant === 'sub'
@@ -305,6 +309,10 @@ export default function ActionMenu({
                 ? 'ghost'
                 : variant === 'primary'
                 ? 'accent-soft'
+                : variant === 'app'
+                ? 'app'
+                : variant === 'card'
+                ? 'card'
                 : variant === 'surface'
                 ? 'surface'
                 : 'ghost'

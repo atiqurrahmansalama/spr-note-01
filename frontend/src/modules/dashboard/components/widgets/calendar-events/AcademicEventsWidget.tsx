@@ -98,6 +98,7 @@ export default function AcademicEventsWidget({
           hideCategorySelector={true}
           hideSearch={true}
           hideViewModeToggle={true}
+          embeddedSurface={true}
           onSaveEvent={handleSaveEvent}
           onDeleteEvent={handleDeleteEvent}
         />

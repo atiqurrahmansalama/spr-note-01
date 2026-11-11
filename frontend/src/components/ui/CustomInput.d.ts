@@ -27,7 +27,7 @@ export interface CustomInputProps {
   badge?: React.ReactNode;
   placeholder?: string | Record<string, string>;
   size?: 'xs' | 'sm' | 'md' | 'lg';
-  variant?: 'default' | 'filled' | 'elevated' | 'sub' | 'borderless' | 'compact-number';
+  variant?: 'default' | 'filled' | 'elevated' | 'sub' | 'app' | 'card' | 'borderless' | 'compact-number';
   disabled?: boolean;
   readOnly?: boolean;
   autoFocus?: boolean;

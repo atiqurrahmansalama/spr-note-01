@@ -56,6 +56,11 @@ export interface DailyClassroomFilterProps {
   onBatchHierarchyChange?: (params: { departmentId?: string; classId?: string; sectionId?: string; teacherId?: string }) => void;
   setAcademicFilters?: (params: { departmentId?: string; classId?: string; sectionId?: string; teacherId?: string }) => void;
   maxColumns?: 1 | 2 | 3 | 4 | 5 | 6;
+  collapsible?: boolean;
+  defaultExpanded?: boolean;
+  expanded?: boolean;
+  onToggleExpanded?: (nextExpanded: boolean) => void;
+  storageKey?: string;
   [key: string]: any;
 }
 
@@ -70,6 +75,9 @@ export interface DailyClassroomFilterControlsProps {
   // Collapsible configuration
   collapsible?: boolean;
   defaultExpanded?: boolean;
+  expanded?: boolean;
+  onToggleExpanded?: (nextExpanded: boolean) => void;
+  storageKey?: string;
 
   // Custom filter extensions
   searchControl?: React.ReactNode;
@@ -154,8 +162,11 @@ export default function DailyClassroomFilterControls({
   filterProps = null,
   showCardWrapper = true,
   className = '',
-  collapsible = true,
+  collapsible = filterProps?.collapsible ?? true,
   defaultExpanded = filterProps?.defaultExpanded ?? false,
+  expanded: controlledExpanded = filterProps?.expanded,
+  onToggleExpanded = filterProps?.onToggleExpanded,
+  storageKey = filterProps?.storageKey,
 
   // Custom extensions
   searchControl,
@@ -420,6 +431,9 @@ export default function DailyClassroomFilterControls({
       showCardWrapper={showCardWrapper}
       collapsible={collapsible}
       defaultExpanded={defaultExpanded}
+      expanded={controlledExpanded}
+      onToggleExpanded={onToggleExpanded}
+      storageKey={storageKey}
       primaryRow={primaryRow}
       secondaryRow={secondaryRow}
       scopeItems={scopeItems}
@@ -447,7 +461,7 @@ export default function DailyClassroomFilterControls({
 
           {/* Fallback next line for More button if not consumed by children or period switcher */}
           {!hasVisibleScope && !showPeriodSwitcher && typeof children !== 'function' && moreButton && (
-            <div className="pt-2 border-t theme-border flex items-center justify-end gap-2 text-xs select-none">
+            <div className="pt-1 flex items-center justify-end gap-2 text-xs select-none">
               {moreButton}
             </div>
           )}

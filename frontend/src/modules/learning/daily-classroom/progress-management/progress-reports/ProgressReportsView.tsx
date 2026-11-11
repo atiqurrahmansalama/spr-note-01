@@ -422,8 +422,47 @@ export default function ProgressReportsView({
     setReportToDelete(selected);
   };
 
+  // Reusable Analytics Toggle Button (always anchored first on the far left)
+  const renderAnalyticsButton = () => {
+    if (!canViewAnalytics) return null;
+    return (
+      <button
+        type="button"
+        onClick={handleToggleAnalytics}
+        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border-0 transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none ${
+          effectiveShowAnalytics
+            ? "theme-bg-accent theme-accent-text"
+            : "theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary"
+        }`}
+        title={effectiveShowAnalytics ? t("hideAnalytics", "Hide Analytics") : t("showAnalytics", "Show Analytics")}
+      >
+        <TrendingUpIcon className="w-3.5 h-3.5 shrink-0" />
+        <span>{effectiveShowAnalytics ? t("hideAnalytics", "Hide Analytics") : t("analytics", "Analytics")}</span>
+        <ChevronIcon isOpen={effectiveShowAnalytics} className="w-3 h-3 shrink-0" />
+      </button>
+    );
+  };
+
+  // Reusable Refresh Button (left control group)
+  const renderRefreshButton = () => (
+    <IconButton
+      icon={RefreshIcon}
+      onClick={handleRefresh}
+      loading={isRefreshing}
+      disabled={isRefreshing || isSyncing}
+      variant="sub"
+      size="sm"
+      shape="rounded"
+      title="Refresh Reports & Sync with Database"
+      ariaLabel="Refresh Reports & Sync with Database"
+    />
+  );
+
   // Reusable Table Action Toolbar
-  const renderTableActionToolbar = (extraRightControls?: React.ReactNode) => {
+  const renderTableActionToolbar = (options?: {
+    showAnalyticsControls?: boolean;
+    moreButton?: React.ReactNode;
+  }) => {
     if (selectedIds.size > 0) {
       const activeTargets = getActiveTargetReports();
       const unsyncedTargets = activeTargets.filter(isReportUnsynced);
@@ -464,22 +503,68 @@ export default function ProgressReportsView({
       ];
 
       return (
-        <SelectionActionBar
-          fullWidth={true}
-          bordered={false}
-          selectedCount={selectedIds.size}
-          totalCount={filteredReports.length}
-          onToggleSelectAll={toggleSelectAll}
-          onClearSelection={handleDeselectAll}
-          actions={actions}
-        />
+        <div className="flex flex-wrap items-center justify-between gap-2 w-full">
+          <div className="flex-1 min-w-0">
+            <SelectionActionBar
+              fullWidth={true}
+              bordered={false}
+              selectedCount={selectedIds.size}
+              totalCount={filteredReports.length}
+              onToggleSelectAll={toggleSelectAll}
+              onClearSelection={handleDeselectAll}
+              actions={actions}
+            />
+          </div>
+          {options?.moreButton && (
+            <div className="flex items-center gap-2 ml-auto shrink-0">
+              {options.moreButton}
+            </div>
+          )}
+        </div>
       );
     }
 
     return (
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 w-full">
-        {/* Left: Actions / Pending Sync + Cards/Table Toggle + Extra Controls */}
+        {/* Left: [Analytics / Hide Analytics] -> [Expand All] -> [Cards/Table] -> [Refresh] -> [Sync to DB] */}
         <div className="flex items-center flex-wrap gap-2">
+          {options?.showAnalyticsControls && renderAnalyticsButton()}
+
+          {/* Expand All / Collapse All Button when Analytics is Expanded */}
+          {effectiveShowAnalytics && (
+            <button
+              type="button"
+              onClick={handleToggleExpandAll}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border-0 hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
+              title={isAllExpanded ? t("collapseAll", "Collapse All") : t("expandAll", "Expand All")}
+            >
+              <ChevronIcon isOpen={isAllExpanded} className="w-3.5 h-3.5 shrink-0" />
+              <span>{isAllExpanded ? t("collapseAll", "Collapse All") : t("expandAll", "Expand All")}</span>
+            </button>
+          )}
+
+          {/* Single Toggle Button for Cards / Table View */}
+          <button
+            type="button"
+            onClick={() => handleLayoutModeChange(layoutMode === "card" ? "table" : "card")}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border-0 hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
+            title={layoutMode === "card" ? "Switch to Table View" : "Switch to Cards View"}
+          >
+            {layoutMode === "card" ? (
+              <>
+                <TableIcon className="w-3.5 h-3.5 theme-accent" />
+                <span>Table</span>
+              </>
+            ) : (
+              <>
+                <Squares2X2Icon className="w-3.5 h-3.5 theme-accent" />
+                <span>Cards</span>
+              </>
+            )}
+          </button>
+
+          {options?.showAnalyticsControls && renderRefreshButton()}
+
           {pendingSyncCount > 0 && !offline && (
             <button
               type="button"
@@ -498,45 +583,10 @@ export default function ProgressReportsView({
               </span>
             </button>
           )}
-
-          {/* Expand All / Collapse All Button when Analytics is Expanded */}
-          {effectiveShowAnalytics && (
-            <button
-              type="button"
-              onClick={handleToggleExpandAll}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
-              title={isAllExpanded ? t("collapseAll", "Collapse All") : t("expandAll", "Expand All")}
-            >
-              <ChevronIcon isOpen={isAllExpanded} className="w-3.5 h-3.5 shrink-0" />
-              <span>{isAllExpanded ? t("collapseAll", "Collapse All") : t("expandAll", "Expand All")}</span>
-            </button>
-          )}
-
-          {/* Single Toggle Button for Cards / Table View */}
-          <button
-            type="button"
-            onClick={() => handleLayoutModeChange(layoutMode === "card" ? "table" : "card")}
-            className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
-            title={layoutMode === "card" ? "Switch to Table View" : "Switch to Cards View"}
-          >
-            {layoutMode === "card" ? (
-              <>
-                <TableIcon className="w-3.5 h-3.5 theme-accent" />
-                <span>Table</span>
-              </>
-            ) : (
-              <>
-                <Squares2X2Icon className="w-3.5 h-3.5 theme-accent" />
-                <span>Cards</span>
-              </>
-            )}
-          </button>
-
-          {extraRightControls}
         </div>
 
-        {/* Right: Unsynced Filter Chip + Segmented Switch (Record Reports vs By Student) + 3-Dots Menu */}
-        <div className="flex items-center justify-end gap-2 shrink-0">
+        {/* Right: [Unsynced Chip] -> [More] -> [Record Reports | By Student] -> [3-Dots Menu] */}
+        <div className="flex items-center justify-end flex-wrap gap-2 sm:ml-auto shrink-0">
           {filterUnsyncedOnly && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 dark:text-amber-400 text-xs font-semibold shadow-2xs animate-fade-in shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
@@ -554,11 +604,14 @@ export default function ProgressReportsView({
             </div>
           )}
 
+          {options?.moreButton}
+
           <SegmentedSwitch<"RECORD_REPORTS" | "STUDENT_VIEW">
             value={viewMode}
             onChange={handleViewModeChange}
             options={reportViewOptions}
           />
+
           <ActionMenu
             align="right"
             variant="surface"
@@ -584,6 +637,8 @@ export default function ProgressReportsView({
       <DailyClassroomFilterControls
         showCardWrapper={true}
         collapsible={true}
+        defaultExpanded={false}
+        storageKey={`spr_progress_reports_filters_expanded_${activeTenantId || 'default'}`}
         filterProps={effectiveFilterProps}
         showPeriodSwitcher={false}
         hasTeachers={true}
@@ -750,73 +805,27 @@ export default function ProgressReportsView({
         )}
       >
         {({ moreButton }: { moreButton: React.ReactNode }) => (
-          <div className="pt-2.5 border-t theme-border w-full">
+          <div className="pt-2.5 border-t theme-border-light w-full">
             {effectiveShowAnalytics ? (
-              <div className="flex items-center justify-between gap-3 w-full">
-                <div className="flex items-center gap-2 text-xs font-semibold theme-text-secondary select-none">
-                  <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse shrink-0" />
-                  <span className="theme-text-primary font-bold">
-                    {filteredReports.length} / {reportsList.length}
-                  </span>
-                  <span>Reports Filtered</span>
+              <div className="flex items-center justify-between gap-2 flex-wrap w-full">
+                {/* Left: Hide Analytics + Refresh (always anchored on the left) */}
+                <div className="flex items-center flex-wrap gap-2">
+                  {renderAnalyticsButton()}
+                  {renderRefreshButton()}
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  {moreButton}
-                  <button
-                    type="button"
-                    onClick={handleToggleAnalytics}
-                    className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none theme-bg-accent theme-accent-text border-[var(--accent-main)]"
-                    title={t("hideAnalytics", "Hide Analytics")}
-                  >
-                    <TrendingUpIcon className="w-3.5 h-3.5 shrink-0" />
-                    <span>{t("hideAnalytics", "Hide Analytics")}</span>
-                    <ChevronIcon isOpen={true} className="w-3 h-3 shrink-0" />
-                  </button>
-
-                  <IconButton
-                    icon={RefreshIcon}
-                    onClick={handleRefresh}
-                    loading={isRefreshing}
-                    disabled={isRefreshing || isSyncing}
-                    variant="sub"
-                    size="sm"
-                    shape="rounded"
-                    title="Refresh Reports & Sync with Database"
-                    ariaLabel="Refresh Reports & Sync with Database"
-                  />
-                </div>
+                {/* Right: More / Hide More button (always anchored on the right) */}
+                {moreButton && (
+                  <div className="flex items-center justify-end gap-2 ml-auto shrink-0">
+                    {moreButton}
+                  </div>
+                )}
               </div>
             ) : (
-              renderTableActionToolbar(
-                <>
-                  {moreButton}
-                  {canViewAnalytics && (
-                    <button
-                      type="button"
-                      onClick={handleToggleAnalytics}
-                      className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary"
-                      title={t("showAnalytics", "Show Analytics")}
-                    >
-                      <TrendingUpIcon className="w-3.5 h-3.5 shrink-0" />
-                      <span>{t("analytics", "Analytics")}</span>
-                      <ChevronIcon isOpen={false} className="w-3 h-3 shrink-0" />
-                    </button>
-                  )}
-
-                  <IconButton
-                    icon={RefreshIcon}
-                    onClick={handleRefresh}
-                    loading={isRefreshing}
-                    disabled={isRefreshing || isSyncing}
-                    variant="sub"
-                    size="sm"
-                    shape="rounded"
-                    title="Refresh Reports & Sync with Database"
-                    ariaLabel="Refresh Reports & Sync with Database"
-                  />
-                </>
-              )
+              renderTableActionToolbar({
+                showAnalyticsControls: true,
+                moreButton,
+              })
             )}
           </div>
         )}
@@ -865,7 +874,7 @@ export default function ProgressReportsView({
 
       {/* 2c. Dedicated Table Controls Box when Analytics is Expanded */}
       {effectiveShowAnalytics && (
-        <div className="w-full theme-bg-surface border theme-border rounded-2xl p-2.5 sm:px-4 sm:py-2.5 shadow-2xs select-none">
+        <div className="w-full theme-bg-surface border-0 rounded-2xl p-2.5 sm:px-4 sm:py-2.5 shadow-xs select-none">
           {renderTableActionToolbar()}
         </div>
       )}

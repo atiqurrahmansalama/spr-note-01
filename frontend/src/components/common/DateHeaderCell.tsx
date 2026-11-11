@@ -21,6 +21,7 @@ export interface DateHeaderCellProps {
   isCurrentMonth?: boolean;
   keepNormalBgOnOtherMonths?: boolean;
   showEventBackground?: boolean;
+  borderless?: boolean;
   onClick?: (e?: React.MouseEvent) => void;
   title?: string;
   className?: string;
@@ -61,6 +62,7 @@ export const DateHeaderCell: React.FC<DateHeaderCellProps> = ({
   isCurrentMonth = true,
   keepNormalBgOnOtherMonths = false,
   showEventBackground = false,
+  borderless = false,
   onClick,
   title,
   className = '',
@@ -119,13 +121,19 @@ export const DateHeaderCell: React.FC<DateHeaderCellProps> = ({
   } else if (hasEvent && eventColors && showEventBackground) {
     statusClasses = `${eventColors.bg} ${eventColors.text} font-bold hover:brightness-95`;
   } else if (isHoliday) {
-    statusClasses = 'theme-bg-sub/80 hover:theme-bg-sub theme-text-secondary';
+    statusClasses = borderless
+      ? 'theme-bg-elevated/60 hover:theme-bg-elevated theme-text-secondary'
+      : 'theme-bg-sub/80 hover:theme-bg-sub theme-text-secondary';
   } else if (!isCurrentMonth) {
-    statusClasses = keepNormalBgOnOtherMonths
+    statusClasses = borderless
+      ? 'theme-bg-app/50 hover:theme-bg-elevated/50 opacity-45 hover:opacity-80 theme-text-secondary'
+      : keepNormalBgOnOtherMonths
       ? 'theme-bg-surface hover:theme-bg-sub/40 opacity-40 hover:opacity-75 theme-text-secondary'
       : 'theme-bg-sub/30 opacity-40 hover:opacity-75 theme-text-secondary';
   } else {
-    statusClasses = 'theme-bg-surface hover:theme-bg-sub/40 theme-text-primary';
+    statusClasses = borderless
+      ? 'theme-bg-app hover:theme-bg-elevated/60 theme-text-primary'
+      : 'theme-bg-surface hover:theme-bg-sub/40 theme-text-primary';
   }
 
   return (
@@ -134,7 +142,9 @@ export const DateHeaderCell: React.FC<DateHeaderCellProps> = ({
       title={tooltipText}
       data-active={isSelected}
       data-today={isToday}
-      className={`py-1.5 px-0.5 sm:px-1 font-mono border-r border-b theme-border transition-colors cursor-pointer select-none align-middle ${statusClasses} ${className}`}
+      className={`py-1.5 px-0.5 sm:px-1 font-mono ${
+        borderless ? 'border-0 rounded-2xl' : 'border-r border-b theme-border'
+      } transition-colors cursor-pointer select-none align-middle ${statusClasses} ${className}`}
       {...restProps}
     >
       <div className="flex flex-col items-center justify-between min-h-[62px] sm:min-h-[68px] py-1">
@@ -188,7 +198,7 @@ export const DateHeaderCell: React.FC<DateHeaderCellProps> = ({
         </div>
 
         {/* Bottom Group: Centered 2-Letter Weekday Name */}
-        <div className="w-full pt-1.5 mt-1 border-t theme-border flex items-center justify-center">
+        <div className={`w-full pt-1.5 mt-1 ${borderless ? 'border-0' : 'border-t theme-border'} flex items-center justify-center`}>
           <span
             className={`text-[8px] sm:text-[9px] font-semibold uppercase leading-none text-center block ${
               isSelected

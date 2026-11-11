@@ -37,6 +37,7 @@ export interface FilterBoxProps {
   defaultExpanded?: boolean;
   expanded?: boolean;
   onToggleExpanded?: (nextExpanded: boolean) => void;
+  storageKey?: string;
   moreLabel?: string;
   hideMoreLabel?: string;
 
@@ -77,6 +78,7 @@ export default function FilterBox({
   defaultExpanded = false,
   expanded: controlledExpanded,
   onToggleExpanded,
+  storageKey,
   moreLabel = 'More',
   hideMoreLabel = 'Hide More',
   scopeSummary,
@@ -91,7 +93,17 @@ export default function FilterBox({
   footerActions,
   children,
 }: FilterBoxProps) {
-  const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
+  const [internalExpanded, setInternalExpanded] = useState<boolean>(() => {
+    if (storageKey && typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved !== null) {
+          return saved === 'true';
+        }
+      } catch {}
+    }
+    return defaultExpanded;
+  });
   const isExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
 
   const effectiveReset = onResetFilters || onReset;
@@ -110,7 +122,7 @@ export default function FilterBox({
           <button
             type="button"
             onClick={effectiveReset}
-            className="px-2.5 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs hover:theme-bg-elevated select-none"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border-0 theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs hover:theme-bg-elevated select-none"
             title="Reset all active filters"
           >
             <CloseIcon className="w-3 h-3 theme-accent" />
@@ -129,6 +141,11 @@ export default function FilterBox({
   // ── 2. Full Multi-Row Card Box Variant ('card') ──
   const handleToggle = () => {
     const next = !isExpanded;
+    if (storageKey && typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(storageKey, String(next));
+      } catch {}
+    }
     if (onToggleExpanded) {
       onToggleExpanded(next);
     } else {
@@ -147,7 +164,7 @@ export default function FilterBox({
       <button
         type="button"
         onClick={handleToggle}
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary border theme-border transition-colors cursor-pointer active:scale-95 text-xs font-semibold select-none ${customClass}`}
+        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary border-0 shadow-2xs transition-colors cursor-pointer active:scale-95 text-xs font-semibold select-none ${customClass}`}
         title={isExpanded ? hideMoreLabel : moreLabel}
       >
         <span>{isExpanded ? hideMoreLabel : moreLabel}</span>
@@ -162,7 +179,7 @@ export default function FilterBox({
       <button
         type="button"
         onClick={effectiveReset}
-        className="flex items-center gap-1 px-2.5 py-1 rounded-xl theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary border theme-border transition-colors cursor-pointer text-xs font-semibold select-none shadow-2xs"
+        className="flex items-center gap-1 px-2.5 py-1 rounded-xl theme-bg-sub hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary border-0 transition-colors cursor-pointer text-xs font-semibold select-none shadow-2xs"
         title="Reset active filters"
       >
         <CloseIcon className="w-3 h-3 theme-accent" />
@@ -203,7 +220,7 @@ export default function FilterBox({
 
       {/* 3. Scope Summary Line (Visible ONLY when collapsed AND active scope items exist) */}
       {hasVisibleScope && (
-        <div className="pt-2.5 border-t theme-border flex items-center justify-between text-xs font-medium theme-text-secondary flex-wrap gap-2 animate-fade-in select-none">
+        <div className="pt-2.5 border-t theme-border-light flex items-center justify-between text-xs font-medium theme-text-secondary flex-wrap gap-2 animate-fade-in select-none">
           {/* Left: Selected Scope Summary */}
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             {scopeSummary ? (
@@ -243,7 +260,7 @@ export default function FilterBox({
 
       {/* 5. Fallback Next Line for More/Reset Button if collapsed with no scope items and no children */}
       {!hasVisibleScope && (collapsible && hasSecondary) && !children && (
-        <div className="pt-2 border-t theme-border flex items-center justify-end gap-2 text-xs select-none animate-fade-in">
+        <div className="pt-1 flex items-center justify-end gap-2 text-xs select-none animate-fade-in">
           {footerActions}
           {renderResetButton()}
           {renderMoreButton()}
@@ -255,7 +272,7 @@ export default function FilterBox({
   if (showCardWrapper) {
     return (
       <div
-        className={`@container p-3 sm:p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3 w-full min-w-0 ${className}`}
+        className={`@container p-3 sm:p-4 rounded-2xl theme-bg-surface border-0 shadow-xs space-y-3 w-full min-w-0 ${className}`}
       >
         {content}
       </div>

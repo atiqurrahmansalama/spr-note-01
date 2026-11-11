@@ -103,7 +103,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
                 <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-md ${style.bg} theme-text-primary border-0 shadow-2xs`}>
                   {getEventDisplayType(event, activeTenantId)}
                 </span>
-                <span className="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-md theme-bg-sub border-0 shadow-2xs theme-text-secondary">
+                <span className="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-md theme-bg-app border-0 shadow-2xs theme-text-secondary">
                   Audience: {event.audience || 'ALL'}
                 </span>
               </div>
@@ -119,13 +119,13 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
       </div>
 
       {/* Schedule Info Grid */}
-      <div className="p-4 rounded-3xl theme-bg-surface border-0 shadow-xs space-y-3.5 text-xs">
-        <h4 className="text-[11px] font-mono font-bold uppercase tracking-wider theme-text-secondary">
+      <div className="p-4 rounded-3xl theme-bg-surface border-0 shadow-xs space-y-2 text-xs">
+        <h4 className="text-[11px] font-mono font-bold uppercase tracking-wider theme-text-secondary px-1 pb-1">
           Schedule & Timing Details
         </h4>
 
         {/* Time */}
-        <div className="flex items-center justify-between py-2 border-0">
+        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl theme-bg-app border-0">
           <span className="theme-text-secondary font-medium">Session Timing:</span>
           <span className="font-mono font-bold theme-text-primary">
             {isAllDay ? 'Full Day' : `${formatTime12(event.startTime)} – ${formatTime12(event.endTime)}`}
@@ -133,7 +133,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
         </div>
 
         {/* Date / Recurrence */}
-        <div className="flex items-center justify-between py-2 border-0">
+        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl theme-bg-app border-0">
           <span className="theme-text-secondary font-medium">Recurrence Pattern:</span>
           <span className="font-semibold theme-text-primary">
             {event.repeats ? 'Weekly Recurring' : 'Single Date'}
@@ -142,7 +142,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
 
         {/* Start Date */}
         {event.startDate && (
-          <div className="flex items-center justify-between py-2 border-0">
+          <div className="flex items-center justify-between px-3 py-2.5 rounded-xl theme-bg-app border-0">
             <span className="theme-text-secondary font-medium">Effective Date:</span>
             <span className="font-mono font-medium theme-text-primary">{event.startDate}</span>
           </div>
@@ -150,7 +150,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
 
         {/* Repeat Days */}
         {event.repeats && Array.isArray(event.repeatDays) && event.repeatDays.length > 0 && (
-          <div className="py-2 border-0 space-y-1.5">
+          <div className="px-3 py-2.5 rounded-xl theme-bg-app border-0 space-y-1.5">
             <span className="theme-text-secondary font-medium block">Active Days:</span>
             <div className="flex flex-wrap gap-1.5">
               {event.repeatDays.map((d: number) => (
@@ -167,7 +167,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
 
         {/* Active System Impacts */}
         {Array.isArray(event.impacts) && event.impacts.length > 0 && (
-          <div className="py-2 border-0 space-y-1.5">
+          <div className="px-3 py-2.5 rounded-xl theme-bg-app border-0 space-y-1.5">
             <span className="theme-text-secondary font-medium block">Active System Impacts:</span>
             <div className="flex flex-wrap gap-1.5">
               {event.impacts.map((impactId: string) => {
@@ -175,7 +175,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
                 return (
                   <span
                     key={impactId}
-                    className="px-2 py-0.5 rounded-lg text-[11px] font-semibold theme-bg-sub border-0 theme-text-primary flex items-center gap-1 shadow-2xs"
+                    className="px-2 py-0.5 rounded-lg text-[11px] font-semibold theme-bg-surface border-0 theme-text-primary flex items-center gap-1 shadow-2xs"
                   >
                     <span className="w-1.5 h-1.5 rounded-full theme-bg-accent" />
                     <span>{matched?.name || matched?.badge || impactId}</span>
@@ -187,7 +187,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
         )}
 
         {/* Priority Rank */}
-        <div className="flex items-center justify-between py-2 border-0">
+        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl theme-bg-app border-0">
           <span className="theme-text-secondary font-medium">Precedence Priority:</span>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-bold theme-bg-accent-soft theme-accent border-0 shadow-2xs">
             Rank {event.priorityRank || (event as any).rank || 1}
@@ -196,7 +196,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
 
         {/* Timezone */}
         {event.timezone && (
-          <div className="flex items-center justify-between py-2 border-0">
+          <div className="flex items-center justify-between px-3 py-2.5 rounded-xl theme-bg-app border-0">
             <span className="theme-text-secondary font-medium">Timezone:</span>
             <span className="font-mono text-xs theme-text-secondary">{event.timezone}</span>
           </div>
@@ -239,7 +239,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
             <button
               type="button"
               onClick={() => setIsConfirmingDelete(false)}
-              className="px-3.5 py-2 rounded-xl border-0 theme-bg-sub hover:theme-bg-elevated theme-text-secondary text-xs font-semibold transition cursor-pointer"
+              className="px-3.5 py-2 rounded-xl border-0 theme-bg-surface hover:theme-bg-elevated/60 theme-text-secondary text-xs font-semibold transition cursor-pointer shadow-xs"
             >
               Cancel
             </button>
@@ -280,7 +280,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-xl border-0 theme-bg-sub hover:theme-bg-elevated theme-text-secondary font-semibold text-xs transition cursor-pointer"
+                className="px-4 py-2.5 rounded-xl border-0 theme-bg-surface hover:theme-bg-elevated/60 theme-text-secondary font-semibold text-xs transition cursor-pointer shadow-xs"
               >
                 Close
               </button>

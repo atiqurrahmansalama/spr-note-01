@@ -5,6 +5,8 @@ export type IconButtonVariant =
   | 'ghost'        // Flat transparent, light subtle background on hover/touch (Default)
   | 'sub'          // Flat transparent, light subtle background on hover/touch
   | 'surface'      // Flat transparent, light subtle background on hover/touch
+  | 'app'          // Soft app canvas background, borderless (for surface cards)
+  | 'card'         // Soft surface card background, borderless (for app containers)
   | 'outline'      // Flat transparent, light subtle background on hover/touch
   | 'filled'       // theme-bg-elevated, light subtle background on hover/touch
   | 'accent'       // theme-bg-accent theme-accent-text hover:brightness-110 shadow-2xs
@@ -86,6 +88,8 @@ const VARIANT_STYLES: Record<IconButtonVariant, string> = {
   ghost: 'bg-transparent border-0 theme-text-secondary hover:theme-text-primary hover:bg-current/[0.10] active:bg-current/[0.18]',
   sub: 'bg-transparent border-0 theme-text-secondary hover:theme-text-primary hover:bg-current/[0.10] active:bg-current/[0.18]',
   surface: 'bg-transparent border-0 theme-text-secondary hover:theme-text-primary hover:bg-current/[0.10] active:bg-current/[0.18]',
+  app: 'theme-bg-app border-0 theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/60 active:scale-95',
+  card: 'theme-bg-surface border-0 theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated/60 shadow-2xs active:scale-95',
   outline: 'bg-transparent border theme-border theme-text-secondary hover:theme-text-primary hover:bg-current/[0.10] active:bg-current/[0.18]',
   filled: 'theme-bg-elevated border-0 theme-text-primary hover:opacity-90 active:opacity-80',
   accent: 'theme-bg-accent border-0 theme-accent-text hover:brightness-110 active:brightness-95 shadow-2xs',

@@ -278,12 +278,12 @@ export const DayAgendaDrawer: React.FC<DayAgendaDrawerProps> = ({
                           {isAllDay ? 'Full Day' : `${formatTime12(evt.startTime)} – ${formatTime12(evt.endTime)}`}
                         </span>
 
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-sub border-0 theme-text-secondary">
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-surface border-0 shadow-2xs theme-text-secondary">
                           {getEventDisplayType(evt)}
                         </span>
 
                         {evt.audience && (
-                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-sub border-0 theme-text-secondary">
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-surface border-0 shadow-2xs theme-text-secondary">
                             Audience: {evt.audience}
                           </span>
                         )}

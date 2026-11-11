@@ -63,7 +63,7 @@ export default function SegmentedSwitch<T extends string = string>({
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={`inline-flex items-center theme-bg-sub border theme-border shadow-2xs shrink-0 select-none ${sizeClasses.container} ${
+      className={`inline-flex items-center theme-bg-sub border-0 shadow-2xs shrink-0 select-none ${sizeClasses.container} ${
         fullWidth ? 'w-full' : ''
       } ${className}`}
     >
@@ -106,7 +106,7 @@ export default function SegmentedSwitch<T extends string = string>({
                 className={`font-mono font-bold rounded-full transition-colors duration-150 ${sizeClasses.badge} ${
                   isActive
                     ? 'theme-bg-surface/20 theme-accent-text'
-                    : 'theme-bg-surface border theme-border theme-text-secondary'
+                    : 'theme-bg-surface border-0 theme-text-secondary'
                 }`}
               >
                 {opt.count}

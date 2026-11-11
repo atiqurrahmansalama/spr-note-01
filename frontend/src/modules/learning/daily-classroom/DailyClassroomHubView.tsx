@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
-import { CollapsiblePageHeader } from '@/components/ui';
+import { CollapsiblePageHeader, TabSwitcher } from '@/components/ui';
 import CustomButton from '@/components/ui/CustomButton';
 import SegmentedSwitch from '@/components/ui/SegmentedSwitch';
 import { PageContainer } from '@/components/layout';
@@ -998,54 +998,65 @@ export default function DailyClassroomHubView({
 
   return (
     <PageContainer isEmbedded={isEmbedded} className="space-y-4">
-      {/* 1. Collapsible Header & Tab Switcher */}
-      <CollapsiblePageHeader
-        hideHeader={hideHeader}
-        title={hubTitle}
-        icon={HubIcon}
-        storageKey={isProgressHub ? 'progress_management_header' : 'lesson_management_header'}
-        tabs={activeTabs}
-        activeTab={activeTab}
-        onChange={handleTabChange}
-        actionsPlacement="tabs"
-        keepTabsActionsInline={isProgressHub && activeTab === 'PROGRESS'}
-        actions={
-          !isProgressHub && activeTab === 'LESSON' ? (
-            <CustomButton
-              type="button"
-              variant="primary"
-              size="sm"
-              icon={PlusIcon}
-              onClick={handleOpenAddLesson}
-            >
-              Add Lesson
-            </CustomButton>
-          ) : !isProgressHub && (activeTab === 'LESSON_ASSESSMENT' || activeTab === 'ASSESSMENT') ? (
-            <CustomButton
-              type="button"
-              variant="primary"
-              size="sm"
-              icon={PlusIcon}
-              onClick={() => handleOpenAssessmentDrawer('')}
-            >
-              Evaluate Student
-            </CustomButton>
-          ) : isProgressHub && activeTab === 'PROGRESS' ? (
-            isQuranAllowed && isBookAllowed ? (
-              <SegmentedSwitch<'QURAN' | 'BOOK'>
-                value={progressMode}
-                onChange={handleProgressModeChange}
-                hideIconsOnMobile={true}
-                options={[
-                  { value: 'QURAN', label: 'Quran', icon: BookOpenIcon, hideIconOnMobile: true },
-                  { value: 'BOOK', label: 'Book', icon: LayersIcon, hideIconOnMobile: true },
-                ]}
-                size="sm"
-              />
-            ) : null
-          ) : null
-        }
-      />
+      {/* 1. Tab Switcher (Previous TabSwitcher for Progress Management without Big Header; CollapsiblePageHeader for Lesson Management) */}
+      {!hideHeader && (
+        isProgressHub ? (
+          <TabSwitcher
+            tabs={activeTabs}
+            activeTab={activeTab}
+            onChange={handleTabChange}
+            keepRightContentInline={activeTab === 'PROGRESS'}
+            rightContent={
+              activeTab === 'PROGRESS' && isQuranAllowed && isBookAllowed ? (
+                <SegmentedSwitch<'QURAN' | 'BOOK'>
+                  value={progressMode}
+                  onChange={handleProgressModeChange}
+                  hideIconsOnMobile={true}
+                  options={[
+                    { value: 'QURAN', label: 'Quran', icon: BookOpenIcon, hideIconOnMobile: true },
+                    { value: 'BOOK', label: 'Book', icon: LayersIcon, hideIconOnMobile: true },
+                  ]}
+                  size="sm"
+                />
+              ) : null
+            }
+          />
+        ) : (
+          <CollapsiblePageHeader
+            hideHeader={hideHeader}
+            title={hubTitle}
+            icon={HubIcon}
+            storageKey="lesson_management_header"
+            tabs={activeTabs}
+            activeTab={activeTab}
+            onChange={handleTabChange}
+            actionsPlacement="tabs"
+            actions={
+              activeTab === 'LESSON' ? (
+                <CustomButton
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  icon={PlusIcon}
+                  onClick={handleOpenAddLesson}
+                >
+                  Add Lesson
+                </CustomButton>
+              ) : (activeTab === 'LESSON_ASSESSMENT' || activeTab === 'ASSESSMENT') ? (
+                <CustomButton
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  icon={PlusIcon}
+                  onClick={() => handleOpenAssessmentDrawer('')}
+                >
+                  Evaluate Student
+                </CustomButton>
+              ) : null
+            }
+          />
+        )
+      )}
 
       {/* ── Lesson Management Tabs (with Keep-Alive Memory Retention) ── */}
       {!isProgressHub && visitedTabs.has('LESSON') && (

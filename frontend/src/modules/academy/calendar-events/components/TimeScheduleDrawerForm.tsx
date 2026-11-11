@@ -143,7 +143,7 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs sm:text-sm font-semibold rounded-2xl border-0 theme-bg-sub hover:theme-bg-elevated transition focus:outline-none cursor-pointer shadow-xs"
+        className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs sm:text-sm font-semibold rounded-2xl border-0 theme-bg-surface hover:theme-bg-elevated/50 transition focus:outline-none cursor-pointer shadow-xs"
       >
         <span className={value ? "font-medium font-mono theme-text-primary" : "theme-text-secondary"}>
           {value ? formatTime12(value) : placeholder}
@@ -298,7 +298,7 @@ export function UntilWhenPicker({
       <button
         type="button"
         onClick={handleToggle}
-        className="w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 rounded-2xl theme-bg-sub border-0 theme-text-primary text-xs sm:text-sm font-semibold hover:theme-bg-elevated focus:outline-none transition-all duration-200 cursor-pointer select-none shadow-xs"
+        className="w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 rounded-2xl theme-bg-surface border-0 theme-text-primary text-xs sm:text-sm font-semibold hover:theme-bg-elevated/50 focus:outline-none transition-all duration-200 cursor-pointer select-none shadow-xs"
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {until === "DATE" ? (
@@ -420,8 +420,8 @@ export function EventColorPickerDropdown({ value, onChange }) {
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl border-0 transition cursor-pointer text-left focus:outline-none shadow-xs ${
           isOpen
-            ? "bg-[var(--accent-main)]/15 theme-bg-sub"
-            : "theme-bg-sub hover:theme-bg-elevated"
+            ? "bg-[var(--accent-main)]/15 dark:bg-[var(--accent-main)]/25"
+            : "theme-bg-surface hover:theme-bg-elevated/50"
         }`}
       >
         <div className="flex items-center gap-2.5 min-w-0">
@@ -437,7 +437,7 @@ export function EventColorPickerDropdown({ value, onChange }) {
           </span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0 ml-2">
-          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-surface border-0 theme-text-secondary shadow-2xs">
+          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-app border-0 theme-text-secondary shadow-2xs">
             {isOpen ? "Close" : "Change"}
           </span>
           <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary" />
@@ -1201,7 +1201,7 @@ export default function TimeScheduleDrawerForm({
           </div>
 
           {/* All Day Toggle Switch */}
-          <div className="flex items-center justify-between p-3.5 rounded-2xl border-0 theme-bg-app shadow-xs">
+          <div className="flex items-center justify-between p-3.5 rounded-2xl border-0 theme-bg-surface shadow-xs">
             <div>
               <div className="text-xs font-bold theme-text-primary">All day</div>
             </div>
@@ -1237,7 +1237,7 @@ export default function TimeScheduleDrawerForm({
           )}
 
           {/* Repeats Toggle Switch (Matches All Day Toggle Design) */}
-          <div className="flex items-center justify-between p-3.5 rounded-2xl border-0 theme-bg-app shadow-xs">
+          <div className="flex items-center justify-between p-3.5 rounded-2xl border-0 theme-bg-surface shadow-xs">
             <div>
               <div className="text-xs font-bold theme-text-primary">Repeats</div>
             </div>
@@ -1273,7 +1273,7 @@ export default function TimeScheduleDrawerForm({
                         className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full text-xs font-bold flex items-center justify-center transition cursor-pointer select-none border-0 ${
                           isSelected
                             ? "theme-bg-accent text-white shadow-sm"
-                            : "theme-bg-sub/60 theme-text-secondary hover:theme-bg-elevated/40 hover:theme-text-primary"
+                            : "theme-bg-surface theme-text-secondary hover:theme-bg-elevated/50 hover:theme-text-primary shadow-2xs"
                         }`}
                         title={item.name}
                       >
@@ -1333,7 +1333,7 @@ export default function TimeScheduleDrawerForm({
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2.5 rounded-xl border-0 theme-bg-sub hover:theme-bg-elevated theme-text-secondary text-sm font-semibold transition cursor-pointer"
+              className="px-4 py-2.5 rounded-xl border-0 theme-bg-surface hover:theme-bg-elevated/50 theme-text-secondary text-sm font-semibold transition cursor-pointer shadow-xs"
             >
               Cancel
             </button>

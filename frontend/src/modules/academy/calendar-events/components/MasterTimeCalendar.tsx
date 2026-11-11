@@ -36,31 +36,31 @@ const WEEKDAY_NAMES_FULL = [
 ];
 
 export const EVENT_COLOR_MAP: Record<string, EventColorStyle> = {
-  emerald: { bg: "bg-emerald-500/10", border: "border-0", text: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500", hex: "#10b981" },
-  indigo: { bg: "bg-indigo-500/10", border: "border-0", text: "text-indigo-600 dark:text-indigo-400", dot: "bg-indigo-500", hex: "#6366f1" },
-  blue: { bg: "bg-blue-500/10", border: "border-0", text: "text-blue-600 dark:text-blue-400", dot: "bg-blue-500", hex: "#3b82f6" },
-  sky: { bg: "bg-sky-500/10", border: "border-0", text: "text-sky-600 dark:text-sky-400", dot: "bg-sky-500", hex: "#0ea5e9" },
-  cyan: { bg: "bg-cyan-500/10", border: "border-0", text: "text-cyan-600 dark:text-cyan-400", dot: "bg-cyan-500", hex: "#06b6d4" },
-  teal: { bg: "bg-teal-500/10", border: "border-0", text: "text-teal-600 dark:text-teal-400", dot: "bg-teal-500", hex: "#14b8a6" },
-  violet: { bg: "bg-violet-500/10", border: "border-0", text: "text-violet-600 dark:text-violet-400", dot: "bg-violet-500", hex: "#8b5cf6" },
-  purple: { bg: "bg-purple-500/10", border: "border-0", text: "text-purple-600 dark:text-purple-400", dot: "bg-purple-500", hex: "#a855f7" },
-  fuchsia: { bg: "bg-fuchsia-500/10", border: "border-0", text: "text-fuchsia-600 dark:text-fuchsia-400", dot: "bg-fuchsia-500", hex: "#d946ef" },
-  rose: { bg: "bg-rose-500/10", border: "border-0", text: "text-rose-600 dark:text-rose-400", dot: "bg-rose-500", hex: "#f43f5e" },
-  red: { bg: "bg-red-500/10", border: "border-0", text: "text-red-600 dark:text-red-400", dot: "bg-red-500", hex: "#ef4444" },
-  orange: { bg: "bg-orange-500/10", border: "border-0", text: "text-orange-600 dark:text-orange-400", dot: "bg-orange-500", hex: "#f97316" },
-  amber: { bg: "bg-amber-500/10", border: "border-0", text: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500", hex: "#f59e0b" },
-  lime: { bg: "bg-lime-500/10", border: "border-0", text: "text-lime-600 dark:text-lime-400", dot: "bg-lime-500", hex: "#84cc16" },
-  slate: { bg: "bg-slate-500/10", border: "border-0", text: "text-slate-600 dark:text-slate-400", dot: "bg-slate-500", hex: "#64748b" },
+  emerald: { bg: "bg-emerald-500/15 dark:bg-emerald-500/20", border: "border-0", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500", hex: "#10b981" },
+  indigo: { bg: "bg-indigo-500/15 dark:bg-indigo-500/20", border: "border-0", text: "text-indigo-700 dark:text-indigo-300", dot: "bg-indigo-500", hex: "#6366f1" },
+  blue: { bg: "bg-blue-500/15 dark:bg-blue-500/20", border: "border-0", text: "text-blue-700 dark:text-blue-300", dot: "bg-blue-500", hex: "#3b82f6" },
+  sky: { bg: "bg-sky-500/15 dark:bg-sky-500/20", border: "border-0", text: "text-sky-700 dark:text-sky-300", dot: "bg-sky-500", hex: "#0ea5e9" },
+  cyan: { bg: "bg-cyan-500/15 dark:bg-cyan-500/20", border: "border-0", text: "text-cyan-700 dark:text-cyan-300", dot: "bg-cyan-500", hex: "#06b6d4" },
+  teal: { bg: "bg-teal-500/15 dark:bg-teal-500/20", border: "border-0", text: "text-teal-700 dark:text-teal-300", dot: "bg-teal-500", hex: "#14b8a6" },
+  violet: { bg: "bg-violet-500/15 dark:bg-violet-500/20", border: "border-0", text: "text-violet-700 dark:text-violet-300", dot: "bg-violet-500", hex: "#8b5cf6" },
+  purple: { bg: "bg-purple-500/15 dark:bg-purple-500/20", border: "border-0", text: "text-purple-700 dark:text-purple-300", dot: "bg-purple-500", hex: "#a855f7" },
+  fuchsia: { bg: "bg-fuchsia-500/15 dark:bg-fuchsia-500/20", border: "border-0", text: "text-fuchsia-700 dark:text-fuchsia-300", dot: "bg-fuchsia-500", hex: "#d946ef" },
+  rose: { bg: "bg-rose-500/15 dark:bg-rose-500/20", border: "border-0", text: "text-rose-700 dark:text-rose-300", dot: "bg-rose-500", hex: "#f43f5e" },
+  red: { bg: "bg-red-500/15 dark:bg-red-500/20", border: "border-0", text: "text-red-700 dark:text-red-300", dot: "bg-red-500", hex: "#ef4444" },
+  orange: { bg: "bg-orange-500/15 dark:bg-orange-500/20", border: "border-0", text: "text-orange-700 dark:text-orange-300", dot: "bg-orange-500", hex: "#f97316" },
+  amber: { bg: "bg-amber-500/15 dark:bg-amber-500/20", border: "border-0", text: "text-amber-700 dark:text-amber-300", dot: "bg-amber-500", hex: "#f59e0b" },
+  lime: { bg: "bg-lime-500/15 dark:bg-lime-500/20", border: "border-0", text: "text-lime-700 dark:text-lime-300", dot: "bg-lime-500", hex: "#84cc16" },
+  slate: { bg: "bg-slate-500/15 dark:bg-slate-500/20", border: "border-0", text: "text-slate-700 dark:text-slate-300", dot: "bg-slate-500", hex: "#64748b" },
   // Soft & Light Pastel Colors
-  mint: { bg: "bg-emerald-400/10", border: "border-0", text: "text-emerald-600 dark:text-emerald-300", dot: "bg-emerald-300", hex: "#6ee7b7" },
-  lavender: { bg: "bg-violet-400/10", border: "border-0", text: "text-violet-600 dark:text-violet-300", dot: "bg-violet-300", hex: "#c4b5fd" },
-  peach: { bg: "bg-orange-400/10", border: "border-0", text: "text-orange-600 dark:text-orange-300", dot: "bg-orange-300", hex: "#fdba74" },
-  coral: { bg: "bg-rose-400/10", border: "border-0", text: "text-rose-600 dark:text-rose-300", dot: "bg-rose-300", hex: "#fca5a5" },
-  sage: { bg: "bg-green-400/10", border: "border-0", text: "text-green-600 dark:text-green-300", dot: "bg-green-300", hex: "#86efac" },
-  ice: { bg: "bg-sky-400/10", border: "border-0", text: "text-sky-600 dark:text-sky-300", dot: "bg-sky-300", hex: "#7dd3fc" },
-  sand: { bg: "bg-slate-400/10", border: "border-0", text: "text-slate-600 dark:text-slate-300", dot: "bg-slate-300", hex: "#cbd5e1" },
-  pink: { bg: "bg-pink-400/10", border: "border-0", text: "text-pink-600 dark:text-pink-300", dot: "bg-pink-300", hex: "#f472b6" },
-  cream: { bg: "bg-amber-300/10", border: "border-0", text: "text-amber-600 dark:text-amber-300", dot: "bg-amber-300", hex: "#fde68a" },
+  mint: { bg: "bg-emerald-400/15 dark:bg-emerald-400/20", border: "border-0", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-400", hex: "#6ee7b7" },
+  lavender: { bg: "bg-violet-400/15 dark:bg-violet-400/20", border: "border-0", text: "text-violet-700 dark:text-violet-300", dot: "bg-violet-400", hex: "#c4b5fd" },
+  peach: { bg: "bg-orange-400/15 dark:bg-orange-400/20", border: "border-0", text: "text-orange-700 dark:text-orange-300", dot: "bg-orange-400", hex: "#fdba74" },
+  coral: { bg: "bg-rose-400/15 dark:bg-rose-400/20", border: "border-0", text: "text-rose-700 dark:text-rose-300", dot: "bg-rose-400", hex: "#fca5a5" },
+  sage: { bg: "bg-green-400/15 dark:bg-green-400/20", border: "border-0", text: "text-green-700 dark:text-green-300", dot: "bg-green-400", hex: "#86efac" },
+  ice: { bg: "bg-sky-400/15 dark:bg-sky-400/20", border: "border-0", text: "text-sky-700 dark:text-sky-300", dot: "bg-sky-400", hex: "#7dd3fc" },
+  sand: { bg: "bg-slate-400/15 dark:bg-slate-400/20", border: "border-0", text: "text-slate-700 dark:text-slate-300", dot: "bg-slate-400", hex: "#cbd5e1" },
+  pink: { bg: "bg-pink-400/15 dark:bg-pink-400/20", border: "border-0", text: "text-pink-700 dark:text-pink-300", dot: "bg-pink-400", hex: "#f472b6" },
+  cream: { bg: "bg-amber-300/20 dark:bg-amber-300/20", border: "border-0", text: "text-amber-700 dark:text-amber-300", dot: "bg-amber-400", hex: "#fde68a" },
 };
 
 /**
@@ -216,6 +216,7 @@ export interface MasterTimeCalendarProps {
   onDisplayModeChange?: (mode: CalendarDisplayMode | string) => void;
   className?: string;
   isHijriEnabled?: boolean;
+  embeddedSurface?: boolean;
 }
 
 interface MonthGridCell {
@@ -262,6 +263,7 @@ export default function MasterTimeCalendar({
   hideCategorySelector = false,
   hideSearch = false,
   hideViewModeToggle = false,
+  embeddedSurface = false,
 }: MasterTimeCalendarProps) {
   const { openDrawer } = useRightSidebar();
   const { activeTenantId } = useTenant();
@@ -836,40 +838,52 @@ export default function MasterTimeCalendar({
     }
   }, [selectedDay, viewMonth, viewYear, displayMode]);
 
+  const navControlVariant = embeddedSurface ? "card" : "app";
+
   return (
     <div className={`flex flex-col w-full min-w-0 @container ${className}`}>
       
       {/* ─── Single Unified Calendar Control Bar Card ──────────────────── */}
-      <div className="p-3 sm:p-4 rounded-3xl border-0 theme-bg-surface shadow-xs flex flex-col @[720px]:flex-row items-stretch @[720px]:items-center justify-between gap-2.5 sm:gap-3 mb-4 w-full min-w-0">
+      <div
+        className={`${
+          embeddedSurface
+            ? "p-2 sm:p-2.5 rounded-2xl border-0 theme-bg-app mb-3"
+            : "p-3 sm:p-4 rounded-3xl border-0 theme-bg-surface shadow-xs mb-4"
+        } flex flex-col @[720px]:flex-row items-stretch @[720px]:items-center justify-between gap-2.5 sm:gap-3 w-full min-w-0`}
+      >
         
-        {/* Left Side: Month Navigator with Arrow Buttons & Hijri Date (Left-aligned on all screen sizes) */}
+        {/* Left Side: Month Navigator with [< Month Year >] & Hijri Date */}
         {viewMode === "month" ? (
-          <div className="flex items-center justify-start gap-2 sm:gap-3 shrink-0 flex-wrap">
-            <div className="flex items-center gap-1 shrink-0">
-              <IconButton
-                icon={ChevronLeftIcon}
-                variant="sub"
-                size="sm"
-                onClick={handlePrevMonth}
-                title="Previous Month"
-                ariaLabel="Previous Month"
-              />
-              <IconButton
-                icon={ChevronRightIcon}
-                variant="sub"
-                size="sm"
-                onClick={handleNextMonth}
-                title="Next Month"
-                ariaLabel="Next Month"
-              />
-            </div>
+          <div className="flex items-center justify-start gap-2 flex-wrap min-w-0">
+            <div className="flex flex-col items-start min-w-0">
+              {/* Row 1: Arrows strictly bracket ONLY Month Year */}
+              <div className="flex items-center gap-1.5 flex-nowrap">
+                <IconButton
+                  icon={ChevronLeftIcon}
+                  variant={navControlVariant}
+                  size="xs"
+                  onClick={handlePrevMonth}
+                  title="Previous Month"
+                  ariaLabel="Previous Month"
+                />
 
-            <div className="flex flex-col min-w-0">
-              <h3 className="text-sm sm:text-base font-bold theme-text-primary tracking-tight leading-tight truncate">
-                {MONTH_NAMES[viewMonth]} {viewYear}
-              </h3>
+                <h3 className="text-sm sm:text-base font-bold theme-text-primary tracking-tight leading-tight whitespace-nowrap">
+                  {MONTH_NAMES[viewMonth]} {viewYear}
+                </h3>
+
+                <IconButton
+                  icon={ChevronRightIcon}
+                  variant={navControlVariant}
+                  size="xs"
+                  onClick={handleNextMonth}
+                  title="Next Month"
+                  ariaLabel="Next Month"
+                />
+              </div>
+
+              {/* Row 2: Hijri subtitle neatly beneath without expanding arrows */}
               {isHijriEnabled && hijriMonthHeader && (
-                <span className="text-[10px] sm:text-xs font-mono theme-accent font-semibold leading-none pt-0.5 truncate">
+                <span className="text-[10px] sm:text-xs font-mono theme-accent font-semibold leading-none pt-1 pl-0.5 truncate max-w-[200px] sm:max-w-[260px]">
                   {hijriMonthHeader}
                 </span>
               )}
@@ -879,7 +893,7 @@ export default function MasterTimeCalendar({
             {!isViewingToday && (
               <CustomButton
                 type="button"
-                variant="sub"
+                variant={navControlVariant}
                 size="sm"
                 icon={CalendarIcon}
                 onClick={handleJumpToday}
@@ -909,7 +923,7 @@ export default function MasterTimeCalendar({
             {viewMode === "month" && !hideViewModeToggle && (
               <CustomButton
                 type="button"
-                variant="sub"
+                variant={navControlVariant}
                 size="sm"
                 icon={displayMode === "grid" ? TimelineIcon : GridIcon}
                 onClick={() => handleSetDisplayMode(displayMode === "grid" ? "timeline" : "grid")}
@@ -926,6 +940,7 @@ export default function MasterTimeCalendar({
                 <CustomInput
                   type="search"
                   size="sm"
+                  variant={navControlVariant}
                   value={searchQuery}
                   onChange={(val: string) => setSearchQuery(val)}
                   placeholder="Search..."
@@ -936,29 +951,39 @@ export default function MasterTimeCalendar({
 
             {/* Three-dots Action Menu */}
             {actionMenuItems && actionMenuItems.length > 0 && (
-              <ActionMenu items={actionMenuItems} />
+              <ActionMenu
+                items={actionMenuItems}
+                variant={navControlVariant}
+                buttonClassName="rounded-xl"
+              />
             )}
           </div>
         )}
       </div>
 
       {/* ─── Calendar Main Content Area ─── */}
-      <div className="overflow-hidden rounded-3xl border-0 theme-bg-surface shadow-xs w-full min-w-0">
+      <div
+        className={`overflow-hidden border-0 w-full min-w-0 ${
+          embeddedSurface
+            ? "rounded-2xl bg-transparent"
+            : "rounded-3xl theme-bg-surface shadow-xs"
+        }`}
+      >
         
         {/* ─── 1. Traditional 7-Column Month Grid View ─── */}
         {viewMode === "month" && displayMode === "grid" && (
-          <div className="flex flex-col w-full min-w-0">
+          <div className={`flex flex-col w-full min-w-0 ${embeddedSurface ? "p-0" : "p-2 sm:p-3"}`}>
             {/* Weekday Header Columns (SUN to SAT) */}
-            <div className="grid grid-cols-7 border-0 theme-bg-sub/40 text-center select-none shrink-0 py-1">
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5 text-center select-none shrink-0 mb-1.5">
               {WEEKDAY_NAMES_SHORT.map((wd) => (
-                <div key={wd} className="py-1 text-[9px] @sm:text-[10px] @lg:text-xs font-bold tracking-wider uppercase border-0 theme-text-secondary">
+                <div key={wd} className="py-1.5 rounded-xl theme-bg-app text-[9px] @sm:text-[10px] @lg:text-xs font-bold tracking-wider uppercase border-0 theme-text-secondary">
                   {wd}
                 </div>
               ))}
             </div>
 
             {/* Month Grid Weeks Rows with Spanning Multi-Day Banners */}
-            <div className="flex flex-col w-full">
+            <div className="flex flex-col w-full gap-1 sm:gap-1.5">
               {weeks.map((weekDays, weekIdx) => {
                 const { items: weekEvents, maxTracks } = getWeekEvents(weekDays);
                 const weekRowMinHeight = Math.max(88, 36 + maxTracks * 26);
@@ -968,9 +993,9 @@ export default function MasterTimeCalendar({
                     key={`week-${weekIdx}-${weekDays[0].dateStr}`}
                     className="relative w-full border-0"
                   >
-                    {/* Background 7-Day Columns Grid matching Weekday Header border */}
+                    {/* Background 7-Day Columns Grid */}
                     <div
-                      className="grid grid-cols-7 w-full min-h-0"
+                      className="grid grid-cols-7 gap-1 sm:gap-1.5 w-full min-h-0"
                       style={{ "--week-min-h": `${weekRowMinHeight}px` } as React.CSSProperties}
                     >
                       {weekDays.map((cell) => {
@@ -994,8 +1019,12 @@ export default function MasterTimeCalendar({
                                 handleOpenAddDrawer(cell.dateStr);
                               }
                             }}
-                            className={`border-0 aspect-square @md:aspect-auto min-h-0 @md:min-h-[var(--week-min-h,88px)] w-full p-1 @sm:p-1.5 @xl:p-2 flex flex-col justify-between transition-colors cursor-pointer group select-none theme-bg-surface hover:theme-bg-sub/40 rounded-lg ${
-                              cell.isCurrentMonth ? "" : "opacity-40 hover:opacity-75"
+                            className={`border-0 aspect-square @md:aspect-auto min-h-0 @md:min-h-[var(--week-min-h,88px)] w-full p-1 @sm:p-1.5 @xl:p-2 flex flex-col justify-between transition-colors cursor-pointer group select-none rounded-xl sm:rounded-2xl ${
+                              isToday
+                                ? "bg-[var(--accent-main)]/15 dark:bg-[var(--accent-main)]/22 hover:bg-[var(--accent-main)]/20"
+                                : cell.isCurrentMonth
+                                ? "theme-bg-app hover:theme-bg-elevated/60"
+                                : "theme-bg-app/50 opacity-45 hover:opacity-75"
                             }`}
                             title={dayEvents.length > 0 ? `${dayEvents.length} item(s) on ${cell.dateStr}. Click to view details.` : cell.dateStr}
                           >
@@ -1026,7 +1055,7 @@ export default function MasterTimeCalendar({
                                     e.stopPropagation();
                                     handleOpenAddDrawer(cell.dateStr);
                                   }}
-                                  className="hidden @2xl:inline-block absolute right-0 top-0 opacity-0 group-hover:opacity-100 text-[10px] theme-accent font-bold px-1 rounded transition hover:theme-bg-sub cursor-pointer"
+                                  className="hidden @2xl:inline-block absolute right-0 top-0 opacity-0 group-hover:opacity-100 text-[10px] theme-accent font-bold px-1 rounded transition hover:theme-bg-surface cursor-pointer"
                                   title="Add schedule"
                                 >
                                   +
@@ -1052,7 +1081,7 @@ export default function MasterTimeCalendar({
                     </div>
 
                     {/* Medium & Large Screens: Continuous Spanning Events Grid Layer across the Week */}
-                    <div className="hidden @md:grid grid-cols-7 gap-y-1 absolute inset-x-0 top-[32px] bottom-1 pointer-events-none z-10 auto-rows-max">
+                    <div className="hidden @md:grid grid-cols-7 gap-x-1 sm:gap-x-1.5 gap-y-1 absolute inset-x-0 top-[30px] @sm:top-[32px] @xl:top-[34px] bottom-1 pointer-events-none z-10 auto-rows-max">
                       {weekEvents.map((item) => {
                         const { event: evt, startCol, span, isStart, isEnd, row } = item;
                         const style = getEventColors(evt, activeTenantId);
@@ -1101,7 +1130,7 @@ export default function MasterTimeCalendar({
         {viewMode === "month" && displayMode === "timeline" && (
           <div className="flex flex-col w-full min-w-0">
             
-            {/* Continuous Day-Number Strip - Supports smooth scrolling beyond month boundaries (Prev, Current & Next Month) */}
+            {/* Continuous Day-Number Strip - Borderless soft-tinted tiles */}
             <div
               ref={dayStripRef}
               onWheel={(e) => {
@@ -1110,7 +1139,9 @@ export default function MasterTimeCalendar({
                   e.currentTarget.scrollLeft += delta;
                 }
               }}
-              className="flex items-stretch overflow-x-auto scrollbar-none select-none theme-bg-surface min-w-0 cursor-grab active:cursor-grabbing border-b theme-border"
+              className={`flex items-stretch overflow-x-auto scrollbar-none select-none min-w-0 cursor-grab active:cursor-grabbing border-0 gap-1.5 ${
+                embeddedSurface ? "pb-2" : "p-2 sm:p-3 theme-bg-surface"
+              }`}
             >
               {timelineStripDays.map((item) => {
                 const isSelected = item.isCurrentMonth && item.dayNum === safeSelectedDay;
@@ -1135,6 +1166,7 @@ export default function MasterTimeCalendar({
                     isToday={isToday}
                     isCurrentMonth={item.isCurrentMonth}
                     keepNormalBgOnOtherMonths={true}
+                    borderless={true}
                     onClick={() => {
                       if (item.isCurrentMonth) {
                         setSelectedDay(item.dayNum);
@@ -1143,17 +1175,17 @@ export default function MasterTimeCalendar({
                         setSelectedDay(item.dayNum);
                       }
                     }}
-                    className="w-[34px] min-w-[34px] max-w-[34px] @sm:w-[40px] @sm:min-w-[40px] @sm:max-w-[40px] shrink-0"
+                    className="w-[36px] min-w-[36px] max-w-[36px] @sm:w-[42px] @sm:min-w-[42px] @sm:max-w-[42px] shrink-0"
                   />
                 );
               })}
             </div>
 
-            {/* Selected Day Main View: Vertical Timeline (Maximized width for sidebars) */}
-            <div className="p-1.5 @sm:p-3 @md:p-5 space-y-2 @sm:space-y-3.5 min-w-0">
+            {/* Selected Day Main View: Vertical Timeline */}
+            <div className={`${embeddedSurface ? "pt-2" : "p-2 @sm:p-3 @md:p-4"} space-y-2.5 @sm:space-y-3.5 min-w-0`}>
               
               {/* Top Selected Day Date Header with Hijri Date */}
-              <div className="flex items-center justify-between gap-2 px-1 pb-2 border-0 flex-wrap">
+              <div className="flex items-center justify-between gap-2 px-1 pb-1 border-0 flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs @sm:text-sm font-bold theme-text-primary">
                     {WEEKDAY_NAMES_FULL[selectedWeekday]}, {selectedDay} {MONTH_NAMES[viewMonth]} {viewYear}
@@ -1171,7 +1203,7 @@ export default function MasterTimeCalendar({
 
               {/* Timeline Cards Container */}
               {selectedDayEvents.length === 0 ? (
-                <div className="p-6 @sm:p-10 text-center border-0 rounded-2xl theme-bg-app shadow-xs my-2 flex flex-col items-center justify-center gap-2">
+                <div className="p-6 @sm:p-10 text-center border-0 rounded-2xl theme-bg-app shadow-2xs my-1 flex flex-col items-center justify-center gap-2">
                   <div className="p-2.5 rounded-xl theme-bg-surface border-0 theme-text-secondary opacity-60 shadow-xs">
                     <CalendarIcon className="w-5 h-5" />
                   </div>
@@ -1219,10 +1251,10 @@ export default function MasterTimeCalendar({
                           )}
                         </div>
 
-                        {/* Event Card (Maximum usable width) */}
+                        {/* Event Card (Distinct soft surface inside parent container) */}
                         <div
                           onClick={() => handleOpenEventDetail(evt, selectedDateStr)}
-                          className="flex-1 min-w-0 p-2 @sm:p-3 @md:p-3.5 rounded-2xl border-0 theme-bg-surface hover:theme-bg-elevated/40 transition-all duration-200 cursor-pointer shadow-xs relative overflow-hidden flex items-center justify-between gap-1.5 @sm:gap-2.5"
+                          className="flex-1 min-w-0 p-2 @sm:p-3 @md:p-3.5 rounded-2xl border-0 theme-bg-app hover:theme-bg-elevated/60 transition-all duration-200 cursor-pointer shadow-2xs relative overflow-hidden flex items-center justify-between gap-1.5 @sm:gap-2.5"
                         >
                           {/* Left Accent Bar */}
                           <div className={`absolute left-0 top-0 bottom-0 w-1 @sm:w-1.5 ${style.dot}`} />
@@ -1271,9 +1303,9 @@ export default function MasterTimeCalendar({
 
         {/* ─── 3. Full Agenda / List View ─── */}
         {viewMode === "list" && (
-          <div className="p-3 @sm:p-4 space-y-2.5 @sm:space-y-3">
+          <div className={`${embeddedSurface ? "p-0" : "p-3 @sm:p-4"} space-y-2.5 @sm:space-y-3`}>
             {filteredEvents.length === 0 ? (
-              <div className="p-10 @sm:p-12 text-center text-xs theme-text-secondary border-0 rounded-2xl theme-bg-app shadow-xs">
+              <div className="p-10 @sm:p-12 text-center text-xs theme-text-secondary border-0 rounded-2xl theme-bg-app shadow-2xs">
                 No events or working hours matching the filter criteria.
               </div>
             ) : (
@@ -1285,7 +1317,7 @@ export default function MasterTimeCalendar({
                   <div
                     key={evt.id}
                     onClick={() => handleOpenEventDetail(evt)}
-                    className="p-3.5 @sm:p-4 rounded-2xl border-0 theme-bg-surface hover:theme-bg-elevated/40 transition cursor-pointer flex flex-col @sm:flex-row items-start @sm:items-center justify-between gap-2.5 @sm:gap-4 shadow-xs"
+                    className="p-3.5 @sm:p-4 rounded-2xl border-0 theme-bg-app hover:theme-bg-elevated/60 transition cursor-pointer flex flex-col @sm:flex-row items-start @sm:items-center justify-between gap-2.5 @sm:gap-4 shadow-2xs"
                   >
                     <div className="flex items-start @sm:items-center gap-3 min-w-0 flex-1">
                       <div className={`w-2.5 h-2.5 @sm:w-3 @sm:h-3 rounded-full shrink-0 mt-1 @sm:mt-0 ${style.dot}`} />

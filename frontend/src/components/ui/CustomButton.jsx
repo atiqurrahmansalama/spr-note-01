@@ -104,6 +104,10 @@ const CustomButton = forwardRef(function CustomButton(
   // ─── Variant Styling ──────────────────────────────────────────────────────
   const variantClasses = useMemo(() => {
     switch (variant) {
+      case 'app':
+        return 'theme-bg-app border-0 hover:theme-bg-elevated/60 theme-text-secondary hover:theme-text-primary shadow-2xs';
+      case 'card':
+        return 'theme-bg-surface border-0 hover:theme-bg-elevated/60 theme-text-secondary hover:theme-text-primary shadow-2xs';
       case 'secondary':
       case 'sub':
         return 'theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary shadow-2xs';

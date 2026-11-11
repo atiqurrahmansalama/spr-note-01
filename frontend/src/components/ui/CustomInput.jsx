@@ -722,6 +722,10 @@ const CustomInput = forwardRef(function CustomInput(
     variantClasses = "theme-bg-elevated theme-border border";
   } else if (variant === "elevated") {
     variantClasses = "theme-bg-elevated theme-border border";
+  } else if (variant === "app") {
+    variantClasses = "theme-bg-app border-0 ring-0 hover:theme-bg-elevated/40";
+  } else if (variant === "card") {
+    variantClasses = "theme-bg-surface border-0 ring-0 shadow-2xs hover:theme-bg-elevated/40";
   } else if (isBorderless) {
     variantClasses = "bg-transparent border-0 outline-none shadow-none";
   }

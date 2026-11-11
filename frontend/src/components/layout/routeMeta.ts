@@ -18,13 +18,15 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
   "/studies/daily-classroom": { title: "Lesson Management", category: "Daily Classroom" },
   "/studies/lesson-management": { title: "Lesson Management", category: "Daily Classroom" },
   "/studies/progress-management": { title: "Progress Management", category: "Daily Classroom" },
-  "/studies/daily-progress": { title: "Daily Progress", category: "Daily Classroom" },
-  "/studies/progress-reports": { title: "Progress Reports", category: "Daily Classroom" },
-  "/studies/progress-reports/records": { title: "Progress Reports", category: "Daily Classroom" },
-  "/studies/progress-reports/by-student": { title: "Progress Reports", category: "Daily Classroom" },
-  "/studies/progress-assessments": { title: "Progress Reports", category: "Daily Classroom" },
-  "/studies/progress-analytics": { title: "Progress Analytics", category: "Daily Classroom" },
-  "/progress-analytics": { title: "Progress Analytics", category: "Daily Classroom" },
+  "/studies/daily-progress": { title: "Daily Progress", subCategory: "Progress Management", category: "Daily Classroom" },
+  "/studies/daily-progress/quran": { title: "Daily Progress", subCategory: "Progress Management", category: "Daily Classroom" },
+  "/studies/daily-progress/book": { title: "Daily Progress", subCategory: "Progress Management", category: "Daily Classroom" },
+  "/studies/progress-reports": { title: "Progress Reports", subCategory: "Progress Management", category: "Daily Classroom" },
+  "/studies/progress-reports/records": { title: "Progress Reports", subCategory: "Progress Management", category: "Daily Classroom" },
+  "/studies/progress-reports/by-student": { title: "Progress Reports", subCategory: "Progress Management", category: "Daily Classroom" },
+  "/studies/progress-assessments": { title: "Progress Reports", subCategory: "Progress Management", category: "Daily Classroom" },
+  "/studies/progress-analytics": { title: "Progress Analytics", subCategory: "Progress Management", category: "Daily Classroom" },
+  "/progress-analytics": { title: "Progress Analytics", subCategory: "Progress Management", category: "Daily Classroom" },
   "/studies/lesson-assessments": { title: "Lesson Assessments", category: "Daily Classroom" },
   "/studies/daily-lessons": { title: "Daily Lessons", category: "Daily Classroom" },
   "/studies/lesson-analytics": { title: "Lesson Analytics", category: "Daily Classroom" },
@@ -32,8 +34,12 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
   "/studies/recitations": { title: "Lesson Assessments", category: "Daily Classroom" },
   "/studies/homework": { title: "Daily Homework", category: "Daily Classroom" },
   "/progress-management": { title: "Progress Management", category: "Daily Classroom" },
-  "/daily-progress": { title: "Daily Progress", category: "Daily Classroom" },
-  "/progress-reports": { title: "Progress Reports", category: "Daily Classroom" },
+  "/daily-progress": { title: "Daily Progress", subCategory: "Progress Management", category: "Daily Classroom" },
+  "/daily-progress/quran": { title: "Daily Progress", subCategory: "Progress Management", category: "Daily Classroom" },
+  "/daily-progress/book": { title: "Daily Progress", subCategory: "Progress Management", category: "Daily Classroom" },
+  "/progress-reports": { title: "Progress Reports", subCategory: "Progress Management", category: "Daily Classroom" },
+  "/progress-reports/records": { title: "Progress Reports", subCategory: "Progress Management", category: "Daily Classroom" },
+  "/progress-reports/by-student": { title: "Progress Reports", subCategory: "Progress Management", category: "Daily Classroom" },
   "/daily-lessons": { title: "Daily Lessons", category: "Daily Classroom" },
   "/recitations": { title: "Daily Assessment", category: "Daily Classroom" },
   "/homework-tasks": { title: "Daily Homework", category: "Daily Classroom" },
@@ -153,8 +159,8 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
  * Resolves breadcrumbs and category title based on URL pathname & query params
  */
 export function resolveRouteMeta(pathname: string, search: string = ""): RouteMeta {
-  const currentPath = pathname;
-  let meta = ROUTE_TITLE_MAP[currentPath];
+  const currentPath = pathname.length > 1 ? pathname.replace(/\/+$/, "").toLowerCase() : pathname;
+  let meta = ROUTE_TITLE_MAP[pathname] || ROUTE_TITLE_MAP[currentPath];
 
   if (
     currentPath === "/preferences" ||

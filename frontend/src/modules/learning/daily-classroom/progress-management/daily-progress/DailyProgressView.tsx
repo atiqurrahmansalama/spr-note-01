@@ -10,6 +10,7 @@ const loadDocLabModal = () => import("@/components/print/DocLabQuickReportModal"
 const DocLabQuickReportModal = lazy(loadDocLabModal);
 import { PageContainer } from "@/components/layout";
 import { useToast } from "@/context/ToastContext";
+import { useTenant } from "@/context/TenantContext";
 import { useFont } from "@/context/useFont";
 import { useUndoRedo } from "@/context/useUndoRedo";
 import { useFeatureControl } from "@/context/FeatureControlContext";
@@ -56,8 +57,39 @@ export default function DailyProgressView({
   className = "",
 }: DailyProgressViewProps) {
   const { showToast } = useToast();
+  const { activeTenantId } = useTenant();
   const { activeFont, activeFontSize } = useFont();
   const { isFeatureEnabled, loading: featureLoading } = useFeatureControl();
+
+  const filterStorageKey = `spr_daily_progress_filters_expanded_${activeTenantId || 'default'}`;
+
+  const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(filterStorageKey);
+      if (saved !== null) {
+        return saved === 'true';
+      }
+    } catch {}
+    return false; // Default: hidden/collapsed per user requirement
+  });
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(filterStorageKey);
+      if (saved !== null) {
+        setIsFilterExpanded(saved === 'true');
+      } else {
+        setIsFilterExpanded(false);
+      }
+    } catch {}
+  }, [filterStorageKey]);
+
+  const handleToggleFilterExpanded = useCallback((nextExpanded: boolean) => {
+    setIsFilterExpanded(nextExpanded);
+    try {
+      localStorage.setItem(filterStorageKey, String(nextExpanded));
+    } catch {}
+  }, [filterStorageKey]);
 
   const isQuranAllowed = isFeatureEnabled("progress_mode_quran");
   const isBookAllowed = isFeatureEnabled("progress_mode_book");
@@ -485,7 +517,10 @@ export default function DailyProgressView({
       <DailyClassroomFilterControls
         showCardWrapper={true}
         collapsible={true}
-        defaultExpanded={true}
+        defaultExpanded={false}
+        expanded={isFilterExpanded}
+        onToggleExpanded={handleToggleFilterExpanded}
+        storageKey={filterStorageKey}
         filterProps={filterProps ? {
           ...filterProps,
           selectedDepartmentId,
@@ -497,7 +532,10 @@ export default function DailyProgressView({
           selectedSectionId,
           onSectionChange: handleSectionChange,
           sectionSelectOptions,
-          defaultExpanded: true,
+          defaultExpanded: false,
+          expanded: isFilterExpanded,
+          onToggleExpanded: handleToggleFilterExpanded,
+          storageKey: filterStorageKey,
         } : undefined}
         showDate={sectionConfig.headerDate?.enabled !== false}
         dateLabel="Date"
