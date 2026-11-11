@@ -396,7 +396,7 @@ export const PublicStaffOnboardingView: React.FC = () => {
             </div>
             <div className="flex justify-between items-center gap-3">
               <span className="theme-text-secondary">
-                {tp('joiningDate', 'Joining Date')}:
+                {tp('joiningDate', 'JOINING DATE')}:
               </span>
               <span className="font-bold theme-text-primary text-end">
                 {formattedJoiningDate}

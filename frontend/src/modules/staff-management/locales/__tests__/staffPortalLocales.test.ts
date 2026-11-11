@@ -19,6 +19,7 @@ import {
   splitCandidateFullName,
   buildCandidateInitialData,
   buildInitialStaffPayload,
+  normalizeStaffDate,
 } from "../../onboarding/utils/candidateIdentity";
 import {
   isValidEmailAddress,
@@ -170,6 +171,27 @@ assert.strictEqual(withToken.token, "stf_abc123");
 assert.strictEqual(withToken.staff_type, "ADMIN");
 assert.strictEqual(withToken.designation, "Office Manager");
 assert.strictEqual(withToken.rank_order, 2);
+
+// 6. Date normalization & multilingual name_i18n payload tests (prevents DRF dob="" format error)
+assert.strictEqual(normalizeStaffDate(""), null);
+assert.strictEqual(normalizeStaffDate("   "), null);
+assert.strictEqual(normalizeStaffDate(undefined), null);
+assert.strictEqual(normalizeStaffDate(null), null);
+assert.strictEqual(normalizeStaffDate("2026-11-12"), "2026-11-12");
+assert.strictEqual(normalizeStaffDate("12/11/2026"), "2026-11-12");
+assert.strictEqual(normalizeStaffDate("5-3-1995"), "1995-03-05");
+
+const multiLangDraft = buildInitialStaffPayload({
+  name: { en: "Ustad Bilal", bn: "উস্তাদ বিলাল", ar: "أستاذ بلال" },
+  email: "bilal@madrasa.edu",
+});
+assert.strictEqual(multiLangDraft.name, "Ustad Bilal");
+assert.strictEqual(multiLangDraft.bangla_name, "উস্তাদ বিলাল");
+assert.deepStrictEqual(multiLangDraft.name_i18n, {
+  en: "Ustad Bilal",
+  bn: "উস্তাদ বিলাল",
+  ar: "أستاذ بلال",
+});
 
 console.log("staffPortalLocales.test.ts passed!");
 

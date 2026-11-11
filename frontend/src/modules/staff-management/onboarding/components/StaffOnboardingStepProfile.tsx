@@ -3,6 +3,7 @@ import CustomInput from '@/components/ui/CustomInput';
 import CustomSelect from '@/components/ui/CustomSelect';
 import ReusableCalendar from '@/components/common/ReusableCalendar';
 import { CameraIcon, CloseIcon } from '@/components/ui/Icons';
+import { hasAnyLanguageContent } from '@/i18n/localizedEntity';
 import { useStaffTranslation } from '../../locales';
 import type { StaffOnboardingPayload } from '../../types';
 
@@ -52,12 +53,18 @@ export const StaffOnboardingStepProfile: React.FC<StaffOnboardingStepProfileProp
   );
 
   // Core shared fields reused identically between Full Wizard and Quick Staff Onboarding
+  const nameFieldValue =
+    formData.name_i18n && hasAnyLanguageContent(formData.name_i18n)
+      ? formData.name_i18n
+      : formData.name;
+
   const nameField = (
     <CustomInput
-      label={`${t('fullNameEn', 'Full Name (English)')}`}
+      label={t('fullName', 'Full Name')}
       name="name"
+      multiLanguage={true}
       placeholder={t('fullNameEnPlaceholder', 'e.g. Mufti Muhammad Abdullah')}
-      value={formData.name}
+      value={nameFieldValue}
       onChange={(val) => onChange('name', val)}
       error={errors.name}
       required
@@ -79,20 +86,21 @@ export const StaffOnboardingStepProfile: React.FC<StaffOnboardingStepProfileProp
 
   const emailField = (
     <CustomInput
-      label={t('emailAddressOptional', 'Email Address (Optional)')}
+      label={t('emailAddress', 'Email Address')}
       name="email"
       type="email"
       placeholder={t('emailAddressPlaceholder', 'teacher@institution.edu')}
       value={formData.email || ''}
       onChange={(val) => onChange('email', val)}
       error={errors.email}
+      required
     />
   );
 
   // Compact mode for Quick Staff Onboarding (single responsive 3-column grid, zero duplicate inputs)
   if (mode === 'quick') {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 border-0 animate-fade-in">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start border-0 animate-fade-in">
         <div className="sm:col-span-2 lg:col-span-1">{nameField}</div>
         {phoneField}
         {emailField}
@@ -107,15 +115,7 @@ export const StaffOnboardingStepProfile: React.FC<StaffOnboardingStepProfileProp
         <div className="w-full space-y-4 max-w-lg border-0">
           {nameField}
 
-          <CustomInput
-            label={t('fullNameBn', 'Full Name (Bangla / Arabic)')}
-            name="bangla_name"
-            placeholder={t('fullNameBnPlaceholder', 'Local / regional script name (optional)')}
-            value={formData.bangla_name || ''}
-            onChange={(val) => onChange('bangla_name', val)}
-          />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start border-0">
             {phoneField}
             {emailField}
           </div>

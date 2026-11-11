@@ -50,8 +50,7 @@ export const en = {
   directOnboardingTab: 'Full Onboarding Wizard',
   onlineQrTab: 'Online QR & Link Onboarding',
   quickOnboardingTitle: 'Quick Staff Onboarding',
-  quickOnboardingSubtitle: 'Fast-track registration reusing core identity & institutional role fields',
-  switchToFullWizard: 'Switch to Full Wizard',
+  quickOnboardingSubtitle: 'Fast-track registration with core identity, contact, and institutional rank fields',
   quickSubmitOnboarding: 'Complete Quick Onboarding',
   viewStaffRoster: 'View Staff Roster',
   generateInviteQr: 'Generate Invite QR',
@@ -99,6 +98,7 @@ export const en = {
   cancel: 'Cancel',
 
   // Forms & Placeholders
+  fullName: 'Full Name',
   fullNameEn: 'Full Name (English)',
   fullNameEnPlaceholder: 'e.g. Mufti Muhammad Abdullah',
   fullNameBn: 'Full Name (Bangla / Arabic)',
@@ -144,6 +144,7 @@ export const en = {
   validationNameMin: 'Name must be at least 2 characters',
   validationPhoneRequired: 'Primary mobile phone number is required',
   validationPhoneInvalid: 'Invalid mobile number (e.g. 017XXXXXXXX)',
+  validationEmailRequired: 'Email address is required',
   validationEmailInvalid: 'Invalid email address format',
   validationNidInvalid: 'NID must be 10, 13, or 17 digits',
   validationEmergencyPhone: 'Invalid emergency phone number',

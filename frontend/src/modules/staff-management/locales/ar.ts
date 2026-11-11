@@ -50,8 +50,7 @@ export const ar = {
   directOnboardingTab: 'معالج الانضمام الكامل',
   onlineQrTab: 'التوظيف عبر الرابط ورمز QR',
   quickOnboardingTitle: 'انضمام الكادر السريع',
-  quickOnboardingSubtitle: 'تسجيل سريع يعيد استخدام حقول الهوية الأساسية والمسمى الوظيفي',
-  switchToFullWizard: 'التبديل إلى المعالج الكامل',
+  quickOnboardingSubtitle: 'تسجيل سريع يشمل بيانات الهوية والتواصل والمسمى الوظيفي',
   quickSubmitOnboarding: 'إتمام التسجيل السريع',
   viewStaffRoster: 'عرض سجل الموظفين',
   generateInviteQr: 'توليد رمز الدعوة',
@@ -99,6 +98,7 @@ export const ar = {
   cancel: 'إلغاء',
 
   // Forms & Placeholders
+  fullName: 'الاسم الكامل',
   fullNameEn: 'الاسم الكامل (بالإنجليزية)',
   fullNameEnPlaceholder: 'مثال: Mufti Muhammad Abdullah',
   fullNameBn: 'الاسم باللغة المحلية / العربية',
@@ -144,6 +144,7 @@ export const ar = {
   validationNameMin: 'يجب أن يتكون الاسم من حرفين على الأقل',
   validationPhoneRequired: 'رقم الهاتف الأساسي مطلوب',
   validationPhoneInvalid: 'رقم هاتف غير صالح',
+  validationEmailRequired: 'البريد الإلكتروني مطلوب',
   validationEmailInvalid: 'صيغة البريد الإلكتروني غير صحيحة',
   validationNidInvalid: 'يجب أن يتكون رقم الهوية من ١٠ أو ١٣ أو ١٧ رقماً',
   validationEmergencyPhone: 'رقم هاتف الطوارئ غير صالح',

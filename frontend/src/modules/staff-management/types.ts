@@ -2,6 +2,7 @@
  * SPR Note — Staff Management Module Domain Types
  */
 
+import type { LocalizedValue } from '@/i18n/localizedEntity';
 import type {
   StaffMember,
   StaffMetrics,
@@ -42,7 +43,8 @@ export interface StaffOnboardingPayload {
   name: string;
   name_en?: string;
   bangla_name?: string;
-  email?: string;
+  name_i18n?: LocalizedValue;
+  email: string;
   phone_number: string;
   gender: 'MALE' | 'FEMALE' | 'OTHER';
   dob?: string;

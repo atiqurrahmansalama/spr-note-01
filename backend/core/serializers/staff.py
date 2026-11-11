@@ -605,13 +605,25 @@ class StaffOnboardingApplicationSerializer(serializers.Serializer):
     token = serializers.CharField(required=False, allow_blank=True, default='')
 
     # Core User Identity
-    name = serializers.CharField(max_length=150)
+    name = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
+    name_i18n = serializers.JSONField(required=False, default=dict)
     bangla_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
-    email = serializers.EmailField(required=False, allow_blank=True, default='')
+    email = serializers.EmailField(
+        required=True,
+        allow_blank=False,
+        error_messages={
+            'required': 'Email address is required.',
+            'blank': 'Email address is required.',
+        },
+    )
     phone_number = serializers.CharField(max_length=20)
     user_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     gender = serializers.CharField(max_length=20, required=False, default='MALE')
-    dob = serializers.DateField(required=False, allow_null=True)
+    dob = serializers.DateField(
+        required=False,
+        allow_null=True,
+        input_formats=['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', 'iso-8601'],
+    )
     nid_no = serializers.CharField(max_length=64, required=False, allow_blank=True, default='')
     blood_group = serializers.CharField(max_length=10, required=False, allow_blank=True, default='')
     emergency_contact = serializers.CharField(max_length=32, required=False, allow_blank=True, default='')
@@ -623,7 +635,12 @@ class StaffOnboardingApplicationSerializer(serializers.Serializer):
     rank_order = serializers.IntegerField(default=99)
     department = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     employment_status = serializers.ChoiceField(choices=StaffProfile.EMPLOYMENT_STATUS_CHOICES, default='PERMANENT')
-    joining_date = serializers.DateField(required=False, default=timezone.localdate)
+    joining_date = serializers.DateField(
+        required=False,
+        allow_null=True,
+        default=timezone.localdate,
+        input_formats=['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', 'iso-8601'],
+    )
 
     # Academic & Duty
     highest_degree = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
@@ -648,4 +665,48 @@ class StaffOnboardingApplicationSerializer(serializers.Serializer):
     bank_name = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
     bank_account_no = serializers.CharField(max_length=64, required=False, allow_blank=True, default='')
     mobile_banking_no = serializers.CharField(max_length=32, required=False, allow_blank=True, default='')
+
+    def to_internal_value(self, data):
+        # Coerce empty string date/nullable values to None so optional blank fields (e.g. dob="")
+        # never trigger DRF "Date has wrong format" errors.
+        if hasattr(data, 'dict'):
+            mutable = data.dict()
+        elif isinstance(data, dict):
+            mutable = dict(data)
+        else:
+            return super().to_internal_value(data)
+
+        for nullable_field in ('dob', 'joining_date', 'department', 'user_id'):
+            val = mutable.get(nullable_field)
+            if isinstance(val, str) and not val.strip():
+                mutable[nullable_field] = None
+
+        if isinstance(mutable.get('email'), str):
+            mutable['email'] = mutable['email'].strip()
+
+        return super().to_internal_value(mutable)
+
+    def validate(self, attrs):
+        raw_i18n = attrs.get('name_i18n')
+        i18n_map = raw_i18n if isinstance(raw_i18n, dict) else {}
+
+        primary_name = str(attrs.get('name') or '').strip()
+        if not primary_name and i18n_map:
+            primary_name = str(
+                i18n_map.get('en')
+                or next((v for v in i18n_map.values() if isinstance(v, str) and v.strip()), '')
+            ).strip()
+
+        if len(primary_name) < 2:
+            raise serializers.ValidationError({'name': 'Candidate full name must be at least 2 characters.'})
+
+        bn_name = str(attrs.get('bangla_name') or i18n_map.get('bn') or '').strip()
+        attrs['name'] = primary_name
+        attrs['bangla_name'] = bn_name
+        attrs['name_i18n'] = {
+            **{str(k): str(v).strip() for k, v in i18n_map.items() if isinstance(v, str) and v.strip()},
+            **({'en': primary_name} if primary_name and not i18n_map.get('en') else {}),
+            **({'bn': bn_name} if bn_name else {}),
+        }
+        return attrs
 

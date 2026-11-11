@@ -50,8 +50,7 @@ export const bn = {
   directOnboardingTab: 'পূর্ণাঙ্গ অনবোর্ডিং উইজার্ড',
   onlineQrTab: 'অনলাইন কিউআর ও লিংক অনবোর্ডিং',
   quickOnboardingTitle: 'দ্রুত স্টাফ অনবোর্ডিং',
-  quickOnboardingSubtitle: 'মূল পরিচয় ও প্রাতিষ্ঠানিক পদবির তথ্য দিয়ে দ্রুত নিয়োগ সম্পন্ন করুন',
-  switchToFullWizard: 'পূর্ণাঙ্গ উইজার্ডে যান',
+  quickOnboardingSubtitle: 'মূল পরিচয়, যোগাযোগ ও প্রাতিষ্ঠানিক পদবির তথ্য দিয়ে দ্রুত নিয়োগ সম্পন্ন করুন',
   quickSubmitOnboarding: 'দ্রুত নিবন্ধন সম্পন্ন করুন',
   viewStaffRoster: 'স্টাফ তালিকা দেখুন',
   generateInviteQr: 'আমন্ত্রণ কিউআর তৈরি করুন',
@@ -99,6 +98,7 @@ export const bn = {
   cancel: 'বাতিল',
 
   // Forms & Placeholders
+  fullName: 'পূর্ণ নাম',
   fullNameEn: 'পূর্ণ নাম (ইংরেজি)',
   fullNameEnPlaceholder: 'যেমন: মুফতী মুহাম্মদ আব্দুল্লাহ (ইংরেজিতে)',
   fullNameBn: 'পূর্ণ নাম (বাংলা / আরবি)',
@@ -144,6 +144,7 @@ export const bn = {
   validationNameMin: 'নাম কমপক্ষে ২ অক্ষরের হতে হবে',
   validationPhoneRequired: 'প্রাথমিক মোবাইল নম্বর দেওয়া আবশ্যক',
   validationPhoneInvalid: 'সঠিক মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)',
+  validationEmailRequired: 'ইমেইল ঠিকানা দেওয়া আবশ্যক',
   validationEmailInvalid: 'সঠিক ইমেইল ঠিকানা দিন',
   validationNidInvalid: 'এনআইডি নম্বর অবশ্যই ১০, ১৩ বা ১৭ সংখ্যার হতে হবে',
   validationEmergencyPhone: 'সঠিক জরুরি মোবাইল নম্বর দিন',

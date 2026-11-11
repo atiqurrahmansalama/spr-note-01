@@ -636,29 +636,38 @@ class StaffOnboardingApplyView(APIView):
             user = None
             if data.get('user_id'):
                 user = User.objects.filter(id=data['user_id']).first()
-            elif request.user.is_authenticated:
+            elif token_obj and request.user.is_authenticated:
                 user = request.user
             else:
                 email = data.get('email', '').strip()
-                phone = data.get('phone_number', '').strip()
-                username = phone or email or f"staff_{uuid.uuid4().hex[:8]}"
+                phone = data.get('phone_number', '').strip() or f"staff_{uuid.uuid4().hex[:8]}"
 
-                user = User.objects.filter(Q(phone_number=phone) | (Q(email=email) & ~Q(email=''))).first()
+                user = User.objects.filter(
+                    Q(phone_number=phone) | (Q(email__iexact=email) & ~Q(email=''))
+                ).first()
                 if not user:
-                    user = User.objects.create(
-                        username=username,
-                        name=data.get('name', ''),
-                        email=email,
-                        phone_number=phone,
-                        gender=data.get('gender', 'MALE'),
-                        institution=institution,
-                        user_type='TEACHER' if data.get('staff_type') == 'TEACHING' else 'STAFF'
-                    )
-                    # Set temporary secure password
                     import secrets
                     temp_pwd = secrets.token_urlsafe(8)
-                    user.set_password(temp_pwd)
-                    user.save()
+                    full_name = str(data.get('name', '') or '').strip()
+                    name_parts = full_name.split(None, 1) if full_name else []
+                    user = User.objects.create_user(
+                        phone_number=phone,
+                        password=temp_pwd,
+                        name=full_name,
+                        first_name=name_parts[0] if len(name_parts) > 0 else '',
+                        last_name=name_parts[1] if len(name_parts) > 1 else '',
+                        name_bn=data.get('bangla_name', '') or None,
+                        email=email,
+                        institution=institution,
+                        user_type='TEACHER' if data.get('staff_type') == 'TEACHING' else 'STAFF',
+                        is_staff=True,
+                    )
+
+            if user and StaffProfile.objects.filter(user=user).exists():
+                return Response(
+                    {"error": "A staff profile already exists for this phone number or email address."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             staff_type = data.get('staff_type') or (token_obj.staff_type if token_obj else 'TEACHING')
 
@@ -666,6 +675,7 @@ class StaffOnboardingApplyView(APIView):
             if user:
                 user_update_fields = []
                 submitted_name = (data.get('name') or '').strip()
+                submitted_name_bn = (data.get('bangla_name') or '').strip()
                 submitted_phone = (data.get('phone_number') or '').strip()
                 submitted_email = (data.get('email') or '').strip()
                 submitted_photo = (data.get('photo_url') or '').strip()
@@ -684,6 +694,10 @@ class StaffOnboardingApplyView(APIView):
                         if len(parts) > 1 and not (user.last_name or '').strip():
                             user.last_name = parts[1]
                             user_update_fields.append('last_name')
+
+                if submitted_name_bn and not (user.name_bn or '').strip():
+                    user.name_bn = submitted_name_bn
+                    user_update_fields.append('name_bn')
 
                 current_phone = (user.phone_number or '').strip()
                 if submitted_phone and (not current_phone or current_phone.startswith('g_') or current_phone.startswith('user_')):
@@ -782,6 +796,8 @@ class StaffOnboardingApplyView(APIView):
                     "id": str(staff_profile.id),
                     "employee_id": emp_id,
                     "name": data.get('name', ''),
+                    "bangla_name": data.get('bangla_name', ''),
+                    "name_i18n": data.get('name_i18n', {}),
                     "designation": staff_profile.designation,
                     "rank_order": staff_profile.rank_order,
                     "staff_type": staff_profile.staff_type,

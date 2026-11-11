@@ -5,8 +5,13 @@ import { staffRanksStore } from '@/utils/localStore';
 import { validateBDPhone, validateEmail, validateNID } from '@/utils/inputValidators';
 import { compressImageFile } from '@/utils/imageCompressor';
 import { submitStaffOnboarding } from '@/api/staffOnboarding';
+import {
+  getLocalizedValue,
+  hasAnyLanguageContent,
+  normalizeLocalizedValue,
+} from '@/i18n/localizedEntity';
 import { useStaffTranslation } from '../../locales';
-import { buildInitialStaffPayload } from '../utils/candidateIdentity';
+import { buildInitialStaffPayload, normalizeStaffDate } from '../utils/candidateIdentity';
 import type { StaffOnboardingPayload } from '../../types';
 
 export { buildInitialStaffPayload };
@@ -78,6 +83,10 @@ export function useStaffOnboardingForm({
       if (initialData.name && !prev.name) {
         next.name = initialData.name;
         next.name_en = prev.name_en || initialData.name;
+        next.name_i18n = {
+          ...(prev.name_i18n || {}),
+          en: prev.name_i18n?.en || initialData.name,
+        };
         changed = true;
       }
       if (initialData.email && !prev.email) {
@@ -117,9 +126,13 @@ export function useStaffOnboardingForm({
     (field: string, value: any): string => {
       let err = '';
       if (field === 'name') {
-        if (!value || !String(value).trim()) {
+        const resolved =
+          typeof value === 'object' && value !== null
+            ? getLocalizedValue(value, 'en')
+            : String(value || '');
+        if (!resolved || !resolved.trim()) {
           err = t('validationNameRequired', 'Candidate full name is required');
-        } else if (String(value).trim().length < 2) {
+        } else if (resolved.trim().length < 2) {
           err = t('validationNameMin', 'Name must be at least 2 characters');
         }
       } else if (field === 'phone_number') {
@@ -129,7 +142,9 @@ export function useStaffOnboardingForm({
           err = t('validationPhoneInvalid', 'Invalid mobile number (e.g. 017XXXXXXXX)');
         }
       } else if (field === 'email') {
-        if (value && String(value).trim() && !validateEmail(value)) {
+        if (!value || !String(value).trim()) {
+          err = t('validationEmailRequired', 'Email address is required');
+        } else if (!validateEmail(value)) {
           err = t('validationEmailInvalid', 'Invalid email address format');
         }
       } else if (field === 'nid_no') {
@@ -156,16 +171,37 @@ export function useStaffOnboardingForm({
 
   const handleChange = (field: keyof StaffOnboardingPayload, valOrEvent: any) => {
     const value =
-      typeof valOrEvent === 'object' && valOrEvent !== null && 'target' in valOrEvent
+      typeof valOrEvent === 'object' &&
+      valOrEvent !== null &&
+      'target' in valOrEvent &&
+      !(typeof valOrEvent.en === 'string' || typeof valOrEvent.bn === 'string' || typeof valOrEvent.ar === 'string' || typeof valOrEvent.ur === 'string')
         ? valOrEvent.target.value
         : valOrEvent;
+
+    if (field === 'name') {
+      const localizedMap = normalizeLocalizedValue(value);
+      const primaryName =
+        getLocalizedValue(localizedMap, 'en') ||
+        (typeof value === 'string' ? value : '') ||
+        '';
+      const bnName = typeof localizedMap.bn === 'string' ? localizedMap.bn : '';
+
+      setFormData((prev) => ({
+        ...prev,
+        name: primaryName,
+        name_en: primaryName,
+        bangla_name: bnName,
+        name_i18n: localizedMap,
+      }));
+
+      const fieldErr = validateField('name', hasAnyLanguageContent(localizedMap) ? localizedMap : primaryName);
+      setErrors((prev) => ({ ...prev, name: fieldErr }));
+      return;
+    }
 
     setFormData((prev) => ({
       ...prev,
       [field]: value,
-      ...(field === 'name' && (!prev.name_en || prev.name_en === prev.name)
-        ? { name_en: String(value || '') }
-        : {}),
     }));
 
     const fieldErr = validateField(field as string, value);
@@ -210,16 +246,17 @@ export function useStaffOnboardingForm({
       const newErrors: Record<string, string> = {};
 
       if (stepsToCheck.includes(1)) {
-        const nameErr = validateField('name', formData.name);
+        const nameErr = validateField(
+          'name',
+          formData.name_i18n && hasAnyLanguageContent(formData.name_i18n) ? formData.name_i18n : formData.name
+        );
         if (nameErr) newErrors.name = nameErr;
 
         const phoneErr = validateField('phone_number', formData.phone_number);
         if (phoneErr) newErrors.phone_number = phoneErr;
 
-        if (formData.email) {
-          const emailErr = validateField('email', formData.email);
-          if (emailErr) newErrors.email = emailErr;
-        }
+        const emailErr = validateField('email', formData.email);
+        if (emailErr) newErrors.email = emailErr;
       }
 
       if (stepsToCheck.includes(2)) {
@@ -257,8 +294,30 @@ export function useStaffOnboardingForm({
 
       setIsSubmitting(true);
       try {
+        const localizedMap = normalizeLocalizedValue(formData.name_i18n || formData.name);
+        const primaryName = (
+          getLocalizedValue(localizedMap, 'en') ||
+          formData.name ||
+          ''
+        ).trim();
+        const bnName = String(localizedMap.bn || formData.bangla_name || '').trim();
+
         const payload = {
           ...formData,
+          name: primaryName,
+          name_en: primaryName,
+          bangla_name: bnName,
+          name_i18n: {
+            ...localizedMap,
+            ...(primaryName && !localizedMap.en ? { en: primaryName } : {}),
+            ...(bnName ? { bn: bnName } : {}),
+          },
+          email: String(formData.email || '').trim(),
+          user_id: formData.user_id || null,
+          department: formData.department ? String(formData.department) : null,
+          dob: normalizeStaffDate(formData.dob),
+          joining_date:
+            normalizeStaffDate(formData.joining_date) || new Date().toISOString().split('T')[0],
           permanent_address: sameAsPresent ? formData.address : formData.permanent_address,
           permanent_division: sameAsPresent ? formData.division : formData.permanent_division,
           permanent_district: sameAsPresent ? formData.district : formData.permanent_district,

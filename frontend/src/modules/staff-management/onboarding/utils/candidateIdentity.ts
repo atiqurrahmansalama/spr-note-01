@@ -4,13 +4,42 @@
  * and unit tests — zero DOM or framework runtime dependencies.
  */
 
+export type StaffLocalizedNameMap = Partial<Record<'en' | 'bn' | 'ar' | 'ur', string>> & Record<string, string | undefined>;
+
 export interface CandidateInitialData {
   user_id?: string | number;
   name: string;
   name_en: string;
+  name_i18n?: StaffLocalizedNameMap;
   email: string;
   phone_number: string;
   photo_url: string;
+}
+
+/**
+ * Normalizes any date input (YYYY-MM-DD, DD/MM/YYYY, Date-parsable string, or blank)
+ * to strict YYYY-MM-DD for DRF DateField compatibility, returning null when blank.
+ */
+export function normalizeStaffDate(rawDate: unknown): string | null {
+  if (rawDate === null || rawDate === undefined) return null;
+  const trimmed = String(rawDate).trim();
+  if (!trimmed) return null;
+
+  const isoMatch = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2].padStart(2, '0')}-${isoMatch[3].padStart(2, '0')}`;
+  }
+
+  const dmyMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmyMatch) {
+    return `${dmyMatch[3]}-${dmyMatch[2].padStart(2, '0')}-${dmyMatch[1].padStart(2, '0')}`;
+  }
+
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().split('T')[0];
+  }
+  return null;
 }
 
 /**
@@ -85,12 +114,36 @@ export function buildInitialStaffPayload(
   initialData: Record<string, any> = {},
   tokenMeta: any = null
 ) {
+  const initialPrimaryName =
+    typeof initialData.name === 'object' && initialData.name !== null
+      ? String(
+          initialData.name.en ||
+            Object.values(initialData.name).find((v) => typeof v === 'string' && v.trim()) ||
+            ''
+        )
+      : String(initialData.name || '');
+
+  const rawI18n =
+    initialData.name_i18n && typeof initialData.name_i18n === 'object'
+      ? initialData.name_i18n
+      : typeof initialData.name === 'object' && initialData.name !== null
+        ? initialData.name
+        : {};
+
+  const initialBanglaName = String(initialData.bangla_name || rawI18n.bn || '');
+  const resolvedI18n: StaffLocalizedNameMap = {
+    ...rawI18n,
+    ...(initialPrimaryName && !rawI18n.en ? { en: initialPrimaryName } : {}),
+    ...(initialBanglaName && !rawI18n.bn ? { bn: initialBanglaName } : {}),
+  };
+
   return {
     token: tokenMeta?.token || initialData.token || "",
     user_id: initialData.user_id || "",
-    name: initialData.name || "",
-    name_en: initialData.name_en || initialData.name || "",
-    bangla_name: initialData.bangla_name || "",
+    name: initialPrimaryName,
+    name_en: initialData.name_en || initialPrimaryName,
+    bangla_name: initialBanglaName,
+    name_i18n: resolvedI18n,
     email: initialData.email || "",
     phone_number: initialData.phone_number || "",
     gender: initialData.gender || "MALE",

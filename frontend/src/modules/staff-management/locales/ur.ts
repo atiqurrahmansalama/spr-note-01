@@ -50,8 +50,7 @@ export const ur = {
   directOnboardingTab: 'مکمل اندراج وزرڈ',
   onlineQrTab: 'آن لائن کیو آر اور لنک اندراج',
   quickOnboardingTitle: 'فوری عملہ اندراج',
-  quickOnboardingSubtitle: 'بنیادی شناخت اور عہدے کے شعبوں کے ساتھ تیز رفتار اندراج',
-  switchToFullWizard: 'مکمل وزرڈ پر جائیں',
+  quickOnboardingSubtitle: 'بنیادی شناخت، رابطہ اور عہدے کی تفصیلات کے ساتھ تیز رفتار اندراج',
   quickSubmitOnboarding: 'فوری اندراج مکمل کریں',
   viewStaffRoster: 'عملے کا روسٹر دیکھیں',
   generateInviteQr: 'دعوتی کیو آر بنائیں',
@@ -99,6 +98,7 @@ export const ur = {
   cancel: 'منسوخ کریں',
 
   // Forms & Placeholders
+  fullName: 'مکمل نام',
   fullNameEn: 'مکمل نام (انگریزی)',
   fullNameEnPlaceholder: 'مثلاً Mufti Muhammad Abdullah',
   fullNameBn: 'مکمل نام (مقامی / عربی)',
@@ -144,6 +144,7 @@ export const ur = {
   validationNameMin: 'نام کم از کم 2 حروف کا ہونا چاہیے',
   validationPhoneRequired: 'بنیادی موبائل نمبر درکار ہے',
   validationPhoneInvalid: 'درست موبائل نمبر درج کریں',
+  validationEmailRequired: 'ای میل پتہ درکار ہے',
   validationEmailInvalid: 'ای میل پتے کا فارمیٹ درست نہیں ہے',
   validationNidInvalid: 'شناختی کارڈ نمبر 10، 13 یا 17 ہندسوں کا ہونا چاہیے',
   validationEmergencyPhone: 'ہنگامی رابطہ نمبر درست نہیں ہے',

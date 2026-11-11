@@ -549,4 +549,60 @@ class DashboardGovernanceAndRoleSyncTestCase(TestCase):
         self.assertEqual(dup_res.status_code, status.HTTP_200_OK)
         self.assertEqual(dup_res.data["name"], "Sabqi")
 
+    def test_quick_staff_onboarding_accepts_blank_dob_requires_email_and_saves_multilingual_name(self):
+        self.client.force_authenticate(user=self.second_admin)
+
+        # 1. Missing email must be rejected cleanly with 400
+        missing_email_res = self.client.post(
+            "/api/v1/staff-onboarding/apply/",
+            {
+                "name": "Hafez Tariq",
+                "phone_number": "01788887777",
+                "email": "",
+                "dob": "",
+                "staff_type": "TEACHING",
+                "designation": "Senior Qari",
+                "joining_date": "2026-11-12",
+            },
+            format="json",
+        )
+        self.assertEqual(missing_email_res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", missing_email_res.data)
+
+        # 2. Quick onboarding with dob="" (blank), multilingual name_i18n, and valid email succeeds cleanly
+        quick_res = self.client.post(
+            "/api/v1/staff-onboarding/apply/",
+            {
+                "name": "Maulana Tareq",
+                "name_i18n": {
+                    "en": "Maulana Tareq",
+                    "bn": "মাওলানা তারেক",
+                    "ar": "مولانا طارق",
+                    "ur": "مولانا طارق",
+                },
+                "phone_number": "01788887777",
+                "email": "tariq.ustad@example.com",
+                "dob": "",
+                "staff_type": "TEACHING",
+                "designation": "Senior Qari",
+                "rank_order": 3,
+                "joining_date": "12/11/2026",
+            },
+            format="json",
+        )
+        self.assertEqual(quick_res.status_code, status.HTTP_201_CREATED, quick_res.data)
+        self.assertEqual(quick_res.data["staff"]["name"], "Maulana Tareq")
+        self.assertEqual(quick_res.data["staff"]["bangla_name"], "মাওলানা তারেক")
+        self.assertEqual(quick_res.data["staff"]["joining_date"], "2026-11-12")
+
+        created_user = User.objects.get(phone_number="01788887777")
+        self.assertEqual(created_user.name, "Maulana Tareq")
+        self.assertEqual(created_user.name_bn, "মাওলানা তারেক")
+        self.assertNotEqual(created_user.pk, self.second_admin.pk)
+        self.assertTrue(
+            StaffProfile.objects.filter(
+                user=created_user, institution=self.inst_alpha, designation="Senior Qari"
+            ).exists()
+        )
+
 

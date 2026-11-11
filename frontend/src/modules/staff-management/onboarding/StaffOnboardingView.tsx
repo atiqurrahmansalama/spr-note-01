@@ -231,7 +231,6 @@ export const StaffOnboardingView: React.FC = () => {
               onFormDataChange={setSharedDraft}
               onCompleted={handleOnboardingCompleted}
               onCancel={() => navigate('/staff/roster')}
-              onSwitchToFullWizard={() => handleTabChange('direct')}
             />
           )}
         </div>

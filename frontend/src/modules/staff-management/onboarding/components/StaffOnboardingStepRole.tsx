@@ -12,6 +12,7 @@ interface StaffOnboardingStepRoleProps {
   errors: Record<string, string>;
   onChange: (field: keyof StaffOnboardingPayload, val: any) => void;
   showIntroBanner?: boolean;
+  mode?: 'full' | 'quick';
 }
 
 export const StaffOnboardingStepRole: React.FC<StaffOnboardingStepRoleProps> = ({
@@ -20,6 +21,7 @@ export const StaffOnboardingStepRole: React.FC<StaffOnboardingStepRoleProps> = (
   errors,
   onChange,
   showIntroBanner = true,
+  mode = 'full',
 }) => {
   const { t, formatNumber } = useStaffTranslation();
 
@@ -54,6 +56,51 @@ export const StaffOnboardingStepRole: React.FC<StaffOnboardingStepRoleProps> = (
     }
   };
 
+  const staffTypeField = (
+    <CustomSelect
+      label={`${t('staffType', 'Staff Category')} *`}
+      options={STAFF_CATEGORY_OPTIONS}
+      value={formData.staff_type}
+      onChange={(val) => onChange('staff_type', val)}
+    />
+  );
+
+  const designationField = (
+    <CustomSelect
+      label={`${t('designation', 'Designation / Official Rank')} *`}
+      options={rankOptions}
+      value={formData.designation}
+      onChange={(val) => handleRankSelect(val)}
+      placeholder={t('selectInstitutionalRank', 'Select Institutional Rank')}
+      searchable={true}
+      error={errors.designation}
+    />
+  );
+
+  const joiningDateField = (
+    <div>
+      <label className="text-xs font-bold theme-text-secondary block mb-1.5 text-start">
+        {t('joiningDate', 'JOINING DATE')}
+      </label>
+      <ReusableCalendar
+        selectedDate={formData.joining_date}
+        onSelectDate={(val: string) => onChange('joining_date', val)}
+        placeholder={t('joiningDatePlaceholder', 'Official joining date')}
+      />
+    </div>
+  );
+
+  // Compact Quick Onboarding mode: strictly essential category, rank, and joining date without Department or Employment Status
+  if (mode === 'quick') {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start animate-fade-in border-0">
+        {staffTypeField}
+        {designationField}
+        <div className="sm:col-span-2 lg:col-span-1">{joiningDateField}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in border-0">
       {showIntroBanner && (
@@ -71,22 +118,8 @@ export const StaffOnboardingStepRole: React.FC<StaffOnboardingStepRoleProps> = (
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-0">
-        <CustomSelect
-          label={`${t('staffType', 'Staff Category')} *`}
-          options={STAFF_CATEGORY_OPTIONS}
-          value={formData.staff_type}
-          onChange={(val) => onChange('staff_type', val)}
-        />
-
-        <CustomSelect
-          label={`${t('designation', 'Designation / Official Rank')} *`}
-          options={rankOptions}
-          value={formData.designation}
-          onChange={(val) => handleRankSelect(val)}
-          placeholder={t('selectInstitutionalRank', 'Select Institutional Rank')}
-          searchable={true}
-          error={errors.designation}
-        />
+        {staffTypeField}
+        {designationField}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 border-0">
@@ -109,14 +142,7 @@ export const StaffOnboardingStepRole: React.FC<StaffOnboardingStepRoleProps> = (
         />
 
         <div className="sm:col-span-2 lg:col-span-1">
-          <label className="text-xs font-bold theme-text-secondary block mb-1.5 text-start">
-            {t('joiningDate', 'Joining Date')}
-          </label>
-          <ReusableCalendar
-            selectedDate={formData.joining_date}
-            onSelectDate={(val: string) => onChange('joining_date', val)}
-            placeholder={t('joiningDatePlaceholder', 'Official joining date')}
-          />
+          {joiningDateField}
         </div>
       </div>
     </div>
