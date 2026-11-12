@@ -69,12 +69,17 @@ const drawerRegistry = new Map();
 /**
  * Helper to update URL search parameters without triggering a hard page refresh
  */
-function updateUrlParams(updater) {
+function updateUrlParams(updater, notifyRouter = false) {
   if (typeof window === 'undefined') return;
   try {
-    const url = new URL(window.location.href);
+    const prevHref = window.location.href;
+    const url = new URL(prevHref);
     updater(url.searchParams);
-    window.history.replaceState({}, '', url.toString());
+    const nextHref = url.toString();
+    window.history.replaceState(window.history.state || {}, '', nextHref);
+    if (notifyRouter && nextHref !== prevHref) {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+    }
   } catch (e) {
     console.warn('Failed to update URL parameters:', e);
   }
@@ -137,31 +142,51 @@ export function RightSidebarProvider({ children }) {
   configRef.current = rightSidebarConfig;
 
   const closeRightSidebar = useCallback((skipUrlClean = false) => {
+    const prevConfig = configRef.current;
+    configRef.current = null;
+    setRightSidebarConfig(null);
+
     if (!skipUrlClean) {
+      updateUrlParams((params) => {
+        const drawerKeysToRemove = [
+          'drawer',
+          'drawerId',
+          'mode',
+          'tokenId',
+          'id',
+          'date',
+          'eventId',
+          'targetId',
+          'classId',
+          'type',
+          'studentId',
+          'bookId',
+          'bookName',
+          'subjectName',
+          'lessonTitle',
+          'startUnit',
+          'endUnit',
+          'slotId',
+        ];
+        drawerKeysToRemove.forEach((key) => params.delete(key));
+      }, true);
+
       if (typeof window !== 'undefined' && window.history.state?.sprDrawer) {
-        window.history.back();
-      } else {
-        updateUrlParams((params) => {
-          params.delete('drawer');
-          params.delete('drawerId');
-          params.delete('mode');
-          params.delete('date');
-          params.delete('eventId');
-          params.delete('targetId');
-          params.delete('classId');
-          params.delete('type');
-        });
+        try {
+          const nextState = { ...(window.history.state || {}) };
+          delete nextState.sprDrawer;
+          window.history.replaceState(nextState, '', window.location.href);
+        } catch {}
       }
     }
 
-    if (configRef.current?.onClose) {
+    if (prevConfig?.onClose) {
       try {
-        configRef.current.onClose();
+        prevConfig.onClose();
       } catch (err) {
         console.warn('Error during right sidebar onClose callback:', err);
       }
     }
-    setRightSidebarConfig(null);
   }, []);
 
   const openRightSidebar = useCallback((config) => {
@@ -217,7 +242,7 @@ export function RightSidebarProvider({ children }) {
     if (syncUrl) {
       pushUrlParams((params) => {
         // Clear previous drawer-specific params
-        const drawerParamKeys = ['id', 'mode', 'studentId', 'bookId', 'bookName', 'subjectName', 'lessonTitle', 'startUnit', 'endUnit', 'slotId'];
+        const drawerParamKeys = ['id', 'mode', 'tokenId', 'studentId', 'bookId', 'bookName', 'subjectName', 'lessonTitle', 'startUnit', 'endUnit', 'slotId'];
         drawerParamKeys.forEach((k) => params.delete(k));
 
         params.set('drawer', drawerKey);

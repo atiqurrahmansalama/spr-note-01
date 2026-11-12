@@ -126,13 +126,13 @@ export const DateHeaderCell: React.FC<DateHeaderCellProps> = ({
       : 'theme-bg-sub/80 hover:theme-bg-sub theme-text-secondary';
   } else if (!isCurrentMonth) {
     statusClasses = borderless
-      ? 'theme-bg-app/50 hover:theme-bg-elevated/50 opacity-45 hover:opacity-80 theme-text-secondary'
+      ? 'theme-bg-tile-muted hover:theme-bg-elevated/60 opacity-55 hover:opacity-85 theme-text-secondary'
       : keepNormalBgOnOtherMonths
       ? 'theme-bg-surface hover:theme-bg-sub/40 opacity-40 hover:opacity-75 theme-text-secondary'
       : 'theme-bg-sub/30 opacity-40 hover:opacity-75 theme-text-secondary';
   } else {
     statusClasses = borderless
-      ? 'theme-bg-app hover:theme-bg-elevated/60 theme-text-primary'
+      ? 'theme-bg-tile hover:theme-bg-elevated/70 theme-text-primary'
       : 'theme-bg-surface hover:theme-bg-sub/40 theme-text-primary';
   }
 

@@ -11,3 +11,4 @@ export { default as AdmissionPipelineWidget } from './AdmissionPipelineWidget';
 export { default as FinanceCollectionWidget } from './FinanceCollectionWidget';
 export { default as ResidentialOccupancyWidget } from './ResidentialOccupancyWidget';
 export { default as NoticeBoardWidget } from './NoticeBoardWidget';
+export { default as ApprovalsSummaryWidget } from './ApprovalsSummaryWidget';

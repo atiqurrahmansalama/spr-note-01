@@ -67,20 +67,18 @@ export const StaffOnboardingStepProfile: React.FC<StaffOnboardingStepProfileProp
       value={nameFieldValue}
       onChange={(val) => onChange('name', val)}
       error={errors.name}
-      required
     />
   );
 
   const phoneField = (
     <CustomInput
-      label={`${t('phoneNumber', 'Primary Phone Number')}`}
+      label={t('phoneNumber', 'Primary Phone Number')}
       name="phone_number"
       type="tel"
       placeholder={t('phoneNumberPlaceholder', '017XXXXXXXX')}
       value={formData.phone_number}
       onChange={(val) => onChange('phone_number', val)}
       error={errors.phone_number}
-      required
     />
   );
 
@@ -93,36 +91,37 @@ export const StaffOnboardingStepProfile: React.FC<StaffOnboardingStepProfileProp
       value={formData.email || ''}
       onChange={(val) => onChange('email', val)}
       error={errors.email}
-      required
     />
   );
 
-  // Compact mode for Quick Staff Onboarding (single responsive 3-column grid, zero duplicate inputs)
+  // Compact mode for Quick Staff Onboarding (container-responsive 2 column grid)
   if (mode === 'quick') {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start border-0 animate-fade-in">
-        <div className="sm:col-span-2 lg:col-span-1">{nameField}</div>
-        {phoneField}
-        {emailField}
+      <div className="@container border-0">
+        <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-4 items-start border-0 animate-fade-in">
+          <div className="@[480px]:col-span-2">{nameField}</div>
+          {phoneField}
+          {emailField}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in border-0">
+    <div className="@container space-y-6 animate-fade-in border-0">
       {/* Top Row: Names & Photo */}
-      <div className="flex flex-col-reverse md:flex-row items-center md:items-start justify-between gap-6 md:gap-10 border-0">
+      <div className="flex flex-col-reverse @[700px]:flex-row items-center @[700px]:items-start justify-between gap-6 @[700px]:gap-10 border-0">
         <div className="w-full space-y-4 max-w-lg border-0">
           {nameField}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start border-0">
+          <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3 items-start border-0">
             {phoneField}
             {emailField}
           </div>
         </div>
 
         {/* Photo Box */}
-        <div className="shrink-0 flex flex-col items-center md:items-end border-0">
+        <div className="shrink-0 flex flex-col items-center @[700px]:items-end border-0">
           <div
             onClick={() => photoInputRef.current?.click()}
             className="relative w-40 sm:w-44 md:w-48 h-48 sm:h-52 md:h-56 rounded-3xl theme-bg-app hover:theme-bg-elevated/40 transition-all flex flex-col items-center justify-center cursor-pointer shadow-xs group overflow-hidden border-0"

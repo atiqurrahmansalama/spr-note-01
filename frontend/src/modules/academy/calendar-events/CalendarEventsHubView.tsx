@@ -226,7 +226,7 @@ export default function CalendarEventsHubView() {
       category: t('scheduleDetails', 'Schedule & Calendar'),
       size: 'lg' as const,
       content: (
-        <div className="p-4 sm:p-6">
+        <div className="pt-1 pb-6 @container">
           <WeeklyHolidaySettingsPanel activeTenantId={activeTenantId} />
         </div>
       ),
@@ -242,7 +242,7 @@ export default function CalendarEventsHubView() {
       category: t('scheduleDetails', 'Schedule & Calendar'),
       size: 'lg' as const,
       content: (
-        <div className="p-4 sm:p-6 space-y-6">
+        <div className="pt-1 pb-6 space-y-6 @container">
           <WorkingSchedulesPanel activeTenantId={activeTenantId} />
           <EventTypesPanel activeTenantId={activeTenantId} />
         </div>
@@ -351,7 +351,7 @@ export default function CalendarEventsHubView() {
         </div>
 
         {/* ─── 3. Reusable Master Calendar Engine ────────────────────── */}
-        <div className="min-h-[640px] w-full min-w-0">
+        <div className="min-h-[640px] w-full min-w-0 pb-16 sm:pb-24">
           <MasterTimeCalendar
             events={events}
             onSaveEvent={handleSaveEvent}

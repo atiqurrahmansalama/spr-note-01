@@ -12,3 +12,4 @@ from .notifications import *
 from .templates import *
 from .system import *
 from .finance import *
+from .approvals import *

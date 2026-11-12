@@ -60,5 +60,18 @@ export const ur = {
   workspaceRoleBuilder: 'ورک اسپیس حسب ضرورت کار (رول بلڈر)',
   widgetGovernance: 'وجیٹ رول اور اکیڈمی اسکوپس',
   doneCustomizing: 'حسب ضرورت مکمل',
+
+  // Approvals Widget
+  approvalsCenterTitle: 'منظوری کا مرکز',
+  pendingQueueSub: 'ادارہ جاتی جائزہ اور فیصلے کی قطار',
+  viewAll: 'تمام دیکھیں',
+  totalPending: 'زیر التواء',
+  staffDomain: 'عملہ',
+  studentDomain: 'طلباء',
+  financeDomain: 'مالیات',
+  urgentReview: 'جائزہ درکار ہے',
+  loadingQueue: 'زیر التواء منظوریوں کی جانچ ہو رہی ہے...',
+  allCaughtUp: 'سب کچھ اپ ٹو ڈیٹ ہے!',
+  noPendingNotice: 'فی الحال جائزے کے لیے کوئی درخواست یا التجا زیر التواء نہیں ہے۔',
 };
 

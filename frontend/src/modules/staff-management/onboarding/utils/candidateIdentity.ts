@@ -155,9 +155,15 @@ export function buildInitialStaffPayload(
 
     // Role & Hierarchy
     staff_type: tokenMeta?.staff_type || initialData.staff_type || "TEACHING",
-    designation: tokenMeta?.designation || initialData.designation || "",
+    designation:
+      tokenMeta?.designation ||
+      (Array.isArray(tokenMeta?.allowed_designations) && tokenMeta.allowed_designations.length === 1
+        ? tokenMeta.allowed_designations[0]
+        : '') ||
+      initialData.designation ||
+      "",
     rank_order: tokenMeta?.rank_order || initialData.rank_order || 99,
-    department: initialData.department || "",
+    department: tokenMeta?.department_id || initialData.department || "",
     employment_status: initialData.employment_status || "PERMANENT",
     joining_date: initialData.joining_date || new Date().toISOString().split("T")[0],
 

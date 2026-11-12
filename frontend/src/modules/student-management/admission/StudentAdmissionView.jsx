@@ -19,6 +19,7 @@ import {
   SparklesIcon,
   EditIcon,
   CloseIcon,
+  ChecklistIcon,
 } from '../../../components/ui/Icons';
 import PageHeader from '../../../components/ui/PageHeader';
 import TabSwitcher from '../../../components/ui/TabSwitcher';
@@ -35,6 +36,8 @@ import {
   toggleAdmissionTokenActive,
   deleteAdmissionToken,
 } from '../../../api/admissions';
+import { getApprovalSummary } from '../../../api/approvals';
+import { ApprovalQueuePanel } from '../../approvals/components/ApprovalQueuePanel';
 
 export default function StudentAdmissionView() {
   const { showToast } = useToast();
@@ -55,8 +58,26 @@ export default function StudentAdmissionView() {
   const editId = searchParams.get('edit') || searchParams.get('student_id') || searchParams.get('id');
   const rawUrlTab = searchParams.get('tab');
 
+  // Pending approvals counter for badge
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+
+  const loadApprovalCount = useCallback(async () => {
+    try {
+      const summary = await getApprovalSummary();
+      const count = summary?.by_domain?.STUDENT_ADMISSION ?? 0;
+      setPendingApprovalsCount(count);
+    } catch {
+      // Non-blocking
+    }
+  }, []);
+
+  useEffect(() => {
+    loadApprovalCount();
+  }, [loadApprovalCount, rawUrlTab]);
+
   // Compute active tab dynamically based on URL and enabled features
   const activeTab = useMemo(() => {
+    if (rawUrlTab === 'approvals') return 'approvals';
     if (rawUrlTab === 'online_qr') return 'online_qr';
     if (rawUrlTab === 'quick') {
       if (canUseQuick) return 'quick';
@@ -88,8 +109,13 @@ export default function StudentAdmissionView() {
       list.push({ id: 'direct', label: 'Full Admission Wizard', icon: AcademicCapIcon });
     }
     list.push({ id: 'online_qr', label: 'Online QR & Link Admission', icon: QrCodeIcon });
+    list.push({
+      id: 'approvals',
+      label: pendingApprovalsCount > 0 ? `Pending Approvals (${pendingApprovalsCount})` : 'Pending Approvals',
+      icon: ChecklistIcon,
+    });
     return list;
-  }, [canUseQuick, canUseFull]);
+  }, [canUseQuick, canUseFull, pendingApprovalsCount]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [admittedStudent, setAdmittedStudent] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
@@ -730,6 +756,13 @@ export default function StudentAdmissionView() {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* TAB 4: Pending Approvals Queue (Unified Reusable Approvals Engine) */}
+      {activeTab === 'approvals' && (
+        <div className="pt-2 border-0">
+          <ApprovalQueuePanel domain="STUDENT_ADMISSION" />
         </div>
       )}
 

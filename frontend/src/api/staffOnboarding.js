@@ -5,6 +5,40 @@ import { API_BASE_URL } from '../config/api';
  * Enterprise Staff Onboarding Campaigns & Public Application API
  */
 
+function extractApiErrorMessage(errPayload, fallback) {
+  if (!errPayload || typeof errPayload !== 'object') {
+    return fallback;
+  }
+  if (typeof errPayload.message === 'string' && errPayload.message.trim()) {
+    return errPayload.message.trim();
+  }
+  if (typeof errPayload.error === 'string' && errPayload.error.trim()) {
+    return errPayload.error.trim();
+  }
+  if (typeof errPayload.detail === 'string' && errPayload.detail.trim()) {
+    return errPayload.detail.trim();
+  }
+
+  // Unwrap custom_exception_handler `details` object or raw DRF field dictionary
+  const fieldSource =
+    errPayload.details && typeof errPayload.details === 'object'
+      ? errPayload.details
+      : errPayload;
+
+  const ignoredMetaKeys = new Set(['success', 'status_code', 'error_type', 'request_id']);
+  for (const key of Object.keys(fieldSource)) {
+    if (ignoredMetaKeys.has(key)) continue;
+    const val = fieldSource[key];
+    if (Array.isArray(val) && val.length > 0) {
+      return key === 'detail' || key === 'non_field_errors' ? String(val[0]) : `${key}: ${val[0]}`;
+    }
+    if (typeof val === 'string' && val.trim()) {
+      return key === 'detail' || key === 'non_field_errors' ? val.trim() : `${key}: ${val.trim()}`;
+    }
+  }
+  return fallback;
+}
+
 // ==========================================
 // 1. INSTITUTIONAL STAFF ONBOARDING TOKENS & QR
 // ==========================================
@@ -25,15 +59,7 @@ export const createStaffOnboardingToken = async (payload) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    let msg = err.error || err.detail;
-    if (!msg && typeof err === 'object') {
-      const firstKey = Object.keys(err)[0];
-      if (firstKey) {
-        const val = err[firstKey];
-        msg = Array.isArray(val) ? `${firstKey}: ${val[0]}` : `${firstKey}: ${val}`;
-      }
-    }
-    throw new Error(msg || 'Failed to create staff onboarding token');
+    throw new Error(extractApiErrorMessage(err, 'Failed to create staff onboarding token'));
   }
   return await response.json();
 };
@@ -45,15 +71,7 @@ export const updateStaffOnboardingToken = async (id, payload) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    let msg = err.error || err.detail;
-    if (!msg && typeof err === 'object') {
-      const firstKey = Object.keys(err)[0];
-      if (firstKey) {
-        const val = err[firstKey];
-        msg = Array.isArray(val) ? `${firstKey}: ${val[0]}` : `${firstKey}: ${val}`;
-      }
-    }
-    throw new Error(msg || 'Failed to update staff onboarding token');
+    throw new Error(extractApiErrorMessage(err, 'Failed to update staff onboarding token'));
   }
   return await response.json();
 };
@@ -90,7 +108,7 @@ export const verifyPublicStaffToken = async (token) => {
   const response = await fetch(targetUrl);
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || err.detail || 'Invalid or expired staff invitation link');
+    throw new Error(extractApiErrorMessage(err, 'Invalid or expired staff invitation link'));
   }
   return await response.json();
 };
@@ -102,15 +120,7 @@ export const submitStaffOnboarding = async (payload) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    let msg = err.error || err.detail;
-    if (!msg && typeof err === 'object') {
-      const firstKey = Object.keys(err)[0];
-      if (firstKey) {
-        const val = err[firstKey];
-        msg = Array.isArray(val) ? `${firstKey}: ${val[0]}` : `${firstKey}: ${val}`;
-      }
-    }
-    throw new Error(msg || 'Failed to submit staff onboarding application');
+    throw new Error(extractApiErrorMessage(err, 'Failed to submit staff onboarding application'));
   }
   return await response.json();
 };

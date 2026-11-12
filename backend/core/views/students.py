@@ -574,6 +574,67 @@ class AuthenticatedOnlineAdmissionApplyView(APIView):
                 created_by=user
             )
 
+        # If token does NOT have auto_enroll enabled, route through Unified Approval Workflow Engine
+        if not getattr(token_obj, 'auto_enroll', True):
+            from core.services.approval_engine import ApprovalService
+
+            admission_payload = {
+                'name': student_data.get('name', '').strip() or student_data.get('name_en', '').strip(),
+                'name_en': student_data.get('name', '').strip() or student_data.get('name_en', '').strip(),
+                'bangla_name': student_data.get('bangla_name', '').strip(),
+                'gender': student_data.get('gender', 'MALE'),
+                'dob': student_data.get('dob') or None,
+                'blood_group': student_data.get('blood_group', ''),
+                'birth_certificate_no': student_data.get('birth_certificate_no', ''),
+                'nid_no': student_data.get('nid_no', ''),
+                'student_class_id': student_class_id,
+                'target_class_name': token_obj.target_class.name if token_obj.target_class else "General",
+                'student_group_id': student_group_id,
+                'target_group_name': token_obj.target_group.name if token_obj.target_group else "",
+                'session_year': token_obj.session_year,
+                'present_address': present_address_data,
+                'permanent_address': permanent_address_data,
+                'guardian': guardian_data,
+                'primary_guardian_name': guardian_data.get('primary_guardian_name') or guardian_data.get('father_name', ''),
+                'primary_guardian_phone': guardian_data.get('guardian_phone') or guardian_data.get('father_phone') or user.phone_number or '',
+                'user_id': user.id,
+                'admission_mode': 'ONLINE_PORTAL',
+            }
+
+            appr_res = ApprovalService.submit_request(
+                institution=inst,
+                domain='STUDENT_ADMISSION',
+                source_mode='PUBLIC_PORTAL',
+                form_mode='FULL',
+                payload=admission_payload,
+                token_obj=token_obj,
+                submitted_by=user,
+                auto_approve=False
+            )
+
+            # Increment token applied count
+            token_obj.applied_count = F('applied_count') + 1
+            token_obj.save(update_fields=['applied_count'])
+            token_obj.refresh_from_db()
+
+            return Response({
+                'success': True,
+                'message': 'Student admission application submitted successfully for review and approval.',
+                'approval_status': 'PENDING',
+                'tracking_code': appr_res['tracking_code'],
+                'receipt': {
+                    'tracking_code': appr_res['tracking_code'],
+                    'name': admission_payload['name'],
+                    'bangla_name': admission_payload['bangla_name'],
+                    'class_name': admission_payload['target_class_name'],
+                    'institution_name': inst.name,
+                    'submission_date': timezone.now().strftime('%Y-%m-%d'),
+                    'session_year': token_obj.session_year,
+                    'applicant_email': user.email or user.phone_number,
+                    'status': 'Pending Approval'
+                }
+            }, status=status.HTTP_201_CREATED)
+
         # Create Student
         student = Student.objects.create(
             institution=inst,
@@ -591,7 +652,7 @@ class AuthenticatedOnlineAdmissionApplyView(APIView):
             permanent_address=perm_addr,
             admission_date=timezone.now().date(),
             admission_mode='FULL',
-            status='Active' if token_obj.auto_enroll else 'Pending',
+            status='Active',
             created_by=user
         )
 

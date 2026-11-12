@@ -605,4 +605,90 @@ class DashboardGovernanceAndRoleSyncTestCase(TestCase):
             ).exists()
         )
 
+    def test_staff_onboarding_token_persists_and_exposes_onboarding_mode(self):
+        self.client.force_authenticate(user=self.second_admin)
+
+        create_res = self.client.post(
+            "/api/v1/staff-onboarding/tokens/",
+            {
+                "title": "Fast Hifz Faculty Drive",
+                "onboarding_mode": "QUICK",
+                "staff_type": "TEACHING",
+                "designation": "",
+                "allowed_designations": ["Senior Qari", "Hifz Teacher"],
+                "rank_order": 3,
+                "max_applications": 10,
+                "auto_approve": True,
+                "include_payroll": False,
+            },
+            format="json",
+        )
+        self.assertEqual(create_res.status_code, status.HTTP_201_CREATED, create_res.data)
+        self.assertEqual(create_res.data["onboarding_mode"], "QUICK")
+        self.assertEqual(create_res.data["allowed_designations"], ["Senior Qari", "Hifz Teacher"])
+        token_str = create_res.data["token"]
+
+        # Public verify endpoint exposes onboarding_mode, allowed_designations, and policy flags cleanly
+        self.client.force_authenticate(user=None)
+        verify_res = self.client.get(f"/api/v1/public/staff-onboard/verify/?token={token_str}")
+        self.assertEqual(verify_res.status_code, status.HTTP_200_OK, verify_res.data)
+        self.assertEqual(verify_res.data["onboarding_mode"], "QUICK")
+        self.assertEqual(verify_res.data["allowed_designations"], ["Senior Qari", "Hifz Teacher"])
+        self.assertFalse(verify_res.data["include_payroll"])
+        self.assertTrue(verify_res.data["auto_approve"])
+
+        # Public apply rejects unassigned designation
+        rejected_apply = self.client.post(
+            "/api/v1/public/staff-onboard/apply/",
+            {
+                "token": token_str,
+                "name": "Unlisted Candidate",
+                "phone_number": "01799990001",
+                "email": "unlisted@example.com",
+                "staff_type": "TEACHING",
+                "designation": "Accountant",
+            },
+            format="json",
+        )
+        self.assertEqual(rejected_apply.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("designation", rejected_apply.data)
+
+        # Management and custom Admin Tools categories must be accepted without 400 validation errors
+        self.client.force_authenticate(user=self.second_admin)
+        mgmt_res = self.client.post(
+            "/api/v1/staff-onboarding/tokens/",
+            {
+                "title": "Management & Coordinator Drive",
+                "onboarding_mode": "FULL",
+                "staff_type": "MANAGEMENT",
+                "designation": "",
+                "allowed_designations": ["Academic Coordinator"],
+                "rank_order": 2,
+                "max_applications": 0,
+                "auto_approve": True,
+                "include_payroll": False,
+            },
+            format="json",
+        )
+        self.assertEqual(mgmt_res.status_code, status.HTTP_201_CREATED, mgmt_res.data)
+        self.assertEqual(mgmt_res.data["staff_type"], "MANAGEMENT")
+
+        custom_cat_res = self.client.post(
+            "/api/v1/staff-onboarding/tokens/",
+            {
+                "title": "Visiting Scholars Fellowship",
+                "onboarding_mode": "QUICK",
+                "staff_type": "VISITING_SCHOLAR",
+                "designation": "",
+                "allowed_designations": [],
+                "rank_order": 99,
+                "max_applications": 5,
+                "auto_approve": False,
+                "include_payroll": False,
+            },
+            format="json",
+        )
+        self.assertEqual(custom_cat_res.status_code, status.HTTP_201_CREATED, custom_cat_res.data)
+        self.assertEqual(custom_cat_res.data["staff_type"], "VISITING_SCHOLAR")
+
 

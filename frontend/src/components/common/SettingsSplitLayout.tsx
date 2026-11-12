@@ -11,6 +11,8 @@ export interface SettingsSectionItem {
   icon?: React.ComponentType<{ className?: string }>;
   tag?: string;
   badge?: string | number;
+  superAdminOnly?: boolean;
+  adminOnly?: boolean;
   [key: string]: any;
 }
 
@@ -229,7 +231,9 @@ export const SettingsSplitLayout: React.FC<SettingsSplitLayoutProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`w-full max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-6 pb-16 @sm:pb-20 @md:pb-24 space-y-5 font-sans text-left min-h-screen theme-text-primary animate-fade-in select-none min-w-0 ${className}`}
+      className={`w-full max-w-7xl mx-auto py-3 sm:py-5 px-3 sm:px-6 space-y-5 font-sans text-left theme-text-primary animate-fade-in select-none min-w-0 ${
+        isCompact ? "pb-16" : "h-full min-h-0 flex flex-col"
+      } ${className}`}
     >
       {/* ─── 1. Compact Container Mode (< 740px width or mobile) ──────── */}
       {isCompact ? (
@@ -266,19 +270,21 @@ export const SettingsSplitLayout: React.FC<SettingsSplitLayoutProps> = ({
         </div>
       ) : (
         /* ─── 2. Wide Split-Panel Layout (>= 740px width) ─────────────── */
-        <div className="w-full space-y-6">
+        <div className="w-full flex-1 min-h-0 flex flex-col space-y-5">
           {title && (
-            <PageHeader
-              icon={HeaderIcon}
-              title={title}
-              subtitle={subtitle}
-              actions={actions}
-            />
+            <div className="shrink-0">
+              <PageHeader
+                icon={HeaderIcon}
+                title={title}
+                subtitle={subtitle}
+                actions={actions}
+              />
+            </div>
           )}
 
-          <div className="flex flex-row items-start gap-5 lg:gap-6 w-full min-w-0">
-            {/* Left Master Navigation List Panel (Separate Independent Scroll with Hidden Scrollbar) */}
-            <div className="w-64 lg:w-72 xl:w-80 shrink-0 sticky top-20 flex flex-col max-h-[calc(100vh-6.5rem)]">
+          <div className="flex flex-row items-stretch gap-5 lg:gap-6 w-full min-w-0 flex-1 min-h-0">
+            {/* Left Master Navigation List Panel (Independent Full-Height Scroll) */}
+            <div className="w-64 lg:w-72 xl:w-80 shrink-0 h-full min-h-0 flex flex-col">
               {searchable && (
                 <div className="pb-3 shrink-0">
                   <CustomInput
@@ -292,15 +298,15 @@ export const SettingsSplitLayout: React.FC<SettingsSplitLayoutProps> = ({
 
               {/* Independently scrollable menu container without visible scrollbar */}
               <div
-                className="flex-1 overflow-y-auto pr-1 pb-6 space-y-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:bg-transparent"
+                className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 pb-10 space-y-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:bg-transparent"
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
               >
                 {renderNavigationGroups(false)}
               </div>
             </div>
 
-            {/* Right Detail Configuration Content Area */}
-            <div className="flex-1 min-w-0 w-full animate-fade-in">
+            {/* Right Detail Configuration Content Area (Independent Scroll) */}
+            <div className="flex-1 min-w-0 w-full h-full min-h-0 overflow-y-auto overscroll-contain pb-16 pr-0.5 animate-fade-in">
               {children}
             </div>
           </div>

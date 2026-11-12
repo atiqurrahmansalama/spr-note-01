@@ -15,6 +15,9 @@ export interface DataViewToolbarProps {
   viewMode?: 'grid' | 'table';
   onToggleViewMode?: (mode: 'grid' | 'table') => void;
   onViewModeChange?: (mode: 'grid' | 'table') => void;
+  tableLabel?: string;
+  cardsLabel?: string;
+  searchVariant?: 'sub' | 'default' | 'app' | 'card' | 'filled' | 'borderless' | 'elevated' | 'compact-number';
   onRefresh?: () => void;
   loading?: boolean;
   actions?: React.ReactNode;
@@ -52,6 +55,9 @@ export default function DataViewToolbar({
   viewMode = 'table',
   onToggleViewMode = null,
   onViewModeChange = null,
+  tableLabel = 'Table View',
+  cardsLabel = 'Card Grid',
+  searchVariant = 'app',
   onRefresh = null,
   loading = false,
   actions = null,
@@ -108,18 +114,18 @@ export default function DataViewToolbar({
         <button
           type="button"
           onClick={handleToggle}
-          className="px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-sub border theme-border hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 select-none"
+          className="px-3.5 py-2.5 rounded-2xl text-xs font-semibold theme-bg-tile border-0 hover:theme-bg-elevated/75 theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0 select-none"
           title={viewMode === 'grid' ? 'Switch to Table View' : 'Switch to Cards View'}
         >
           {viewMode === 'grid' ? (
             <>
-              <TableIcon className="w-3.5 h-3.5 theme-accent" />
-              <span>Table</span>
+              <TableIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
+              <span>{tableLabel}</span>
             </>
           ) : (
             <>
-              <Squares2X2Icon className="w-3.5 h-3.5 theme-accent" />
-              <span>Cards</span>
+              <Squares2X2Icon className="w-3.5 h-3.5 theme-accent shrink-0" />
+              <span>{cardsLabel}</span>
             </>
           )}
         </button>
@@ -131,7 +137,7 @@ export default function DataViewToolbar({
   if (stackedSwitcher) {
     return (
       <div
-        className={`@container p-3 sm:p-4 rounded-2xl theme-bg-surface border theme-border shadow-xs space-y-3 w-full min-w-0 ${className}`}
+        className={`@container p-3 sm:p-4 rounded-3xl theme-bg-surface border-0 shadow-xs space-y-3 w-full min-w-0 ${className}`}
       >
         {/* Top Row: Search Input + All Filters in a Single Responsive Grid Row */}
         <div className={`grid ${filterGridClassName || 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 @[900px]:grid-cols-6'} gap-2.5 w-full items-end`}>
@@ -141,6 +147,7 @@ export default function DataViewToolbar({
                 label={searchLabel || 'Search'}
                 type="search"
                 size="md"
+                variant={searchVariant}
                 value={searchQuery}
                 onChange={(val) => onSearchChange(val)}
                 placeholder={searchPlaceholder}
@@ -153,7 +160,7 @@ export default function DataViewToolbar({
         </div>
 
         {/* Bottom Row: Showing Count (Left) + Center Selection Cluster (Desktop) + Controls (Right) */}
-        <div className="pt-2.5 border-t theme-border flex items-center justify-between gap-3 flex-wrap">
+        <div className="pt-2.5 border-0 flex items-center justify-between gap-3 flex-wrap">
           {/* Left: Showing count & Reset filter */}
           <div className="flex items-center gap-2.5 shrink-0">
             <div className="text-xs font-semibold theme-text-secondary">
@@ -172,7 +179,7 @@ export default function DataViewToolbar({
               <button
                 type="button"
                 onClick={onResetFilters}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold theme-bg-sub border theme-border theme-text-secondary hover:theme-text-primary transition flex items-center gap-1 cursor-pointer shadow-2xs hover:theme-bg-elevated"
+                className="px-2.5 py-1 rounded-xl text-[11px] font-semibold theme-bg-tile border-0 theme-text-secondary hover:theme-text-primary transition flex items-center gap-1 cursor-pointer shadow-xs hover:theme-bg-elevated/75"
                 title="Reset all active filters"
               >
                 <CloseIcon className="w-3 h-3 theme-accent" />
@@ -186,10 +193,10 @@ export default function DataViewToolbar({
             )}
           </div>
 
-          {/* Center (Desktop) or Next Line (Mobile): Selection Cluster inside a Single Bordered Pill */}
+          {/* Center (Desktop) or Next Line (Mobile): Selection Cluster */}
           {isSelected && (
-            <div className="order-last sm:order-2 @[640px]:order-2 w-full sm:w-auto @[640px]:w-auto flex items-center justify-center animate-fade-in pt-2 sm:pt-0 @[640px]:pt-0 border-t sm:border-t-0 @[640px]:border-t-0 theme-border">
-              <div className="flex items-center gap-2.5 px-3 py-1 rounded-xl theme-bg-sub/50 border theme-border shadow-2xs">
+            <div className="order-last sm:order-2 @[640px]:order-2 w-full sm:w-auto @[640px]:w-auto flex items-center justify-center animate-fade-in pt-2 sm:pt-0 @[640px]:pt-0 border-0">
+              <div className="flex items-center gap-2.5 px-3 py-1 rounded-2xl theme-bg-tile border-0 shadow-xs">
                 {/* Selected Count Indicator */}
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse shrink-0" />
@@ -199,7 +206,7 @@ export default function DataViewToolbar({
                 </div>
 
                 {/* Subtle Divider */}
-                <span className="h-3.5 w-px bg-zinc-300 dark:bg-zinc-700/70 shrink-0" />
+                <span className="h-3.5 w-px bg-black/15 dark:bg-white/15 shrink-0" />
 
                 {/* Actions Group: Bulk Actions + Close Icon Button */}
                 <div className="flex items-center gap-1 shrink-0">
@@ -232,7 +239,7 @@ export default function DataViewToolbar({
   // 2. Inline Single-Row Mode (Default for standard views with 0-2 filters)
   return (
     <div
-      className={`@container p-2.5 sm:p-3 rounded-2xl theme-bg-surface border theme-border shadow-xs flex flex-col @[900px]:flex-row @[900px]:items-end justify-between gap-2.5 sm:gap-3 w-full min-w-0 ${className}`}
+      className={`@container p-3 sm:p-3.5 rounded-3xl theme-bg-surface border-0 shadow-xs flex flex-col @[900px]:flex-row @[900px]:items-end justify-between gap-2.5 sm:gap-3 w-full min-w-0 ${className}`}
     >
       {/* Left & Middle: Search Bar + Side-by-Side Filters */}
       <div className="flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-2.5 flex-1 min-w-0">
@@ -242,6 +249,7 @@ export default function DataViewToolbar({
               label={searchLabel}
               type="search"
               size="md"
+              variant={searchVariant}
               value={searchQuery}
               onChange={(val) => onSearchChange(val)}
               placeholder={searchPlaceholder}
@@ -251,7 +259,7 @@ export default function DataViewToolbar({
         )}
 
         {activeFilters && (
-          <div className="flex items-end gap-2 overflow-x-auto no-scrollbar py-0.5 min-w-0 flex-1">
+          <div className="flex flex-wrap sm:flex-nowrap items-end gap-2 min-w-0 flex-1">
             {activeFilters}
           </div>
         )}
@@ -259,8 +267,8 @@ export default function DataViewToolbar({
 
       {/* Center (Desktop) or Next Line (Mobile): Selection Cluster in Inline Mode */}
       {isSelected && (
-        <div className="order-last sm:order-2 @[720px]:order-2 w-full sm:w-auto @[720px]:w-auto flex items-center justify-center animate-fade-in pt-1.5 sm:pt-0 @[720px]:pt-0 border-t sm:border-t-0 @[720px]:border-t-0 theme-border">
-          <div className="flex items-center gap-2.5 px-3 py-1 rounded-xl theme-bg-sub/50 border theme-border shadow-2xs">
+        <div className="order-last sm:order-2 @[720px]:order-2 w-full sm:w-auto @[720px]:w-auto flex items-center justify-center animate-fade-in pt-1.5 sm:pt-0 @[720px]:pt-0 border-0">
+          <div className="flex items-center gap-2.5 px-3 py-1 rounded-2xl theme-bg-tile border-0 shadow-xs">
             {/* Selected Count Indicator */}
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse shrink-0" />
@@ -270,7 +278,7 @@ export default function DataViewToolbar({
             </div>
 
             {/* Subtle Divider */}
-            <span className="h-3.5 w-px bg-zinc-300 dark:bg-zinc-700/70 shrink-0" />
+            <span className="h-3.5 w-px bg-black/15 dark:bg-white/15 shrink-0" />
 
             {/* Actions Group: Bulk Actions + Close Icon Button */}
             <div className="flex items-center gap-1 shrink-0">
@@ -292,7 +300,7 @@ export default function DataViewToolbar({
       )}
 
       {/* Right Side: Refresh + View Switcher + Action Buttons */}
-      <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 w-full sm:w-auto pt-1 sm:pt-0 border-t sm:border-t-0 theme-border sm:border-transparent pb-0.5">
+      <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 w-full sm:w-auto pt-1 sm:pt-0 border-0 pb-0.5">
         {renderControls()}
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/context/ToastContext';
 import { useTenant } from '@/context/TenantContext';
-import { staffRanksStore } from '@/utils/localStore';
+import { useStaffRanks } from '../../hooks';
 import { validateBDPhone, validateEmail, validateNID } from '@/utils/inputValidators';
 import { compressImageFile } from '@/utils/imageCompressor';
 import { submitStaffOnboarding } from '@/api/staffOnboarding';
@@ -55,7 +55,7 @@ export function useStaffOnboardingForm({
   );
 
   const [currentStep, setCurrentStep] = useState(1);
-  const [ranksList, setRanksList] = useState(() => staffRanksStore.getRanks(activeTenantId));
+  const { ranksList } = useStaffRanks(activeTenantId);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sameAsPresent, setSameAsPresent] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -111,15 +111,6 @@ export function useStaffOnboardingForm({
     initialData?.phone_number,
     initialData?.photo_url,
   ]);
-
-  // Listen for live rank updates from Developer Tools
-  useEffect(() => {
-    const handleRanksUpdated = () => {
-      setRanksList(staffRanksStore.getRanks(activeTenantId));
-    };
-    window.addEventListener('spr_staff_ranks_updated', handleRanksUpdated);
-    return () => window.removeEventListener('spr_staff_ranks_updated', handleRanksUpdated);
-  }, [activeTenantId]);
 
   // Field-level Validation
   const validateField = useCallback(

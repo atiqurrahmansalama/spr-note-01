@@ -2,14 +2,17 @@ import React, { useState, useMemo } from 'react';
 import {
   CalendarIcon,
   TimerIcon,
+  ClockIcon,
   EditIcon,
   TrashIcon,
 } from '../../../../components/ui/Icons';
 import CustomSelect from '../../../../components/ui/CustomSelect';
+import CustomButton from '../../../../components/ui/CustomButton';
 import { getEventColors, getEventDisplayType } from './MasterTimeCalendar';
 import { calendarImpactScopesStore } from '../../../../utils/localStore';
 import { useTenant } from '../../../../context/TenantContext';
 import { DrawerContainer } from '../../../../components/layout';
+import { useCalendarTranslation } from '../locales';
 import type { CalendarEvent } from '../types';
 
 function formatTime12(timeStr?: string): string {
@@ -46,6 +49,7 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
   readOnly = false,
 }) => {
   const { activeTenantId } = useTenant();
+  const { t } = useCalendarTranslation();
   const effectiveDate = currentDate || initialDate || event?.startDate || new Date().toISOString().split('T')[0];
 
   const [isConfirmingDelete, setIsConfirmingDelete] = useState<boolean>(false);
@@ -83,221 +87,239 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
   );
 
   return (
-    <DrawerContainer padding="normal" spacing="normal">
-      {/* Top Main Banner Card */}
-      <div className="p-4 rounded-3xl theme-bg-surface border-0 shadow-xs space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${style.bg} border-0 shadow-xs`}>
+    <DrawerContainer padding="none" spacing="normal">
+      <div className="space-y-6 pt-2 pb-6 @container">
+        {/* Top Hero Summary Surface */}
+        <div className="p-4 sm:p-5 rounded-3xl theme-bg-surface border-0 shadow-xs space-y-3.5">
+          <div className="flex items-start gap-3.5">
+            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${style.bg} border-0 shadow-xs`}>
               {isWorkingHours ? (
-                <TimerIcon className="w-5 h-5 theme-text-primary" />
+                <TimerIcon className={`w-5 h-5 ${style.text}`} />
               ) : (
-                <CalendarIcon className="w-5 h-5 theme-text-primary" />
+                <CalendarIcon className={`w-5 h-5 ${style.text}`} />
               )}
             </div>
-            <div>
-              <h3 className="text-base font-bold theme-text-primary leading-snug">
-                {event.title}
-              </h3>
-              <div className="flex items-center gap-2 mt-1">
-                <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-md ${style.bg} theme-text-primary border-0 shadow-2xs`}>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base font-bold theme-text-primary leading-snug break-words">
+                  {event.title}
+                </h3>
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: style.hex }}
+                />
+              </div>
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <span className={`inline-flex px-2.5 py-0.5 text-[11px] font-semibold rounded-lg ${style.bg} ${style.text} border-0`}>
                   {getEventDisplayType(event, activeTenantId)}
                 </span>
-                <span className="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-md theme-bg-app border-0 shadow-2xs theme-text-secondary">
-                  Audience: {event.audience || 'ALL'}
+                <span className="inline-flex px-2.5 py-0.5 text-[11px] font-medium rounded-lg theme-bg-app border-0 theme-text-secondary">
+                  {t('audience', 'Audience')}: {event.audience || 'ALL'}
                 </span>
               </div>
             </div>
           </div>
-        </div>
 
-        {event.description && (
-          <div className="p-3 rounded-2xl theme-bg-app border-0 text-xs theme-text-secondary leading-relaxed shadow-xs">
-            {event.description}
-          </div>
-        )}
-      </div>
-
-      {/* Schedule Info Grid */}
-      <div className="p-4 rounded-3xl theme-bg-surface border-0 shadow-xs space-y-2 text-xs">
-        <h4 className="text-[11px] font-mono font-bold uppercase tracking-wider theme-text-secondary px-1 pb-1">
-          Schedule & Timing Details
-        </h4>
-
-        {/* Time */}
-        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl theme-bg-app border-0">
-          <span className="theme-text-secondary font-medium">Session Timing:</span>
-          <span className="font-mono font-bold theme-text-primary">
-            {isAllDay ? 'Full Day' : `${formatTime12(event.startTime)} – ${formatTime12(event.endTime)}`}
-          </span>
-        </div>
-
-        {/* Date / Recurrence */}
-        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl theme-bg-app border-0">
-          <span className="theme-text-secondary font-medium">Recurrence Pattern:</span>
-          <span className="font-semibold theme-text-primary">
-            {event.repeats ? 'Weekly Recurring' : 'Single Date'}
-          </span>
-        </div>
-
-        {/* Start Date */}
-        {event.startDate && (
-          <div className="flex items-center justify-between px-3 py-2.5 rounded-xl theme-bg-app border-0">
-            <span className="theme-text-secondary font-medium">Effective Date:</span>
-            <span className="font-mono font-medium theme-text-primary">{event.startDate}</span>
-          </div>
-        )}
-
-        {/* Repeat Days */}
-        {event.repeats && Array.isArray(event.repeatDays) && event.repeatDays.length > 0 && (
-          <div className="px-3 py-2.5 rounded-xl theme-bg-app border-0 space-y-1.5">
-            <span className="theme-text-secondary font-medium block">Active Days:</span>
-            <div className="flex flex-wrap gap-1.5">
-              {event.repeatDays.map((d: number) => (
-                <span
-                  key={d}
-                  className="px-2 py-0.5 rounded-lg text-[11px] font-semibold theme-bg-accent-soft theme-accent border-0 shadow-2xs"
-                >
-                  {WEEKDAY_NAMES[d] || `Day ${d}`}
-                </span>
-              ))}
+          {event.description && (
+            <div className="p-3.5 rounded-2xl theme-bg-app border-0 text-xs theme-text-secondary leading-relaxed">
+              {event.description}
             </div>
-          </div>
-        )}
-
-        {/* Active System Impacts */}
-        {Array.isArray(event.impacts) && event.impacts.length > 0 && (
-          <div className="px-3 py-2.5 rounded-xl theme-bg-app border-0 space-y-1.5">
-            <span className="theme-text-secondary font-medium block">Active System Impacts:</span>
-            <div className="flex flex-wrap gap-1.5">
-              {event.impacts.map((impactId: string) => {
-                const matched = allScopes.find((i: any) => i.id === impactId || i.code === impactId);
-                return (
-                  <span
-                    key={impactId}
-                    className="px-2 py-0.5 rounded-lg text-[11px] font-semibold theme-bg-surface border-0 theme-text-primary flex items-center gap-1 shadow-2xs"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full theme-bg-accent" />
-                    <span>{matched?.name || matched?.badge || impactId}</span>
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Priority Rank */}
-        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl theme-bg-app border-0">
-          <span className="theme-text-secondary font-medium">Precedence Priority:</span>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-bold theme-bg-accent-soft theme-accent border-0 shadow-2xs">
-            Rank {event.priorityRank || (event as any).rank || 1}
-          </span>
+          )}
         </div>
 
-        {/* Timezone */}
-        {event.timezone && (
-          <div className="flex items-center justify-between px-3 py-2.5 rounded-xl theme-bg-app border-0">
-            <span className="theme-text-secondary font-medium">Timezone:</span>
-            <span className="font-mono text-xs theme-text-secondary">{event.timezone}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Inline Delete Confirmation Block with CustomSelect Scope */}
-      {!readOnly && isConfirmingDelete ? (
-        <div className="p-4 rounded-2xl bg-rose-500/10 dark:bg-rose-950/30 border-0 space-y-3 animate-fade-in shadow-xs">
-          <div className="flex items-center gap-2">
-            <TrashIcon className="w-4 h-4 theme-danger" />
-            <h4 className="text-xs font-bold theme-text-primary">
-              Confirm Schedule Deletion
+        {/* Streamlined Timing & Metadata Section */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 pb-1">
+            <ClockIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
+            <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
+              {t('timingDetails', 'Schedule & Timing Details')}
             </h4>
           </div>
 
-          {isRecurringOrMultiDay && (
-            <div className="space-y-1.5 pt-1">
-              <label className="block text-xs font-semibold theme-text-secondary">
-                Apply Deletion To
-              </label>
-              <CustomSelect
-                value={deleteScope}
-                onChange={(val: any) => setDeleteScope(String(val))}
-                options={deleteScopeOptions}
-                placeholder="Select delete scope..."
-                showDescription={true}
-                direction="up"
-              />
+          <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-2.5 text-xs">
+            {/* Time */}
+            <div className="flex items-center justify-between px-3.5 py-3 rounded-2xl theme-bg-surface border-0 shadow-xs">
+              <span className="theme-text-secondary font-medium">{t('sessionTiming', 'Session Timing')}</span>
+              <span className="font-mono font-bold theme-text-primary">
+                {isAllDay
+                  ? t('fullDay', 'Full Day')
+                  : `${formatTime12(event.startTime)} – ${formatTime12(event.endTime)}`}
+              </span>
+            </div>
+
+            {/* Recurrence Pattern */}
+            <div className="flex items-center justify-between px-3.5 py-3 rounded-2xl theme-bg-surface border-0 shadow-xs">
+              <span className="theme-text-secondary font-medium">{t('recurrencePattern', 'Recurrence Pattern')}</span>
+              <span className="font-semibold theme-text-primary">
+                {event.repeats
+                  ? t('weeklyRecurring', 'Weekly Recurring')
+                  : t('singleDate', 'Single Date')}
+              </span>
+            </div>
+
+            {/* Effective Date */}
+            {event.startDate && (
+              <div className="flex items-center justify-between px-3.5 py-3 rounded-2xl theme-bg-surface border-0 shadow-xs">
+                <span className="theme-text-secondary font-medium">{t('effectiveDate', 'Effective Date')}</span>
+                <span className="font-mono font-semibold theme-text-primary">{event.startDate}</span>
+              </div>
+            )}
+
+            {/* Priority Rank */}
+            <div className="flex items-center justify-between px-3.5 py-3 rounded-2xl theme-bg-surface border-0 shadow-xs">
+              <span className="theme-text-secondary font-medium">{t('precedencePriority', 'Precedence Priority')}</span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-mono font-bold theme-bg-accent-soft theme-accent border-0">
+                #{event.priorityRank || (event as any).rank || 1}
+              </span>
+            </div>
+
+            {/* Timezone */}
+            {event.timezone && (
+              <div className="flex items-center justify-between px-3.5 py-3 rounded-2xl theme-bg-surface border-0 shadow-xs @[480px]:col-span-2">
+                <span className="theme-text-secondary font-medium">{t('timezone', 'Timezone')}</span>
+                <span className="font-mono text-xs theme-text-secondary">{event.timezone}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Active Days */}
+          {event.repeats && Array.isArray(event.repeatDays) && event.repeatDays.length > 0 && (
+            <div className="p-3.5 rounded-2xl theme-bg-surface border-0 shadow-xs space-y-2 text-xs">
+              <span className="theme-text-secondary font-medium block">{t('activeDays', 'Active Days')}</span>
+              <div className="flex flex-wrap gap-1.5">
+                {event.repeatDays.map((d: number) => (
+                  <span
+                    key={d}
+                    className="px-2.5 py-1 rounded-xl text-[11px] font-semibold theme-bg-accent-soft theme-accent border-0"
+                  >
+                    {WEEKDAY_NAMES[d] || `Day ${d}`}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
 
-          {!isRecurringOrMultiDay && (
-            <p className="text-[11px] theme-text-secondary">
-              Are you sure you want to permanently delete &quot;{event.title}&quot;?
-            </p>
+          {/* Active System Impacts */}
+          {Array.isArray(event.impacts) && event.impacts.length > 0 && (
+            <div className="p-3.5 rounded-2xl theme-bg-surface border-0 shadow-xs space-y-2 text-xs">
+              <span className="theme-text-secondary font-medium block">{t('impacts', 'System Impacts')}</span>
+              <div className="flex flex-wrap gap-1.5">
+                {event.impacts.map((impactId: string) => {
+                  const matched = allScopes.find((i: any) => i.id === impactId || i.code === impactId);
+                  return (
+                    <span
+                      key={impactId}
+                      className="px-2.5 py-1 rounded-xl text-[11px] font-semibold theme-bg-app border-0 theme-text-primary flex items-center gap-1.5"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full theme-bg-accent shrink-0" />
+                      <span>{matched?.name || matched?.badge || impactId}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
           )}
-
-          <div className="flex items-center justify-end gap-2 pt-2 border-0">
-            <button
-              type="button"
-              onClick={() => setIsConfirmingDelete(false)}
-              className="px-3.5 py-2 rounded-xl border-0 theme-bg-surface hover:theme-bg-elevated/60 theme-text-secondary text-xs font-semibold transition cursor-pointer shadow-xs"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (onDelete) {
-                  onDelete({
-                    id: event.id,
-                    deleteScope: isRecurringOrMultiDay ? deleteScope : 'ALL_EVENTS',
-                    targetDate: effectiveDate,
-                  });
-                }
-              }}
-              className="px-4 py-2 rounded-xl bg-[var(--danger-main)] hover:opacity-90 text-white font-bold text-xs shadow-sm transition cursor-pointer flex items-center gap-1.5 border-0"
-            >
-              <TrashIcon className="w-3.5 h-3.5" />
-              <span>Confirm Delete</span>
-            </button>
-          </div>
         </div>
-      ) : (
-        /* Action Buttons (Read-Only shows only Close button) */
-        <div className={`pt-4 border-0 flex items-center ${readOnly || (!onEdit && !onDelete) ? 'justify-end' : 'justify-between'} gap-2.5`}>
-          {!readOnly && onDelete && (
-            <button
-              type="button"
-              onClick={() => setIsConfirmingDelete(true)}
-              className="px-3.5 py-2.5 rounded-xl border-0 bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <TrashIcon className="w-4 h-4" />
-              <span>Delete</span>
-            </button>
-          )}
 
-          <div className="flex items-center gap-2">
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2.5 rounded-xl border-0 theme-bg-surface hover:theme-bg-elevated/60 theme-text-secondary font-semibold text-xs transition cursor-pointer shadow-xs"
-              >
-                Close
-              </button>
+        {/* Inline Delete Confirmation Block with CustomSelect Scope */}
+        {!readOnly && isConfirmingDelete ? (
+          <div className="p-4 rounded-3xl bg-rose-500/10 dark:bg-rose-950/30 border-0 space-y-3.5 animate-fade-in shadow-xs">
+            <div className="flex items-center gap-2">
+              <TrashIcon className="w-4 h-4 theme-danger shrink-0" />
+              <h4 className="text-xs font-bold theme-text-primary">
+                {t('confirmDeletion', 'Confirm Schedule Deletion')}
+              </h4>
+            </div>
+
+            {isRecurringOrMultiDay ? (
+              <div className="space-y-1.5 pt-1">
+                <label className="block text-xs font-semibold theme-text-secondary">
+                  {t('applyDeletionTo', 'Apply Deletion To')}
+                </label>
+                <CustomSelect
+                  value={deleteScope}
+                  onChange={(val: any) => setDeleteScope(String(val))}
+                  options={deleteScopeOptions}
+                  placeholder={t('applyDeletionTo', 'Select delete scope...')}
+                  showDescription={true}
+                  direction="up"
+                />
+              </div>
+            ) : (
+              <p className="text-xs theme-text-secondary leading-relaxed">
+                {t('confirmDeleteSingle', 'Are you sure you want to permanently delete this item?')} ({event.title})
+              </p>
             )}
-            {!readOnly && onEdit && (
-              <button
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-0">
+              <CustomButton
                 type="button"
-                onClick={onEdit}
-                className="px-4 py-2.5 rounded-xl theme-bg-accent text-white font-bold text-xs shadow-md hover:opacity-90 active:scale-98 transition flex items-center gap-1.5 cursor-pointer border-0 ring-0"
+                variant="surface"
+                size="sm"
+                onClick={() => setIsConfirmingDelete(false)}
               >
-                <EditIcon className="w-4 h-4" />
-                <span>Edit Schedule</span>
-              </button>
-            )}
+                {t('cancel', 'Cancel')}
+              </CustomButton>
+              <CustomButton
+                type="button"
+                variant="danger-solid"
+                size="sm"
+                icon={TrashIcon}
+                onClick={() => {
+                  if (onDelete) {
+                    onDelete({
+                      id: event.id,
+                      deleteScope: isRecurringOrMultiDay ? deleteScope : 'ALL_EVENTS',
+                      targetDate: effectiveDate,
+                    });
+                  }
+                }}
+              >
+                {t('confirmDeleteBtn', 'Confirm Delete')}
+              </CustomButton>
+            </div>
           </div>
-        </div>
-      )}
+        ) : (
+          /* Action Buttons (Read-Only shows only Close button) */
+          <div className={`pt-2 border-0 flex items-center ${readOnly || (!onEdit && !onDelete) ? 'justify-end' : 'justify-between'} gap-2.5 flex-wrap`}>
+            {!readOnly && onDelete && (
+              <CustomButton
+                type="button"
+                variant="danger"
+                size="md"
+                icon={TrashIcon}
+                onClick={() => setIsConfirmingDelete(true)}
+              >
+                {t('deleteBtn', 'Delete')}
+              </CustomButton>
+            )}
+
+            <div className="flex items-center gap-2 ml-auto">
+              {onClose && (
+                <CustomButton
+                  type="button"
+                  variant="surface"
+                  size="md"
+                  onClick={onClose}
+                >
+                  {t('close', 'Close')}
+                </CustomButton>
+              )}
+              {!readOnly && onEdit && (
+                <CustomButton
+                  type="button"
+                  variant="primary"
+                  size="md"
+                  icon={EditIcon}
+                  onClick={onEdit}
+                >
+                  {t('editScheduleBtn', 'Edit Schedule')}
+                </CustomButton>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </DrawerContainer>
   );
 };

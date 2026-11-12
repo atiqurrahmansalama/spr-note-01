@@ -39,6 +39,7 @@ export const emailTemplatesSectionConfig: DeveloperToolsSectionItem = {
   title: "Email Templates & Mailer",
   description: "Live interactive rendering, variable sandbox, and SMTP testing console",
   icon: MailIcon,
+  superAdminOnly: true,
 };
 
 // Fallback catalog in case of cold start or network delay

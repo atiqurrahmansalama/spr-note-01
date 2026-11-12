@@ -362,6 +362,11 @@ class StaffLeaveRequest(models.Model):
 
 
 class StaffOnboardingToken(models.Model):
+    ONBOARDING_MODE_CHOICES = [
+        ('QUICK', 'Quick Onboarding'),
+        ('FULL', 'Full Onboarding Wizard'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     institution = models.ForeignKey(
         'core.AcademicInstitution',
@@ -370,13 +375,23 @@ class StaffOnboardingToken(models.Model):
     )
     token = models.CharField(max_length=64, unique=True, db_index=True)
     title = models.CharField(max_length=150, help_text="e.g. Senior Faculty Recruitment 2026")
+    onboarding_mode = models.CharField(
+        max_length=16,
+        choices=ONBOARDING_MODE_CHOICES,
+        default='FULL',
+        help_text="Form flow presented to applicants opening this public invitation link"
+    )
     staff_type = models.CharField(
-        max_length=20,
-        choices=StaffProfile.STAFF_TYPE_CHOICES,
+        max_length=50,
         default='TEACHING',
         db_index=True
     )
     designation = models.CharField(max_length=100, blank=True, default='', help_text="Preset designation/title")
+    allowed_designations = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of permitted rank/designation titles applicants may apply for"
+    )
     rank_order = models.IntegerField(default=99, help_text="Default hierarchy rank")
     department = models.ForeignKey(
         'core.AcademicDepartment',

@@ -853,7 +853,10 @@ function DataTable<T = any>({
                 : col.cellClassName || col.className || '';
 
             const keyName = col.key || col.accessor || col.id || col.dataIndex;
-            const colStyle = getColumnStyle(keyName, activeColumnWidths, col);
+            const colStyle = getColumnStyle(keyName, activeColumnWidths, col, {
+              isVertical,
+              isNestedTable,
+            });
             const content = getCellValue(item, col, rowIdx, level);
 
             const isTreeCol =
@@ -1203,7 +1206,10 @@ function DataTable<T = any>({
                     );
                     const colSortKey =
                       col.sortKey || col.accessor || col.key || col.id || col.dataIndex;
-                    const colStyle = getColumnStyle(colSortKey, activeColumnWidths, col);
+                    const colStyle = getColumnStyle(colSortKey, activeColumnWidths, col, {
+                      isVertical,
+                      isNestedTable,
+                    });
                     const isStickyRight = isStickyCol(col, 'right');
                     const isColResizable =
                       resizable !== false &&
@@ -1475,7 +1481,10 @@ function DataTable<T = any>({
                     )}
                     {columns.map((col, cIdx) => {
                       const colKey = col.key || col.id || col.accessor || col.dataIndex;
-                      const colStyle = getColumnStyle(colKey, activeColumnWidths, col);
+                      const colStyle = getColumnStyle(colKey, activeColumnWidths, col, {
+                        isVertical,
+                        isNestedTable,
+                      });
                       const val =
                         typeof subRow === 'function'
                           ? subRow(col, cIdx)
@@ -1546,7 +1555,10 @@ function DataTable<T = any>({
                     )}
                     {columns.map((col, cIdx) => {
                       const colKey = col.key || col.id || col.accessor || col.dataIndex;
-                      const colStyle = getColumnStyle(colKey, activeColumnWidths, col);
+                      const colStyle = getColumnStyle(colKey, activeColumnWidths, col, {
+                        isVertical,
+                        isNestedTable,
+                      });
                       let val: any;
                       if (typeof fRow === 'function') {
                         val = fRow(col, cIdx);

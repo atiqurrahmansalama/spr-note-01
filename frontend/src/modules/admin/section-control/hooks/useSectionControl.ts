@@ -550,6 +550,12 @@ export function useSectionControl() {
     } catch {}
   }, []);
 
+  // Discard all unsaved changes
+  const handleDiscardChanges = useCallback(() => {
+    setModifiedFlags({});
+    showToast(t('toasts.discardSuccess', 'Unsaved changes discarded.'), 'info');
+  }, [showToast, t]);
+
   // Save Batch Updates
   const handleSaveBatch = useCallback(async () => {
     const keys = Object.keys(modifiedFlags);
@@ -576,7 +582,7 @@ export function useSectionControl() {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
+      if (!res.ok && res.status === 404) {
         res = await fetchWithAuth('/api/v1/control-panel/rules/batch-update/', {
           method: 'POST',
           body: JSON.stringify(payload),
@@ -584,7 +590,7 @@ export function useSectionControl() {
       }
 
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         showToast(data.message || t('toasts.saveSuccess', 'Section rules saved successfully!'), 'success');
 
         broadcastUpdate();
@@ -593,9 +599,13 @@ export function useSectionControl() {
         refetchConfig();
         loadRules();
       } else {
-        showToast(t('toasts.saveError', 'Failed to save section rule updates.'), 'error');
+        const errorData = await res.json().catch(() => null);
+        console.error('[useSectionControl] Save batch error:', res.status, errorData);
+        const serverMsg = errorData?.message || errorData?.detail || errorData?.error;
+        showToast(serverMsg || t('toasts.saveError', 'Failed to save section rule updates.'), 'error');
       }
-    } catch {
+    } catch (err: any) {
+      console.error('[useSectionControl] Network exception saving rules:', err);
       showToast(t('toasts.serverError', 'Error updating rules on server.'), 'error');
     } finally {
       setSaving(false);
@@ -674,10 +684,17 @@ export function useSectionControl() {
         })),
       };
 
-      await fetchWithAuth('/api/v1/admin/section-control/update/', {
+      const res = await fetchWithAuth('/api/v1/admin/section-control/update/', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        const serverMsg = errorData?.message || errorData?.detail || errorData?.error;
+        showToast(serverMsg || t('toasts.saveError', 'Failed to update global section rules.'), 'error');
+        return;
+      }
 
       // 2. Clear conflicting overrides for these specific section keys
       const clearRes = await fetchWithAuth('/api/v1/admin/section-control/clear-overrides/', {
@@ -745,6 +762,7 @@ export function useSectionControl() {
     loadingLogs,
     handleToggle,
     handleSaveBatch,
+    handleDiscardChanges,
     handleResetOverrides,
     handleClearOverridesGlobally,
     loadRules,

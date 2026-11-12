@@ -2,28 +2,34 @@ import React, { useMemo } from 'react';
 import CustomSelect from '@/components/ui/CustomSelect';
 import ReusableCalendar from '@/components/common/ReusableCalendar';
 import DepartmentSelect from '@/components/selectors/DepartmentSelect';
-import { STAFF_CATEGORY_OPTIONS } from '@/utils/localStore';
+import { useStaffRanks, useStaffCategories } from '../../hooks';
 import { useStaffTranslation } from '../../locales';
 import type { StaffOnboardingPayload, StaffRankItem } from '../../types';
 
 interface StaffOnboardingStepRoleProps {
   formData: StaffOnboardingPayload;
-  ranksList: StaffRankItem[];
+  ranksList?: StaffRankItem[];
   errors: Record<string, string>;
   onChange: (field: keyof StaffOnboardingPayload, val: any) => void;
   showIntroBanner?: boolean;
   mode?: 'full' | 'quick';
+  allowedDesignations?: string[];
 }
 
 export const StaffOnboardingStepRole: React.FC<StaffOnboardingStepRoleProps> = ({
   formData,
-  ranksList,
   errors,
   onChange,
   showIntroBanner = true,
   mode = 'full',
+  allowedDesignations,
 }) => {
-  const { t, formatNumber } = useStaffTranslation();
+  const { t } = useStaffTranslation();
+
+  const { categoryOptions } = useStaffCategories({ currentValue: formData.staff_type });
+  const { rankOptions, getRankByName } = useStaffRanks({
+    allowedDesignations,
+  });
 
   const employmentStatusOptions = useMemo(
     () => [
@@ -36,17 +42,8 @@ export const StaffOnboardingStepRole: React.FC<StaffOnboardingStepRoleProps> = (
     [t]
   );
 
-  const rankOptions = useMemo(() => {
-    return ranksList.map((r) => ({
-      label: `${r.name_bn ? `${r.name_bn} (${r.name})` : r.name} — [${formatNumber(r.order)}]`,
-      value: r.name,
-      rank_order: r.order,
-      staff_type: r.type,
-    }));
-  }, [ranksList, formatNumber]);
-
   const handleRankSelect = (selectedName: string) => {
-    const matched = ranksList.find((r) => r.name === selectedName);
+    const matched = getRankByName(selectedName);
     onChange('designation', selectedName);
     if (matched) {
       onChange('rank_order', matched.order);
@@ -58,8 +55,8 @@ export const StaffOnboardingStepRole: React.FC<StaffOnboardingStepRoleProps> = (
 
   const staffTypeField = (
     <CustomSelect
-      label={`${t('staffType', 'Staff Category')} *`}
-      options={STAFF_CATEGORY_OPTIONS}
+      label={t('staffType', 'Staff Category')}
+      options={categoryOptions}
       value={formData.staff_type}
       onChange={(val) => onChange('staff_type', val)}
     />
@@ -67,7 +64,7 @@ export const StaffOnboardingStepRole: React.FC<StaffOnboardingStepRoleProps> = (
 
   const designationField = (
     <CustomSelect
-      label={`${t('designation', 'Designation / Official Rank')} *`}
+      label={t('designation', 'Designation / Official Rank')}
       options={rankOptions}
       value={formData.designation}
       onChange={(val) => handleRankSelect(val)}
@@ -90,19 +87,21 @@ export const StaffOnboardingStepRole: React.FC<StaffOnboardingStepRoleProps> = (
     </div>
   );
 
-  // Compact Quick Onboarding mode: strictly essential category, rank, and joining date without Department or Employment Status
+  // Compact Quick Onboarding mode: container-responsive 2 column grid
   if (mode === 'quick') {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start animate-fade-in border-0">
-        {staffTypeField}
-        {designationField}
-        <div className="sm:col-span-2 lg:col-span-1">{joiningDateField}</div>
+      <div className="@container border-0">
+        <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-4 items-start animate-fade-in border-0">
+          {staffTypeField}
+          {designationField}
+          <div className="@[480px]:col-span-2">{joiningDateField}</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in border-0">
+    <div className="@container space-y-6 animate-fade-in border-0">
       {showIntroBanner && (
         <div className="p-4 rounded-2xl theme-bg-app border-0 text-start">
           <h4 className="text-xs font-bold theme-text-primary">
@@ -117,12 +116,12 @@ export const StaffOnboardingStepRole: React.FC<StaffOnboardingStepRoleProps> = (
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-0">
+      <div className="grid grid-cols-1 @[540px]:grid-cols-2 gap-4 border-0">
         {staffTypeField}
         {designationField}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 border-0">
+      <div className="grid grid-cols-1 @[540px]:grid-cols-2 @[820px]:grid-cols-3 gap-4 border-0">
         <div>
           <label className="text-xs font-bold theme-text-secondary block mb-1.5 text-start">
             {t('department', 'Department')}
@@ -141,7 +140,7 @@ export const StaffOnboardingStepRole: React.FC<StaffOnboardingStepRoleProps> = (
           onChange={(val) => onChange('employment_status', val)}
         />
 
-        <div className="sm:col-span-2 lg:col-span-1">
+        <div className="@[540px]:col-span-2 @[820px]:col-span-1">
           {joiningDateField}
         </div>
       </div>

@@ -60,5 +60,18 @@ export const en = {
   workspaceRoleBuilder: 'Workspace Customizer (Role Builder)',
   widgetGovernance: 'Widget Role & Academy Scopes',
   doneCustomizing: 'Done Customizing',
+
+  // Approvals Widget
+  approvalsCenterTitle: 'Approvals Center',
+  pendingQueueSub: 'Institutional Review & Decision Queue',
+  viewAll: 'View All',
+  totalPending: 'Pending',
+  staffDomain: 'Staff',
+  studentDomain: 'Students',
+  financeDomain: 'Finance',
+  urgentReview: 'Needs Review',
+  loadingQueue: 'Checking pending approvals...',
+  allCaughtUp: 'All caught up!',
+  noPendingNotice: 'No applications or requests currently awaiting review.',
 };
 

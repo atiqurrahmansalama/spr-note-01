@@ -56,13 +56,19 @@ export const DocumentTypesPanel: React.FC<AdmissionTaxonomyProps> = ({ activeTen
           defaultValue: ["PDF", "JPG", "PNG"],
           tableHeader: "Allowed Formats",
           renderBadge: (val: any) => {
-            const resolved = resolveAllowedFormatsConfig(val);
+            const config = resolveAllowedFormatsConfig(val);
+            const tags: string[] =
+              Array.isArray(config?.tags) && config.tags.length > 0
+                ? config.tags
+                : Array.isArray(val)
+                ? val
+                : ["PDF", "JPG", "PNG"];
             return (
               <div className="flex flex-wrap gap-1">
-                {resolved.map((fmt: string) => (
+                {tags.map((fmt: string) => (
                   <span
                     key={fmt}
-                    className="px-1.5 py-0.5 rounded font-mono text-[10px] font-bold theme-bg-sub theme-text-secondary border theme-border"
+                    className="px-1.5 py-0.5 rounded font-mono text-[10px] font-bold theme-bg-sub theme-text-secondary border-0 shadow-2xs"
                   >
                     {fmt}
                   </span>

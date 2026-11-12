@@ -174,9 +174,11 @@ from .views import (
     DepartmentBudgetViewSet,
     FinancialStatementReportsView,
     FinancialAuditLogViewSet,
+    ApprovalRequestViewSet,
 )
 
 router = DefaultRouter()
+router.register(r'approvals', ApprovalRequestViewSet, basename='approvals')
 router.register(r'audit-logs', AuditLogViewSet, basename='audit-logs')
 router.register(r'institutions', InstitutionViewSet, basename='institution')
 router.register(r'institution-categories', InstitutionCategoryViewSet, basename='institution-category')

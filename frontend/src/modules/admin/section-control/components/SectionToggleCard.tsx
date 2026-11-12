@@ -100,13 +100,7 @@ export const SectionToggleCard: React.FC<SectionToggleCardProps> = ({
           ? t('actions.disable', 'Click to disable')
           : t('actions.enable', 'Click to enable')
       }
-      className={`group rounded-xl transition-all duration-150 select-none flex items-center justify-between gap-3 sm:gap-4 px-3.5 py-2.5 sm:px-4 sm:py-3 cursor-pointer ${
-        isChild && !parentActive
-          ? 'theme-bg-sub/20 opacity-65 hover:opacity-95 hover:theme-bg-sub/40'
-          : isEffectivelyEnabled
-          ? 'theme-bg-surface hover:theme-bg-elevated shadow-2xs'
-          : 'theme-bg-sub/35 opacity-75 hover:opacity-100 hover:theme-bg-sub/60'
-      } ${hasLocalMod ? 'ring-1.5 ring-[var(--accent-main)]/60' : ''}`}
+      className="group rounded-xl transition-all duration-150 select-none flex items-center justify-between gap-3 sm:gap-4 px-3.5 py-2.5 sm:px-4 sm:py-3 cursor-pointer theme-bg-surface hover:theme-bg-elevated shadow-2xs border-0 ring-0"
     >
       {/* Left & Center: Streamlined Content (Click expands/collapses for parent rows) */}
       <div className="min-w-0 flex-1 space-y-1">
@@ -131,6 +125,13 @@ export const SectionToggleCard: React.FC<SectionToggleCardProps> = ({
           <span className="font-semibold text-xs sm:text-[13px] theme-text-primary truncate">
             {section.title}
           </span>
+
+          {hasLocalMod && (
+            <span
+              className="w-2 h-2 rounded-full bg-[var(--accent-main)] shrink-0 animate-pulse"
+              title={t('badges.unsaved', 'Unsaved change')}
+            />
+          )}
 
           {isChild && !parentActive ? (
             <span className="theme-danger-badge text-[9px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0">

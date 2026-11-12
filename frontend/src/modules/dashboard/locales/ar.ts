@@ -60,5 +60,18 @@ export const ar = {
   workspaceRoleBuilder: 'مخصص مساحة العمل (منشئ الأدوار)',
   widgetGovernance: 'نطاقات أدوار الأدوات والأكاديمية',
   doneCustomizing: 'تم التخصيص',
+
+  // Approvals Widget
+  approvalsCenterTitle: 'مركز الموافقات',
+  pendingQueueSub: 'قائمة المراجعة والقرارات المؤسسية',
+  viewAll: 'عرض الكل',
+  totalPending: 'قيد الانتظار',
+  staffDomain: 'الموظفين',
+  studentDomain: 'الطلاب',
+  financeDomain: 'المالية',
+  urgentReview: 'بحاجة إلى مراجعة',
+  loadingQueue: 'جارٍ التحقق من الموافقات المعلقة...',
+  allCaughtUp: 'كل شيء محدث!',
+  noPendingNotice: 'لا توجد طلبات معلقة للمراجعة حالياً.',
 };
 

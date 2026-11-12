@@ -31,6 +31,7 @@ export const en = {
   actions: {
     saveChanges: 'Save Changes',
     saving: 'Saving...',
+    discardChanges: 'Discard Changes',
     forceApply: 'Save & Override All',
     forceApplyTitle: 'Save global defaults and override all role, group, and user customizations immediately.',
     applying: 'Saving & Overriding All...',
@@ -108,6 +109,7 @@ export const en = {
 
   toasts: {
     noChanges: 'No flag changes to save.',
+    discardSuccess: 'Unsaved changes discarded.',
     saveSuccess: 'Feature and module rules saved successfully!',
     saveError: 'Failed to save feature rule updates.',
     serverError: 'Error updating rules on server.',

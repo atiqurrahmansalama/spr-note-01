@@ -5,7 +5,11 @@ import { HealthDiagnosticsResponse } from "./types";
 // Domain Feature Components
 import { AcademyCategoriesPanel, BranchCategoriesPanel } from "../../academy/campus-structure/AcademyStructureTaxonomyPanels";
 import { PeriodSequencesPanel, PeriodCategoriesPanel, CurriculumSubjectsPanel } from "../../academy/routine-curriculum/RoutineTaxonomyPanels";
-import { StaffRanksPanel, StaffRecruitmentRulesPanel } from "../../staff-management/StaffTaxonomyPanels";
+import {
+  StaffCategoriesPanel,
+  StaffRanksPanel,
+  StaffRecruitmentRulesPanel,
+} from "../../staff-management/StaffTaxonomyPanels";
 import {
   WorkingSchedulesPanel,
   EventTypesPanel,
@@ -24,6 +28,7 @@ import TrashRestorationView from "../../admin/TrashRestorationView";
 import { SystemEnvironmentPanel } from "./SystemEnvironmentPanel";
 import { EmailTemplatesPreviewPanel } from "./EmailTemplatesPreviewPanel";
 import { ReleaseManagementView } from "../../version-control";
+import AttendanceSettingsView from "../../attendance/AttendanceSettingsView";
 
 
 export interface DeveloperToolsContentRendererProps {
@@ -77,6 +82,13 @@ export const DeveloperToolsContentRenderer: React.FC<DeveloperToolsContentRender
         </div>
       )}
 
+      {/* Section: Staff Categories */}
+      {currentRenderSection === "staff-categories" && (
+        <div className="w-full animate-fade-in">
+          <StaffCategoriesPanel activeTenantId={activeTenantId} />
+        </div>
+      )}
+
       {/* Section: Staff Ranks & Designations */}
       {currentRenderSection === "staff-ranks" && (
         <div className="w-full animate-fade-in">
@@ -109,6 +121,20 @@ export const DeveloperToolsContentRenderer: React.FC<DeveloperToolsContentRender
       {currentRenderSection === "weekly-holidays" && (
         <div className="w-full animate-fade-in">
           <WeeklyHolidaySettingsPanel activeTenantId={activeTenantId} />
+        </div>
+      )}
+
+      {/* Section 2.6: Attendance Timing Policies */}
+      {(currentRenderSection === "timing-rules" || currentRenderSection === "attendance-timing") && (
+        <div className="w-full animate-fade-in">
+          <AttendanceSettingsView isEmbedded={true} activeSectionOverride="timing-rules" />
+        </div>
+      )}
+
+      {/* Section 2.7: Class Attendance Off Events */}
+      {(currentRenderSection === "event-restrictions" || currentRenderSection === "attendance-off-events") && (
+        <div className="w-full animate-fade-in">
+          <AttendanceSettingsView isEmbedded={true} activeSectionOverride="event-restrictions" />
         </div>
       )}
 

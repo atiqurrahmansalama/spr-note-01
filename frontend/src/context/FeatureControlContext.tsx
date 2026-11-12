@@ -123,25 +123,29 @@ export const HARD_DEFAULTS: Record<string, boolean> = {
   finance_general_ledger: true,
   finance_reports: true,
 
-  // 9. App Management
+  // 9. Institution Settings
+  nav_institution_settings: true,
+  admin_tools: true,
+  attendance_policies_slots: true,
+
+  // 10. App Management
   nav_app_management: true,
+  app_approvals: true,
   app_section_control: true,
   app_user_management: true,
   app_role_management: true,
   app_activity_analytics: true,
   notification_management: true,
 
-  // 10. Settings
+  // 11. Settings
   nav_settings: true,
   settings_profile: true,
-  attendance_policies_slots: true,
   settings_security: true,
   settings_personalize: true,
   personalize_tab_appearance: true,
   personalize_tab_datetime: true,
   personalize_tab_language: true,
   settings_backup: true,
-  admin_tools: true,
   version_control: true,
 
   // 11. System & Standalone

@@ -3,8 +3,8 @@ import { useToast } from '@/context/ToastContext';
 import { useTenant } from '@/context/TenantContext';
 import { fetchWithAuth } from '@/utils/authService';
 import { getStaffList, getStaffMetrics, deleteStaff } from '@/api/staff';
-import { staffRanksStore } from '@/utils/localStore';
-import type { StaffMember, StaffMetrics, StaffRankItem, DepartmentItem } from '../../types';
+import { useStaffRanks } from '../../hooks';
+import type { StaffMember, StaffMetrics, DepartmentItem } from '../../types';
 
 export function useStaffRoster() {
   const { showToast } = useToast();
@@ -12,9 +12,7 @@ export function useStaffRoster() {
 
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [departments, setDepartments] = useState<DepartmentItem[]>([]);
-  const [ranksList, setRanksList] = useState<StaffRankItem[]>(() =>
-    staffRanksStore.getRanks(activeTenantId)
-  );
+  const { ranksList } = useStaffRanks(activeTenantId);
   const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
@@ -93,15 +91,6 @@ export function useStaffRoster() {
     window.addEventListener('spr_tenant_changed', handleTenantChanged);
     return () => window.removeEventListener('spr_tenant_changed', handleTenantChanged);
   }, [loadData]);
-
-  // Listen for live rank updates from Developer Tools
-  useEffect(() => {
-    const handleRanksUpdated = () => {
-      setRanksList(staffRanksStore.getRanks(activeTenantId));
-    };
-    window.addEventListener('spr_staff_ranks_updated', handleRanksUpdated);
-    return () => window.removeEventListener('spr_staff_ranks_updated', handleRanksUpdated);
-  }, [activeTenantId]);
 
   // Delete Single Staff Member
   const handleDeleteStaff = async (staff: StaffMember) => {

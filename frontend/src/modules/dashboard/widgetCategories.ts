@@ -97,6 +97,13 @@ export const MODULE_CATEGORIES: ModuleCategoryDef[] = [
     icon: ShieldCheckIcon,
     widgetIds: ['recent_activity', 'system_gateways'],
   },
+  {
+    id: 'APPROVALS_CENTER',
+    title: 'Approvals & Decision Center',
+    moduleName: 'Approvals Center',
+    icon: ChecklistIcon,
+    widgetIds: ['approvals_summary'],
+  },
 ];
 
 // Backward-compatible alias for existing imports

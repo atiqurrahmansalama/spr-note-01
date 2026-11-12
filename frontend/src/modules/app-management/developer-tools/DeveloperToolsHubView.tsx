@@ -8,6 +8,9 @@ import { DeveloperToolsContentRenderer } from "./DeveloperToolsContentRenderer";
 import { useToast } from "../../../context/ToastContext";
 import { useTenant } from "../../../context/TenantContext";
 import { fetchWithAuth } from "../../../utils/authService";
+import { useAuth } from "../../../context/AuthContext";
+import { auth as authStore } from "../../../utils/localStore";
+import { isUserSuperAdmin } from "../../../utils/roleUtils";
 import {
   calendarEventKindsStore,
   documentTypesStore,
@@ -19,8 +22,19 @@ import {
  */
 export const DeveloperToolsHubView: React.FC = () => {
   const { showToast } = useToast() as any;
-  const { activeTenantId } = useTenant() as any;
+  const { activeTenantId, isMultiTenantAdmin } = useTenant() as any;
+  const { user: authUser } = useAuth();
+  const currentUser = (authUser && typeof authUser === 'object' ? authUser : null) || authStore.getUser() || {};
+  const isSuper = isUserSuperAdmin(currentUser, isMultiTenantAdmin);
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Role-governed visible sections: Platform diagnostic tools are strictly reserved for Super Admin
+  const visibleSections = useMemo(() => {
+    return DEVELOPER_TOOLS_SECTIONS.filter((section) => {
+      if (section.superAdminOnly && !isSuper) return false;
+      return true;
+    });
+  }, [isSuper]);
 
   const [eventKinds, setEventKinds] = useState<any[]>(() => calendarEventKindsStore.getKinds(activeTenantId));
   const [docTypes, setDocTypes] = useState<any[]>(() => documentTypesStore.getDocumentTypes(activeTenantId));
@@ -126,7 +140,7 @@ export const DeveloperToolsHubView: React.FC = () => {
     }
   }, [pathSectionId, queryTab]);
 
-  const currentRenderSection = activeSection || DEVELOPER_TOOLS_SECTIONS[0]?.id || "categories";
+  const currentRenderSection = activeSection || visibleSections[0]?.id || "categories";
 
   const handleSectionChange = (sectionId: string | null) => {
     setActiveSection(sectionId);
@@ -180,10 +194,9 @@ export const DeveloperToolsHubView: React.FC = () => {
 
   return (
     <SettingsSplitLayout
-      title="Admin Tools"
-      subtitle="Configure institutional taxonomies, academy categories, calendar presets, admission rules, and system runtime."
-      headerIcon={SparklesIcon}
-      sections={DEVELOPER_TOOLS_SECTIONS}
+      title=""
+      subtitle=""
+      sections={visibleSections}
       activeSection={activeSection}
       onSectionChange={handleSectionChange}
       onBackToMenu={handleBackToMenu}

@@ -55,7 +55,10 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
   "/attendance/students/residential": { title: "Residential Attendance", category: "Student" },
   "/attendance/monthly-register": { title: "Class Attendance", category: "Daily Classroom" },
 
-  "/attendance/settings": { title: "Attendance Settings", category: "Settings" },
+  "/attendance/settings": { title: "Attendance Policies & Slots", category: "Institution Settings" },
+  "/institution-settings": { title: "Academic & Policy Standards", category: "Institution Settings" },
+  "/admin-tools": { title: "Academic & Policy Standards", category: "Institution Settings" },
+  "/developer-tools": { title: "Academic & Policy Standards", category: "Institution Settings" },
 
   "/student-management/departments": { title: "Department", category: "Academy" },
   "/student-management/classes": { title: "Class", category: "Academy" },
@@ -150,9 +153,11 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
   "/grading-rules": { title: "Grading Policies", category: "Examination & Results" },
 
   "/about": { title: "About", category: "About" },
-  "/trash-restoration": { title: "Trash & Restoration", category: "Admin Tools" },
-  "/version-control": { title: "Version Control & Releases", category: "Admin Tools" },
-  "/releases": { title: "Version Control & Releases", category: "Admin Tools" },
+  "/approvals": { title: "Approvals Center", category: "App Management" },
+  "/data-backup": { title: "Data & Backup", category: "App Management" },
+  "/trash-restoration": { title: "Trash & Restoration", category: "App Management" },
+  "/version-control": { title: "Version Control & Releases", category: "Settings" },
+  "/releases": { title: "Version Control & Releases", category: "Settings" },
 };
 
 /**
@@ -188,6 +193,32 @@ export function resolveRouteMeta(pathname: string, search: string = ""): RouteMe
     return { title: "Appearance", subCategory: "Preferences", category: "Settings" };
   }
 
+  if (currentPath === "/staff/onboarding" || currentPath === "/staff-onboarding") {
+    const searchParams = new URLSearchParams(search);
+    const activeTab = searchParams.get("tab") || "quick";
+    if (activeTab === "approvals") {
+      return { title: "Pending Approvals", subCategory: "Staff Onboarding", category: "Staff Management" };
+    } else if (activeTab === "online_qr") {
+      return { title: "Online Onboarding", subCategory: "Staff Onboarding", category: "Staff Management" };
+    } else if (activeTab === "direct" || activeTab === "wizard") {
+      return { title: "Full Onboarding Wizard", subCategory: "Staff Onboarding", category: "Staff Management" };
+    }
+    return { title: "Quick Onboarding", subCategory: "Staff Onboarding", category: "Staff Management" };
+  }
+
+  if (currentPath === "/admission" || currentPath === "/student-admission") {
+    const searchParams = new URLSearchParams(search);
+    const activeTab = searchParams.get("tab") || "quick";
+    if (activeTab === "approvals") {
+      return { title: "Pending Approvals", subCategory: "Admission", category: "Student" };
+    } else if (activeTab === "online_qr") {
+      return { title: "Online Admission", subCategory: "Admission", category: "Student" };
+    } else if (activeTab === "direct" || activeTab === "wizard") {
+      return { title: "Full Admission Wizard", subCategory: "Admission", category: "Student" };
+    }
+    return { title: "Quick Admission", subCategory: "Admission", category: "Student" };
+  }
+
   if (currentPath === "/academy/campus-profile") {
     const searchParams = new URLSearchParams(search);
     const activeTab = searchParams.get("tab");
@@ -201,10 +232,10 @@ export function resolveRouteMeta(pathname: string, search: string = ""): RouteMe
   } else if (currentPath === "/academy/classes-groups" || currentPath === "/classes-groups" || currentPath === "/academy/classes-sections" || currentPath === "/classes-sections") {
     meta = { title: "Classes & Sections", subCategory: "Classes & Groups", category: "Academy" };
   } else if (!meta) {
-    if (/^\/students\/[^/]+\/profile/.test(currentPath)) {
-      meta = { title: "Student Profile", category: "Student" };
+    if (/^\/students\/[^/]+/.test(currentPath)) {
+      meta = { title: "Student Profile", subCategory: "Student Roster", category: "Student" };
     } else if (/^\/staff\/[^/]+/.test(currentPath)) {
-      meta = { title: "Staff Profile", category: "Staff" };
+      meta = { title: "Staff Profile", subCategory: "Teacher & Staff Roster", category: "Staff Management" };
     } else {
       meta = { title: "Navigation View", category: "Navigation" };
     }

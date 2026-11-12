@@ -8,12 +8,29 @@ import { readJSON, writeJSON } from "./coreStore";
 
 // ─── Staff Categories Store ──────────────────────────────────────────────────
 
+const normalizeStaffCategory = (cat) => {
+  const rawLabel = cat?.label || cat?.name || cat?.value || "Category";
+  const rawValue = String(
+    cat?.value || cat?.code || rawLabel.toUpperCase().replace(/[^A-Z0-9_]/g, '_')
+  ).trim();
+  return {
+    id: cat?.id || rawValue,
+    value: rawValue,
+    name: cat?.name || rawLabel,
+    label: rawLabel,
+    code: cat?.code || rawValue,
+    badge: cat?.badge || rawValue.slice(0, 6),
+    description: cat?.description || `${rawLabel} Staff`,
+    is_active: cat?.is_active !== false,
+  };
+};
+
 export const STAFF_CATEGORY_OPTIONS = [
-  { value: "MANAGEMENT", label: "Executive / Management", badge: "MGMT", description: "Institutional leadership, Principal, Vice Principal & Executive Board" },
-  { value: "TEACHING", label: "Teaching Faculty", badge: "TEACHING", description: "Islamic Scholars, Subject Teachers, Instructors & Qaris" },
-  { value: "ADMIN", label: "Administrative Staff", badge: "ADMIN", description: "Office Secretaries, IT Executives & Admission Officers" },
-  { value: "FINANCE", label: "Finance & Accounts", badge: "FINANCE", description: "Accountants, Bursars, Cashiers & Audit Officers" },
-  { value: "SUPPORT", label: "Operations & Support", badge: "SUPPORT", description: "Hostel Wardens, Kitchen, Security, Maintenance & Logistics Staff" },
+  { id: "MANAGEMENT", value: "MANAGEMENT", name: "Executive / Management", label: "Executive / Management", code: "MANAGEMENT", badge: "MGMT", description: "Institutional leadership, Principal, Vice Principal & Executive Board", is_active: true },
+  { id: "TEACHING", value: "TEACHING", name: "Teaching Faculty", label: "Teaching Faculty", code: "TEACHING", badge: "TEACHING", description: "Islamic Scholars, Subject Teachers, Instructors & Qaris", is_active: true },
+  { id: "ADMIN", value: "ADMIN", name: "Administrative Staff", label: "Administrative Staff", code: "ADMIN", badge: "ADMIN", description: "Office Secretaries, IT Executives & Admission Officers", is_active: true },
+  { id: "FINANCE", value: "FINANCE", name: "Finance & Accounts", label: "Finance & Accounts", code: "FINANCE", badge: "FINANCE", description: "Accountants, Bursars, Cashiers & Audit Officers", is_active: true },
+  { id: "SUPPORT", value: "SUPPORT", name: "Operations & Support", label: "Operations & Support", code: "SUPPORT", badge: "SUPPORT", description: "Hostel Wardens, Kitchen, Security, Maintenance & Logistics Staff", is_active: true },
 ];
 
 export const staffCategoriesStore = {
@@ -24,56 +41,73 @@ export const staffCategoriesStore = {
       writeJSON(key, STAFF_CATEGORY_OPTIONS);
       return STAFF_CATEGORY_OPTIONS;
     }
-    return raw;
+    return raw.map(normalizeStaffCategory);
   },
   saveCategories: (tenantId, categories) => {
     const key = `spr_staff_categories_${tenantId || 'default'}`;
-    writeJSON(key, categories);
+    const normalized = (categories || []).map(normalizeStaffCategory);
+    writeJSON(key, normalized);
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent("spr_staff_categories_updated", { detail: categories }));
+      window.dispatchEvent(new CustomEvent("spr_staff_categories_updated", { detail: normalized }));
     }
-    return categories;
+    return normalized;
   },
   addCategory: (tenantId, categoryData) => {
     const list = staffCategoriesStore.getCategories(tenantId);
-    const label = typeof categoryData === 'string' ? categoryData : categoryData.label || categoryData.name;
-    const value = (typeof categoryData === 'object' && categoryData.value)
-      ? categoryData.value
+    const label = typeof categoryData === 'string'
+      ? categoryData
+      : (categoryData?.name || categoryData?.label || '').trim();
+    const rawValue = (typeof categoryData === 'object' && (categoryData?.value || categoryData?.code))
+      ? String(categoryData.value || categoryData.code)
       : label.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
-    const newCat = {
+    const value = rawValue || `CAT_${Date.now()}`;
+    const newCat = normalizeStaffCategory({
+      id: value,
       value,
+      name: label,
       label,
-      badge: (typeof categoryData === 'object' && categoryData.badge) ? categoryData.badge : value.slice(0, 5),
-      description: (typeof categoryData === 'object' && categoryData.description) ? categoryData.description : `${label} Staff`,
-    };
+      code: value,
+      badge: typeof categoryData === 'object' && categoryData?.badge ? categoryData.badge : value.slice(0, 6),
+      description: typeof categoryData === 'object' && categoryData?.description ? categoryData.description : `${label} Staff`,
+      is_active: typeof categoryData === 'object' && categoryData?.is_active !== undefined ? Boolean(categoryData.is_active) : true,
+    });
     const updated = [...list, newCat];
     staffCategoriesStore.saveCategories(tenantId, updated);
     return newCat;
   },
-  updateCategory: (tenantId, value, newLabel) => {
+  updateCategory: (tenantId, idOrValue, payloadOrLabel) => {
     const list = staffCategoriesStore.getCategories(tenantId);
-    const updated = list.map((c) =>
-      c.value === value
-        ? {
-            ...c,
-            label: newLabel,
-          }
-        : c
-    );
+    const updated = list.map((c) => {
+      if (c.id !== idOrValue && c.value !== idOrValue) return c;
+      if (typeof payloadOrLabel === 'string') {
+        return normalizeStaffCategory({ ...c, name: payloadOrLabel, label: payloadOrLabel });
+      }
+      const nextLabel = payloadOrLabel?.name || payloadOrLabel?.label || c.label;
+      return normalizeStaffCategory({
+        ...c,
+        ...payloadOrLabel,
+        name: nextLabel,
+        label: nextLabel,
+      });
+    });
     staffCategoriesStore.saveCategories(tenantId, updated);
     return updated;
   },
-  deleteCategory: (tenantId, valueToDelete, replacementValue) => {
+  deleteCategory: (tenantId, idOrValue, replacementValue) => {
     const list = staffCategoriesStore.getCategories(tenantId);
-    const updated = list.filter((c) => c.value !== valueToDelete);
+    const target = list.find((c) => c.id === idOrValue || c.value === idOrValue);
+    const targetValue = target?.value || idOrValue;
+    const updated = list.filter((c) => c.id !== idOrValue && c.value !== idOrValue);
     staffCategoriesStore.saveCategories(tenantId, updated);
 
-    // Migrate all staff ranks from deleted category to replacement category
-    const ranks = staffRanksStore.getRanks(tenantId);
-    const updatedRanks = ranks.map((r) =>
-      r.type === valueToDelete ? { ...r, type: replacementValue } : r
-    );
-    staffRanksStore.saveRanks(tenantId, updatedRanks);
+    if (replacementValue || updated[0]?.value) {
+      const fallbackVal = replacementValue || updated[0]?.value;
+      const ranks = staffRanksStore.getRanks(tenantId);
+      const updatedRanks = ranks.map((r) =>
+        r.type === targetValue ? { ...r, type: fallbackVal } : r
+      );
+      staffRanksStore.saveRanks(tenantId, updatedRanks);
+    }
 
     return updated;
   },

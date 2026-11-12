@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircleIcon } from '@/components/ui/Icons';
+import { SubmissionReceiptView } from '@/modules/approvals';
 import { useStaffTranslation } from '../../locales';
 
 interface StaffOnboardingSuccessProps {
@@ -14,6 +15,26 @@ export const StaffOnboardingSuccess: React.FC<StaffOnboardingSuccessProps> = ({
 }) => {
   const navigate = useNavigate();
   const { t } = useStaffTranslation();
+
+  if (
+    result?.tracking_code &&
+    (result?.status === 'pending' ||
+      result?.status === 'scheduled' ||
+      result?.approval_status === 'PENDING' ||
+      !result?.staff?.employee_id)
+  ) {
+    return (
+      <SubmissionReceiptView
+        trackingCode={result.tracking_code}
+        status={result.approval_status || (result.status === 'scheduled' ? 'SCHEDULED' : 'PENDING')}
+        message={result.message}
+        effectiveDate={result.effective_date}
+        applicantName={result?.staff?.name}
+        designationOrClass={result?.staff?.designation}
+        onReset={onReset}
+      />
+    );
+  }
 
   const staff = result?.staff || result?.data || result;
   const staffId = staff?.id;

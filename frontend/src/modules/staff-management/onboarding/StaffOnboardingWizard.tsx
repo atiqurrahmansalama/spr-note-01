@@ -92,6 +92,7 @@ export const StaffOnboardingWizard: React.FC<StaffOnboardingWizardProps> = ({
             ranksList={ranksList}
             errors={errors}
             onChange={handleChange}
+            allowedDesignations={tokenMeta?.allowed_designations}
           />
         )}
 

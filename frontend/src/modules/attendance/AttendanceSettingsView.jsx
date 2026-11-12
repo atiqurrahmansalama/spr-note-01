@@ -42,12 +42,16 @@ const SECTIONS = [
   },
 ];
 
-export default function AttendanceSettingsView() {
+export default function AttendanceSettingsView({
+  isEmbedded = false,
+  activeSectionOverride = null,
+  defaultTab = "timing-rules",
+}) {
   const { showToast } = useToast();
   const { activeTenantId } = useTenant();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const activeSection = searchParams.get("tab") || "timing-rules";
+  const activeSection = activeSectionOverride || searchParams.get("tab") || defaultTab || "timing-rules";
 
   const handleSectionChange = (sectionId) => {
     setSearchParams(
@@ -276,18 +280,10 @@ export default function AttendanceSettingsView() {
     }).length;
   }, [eventKinds, restrictions]);
 
-  return (
-    <SettingsSplitLayout
-      title="Attendance Settings"
-      subtitle="Configure attendance timing windows, late thresholds, edit lockouts, and calendar holiday sync."
-      headerIcon={SettingsIcon}
-      sections={SECTIONS}
-      activeSection={activeSection}
-      onSectionChange={handleSectionChange}
-    >
-      <div className="w-full">
-        {/* ─── Section: Attendance Timing & Lock Policies ───────────────────── */}
-        {activeSection === "timing-rules" && (
+  const contentPane = (
+    <div className="w-full">
+      {/* ─── Section: Attendance Timing & Lock Policies ───────────────────── */}
+      {activeSection === "timing-rules" && (
           <div className="space-y-5 animate-fade-in text-left">
             {/* Top Overview & Action Header */}
             <div className="p-4 sm:p-5 rounded-2xl border theme-border theme-bg-surface shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -799,6 +795,22 @@ export default function AttendanceSettingsView() {
           </div>
         )}
       </div>
+  );
+
+  if (isEmbedded) {
+    return contentPane;
+  }
+
+  return (
+    <SettingsSplitLayout
+      title="Attendance Settings"
+      subtitle="Configure attendance timing windows, late thresholds, edit lockouts, and calendar holiday sync."
+      headerIcon={SettingsIcon}
+      sections={SECTIONS}
+      activeSection={activeSection}
+      onSectionChange={handleSectionChange}
+    >
+      {contentPane}
     </SettingsSplitLayout>
   );
 }

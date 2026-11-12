@@ -6,6 +6,7 @@ import {
   academicSubjectsSectionConfig,
 } from "../../academy/routine-curriculum/RoutineTaxonomyPanels";
 import {
+  staffCategoriesSectionConfig,
   staffRanksSectionConfig,
   staffRecruitmentRulesSectionConfig,
 } from "../../staff-management/StaffTaxonomyPanels";
@@ -26,7 +27,23 @@ import { classroomConfigSectionConfig } from "../../learning/daily-classroom/com
 import { trashRestorationSectionConfig } from "../../admin/TrashRestorationView";
 import { systemEnvironmentSectionConfig } from "./SystemEnvironmentPanel";
 import { emailTemplatesSectionConfig } from "./EmailTemplatesPreviewPanel";
-import { RefreshIcon } from "../../../components/ui/Icons";
+import { RefreshIcon, ClockIcon, CalendarIcon } from "../../../components/ui/Icons";
+
+export const attendanceTimingSectionConfig: DeveloperToolsSectionItem = {
+  id: "timing-rules",
+  group: "Attendance & Schedules",
+  title: "Attendance Timing Policies",
+  description: "Configure start/late thresholds, edit lockout windows, auto-absent triggers, and overrides",
+  icon: ClockIcon,
+};
+
+export const attendanceEventRestrictionsSectionConfig: DeveloperToolsSectionItem = {
+  id: "event-restrictions",
+  group: "Attendance & Schedules",
+  title: "Class Attendance Off Events",
+  description: "Configure which calendar event types and specific events disable class attendance and mark recess",
+  icon: CalendarIcon,
+};
 
 export const versionControlSectionConfig: DeveloperToolsSectionItem = {
   id: "version-control",
@@ -34,6 +51,7 @@ export const versionControlSectionConfig: DeveloperToolsSectionItem = {
   title: "Version Control & Releases",
   description: "Manage client deployment versions, force-updates, and structured changelogs",
   icon: RefreshIcon,
+  superAdminOnly: true,
 };
 
 /**
@@ -45,23 +63,28 @@ export const DEVELOPER_TOOLS_SECTIONS: DeveloperToolsSectionItem[] = [
   academyCategoriesSectionConfig,
   periodSequencesSectionConfig,
   periodCategoriesSectionConfig,
-  staffRanksSectionConfig,
   academicSubjectsSectionConfig,
   gradingPoliciesSectionConfig,
 
-  // Group 2: Event & Calendar Schedules
+  // Group 2: Staff Management
+  staffCategoriesSectionConfig,
+  staffRanksSectionConfig,
+  staffRecruitmentRulesSectionConfig,
+
+  // Group 3: Attendance & Calendar Schedules
   workingSchedulesSectionConfig,
   weeklyHolidaysSectionConfig,
+  attendanceTimingSectionConfig,
+  attendanceEventRestrictionsSectionConfig,
   eventTypesSectionConfig,
   impactScopesSectionConfig,
 
-  // Group 3: Admissions & Recruitment Rules
+  // Group 4: Admissions
   admissionSettingsSectionConfig,
   documentTypesSectionConfig,
   admissionDocRequirementsSectionConfig,
-  staffRecruitmentRulesSectionConfig,
 
-  // Group 4: Classroom Configuration
+  // Group 5: Classroom Configuration
   classroomSessionsSectionConfig,
   classroomConfigSectionConfig,
 

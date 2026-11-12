@@ -18,6 +18,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                     user_obj = User.objects.get(phone_number=phone_input)
                 
                 ip = get_client_ip(request)
+                user_agent = request.META.get('HTTP_USER_AGENT', '')[:500]
                 country = request.data.get('country', '--')
                 city = request.data.get('city', '--')
 

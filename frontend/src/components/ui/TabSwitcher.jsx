@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useHorizontalScroll } from '../../hooks';
+import CustomButton from './CustomButton';
 
 /**
  * Reusable Theme-Aware Tab Switcher Component
@@ -10,6 +11,7 @@ import { useHorizontalScroll } from '../../hooks';
  * @param {string} activeTab
  * @param {Function} onChange
  * @param {React.ReactNode} rightContent
+ * @param {{label: string, icon?: React.ComponentType, onClick: Function, title?: string, variant?: string, disabled?: boolean}|null} inlineAction - Optional built-in compact action button rendered inline on the same row across all screen widths.
  * @param {string} className
  * @param {boolean} keepRightContentInline - When true, keeps rightContent on the exact same row as tabs on mobile/small screens.
  */
@@ -20,11 +22,13 @@ export default function TabSwitcher({
   onChange = null,
   onTabChange = null,
   rightContent = null,
+  inlineAction = null,
   className = '',
   keepRightContentInline = false,
 }) {
   const tabsContainerRef = useHorizontalScroll();
   const handleTabSelect = onChange || onTabChange;
+  const forceInlineRow = Boolean(keepRightContentInline || inlineAction);
 
   // Auto-scroll active tab into view horizontally within container only
   useEffect(() => {
@@ -47,7 +51,7 @@ export default function TabSwitcher({
   return (
     <div
       className={
-        keepRightContentInline
+        forceInlineRow
           ? `flex flex-row items-center justify-between gap-2 sm:gap-4 border-b theme-border w-full min-w-0 ${className}`
           : `flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 sm:border-b theme-border w-full min-w-0 ${className}`
       }
@@ -56,7 +60,7 @@ export default function TabSwitcher({
       <div
         ref={tabsContainerRef}
         className={
-          keepRightContentInline
+          forceInlineRow
             ? "flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 max-w-full cursor-grab active:cursor-grabbing pt-1 sm:pt-1.5"
             : "flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 max-w-full cursor-grab active:cursor-grabbing pt-1 sm:pt-1.5 border-b sm:border-b-0 theme-border"
         }
@@ -101,15 +105,29 @@ export default function TabSwitcher({
         })}
       </div>
 
-      {/* Right-aligned Slot (Action button, search box, filters, etc.) */}
-      {rightContent && (
+      {/* Right-aligned Slot (Built-in inlineAction button or custom rightContent) */}
+      {(inlineAction || rightContent) && (
         <div
           className={
-            keepRightContentInline
-              ? "flex items-center justify-end gap-1.5 sm:gap-2 shrink-0 pb-1 sm:pb-0 w-auto overflow-x-auto scrollbar-none"
+            forceInlineRow
+              ? "flex items-center justify-end gap-1.5 sm:gap-2 shrink-0 pb-1.5 sm:pb-1 w-auto"
               : "flex items-center justify-end gap-2 shrink-0 pb-1.5 sm:pb-0 w-full sm:w-auto overflow-x-auto scrollbar-none"
           }
         >
+          {inlineAction && (
+            <CustomButton
+              type="button"
+              variant={inlineAction.variant || 'primary'}
+              size="sm"
+              icon={inlineAction.icon}
+              onClick={inlineAction.onClick}
+              disabled={inlineAction.disabled}
+              title={inlineAction.title || inlineAction.label}
+              className="whitespace-nowrap shrink-0"
+            >
+              {inlineAction.label}
+            </CustomButton>
+          )}
           {rightContent}
         </div>
       )}

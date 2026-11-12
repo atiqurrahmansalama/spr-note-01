@@ -15,6 +15,7 @@ export const systemEnvironmentSectionConfig = {
   title: "System & Environment",
   description: "Platform version, environment diagnostics, and local cache manager",
   icon: SparklesIcon,
+  superAdminOnly: true,
 };
 
 /**

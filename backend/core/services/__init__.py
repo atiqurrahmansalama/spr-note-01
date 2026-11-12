@@ -16,6 +16,7 @@ from .student_service import register_student, promote_student_class
 from .staff_service import onboard_staff_member, assign_teacher_periods, ensure_institution_staff_profile, sync_user_and_staff_roles
 from .exam_service import calculate_exam_tabulation_stats
 from .attendance_service import record_bulk_classroom_attendance
+from .approval_engine import ApprovalService, BaseApprovalHandler, StaffOnboardingApprovalHandler
 
 # 2. Re-export legacy core business services for 100% backward compatibility
 from core.legacy_services import *  # noqa: F401, F403

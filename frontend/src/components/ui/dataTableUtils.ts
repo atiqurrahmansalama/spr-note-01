@@ -222,7 +222,8 @@ export function getStickyCellClass(
 export function getColumnStyle(
   colKey?: string,
   activeWidths?: Record<string, number>,
-  col?: Column<any>
+  col?: Column<any>,
+  options?: { isVertical?: boolean; isNestedTable?: boolean }
 ): React.CSSProperties | undefined {
   if (colKey && activeWidths?.[colKey] !== undefined) {
     const customWidth = activeWidths[colKey];
@@ -236,8 +237,24 @@ export function getColumnStyle(
   if (col?.width || col?.minWidth || col?.maxWidth) {
     return {
       width: col.width || undefined,
-      minWidth: col.minWidth || undefined,
+      minWidth: col.minWidth ?? col.width ?? undefined,
       maxWidth: col.maxWidth || undefined,
+      boxSizing: 'border-box',
+    };
+  }
+  if (!options?.isVertical && !options?.isNestedTable && !col?.compactWidth) {
+    const normalizedKey = String(colKey || col?.key || col?.id || '').toLowerCase();
+    const defaultMinWidth =
+      normalizedKey === 'actions' || normalizedKey === 'action'
+        ? '76px'
+        : normalizedKey === 'serial' ||
+          normalizedKey === 'sl' ||
+          normalizedKey === 'order' ||
+          normalizedKey === 'no'
+        ? '56px'
+        : '130px';
+    return {
+      minWidth: defaultMinWidth,
       boxSizing: 'border-box',
     };
   }

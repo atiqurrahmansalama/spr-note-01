@@ -27,6 +27,7 @@ import {
   ReleaseNotesDrawer,
   ForceUpdateModal,
 } from "../../modules/version-control";
+import { GlobalApprovalReviewDrawer } from "../../modules/approvals";
 
 // Re-export ROUTE_TITLE_MAP and RouteMeta for complete backward compatibility
 export { ROUTE_TITLE_MAP, resolveRouteMeta, type RouteMeta };
@@ -109,6 +110,24 @@ export default function AppLayout() {
         <NotificationCenterDrawer
           key={`notification_detail_${notifId || 'active'}`}
           initialNotificationId={notifId}
+          onClose={closeDrawer || closeRightSidebar}
+        />
+      ),
+    };
+  });
+
+  // Global Drawer Registration: Unified Approval Review & Decision
+  useDrawerRegistration('approval-review', (params) => {
+    const reqId = params.get('id');
+    const trackingCode = params.get('trackingCode');
+    return {
+      title: trackingCode ? `Review Request — ${trackingCode}` : 'Review Approval Request',
+      category: 'Approvals',
+      size: 'md',
+      content: (
+        <GlobalApprovalReviewDrawer
+          key={`global_approval_review_${reqId || 'active'}`}
+          requestId={reqId || undefined}
           onClose={closeDrawer || closeRightSidebar}
         />
       ),

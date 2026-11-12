@@ -41,6 +41,9 @@ import {
   CalculatorIcon,
   InvoiceIcon,
   RefreshIcon,
+  ChecklistIcon,
+  AdjustmentsHorizontalIcon,
+  ShieldCheckIcon,
 } from "../ui/Icons";
 
 
@@ -97,6 +100,16 @@ export default function SidebarContainer({
       matchPaths: ["/dashboard"],
       Icon: DashboardIcon,
       key: "nav_dashboard"
+    },
+    {
+      id: "Approvals Center",
+      name: "Approvals Center",
+      i18nKey: "approvalsCenter",
+      path: "/approvals",
+      matchPaths: ["/approvals"],
+      Icon: ChecklistIcon,
+      key: "app_approvals",
+      adminOnly: true,
     },
     {
       id: "Academy",
@@ -296,15 +309,17 @@ export default function SidebarContainer({
       id: "App Management",
       name: "App Management",
       i18nKey: "appManagement",
-      Icon: SettingsIcon,
+      Icon: ShieldCheckIcon,
       hasSub: true,
       key: "nav_app_management",
+      adminOnly: true,
       subItems: [
-        { id: "Feature & Module Control", name: "Feature & Module Control", i18nKey: "sectionControl", path: "/section-control", matchPaths: ["/section-control"], Icon: SectionControlIcon, key: "app_section_control" },
-        { id: "User Management", name: "User Management", i18nKey: "userManagement", path: "/user-management", matchPaths: ["/user-management"], Icon: SectionControlIcon, key: "app_user_management" },
-        { id: "Role Management", name: "Role Management", i18nKey: "roleManagement", path: "/role-management", matchPaths: ["/role-management"], Icon: SectionControlIcon, key: "app_role_management" },
-        { id: "Activity Analytics", name: "Activity Analytics", i18nKey: "activityAnalytics", path: "/activity-analytics", matchPaths: ["/activity-analytics"], Icon: DashboardIcon, key: "app_activity_analytics" },
-        { id: "Notification Management", name: "Notification Management", i18nKey: "notificationGateways", path: "/app-management/notifications", matchPaths: ["/app-management/notifications", "/notifications"], Icon: BellIcon, key: "notification_management" },
+        { id: "User Management", name: "User Management", i18nKey: "userManagement", path: "/user-management", matchPaths: ["/user-management"], Icon: SectionControlIcon, key: "app_user_management", adminOnly: true },
+        { id: "Role Management", name: "Role Management", i18nKey: "roleManagement", path: "/role-management", matchPaths: ["/role-management"], Icon: SectionControlIcon, key: "app_role_management", adminOnly: true },
+        { id: "Feature & Module Control", name: "Feature & Module Control", i18nKey: "sectionControl", path: "/section-control", matchPaths: ["/section-control"], Icon: SectionControlIcon, key: "app_section_control", superAdminOnly: true },
+        { id: "Notification Management", name: "Notification Management", i18nKey: "notificationGateways", path: "/app-management/notifications", matchPaths: ["/app-management/notifications", "/notifications"], Icon: BellIcon, key: "notification_management", adminOnly: true },
+        { id: "Activity Analytics", name: "Activity Analytics", i18nKey: "activityAnalytics", path: "/activity-analytics", matchPaths: ["/activity-analytics"], Icon: DashboardIcon, key: "app_activity_analytics", adminOnly: true },
+        { id: "Data & Backup", name: "Data & Backup", i18nKey: "dataBackup", path: "/data-backup", matchPaths: ["/data-backup"], Icon: CloudIcon, key: "settings_backup", superAdminOnly: true },
       ]
     },
     { 
@@ -316,12 +331,18 @@ export default function SidebarContainer({
       key: "nav_settings",
       subItems: [
         { id: "Profile Settings", name: "Profile Settings", i18nKey: "profileSettings", path: "/profile-settings", matchPaths: ["/profile-settings"], Icon: SettingsIcon, key: "settings_profile" },
-        { id: "Attendance Settings", name: "Attendance Settings", i18nKey: "attendanceSettings", path: "/attendance/settings", matchPaths: ["/attendance/settings"], Icon: AttendanceIcon, key: "attendance_policies_slots" },
-        { id: "Security & Sessions", name: "Security & Sessions", i18nKey: "securitySessions", path: "/security-sessions", matchPaths: ["/security-sessions"], Icon: SettingsIcon, key: "settings_security" },
+        { 
+          id: "Institution Settings", 
+          name: "Institution Settings", 
+          i18nKey: "institutionSettings", 
+          path: "/admin-tools", 
+          matchPaths: ["/admin-tools", "/developer-tools", "/institution-settings", "/sp-management", "/attendance/settings"], 
+          Icon: AdjustmentsHorizontalIcon, 
+          key: "admin_tools", 
+          adminOnly: true 
+        },
         { id: "Preferences", name: "Preferences", i18nKey: "preferences", path: "/preferences", matchPaths: ["/preferences", "/personalize", "/appearance", "/date-time", "/language"], Icon: AppearanceIcon, key: "settings_personalize" },
-        { id: "Data & Backup", name: "Data & Backup", i18nKey: "dataBackup", path: "/data-backup", matchPaths: ["/data-backup"], Icon: CloudIcon, key: "settings_backup" },
         { id: "Version & Releases", name: "Version & Releases", i18nKey: "versionControl", path: "/version-control", matchPaths: ["/version-control", "/releases"], Icon: RefreshIcon, key: "version_control" },
-        { id: "Admin Tools", name: "Admin Tools", i18nKey: "developerTools", path: "/admin-tools", matchPaths: ["/admin-tools", "/developer-tools", "/sp-management"], Icon: SparklesIcon, key: "admin_tools", superAdminOnly: true },
       ]
     },
     { id: "Shortcuts", name: "Shortcuts", i18nKey: "shortcuts", path: "/shortcuts", matchPaths: ["/shortcuts"], Icon: ShortcutsIcon, key: "nav_shortcuts" },
@@ -348,7 +369,8 @@ export default function SidebarContainer({
     .map((item) => {
       if (item.hasSub) {
         const visibleSubItems = item.subItems.filter((sub) => {
-          if (sub.superAdminOnly && !isMultiTenantAdmin) return false;
+          if (sub.superAdminOnly && !isSuper) return false;
+          if (sub.adminOnly && !isAcademyAdministrator && !isSuper) return false;
           if (isAcademyAdministrator && item.id === "Academy") return true;
           return isSectionEnabled(sub.key);
         });
@@ -358,6 +380,8 @@ export default function SidebarContainer({
     })
     .filter((item) => {
       if (isMobileScreen && item.id === "Shortcuts") return false;
+      if (item.superAdminOnly && !isSuper) return false;
+      if (item.adminOnly && !isAcademyAdministrator && !isSuper) return false;
       
       const isVisible = isSectionEnabled(item.key);
       if (!isVisible && !(isAcademyAdministrator && (item.id === "Dashboard" || item.id === "Academy"))) return false;

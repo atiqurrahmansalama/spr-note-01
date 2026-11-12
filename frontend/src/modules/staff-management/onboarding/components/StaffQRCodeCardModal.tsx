@@ -19,9 +19,20 @@ export const StaffQRCodeCardModal: React.FC<StaffQRCodeCardModalProps> = ({
   const roleText = tokenData.designation ? `as ${tokenData.designation}` : 'as Faculty / Staff';
   const shareText = `Assalamu Alaikum,\nYou are invited to join the staff and faculty of ${tokenData.institution_name || 'our institution'} ${roleText}.\n\nPlease complete your official onboarding here:\n${publicUrl}`;
 
+  const assignedPosts = Array.isArray(tokenData.allowed_designations) && tokenData.allowed_designations.length > 0
+    ? tokenData.allowed_designations.join(', ')
+    : tokenData.designation || '';
+
   const details: Array<{ label: string; value: string | number }> = [];
-  if (tokenData.designation) {
-    details.push({ label: 'Designation', value: tokenData.designation });
+  details.push({
+    label: 'Onboarding Flow',
+    value: tokenData.onboarding_mode === 'QUICK' ? 'Quick Onboarding' : 'Full Onboarding Wizard',
+  });
+  if (assignedPosts) {
+    details.push({ label: 'Permitted Posts', value: assignedPosts });
+  }
+  if (tokenData.department_name) {
+    details.push({ label: 'Department', value: tokenData.department_name });
   }
   if (tokenData.staff_type) {
     details.push({ label: 'Staff Category', value: tokenData.staff_type });

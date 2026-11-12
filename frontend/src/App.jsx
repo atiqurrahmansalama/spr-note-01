@@ -91,6 +91,7 @@ const DashboardHubView = lazy(() => import("./modules/dashboard/DashboardHubView
 const FinanceHubView = lazy(() => import("./modules/finance/FinanceHubView"));
 const PublicVerifyReceiptView = lazy(() => import("./modules/finance/components/public-verification/PublicVerifyReceiptView"));
 const ReleaseManagementView = lazy(() => import("./modules/version-control/views/ReleaseManagementView"));
+const ApprovalsHubView = lazy(() => import("./modules/approvals/ApprovalsHubView"));
 
 function ProtectedRoute({ children }) {
   const urlParams = new URLSearchParams(window.location.search);
@@ -158,6 +159,7 @@ export default function App() {
               >
                 <Route path="/dashboard" element={<DashboardHubView />} />
                 <Route path="/dashboard/:roleSlug" element={<DashboardHubView />} />
+                <Route path="/approvals" element={<ApprovalsHubView />} />
                 <Route path="/report-builder" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/student-reports" element={<Navigate to="/studies/progress-reports" replace />} />
                 <Route path="/students" element={<FeatureGuard sectionKey="student_roster"><StudentDirectoryView viewMode="students" /></FeatureGuard>} />
@@ -323,6 +325,8 @@ export default function App() {
                 <Route path="/institutions" element={<FeatureGuard sectionKey="app_institutions"><InstitutionListView /></FeatureGuard>} />
                 <Route path="/admin-tools" element={<DeveloperToolsHubView />} />
                 <Route path="/admin-tools/:sectionId" element={<DeveloperToolsHubView />} />
+                <Route path="/institution-settings" element={<DeveloperToolsHubView />} />
+                <Route path="/institution-settings/:sectionId" element={<DeveloperToolsHubView />} />
                 <Route path="/developer-tools" element={<DeveloperToolsHubView />} />
                 <Route path="/developer-tools/:sectionId" element={<DeveloperToolsHubView />} />
                 <Route path="/sp-management" element={<DeveloperToolsHubView />} />

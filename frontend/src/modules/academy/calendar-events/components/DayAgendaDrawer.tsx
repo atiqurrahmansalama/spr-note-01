@@ -3,11 +3,15 @@ import {
   CalendarIcon,
   PlusIcon,
   AlertTriangleIcon,
+  ArrowLeftIcon,
+  ChevronRightIcon,
 } from '../../../../components/ui/Icons';
+import CustomButton from '../../../../components/ui/CustomButton';
 import { getEventColors, getEventDisplayType } from './MasterTimeCalendar';
 import TimeScheduleDetailDrawer from './TimeScheduleDetailDrawer';
-import { DrawerContainer, DrawerBanner, DrawerFooter } from '../../../../components/layout';
+import { DrawerContainer, DrawerBanner } from '../../../../components/layout';
 import { masterCalendarStore, attendanceEventRestrictionsStore } from '../../../../utils/localStore';
+import { useCalendarTranslation } from '../locales';
 import type { CalendarEvent } from '../types';
 
 function formatTime12(timeStr?: string): string {
@@ -75,6 +79,7 @@ export const DayAgendaDrawer: React.FC<DayAgendaDrawerProps> = ({
   readOnly = false,
 }) => {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const { t } = useCalendarTranslation();
 
   const dateDetails = useMemo(() => formatFullDate(dateStr), [dateStr]);
 
@@ -153,15 +158,18 @@ export const DayAgendaDrawer: React.FC<DayAgendaDrawerProps> = ({
   // If a single event was clicked or chosen for details, show its full drawer
   if (selectedEvent) {
     return (
-      <div className="space-y-4 text-left animate-fade-in">
+      <div className="space-y-4 text-start animate-fade-in">
         {!readOnly && (
-          <button
+          <CustomButton
             type="button"
+            variant="ghost"
+            size="xs"
+            icon={ArrowLeftIcon}
             onClick={() => setSelectedEventId(null)}
-            className="flex items-center gap-1.5 text-xs font-semibold theme-accent hover:underline cursor-pointer pb-1"
+            className="theme-accent"
           >
-            <span>&larr; Back to all day tasks ({sortedEvents.length})</span>
-          </button>
+            {t('backToAllTasks', 'Back to all day tasks')} ({sortedEvents.length})
+          </CustomButton>
         )}
         <TimeScheduleDetailDrawer
           event={selectedEvent}
@@ -177,138 +185,160 @@ export const DayAgendaDrawer: React.FC<DayAgendaDrawerProps> = ({
 
   // Multi-event or zero-event day list
   return (
-    <DrawerContainer padding="normal" spacing="normal">
-      {/* Top Date Header Banner */}
-      <DrawerBanner
-        icon={CalendarIcon}
-        title={dateDetails.weekday || 'Day Agenda'}
-        badge={dateDetails.formatted || dateStr}
-        subtitle={
-          sortedEvents.length > 0
-            ? `${sortedEvents.length} scheduled item${sortedEvents.length > 1 ? 's' : ''} on this date`
-            : 'No active shifts or events scheduled'
-        }
-        actions={
-          !readOnly && (onAddEvent || onOpenEventForm) && (
-            <button
-              type="button"
-              onClick={() => {
-                if (onOpenEventForm) onOpenEventForm(null);
-                else if (onAddEvent) onAddEvent(dateStr);
-              }}
-              className="px-3.5 py-2 rounded-xl theme-bg-accent text-white text-xs font-bold hover:opacity-90 active:scale-98 transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0 shadow-xs w-full sm:w-auto"
-            >
-              <PlusIcon className="w-3.5 h-3.5" />
-              <span>Add Event</span>
-            </button>
-          )
-        }
-      />
+    <DrawerContainer padding="none" spacing="normal">
+      <div className="space-y-6 pt-2 pb-6 @container">
+        {/* Top Date Header Banner */}
+        <DrawerBanner
+          icon={CalendarIcon}
+          title={dateDetails.weekday || t('dayAgenda', 'Day Agenda')}
+          badge={dateDetails.formatted || dateStr}
+          subtitle={
+            sortedEvents.length > 0
+              ? `${sortedEvents.length} ${t('scheduledItems', 'Scheduled Items').toLowerCase()}`
+              : t('noActiveShifts', 'No active shifts or events scheduled')
+          }
+          actions={
+            !readOnly && (onAddEvent || onOpenEventForm) && (
+              <CustomButton
+                type="button"
+                variant="primary"
+                size="sm"
+                icon={PlusIcon}
+                onClick={() => {
+                  if (onOpenEventForm) onOpenEventForm(null);
+                  else if (onAddEvent) onAddEvent(dateStr);
+                }}
+                className="w-full @[440px]:w-auto"
+              >
+                {t('addEvent', 'Add Event')}
+              </CustomButton>
+            )
+          }
+        />
 
-      {/* Prominent Class Off / Holiday Notification Banner */}
-      {isOffDay && (
-        <div className="p-4 rounded-2xl border-0 bg-rose-500/15 dark:bg-rose-950/40 flex items-start gap-3 shadow-xs animate-fade-in text-left">
-          <div className="p-2 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 shrink-0">
-            <AlertTriangleIcon className="w-5 h-5" />
-          </div>
-          <div className="space-y-1 min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="text-sm font-bold text-rose-600 dark:text-rose-400">
-                Class Attendance is Closed / Off
-              </h4>
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-600 dark:text-rose-300 border-0">
-                Class Off
-              </span>
+        {/* Prominent Class Off / Holiday Notification Banner */}
+        {isOffDay && (
+          <div className="p-4 rounded-3xl border-0 bg-rose-500/15 dark:bg-rose-950/40 flex items-start gap-3 shadow-xs animate-fade-in text-start">
+            <div className="p-2 rounded-2xl bg-rose-500/20 text-rose-600 dark:text-rose-400 shrink-0">
+              <AlertTriangleIcon className="w-5 h-5" />
             </div>
-            <p className="text-xs text-rose-600/90 dark:text-rose-300/90 leading-relaxed font-medium">
-              Reason: <strong>{offReason}</strong>. Attendance marking for all class periods is disabled on this date.
-            </p>
+            <div className="space-y-1 min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-sm font-bold text-rose-600 dark:text-rose-400">
+                  {t('classAttendanceClosed', 'Class Attendance is Closed / Off')}
+                </h4>
+                <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-600 dark:text-rose-300 border-0">
+                  {t('classOff', 'Class Off')}
+                </span>
+              </div>
+              <p className="text-xs text-rose-600/90 dark:text-rose-300/90 leading-relaxed font-medium">
+                <strong>{offReason}</strong> — {t('classOffReasonNotice', 'Attendance marking for all class periods is disabled on this date.')}
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Events Worklist & Centered Empty State */}
-      {sortedEvents.length === 0 ? (
-        <div className="p-8 sm:p-12 flex flex-col items-center justify-center text-center rounded-3xl theme-bg-surface border-0 shadow-xs space-y-4 my-2 w-full">
-          <div className="w-14 h-14 rounded-2xl theme-bg-accent-soft theme-accent border-0 flex items-center justify-center shrink-0 shadow-xs">
-            <CalendarIcon className="w-7 h-7" />
+        {/* Events Worklist & Centered Empty State */}
+        {sortedEvents.length === 0 ? (
+          <div className="p-8 sm:p-12 flex flex-col items-center justify-center text-center rounded-3xl theme-bg-surface border-0 shadow-xs space-y-4 my-2 w-full">
+            <div className="w-14 h-14 rounded-2xl theme-bg-accent-soft theme-accent border-0 flex items-center justify-center shrink-0 shadow-xs">
+              <CalendarIcon className="w-7 h-7" />
+            </div>
+            <div className="max-w-xs sm:max-w-sm mx-auto space-y-1.5 text-center flex flex-col items-center">
+              <h4 className="text-sm font-bold theme-text-primary">
+                {t('noSchedulesTitle', 'No Schedules or Events')}
+              </h4>
+              <p className="text-xs theme-text-secondary leading-relaxed">
+                {t('noSchedulesSubtitle', 'No shifts or institutional events are registered for this date.')}
+              </p>
+            </div>
           </div>
-          <div className="max-w-xs sm:max-w-sm mx-auto space-y-1.5 text-center flex flex-col items-center">
-            <h4 className="text-sm font-bold theme-text-primary">
-              No Schedules or Events
-            </h4>
-            <p className="text-xs theme-text-secondary leading-relaxed">
-              No shifts or institutional events are registered for this date.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-2.5">
-          <span className="text-[11px] font-mono font-bold uppercase tracking-wider theme-text-secondary block px-1">
-            Scheduled Items ({sortedEvents.length})
-          </span>
+        ) : (
+          <div className="space-y-3">
+            <span className="text-xs font-bold uppercase tracking-wider theme-text-secondary block px-1">
+              {t('scheduledItems', 'Scheduled Items')} ({sortedEvents.length})
+            </span>
 
-          <div className="space-y-2.5">
-            {sortedEvents.map((evt) => {
-              const style = getEventColors(evt, activeTenantId);
-              const isAllDay = evt.isFullDay || !evt.startTime || !evt.endTime;
-              const rankVal = evt.priorityRank || (evt as any).rank || 1;
+            <div className="space-y-2.5">
+              {sortedEvents.map((evt) => {
+                const style = getEventColors(evt, activeTenantId);
+                const isAllDay = evt.isFullDay || !evt.startTime || !evt.endTime;
+                const rankVal = evt.priorityRank || (evt as any).rank || 1;
 
-              return (
-                <div
-                  key={evt.id}
-                  onClick={() => setSelectedEventId(evt.id)}
-                  className={`p-3.5 sm:p-4 rounded-2xl border-0 transition-all cursor-pointer hover:shadow-sm shadow-xs ${style.bg}`}
-                >
-                  <div className="flex items-start justify-between gap-2.5">
-                    <div className="space-y-1.5 min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${style.dot}`} />
-                        <h4 className="text-xs sm:text-sm font-bold theme-text-primary truncate">
-                          {evt.title}
-                        </h4>
-                      </div>
+                return (
+                  <button
+                    key={evt.id}
+                    type="button"
+                    onClick={() => setSelectedEventId(evt.id)}
+                    className={`w-full text-start p-3.5 sm:p-4 rounded-2xl border-0 ring-0 transition-all cursor-pointer shadow-xs hover:brightness-95 ${style.bg}`}
+                  >
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="space-y-2 min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: style.hex }}
+                          />
+                          <h4 className="text-xs sm:text-sm font-bold theme-text-primary truncate">
+                            {evt.title}
+                          </h4>
+                        </div>
 
-                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent border-0">
-                          Rank {rankVal}
-                        </span>
-
-                        <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md theme-bg-surface border-0 shadow-2xs theme-text-primary">
-                          {isAllDay ? 'Full Day' : `${formatTime12(evt.startTime)} – ${formatTime12(evt.endTime)}`}
-                        </span>
-
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-surface border-0 shadow-2xs theme-text-secondary">
-                          {getEventDisplayType(evt)}
-                        </span>
-
-                        {evt.audience && (
-                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-surface border-0 shadow-2xs theme-text-secondary">
-                            Audience: {evt.audience}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg theme-bg-accent-soft theme-accent border-0">
+                            #{rankVal}
                           </span>
+
+                          <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-lg theme-bg-surface border-0 theme-text-primary">
+                            {isAllDay
+                              ? t('fullDay', 'Full Day')
+                              : `${formatTime12(evt.startTime)} – ${formatTime12(evt.endTime)}`}
+                          </span>
+
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-lg theme-bg-surface border-0 theme-text-secondary">
+                            {getEventDisplayType(evt, activeTenantId)}
+                          </span>
+
+                          {evt.audience && (
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-lg theme-bg-surface border-0 theme-text-secondary">
+                              {t('audience', 'Audience')}: {evt.audience}
+                            </span>
+                          )}
+                        </div>
+
+                        {evt.description && (
+                          <p className="text-[11px] theme-text-secondary line-clamp-2 leading-relaxed font-normal">
+                            {evt.description}
+                          </p>
                         )}
                       </div>
 
-                      {evt.description && (
-                        <p className="text-[11px] theme-text-secondary line-clamp-2 pt-0.5 leading-relaxed font-normal">
-                          {evt.description}
-                        </p>
-                      )}
+                      <div className="flex items-center gap-1 text-xs font-semibold theme-accent shrink-0 pt-0.5">
+                        <span>{t('details', 'Details')}</span>
+                        <ChevronRightIcon className="w-3.5 h-3.5 rtl:rotate-180" />
+                      </div>
                     </div>
-
-                    <span className="text-xs font-semibold theme-accent shrink-0 pt-0.5 hover:underline">
-                      Details &rarr;
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Footer Close */}
-      <DrawerFooter onCancel={onClose || undefined} cancelLabel="Close" />
+        {/* Footer Close */}
+        {onClose && (
+          <div className="pt-2 border-0 flex justify-end">
+            <CustomButton
+              type="button"
+              variant="surface"
+              size="md"
+              onClick={onClose}
+            >
+              {t('close', 'Close')}
+            </CustomButton>
+          </div>
+        )}
+      </div>
     </DrawerContainer>
   );
 };

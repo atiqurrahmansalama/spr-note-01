@@ -1,15 +1,17 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import CustomSelect from "../../../../components/ui/CustomSelect";
 import CustomInput from "../../../../components/ui/CustomInput";
-import TimezoneSelect from "../../../../components/selectors/TimezoneSelect";
-import ReusableCalendar from "../../../../components/common/ReusableCalendar";
+import CustomButton from "../../../../components/ui/CustomButton";
 import {
   SaveIcon,
-  CloseIcon,
   ChevronIcon,
   CalendarIcon,
   CheckIcon,
+  ClockIcon,
+  ShapesIcon,
+  UsersIcon,
 } from "../../../../components/ui/Icons";
+import ReusableCalendar from "../../../../components/common/ReusableCalendar";
 import {
   calendarEventTypesStore,
   calendarEventKindsStore,
@@ -20,8 +22,13 @@ import {
   getDynamicPriorityRankOptions,
 } from "../../../../utils/localStore";
 import { useTenant } from "../../../../context/TenantContext";
+import { useToast } from "../../../../context/ToastContext";
 import { fetchWithAuth } from "../../../../utils/authService";
 import { DrawerContainer } from "../../../../components/layout";
+import { EVENT_COLORS, EVENT_COLOR_CATEGORIES, resolveCanonicalEventColor } from "../constants/eventColors";
+import { useCalendarTranslation } from "../locales";
+
+export { EVENT_COLORS };
 
 const CATEGORY_OPTIONS = [
   { value: "WORKING_HOURS", label: "Add a Working Schedule" },
@@ -43,36 +50,6 @@ const WEEKDAY_INITIALS = [
   { day: 4, label: "T", name: "Thursday" },
   { day: 5, label: "F", name: "Friday" },
   { day: 6, label: "S", name: "Saturday" },
-];
-
-// Curated Vibrant & Soft Pastel Event Colors
-export const EVENT_COLORS = [
-  // Soft & Light Pastel Colors
-  { id: "mint", label: "Soft Mint", hex: "#6ee7b7", group: "Pastel" },
-  { id: "lavender", label: "Soft Lavender", hex: "#c4b5fd", group: "Pastel" },
-  { id: "peach", label: "Soft Peach", hex: "#fdba74", group: "Pastel" },
-  { id: "coral", label: "Soft Coral", hex: "#fca5a5", group: "Pastel" },
-  { id: "sage", label: "Soft Sage", hex: "#86efac", group: "Pastel" },
-  { id: "ice", label: "Ice Blue", hex: "#7dd3fc", group: "Pastel" },
-  { id: "sand", label: "Warm Sand", hex: "#cbd5e1", group: "Pastel" },
-  { id: "pink", label: "Soft Pink", hex: "#f472b6", group: "Pastel" },
-  { id: "cream", label: "Amber Cream", hex: "#fde68a", group: "Pastel" },
-
-  // Standard Vibrant Colors
-  { id: "indigo", label: "Indigo", hex: "#6366f1", group: "Vibrant" },
-  { id: "emerald", label: "Emerald", hex: "#10b981", group: "Vibrant" },
-  { id: "blue", label: "Sky Blue", hex: "#3b82f6", group: "Vibrant" },
-  { id: "teal", label: "Teal", hex: "#14b8a6", group: "Vibrant" },
-  { id: "cyan", label: "Cyan", hex: "#06b6d4", group: "Vibrant" },
-  { id: "purple", label: "Purple", hex: "#a855f7", group: "Vibrant" },
-  { id: "violet", label: "Violet", hex: "#8b5cf6", group: "Vibrant" },
-  { id: "fuchsia", label: "Fuchsia", hex: "#d946ef", group: "Vibrant" },
-  { id: "rose", label: "Rose", hex: "#f43f5e", group: "Vibrant" },
-  { id: "red", label: "Red", hex: "#ef4444", group: "Vibrant" },
-  { id: "orange", label: "Orange", hex: "#f97316", group: "Vibrant" },
-  { id: "amber", label: "Amber", hex: "#f59e0b", group: "Vibrant" },
-  { id: "lime", label: "Lime", hex: "#84cc16", group: "Vibrant" },
-  { id: "slate", label: "Slate Gray", hex: "#64748b", group: "Vibrant" },
 ];
 
 function formatTime12(timeStr) {
@@ -278,18 +255,22 @@ export function UntilWhenPicker({
     return `${d}/${m}/${y ? y.slice(2) : ""}`;
   };
 
+  const { t } = useCalendarTranslation();
+
   return (
     <div ref={containerRef} className="relative w-full">
       <div className="flex items-center justify-between mb-2">
-        <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary">Until</label>
+        <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary">
+          {t("untilWhen", "Until when?")}
+        </label>
         {until === "DATE" && (
           <button
             type="button"
             onClick={handleSelectOngoing}
             className="text-[10px] theme-accent hover:underline font-semibold cursor-pointer uppercase tracking-wider"
-            title="Reset to Ongoing / Forever"
+            title={t("resetToOngoing", "Reset to Ongoing")}
           >
-            Reset to Ongoing
+            {t("resetToOngoing", "Reset to Ongoing")}
           </button>
         )}
       </div>
@@ -298,18 +279,18 @@ export function UntilWhenPicker({
       <button
         type="button"
         onClick={handleToggle}
-        className="w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 rounded-2xl theme-bg-surface border-0 theme-text-primary text-xs sm:text-sm font-semibold hover:theme-bg-elevated/50 focus:outline-none transition-all duration-200 cursor-pointer select-none shadow-xs"
+        className="w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 rounded-2xl theme-bg-surface border-0 theme-text-primary text-xs sm:text-sm font-semibold hover:theme-bg-elevated/40 focus:outline-none transition-all duration-200 cursor-pointer select-none shadow-xs"
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {until === "DATE" ? (
             <>
               <CalendarIcon className="w-4 h-4 theme-accent shrink-0" />
               <span className="truncate font-medium">
-                {untilDate ? formatDateDisplay(untilDate) : "Select End Date"}
+                {untilDate ? formatDateDisplay(untilDate) : t("specifyDate", "Specify date")}
               </span>
             </>
           ) : (
-            <span className="truncate font-medium">Ongoing</span>
+            <span className="truncate font-medium">{t("ongoing", "Ongoing")}</span>
           )}
         </div>
         <ChevronIcon isOpen={isMenuOpen || isCalendarOpen} className="w-3.5 h-3.5 theme-text-secondary shrink-0 ml-1" />
@@ -323,12 +304,16 @@ export function UntilWhenPicker({
             onClick={handleSelectOngoing}
             className={`w-full text-left px-3 py-2 text-xs rounded-xl transition flex items-center justify-between cursor-pointer border-0 ${
               until === "ONGOING"
-                ? "bg-[var(--accent-main)]/15 theme-accent font-bold"
-                : "hover:theme-bg-elevated theme-text-primary"
+                ? "bg-[var(--accent-main)]/15 dark:bg-[var(--accent-main)]/25 theme-accent font-bold"
+                : "theme-bg-app hover:theme-bg-elevated/40 theme-text-primary"
             }`}
           >
-            <span>Ongoing</span>
-            {until === "ONGOING" && <span className="text-xs font-bold">✓</span>}
+            <span>{t("ongoing", "Ongoing")}</span>
+            {until === "ONGOING" && (
+              <span className="w-4 h-4 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center shadow-xs shrink-0">
+                <CheckIcon className="w-2.5 h-2.5" />
+              </span>
+            )}
           </button>
 
           <button
@@ -336,14 +321,19 @@ export function UntilWhenPicker({
             onClick={handleSelectSpecificDate}
             className={`w-full text-left px-3 py-2 text-xs rounded-xl transition flex items-center justify-between cursor-pointer border-0 ${
               until === "DATE"
-                ? "bg-[var(--accent-main)]/15 theme-accent font-bold"
-                : "hover:theme-bg-elevated theme-text-primary"
+                ? "bg-[var(--accent-main)]/15 dark:bg-[var(--accent-main)]/25 theme-accent font-bold"
+                : "theme-bg-app hover:theme-bg-elevated/40 theme-text-primary"
             }`}
           >
             <div className="flex items-center gap-2">
               <CalendarIcon className="w-3.5 h-3.5 theme-accent" />
-              <span>Specify date</span>
+              <span>{t("specifyDate", "Specify date")}</span>
             </div>
+            {until === "DATE" && (
+              <span className="w-4 h-4 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center shadow-xs shrink-0">
+                <CheckIcon className="w-2.5 h-2.5" />
+              </span>
+            )}
           </button>
         </div>
       )}
@@ -367,15 +357,16 @@ export function UntilWhenPicker({
               onClick={handleSelectOngoing}
               className="text-xs font-semibold theme-text-secondary hover:theme-text-primary cursor-pointer"
             >
-              Reset to Ongoing
+              {t("resetToOngoing", "Reset to Ongoing")}
             </button>
-            <button
+            <CustomButton
               type="button"
+              variant="primary"
+              size="xs"
               onClick={() => setIsCalendarOpen(false)}
-              className="px-2.5 py-1 rounded-lg theme-bg-accent text-white text-xs font-bold cursor-pointer"
             >
-              Done
-            </button>
+              {t("done", "Done")}
+            </CustomButton>
           </div>
         </div>
       )}
@@ -384,12 +375,33 @@ export function UntilWhenPicker({
 }
 
 export function EventColorPickerDropdown({ value, onChange }) {
+  const { t } = useCalendarTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
   const containerRef = useRef(null);
 
+  const canonicalId = resolveCanonicalEventColor(value, EVENT_COLORS[0].id);
   const selectedColor = useMemo(() => {
-    return EVENT_COLORS.find((c) => c.id === value) || EVENT_COLORS[0];
-  }, [value]);
+    return EVENT_COLORS.find((c) => c.id === canonicalId) || EVENT_COLORS[0];
+  }, [canonicalId]);
+
+  const filteredColors = useMemo(() => {
+    let list = EVENT_COLORS;
+    if (activeCategory !== "All") {
+      list = list.filter((c) => c.category === activeCategory);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter(
+        (c) =>
+          c.label.toLowerCase().includes(q) ||
+          c.hex.toLowerCase().includes(q) ||
+          c.id.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [activeCategory, searchQuery]);
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -407,113 +419,131 @@ export function EventColorPickerDropdown({ value, onChange }) {
     <div ref={containerRef} className="relative w-full">
       <div className="flex items-center justify-between mb-2">
         <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary">
-          Event Color
+          {t("eventColor", "Event Color")}
         </label>
         <span className="text-[10px] font-mono theme-text-secondary font-semibold">
-          {selectedColor.label}
+          {selectedColor.hex}
         </span>
       </div>
 
-      {/* Default Single Visible Color Card */}
+      {/* Selected Event Color Trigger Card */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl border-0 transition cursor-pointer text-left focus:outline-none shadow-xs ${
+        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl border-0 ring-0 transition cursor-pointer text-left focus:outline-none shadow-xs ${
           isOpen
             ? "bg-[var(--accent-main)]/15 dark:bg-[var(--accent-main)]/25"
-            : "theme-bg-surface hover:theme-bg-elevated/50"
+            : "theme-bg-surface hover:theme-bg-elevated/40"
         }`}
       >
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
           <span
-            className="w-4 h-4 rounded-full shrink-0 shadow-xs border-0"
+            className="w-5 h-5 rounded-full shrink-0 shadow-xs border-0"
             style={{ backgroundColor: selectedColor.hex }}
           />
           <span className="text-xs font-semibold theme-text-primary truncate">
             {selectedColor.label}
           </span>
           <span className="text-[10px] font-mono theme-text-secondary">
-            ({selectedColor.hex})
+            {selectedColor.hex}
           </span>
+          {selectedColor.category && (
+            <span className="hidden @[440px]:inline-block text-[9px] px-2 py-0.5 rounded-full theme-bg-app border-0 theme-text-secondary truncate">
+              {selectedColor.category}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0 ml-2">
-          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md theme-bg-app border-0 theme-text-secondary shadow-2xs">
-            {isOpen ? "Close" : "Change"}
+          <span className="text-[10px] font-semibold px-2.5 py-1 rounded-lg theme-bg-app border-0 theme-text-secondary">
+            {isOpen ? t("close", "Close") : t("chooseColor", "Change")}
           </span>
           <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary" />
         </div>
       </button>
 
-      {/* Expanded Color Palette with Color Names */}
+      {/* Borderless Curated Enterprise Palette Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-1.5 p-3 rounded-2xl theme-bg-surface border-0 shadow-2xl space-y-3 animate-fade-in max-h-72 overflow-y-auto">
-          {/* Soft & Light Pastel Colors */}
-          <div>
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider theme-text-secondary block mb-1.5 px-0.5">
-              Soft & Light Pastel
-            </span>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              {EVENT_COLORS.filter((c) => c.group === "Pastel").map((col) => {
-                const isSelected = selectedColor.id === col.id;
-                return (
-                  <button
-                    key={col.id}
-                    type="button"
-                    onClick={() => {
-                      onChange(col.id);
-                      setIsOpen(false);
-                    }}
-                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border-0 text-left transition cursor-pointer ${
-                      isSelected
-                        ? "bg-[var(--accent-main)]/15 theme-accent font-bold shadow-xs"
-                        : "theme-bg-app hover:theme-bg-elevated/40 theme-text-primary"
-                    }`}
-                  >
-                    <span
-                      className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs border-0"
-                      style={{ backgroundColor: col.hex }}
-                    />
-                    <span className="text-[11px] font-medium truncate flex-1">{col.label}</span>
-                    {isSelected && <CheckIcon className="w-3 h-3 theme-accent shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
+        <div className="mt-2 p-3 rounded-3xl theme-bg-surface border-0 ring-0 shadow-lg animate-fade-in space-y-3 z-30">
+          
+          {/* Top Quick Search Bar */}
+          <div className="w-full">
+            <CustomInput
+              type="search"
+              size="sm"
+              variant="app"
+              placeholder={t("searchColors", "Search color or HEX...")}
+              value={searchQuery}
+              onChange={(val) => setSearchQuery(val)}
+              clearable={true}
+            />
           </div>
 
-          {/* Standard Vibrant Colors */}
-          <div className="pt-2 border-0">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider theme-text-secondary block mb-1.5 px-0.5">
-              Standard Vibrant
-            </span>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              {EVENT_COLORS.filter((c) => c.group === "Vibrant").map((col) => {
-                const isSelected = selectedColor.id === col.id;
-                return (
-                  <button
-                    key={col.id}
-                    type="button"
-                    onClick={() => {
-                      onChange(col.id);
-                      setIsOpen(false);
-                    }}
-                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border-0 text-left transition cursor-pointer ${
-                      isSelected
-                        ? "bg-[var(--accent-main)]/15 theme-accent font-bold shadow-xs"
-                        : "theme-bg-app hover:theme-bg-elevated/40 theme-text-primary"
-                    }`}
-                  >
-                    <span
-                      className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs border-0"
-                      style={{ backgroundColor: col.hex }}
-                    />
-                    <span className="text-[11px] font-medium truncate flex-1">{col.label}</span>
-                    {isSelected && <CheckIcon className="w-3 h-3 theme-accent shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
+          {/* Color Family Category Pills */}
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5 -mx-1 px-1">
+            {EVENT_COLOR_CATEGORIES.map((cat) => {
+              const isActive = activeCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setActiveCategory(cat)}
+                  className={`px-2.5 py-1 rounded-xl text-[10px] font-bold whitespace-nowrap transition cursor-pointer border-0 ring-0 shrink-0 select-none ${
+                    isActive
+                      ? "theme-bg-accent text-white shadow-xs"
+                      : "theme-bg-app hover:theme-bg-elevated/60 theme-text-secondary hover:theme-text-primary"
+                  }`}
+                >
+                  {cat === "All" ? t("allColors", "All") : cat}
+                </button>
+              );
+            })}
           </div>
+
+          {/* Color Swatch Grid */}
+          <div className="grid grid-cols-1 @[420px]:grid-cols-2 @[560px]:grid-cols-3 gap-1.5 max-h-64 overflow-y-auto scrollbar-none pr-0.5">
+            {filteredColors.map((col) => {
+              const isSelected = selectedColor.id === col.id;
+              return (
+                <button
+                  key={col.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(col.id);
+                    setIsOpen(false);
+                  }}
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-2xl border-0 ring-0 text-left transition cursor-pointer ${
+                    isSelected
+                      ? "bg-[var(--accent-main)]/15 dark:bg-[var(--accent-main)]/25 theme-accent font-bold"
+                      : "theme-bg-app hover:theme-bg-elevated/60 theme-text-primary"
+                  }`}
+                >
+                  <span
+                    className="w-4 h-4 rounded-full shrink-0 shadow-xs border-0"
+                    style={{ backgroundColor: col.hex }}
+                  />
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-[11px] font-medium truncate leading-tight">
+                      {col.label}
+                    </span>
+                    <span className="text-[9px] font-mono theme-text-secondary leading-tight opacity-75">
+                      {col.hex}
+                    </span>
+                  </div>
+                  {isSelected && (
+                    <span className="w-4 h-4 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center shadow-xs shrink-0">
+                      <CheckIcon className="w-2.5 h-2.5" />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {filteredColors.length === 0 && (
+            <div className="py-6 text-center text-xs theme-text-secondary">
+              No matching colors found.
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -521,10 +551,9 @@ export function EventColorPickerDropdown({ value, onChange }) {
 }
 
 export function resolveEventFormColor(evt, targetCategory, kinds = [], types = []) {
-  if (evt?.color && EVENT_COLORS.some((c) => c.id === evt.color)) {
-    return evt.color;
+  if (evt?.color) {
+    return resolveCanonicalEventColor(evt.color);
   }
-  // Lookup type in eventTypes
   const matchedType = (types || []).find(
     (t) => t.id === evt?.eventTypeId || t.name === evt?.title || t.code === evt?.code
   );
@@ -533,17 +562,17 @@ export function resolveEventFormColor(evt, targetCategory, kinds = [], types = [
     const matchedKind = (kinds || []).find(
       (k) => k.value === rawType || k.id === rawType || String(k.value).toUpperCase() === String(rawType).toUpperCase()
     );
-    if (matchedKind?.color && EVENT_COLORS.some((c) => c.id === matchedKind.color)) {
-      return matchedKind.color;
+    if (matchedKind?.color) {
+      return resolveCanonicalEventColor(matchedKind.color);
     }
   }
-  if (rawType === "WORKING_HOURS" || targetCategory === "WORKING_HOURS") return "indigo";
-  if (rawType === "HOLIDAY") return "rose";
-  if (rawType === "EXAM") return "amber";
-  if (rawType === "MEETING") return "blue";
-  if (rawType === "ACTIVITY") return "purple";
-  if (rawType === "GENERAL") return "slate";
-  return "emerald";
+  if (rawType === "WORKING_HOURS" || targetCategory === "WORKING_HOURS") return "blueberry";
+  if (rawType === "HOLIDAY") return "radicchio";
+  if (rawType === "EXAM") return "flamingo";
+  if (rawType === "MEETING") return "peacock";
+  if (rawType === "ACTIVITY") return "amethyst";
+  if (rawType === "GENERAL") return "cocoa";
+  return "eucalyptus";
 }
 
 export interface TimeScheduleFormData {
@@ -592,6 +621,9 @@ export default function TimeScheduleDrawerForm({
   onCancel = null,
 }) {
   const { activeTenantId } = useTenant();
+  const { showToast } = useToast() as any;
+  const { t } = useCalendarTranslation();
+  const [validationErrors, setValidationErrors] = useState<{ title?: string; startDate?: string }>({});
   const [eventTypes, setEventTypes] = useState(() => calendarEventTypesStore.getEventTypes(activeTenantId));
   const [eventKinds, setEventKinds] = useState(() => calendarEventKindsStore.getKinds(activeTenantId));
   const [workingSchedules, setWorkingSchedules] = useState(() => calendarWorkingSchedulesStore.getSchedules(activeTenantId));
@@ -884,7 +916,7 @@ export default function TimeScheduleDrawerForm({
         typeLabel: "Working Hours",
         category: "WORKING_HOURS",
         type: "WORKING_HOURS",
-        color: "indigo",
+        color: resolveCanonicalEventColor(ws.color, "blueberry"),
         repeats: true,
         description: ws.description || "",
       }));
@@ -897,7 +929,7 @@ export default function TimeScheduleDrawerForm({
           typeLabel: "Working Hours",
           category: "WORKING_HOURS",
           type: "WORKING_HOURS",
-          color: "indigo",
+          color: resolveCanonicalEventColor(formData.color, "blueberry"),
           repeats: true,
           description: "",
         });
@@ -915,19 +947,19 @@ export default function TimeScheduleDrawerForm({
       GENERAL: "General",
     };
     const kindsColorMap: Record<string, string> = {
-      ACADEMIC: "emerald",
-      HOLIDAY: "rose",
-      EXAM: "amber",
-      MEETING: "blue",
-      ACTIVITY: "purple",
-      GENERAL: "slate",
+      ACADEMIC: "eucalyptus",
+      HOLIDAY: "radicchio",
+      EXAM: "flamingo",
+      MEETING: "peacock",
+      ACTIVITY: "amethyst",
+      GENERAL: "cocoa",
     };
 
     (eventKinds || []).forEach((k: any) => {
       const key = k.value || k.id;
       if (key) {
         kindsMap[key] = k.label || k.name || key;
-        if (k.color) kindsColorMap[key] = k.color;
+        if (k.color) kindsColorMap[key] = resolveCanonicalEventColor(k.color);
       }
     });
 
@@ -945,7 +977,7 @@ export default function TimeScheduleDrawerForm({
     const opts: EventTitleOption[] = baseList.map((et: any) => {
       const rawType = et.type || et.category || "ACADEMIC";
       const typeLabel = kindsMap[rawType] || (rawType ? rawType.replace(/_/g, " ") : "Academic Event");
-      const dynamicColor = kindsColorMap[rawType] || "emerald";
+      const dynamicColor = resolveCanonicalEventColor(kindsColorMap[rawType], "eucalyptus");
 
       return {
         id: et.id,
@@ -971,7 +1003,7 @@ export default function TimeScheduleDrawerForm({
         typeLabel: currentKind?.label || (formData.category === "WORKING_HOURS" ? "Working Hours" : "Academic Event"),
         category: formData.category,
         type: formData.type || (formData.category === "WORKING_HOURS" ? "WORKING_HOURS" : "ACADEMIC"),
-        color: formData.color || currentKind?.color || "emerald",
+        color: resolveCanonicalEventColor(formData.color || currentKind?.color, "eucalyptus"),
         repeats: false,
         description: "",
       });
@@ -1016,25 +1048,44 @@ export default function TimeScheduleDrawerForm({
     });
   };
 
-  const handleSubmit = (e) => {
+  const localizedCategoryOptions = useMemo(
+    () => [
+      { value: "WORKING_HOURS", label: t("workingScheduleOption", CATEGORY_OPTIONS[0].label) },
+      { value: "ACADEMIC_EVENT", label: t("academicEventOption", CATEGORY_OPTIONS[1].label) },
+    ],
+    [t]
+  );
+
+  const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
+    const nextErrors: { title?: string; startDate?: string } = {};
     if (!formData.title.trim()) {
-      alert("Please enter or select a schedule/event title");
-      return;
+      nextErrors.title = t("titleRequiredError", "Please enter or select a schedule or event title.");
     }
     if (!formData.startDate) {
-      alert("Please specify a start date");
+      nextErrors.startDate = t("startDateRequiredError", "Please specify a start date.");
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setValidationErrors(nextErrors);
+      showToast(nextErrors.title || nextErrors.startDate, "warning");
       return;
     }
+
+    setValidationErrors({});
 
     const audienceString = Array.isArray(formData.audience)
       ? (formData.audience.length === 0 ? "ALL" : formData.audience.join(", "))
       : (formData.audience || "ALL");
 
+    const resolvedColor = resolveCanonicalEventColor(
+      formData.color || resolveEventFormColor(formData, formData.category, eventKinds, eventTypes)
+    );
+
     const payload = {
       ...formData,
-      color: formData.color || resolveEventFormColor(formData, formData.category, eventKinds, eventTypes),
+      color: resolvedColor,
       priorityRank: Number(formData.priorityRank) || 1,
       audience: audienceString,
       impacts: Array.isArray(formData.impacts) ? formData.impacts : (formData.impacts ? [formData.impacts] : ["ALL"]),
@@ -1055,12 +1106,13 @@ export default function TimeScheduleDrawerForm({
 
   return (
     <DrawerContainer padding="none" spacing="normal">
-      <form id={formId} onSubmit={handleSubmit} className="space-y-6 pt-2 @container">
+      <form id={formId} onSubmit={handleSubmit} className="space-y-6 pt-2 pb-6 @container">
         {/* ─── 1. Schedule Information Section ─── */}
         <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-1.5 border-0">
+          <div className="flex items-center gap-2 pb-1">
+            <UsersIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
             <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
-              Schedule Information
+              {t("scheduleInformation", "Schedule Information")}
             </h4>
           </div>
 
@@ -1068,42 +1120,44 @@ export default function TimeScheduleDrawerForm({
           <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3">
             <div>
               <CustomSelect
-                label="Entry Purpose"
+                label={t("entryPurpose", "Entry Purpose")}
                 value={formData.category}
                 onChange={(val) => {
                   const isWH = val === "WORKING_HOURS";
                   const defaultTitle = isWH
                     ? (workingSchedules?.[0]?.name || "Morning Working Session")
                     : (eventTypes?.[0]?.name || "Mid-Term Examination");
-                  const newColor = isWH 
-                    ? "indigo" 
+                  const newColor = isWH
+                    ? resolveCanonicalEventColor(workingSchedules?.[0]?.color, "blueberry")
                     : resolveEventFormColor({ title: defaultTitle }, "ACADEMIC_EVENT", eventKinds, eventTypes);
-                  setFormData((prev) => ({ 
-                    ...prev, 
+                  setValidationErrors((prev) => ({ ...prev, title: undefined }));
+                  setFormData((prev) => ({
+                    ...prev,
                     category: val,
                     title: defaultTitle,
                     color: newColor,
-                    repeats: isWH ? true : false,
+                    repeats: isWH,
                   }));
                 }}
-                options={CATEGORY_OPTIONS}
-                placeholder="Select Category"
+                options={localizedCategoryOptions}
+                placeholder={t("entryPurpose", "Select Category")}
               />
             </div>
 
             <div>
               <CustomSelect
-                label="Schedule / Event"
+                label={t("scheduleOrEvent", "Schedule / Event")}
                 value={formData.title}
                 onChange={(val) => {
                   const matched = eventTitleOptions.find((o) => o.value === val);
+                  setValidationErrors((prev) => ({ ...prev, title: undefined }));
                   if (matched) {
                     setFormData((prev) => ({
                       ...prev,
                       title: matched.value,
                       type: matched.type,
                       category: matched.category,
-                      color: matched.color || prev.color,
+                      color: matched.color ? resolveCanonicalEventColor(matched.color, prev.color) : prev.color,
                       repeats: matched.repeats !== undefined ? matched.repeats : prev.repeats,
                     }));
                   } else {
@@ -1111,9 +1165,10 @@ export default function TimeScheduleDrawerForm({
                   }
                 }}
                 options={eventTitleOptions}
-                placeholder="Select Schedule / Event..."
+                placeholder={t("scheduleOrEvent", "Select Schedule / Event...")}
                 searchable={true}
                 showDescription={true}
+                error={validationErrors.title}
               />
             </div>
           </div>
@@ -1122,23 +1177,23 @@ export default function TimeScheduleDrawerForm({
           <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3">
             <div>
               <CustomSelect
-                label="Target Audience (Roles)"
+                label={t("targetAudience", "Target Audience (Roles)")}
                 multiple={true}
                 value={formData.audience}
                 onChange={(val) => setFormData({ ...formData, audience: val })}
                 options={audienceOptions}
-                placeholder="Select Target Roles..."
+                placeholder={t("targetAudience", "Select Target Roles...")}
               />
             </div>
 
             <div>
               <CustomSelect
-                label="System Impact & Integration"
+                label={t("impacts", "System Impacts")}
                 multiple={true}
                 value={formData.impacts}
                 onChange={(val) => setFormData({ ...formData, impacts: val })}
                 options={impactOptions}
-                placeholder="Select Impacted Modules..."
+                placeholder={t("impacts", "Select Impacted Modules...")}
                 showDescription={true}
               />
             </div>
@@ -1147,11 +1202,11 @@ export default function TimeScheduleDrawerForm({
           {/* Priority & Precedence Rank */}
           <div>
             <CustomSelect
-              label="Priority Rank"
+              label={t("priority", "Priority")}
               value={formData.priorityRank || 1}
               onChange={(val) => setFormData({ ...formData, priorityRank: Number(val) })}
               options={priorityRankOptions}
-              placeholder="Select Priority Rank..."
+              placeholder={t("priority", "Select Priority Rank...")}
               showDescription={true}
               direction="auto"
             />
@@ -1161,21 +1216,22 @@ export default function TimeScheduleDrawerForm({
           <div>
             <CustomInput
               type="textarea"
-              label="Description"
+              label={t("descriptionNotes", "Description")}
               optional
               rows={2}
               value={formData.description}
               onChange={(val) => setFormData({ ...formData, description: val })}
-              placeholder="Add schedule details, agenda, instructions or remarks..."
+              placeholder={t("descriptionPlaceholder", "Add schedule details, agenda, instructions or remarks...")}
             />
           </div>
         </div>
 
         {/* ─── 2. Timing & Recurrence Section ─── */}
         <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-1.5 border-0">
+          <div className="flex items-center gap-2 pb-1 pt-2">
+            <ClockIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
             <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
-              Date & Timing
+              {t("dateAndTiming", "Date & Timing")}
             </h4>
           </div>
 
@@ -1183,10 +1239,16 @@ export default function TimeScheduleDrawerForm({
           <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3">
             <div>
               <ReusableCalendar
-                label="Date"
+                label={t("dateLabel", "Date")}
                 selectedDate={formData.startDate}
-                onSelectDate={(newDate) => setFormData({ ...formData, startDate: newDate })}
+                onSelectDate={(newDate) => {
+                  setValidationErrors((prev) => ({ ...prev, startDate: undefined }));
+                  setFormData({ ...formData, startDate: newDate });
+                }}
               />
+              {validationErrors.startDate && (
+                <p className="text-[11px] font-medium theme-danger mt-1">{validationErrors.startDate}</p>
+              )}
             </div>
 
             <div>
@@ -1200,21 +1262,21 @@ export default function TimeScheduleDrawerForm({
             </div>
           </div>
 
-          {/* All Day Toggle Switch */}
-          <div className="flex items-center justify-between p-3.5 rounded-2xl border-0 theme-bg-surface shadow-xs">
-            <div>
-              <div className="text-xs font-bold theme-text-primary">All day</div>
-            </div>
+          {/* All Day Toggle Switch (Project soft surface + theme tokens, zero borders) */}
+          <div className="flex items-center justify-between px-4 py-3 rounded-2xl border-0 theme-bg-surface shadow-xs">
+            <span className="text-xs font-bold theme-text-primary">{t("allDay", "All day")}</span>
             <button
               type="button"
+              role="switch"
+              aria-checked={Boolean(formData.isFullDay)}
               onClick={() => setFormData((prev) => ({ ...prev, isFullDay: !prev.isFullDay }))}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                formData.isFullDay ? "theme-bg-accent" : "bg-gray-300 dark:bg-gray-700"
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center px-0.5 cursor-pointer rounded-full border-0 transition-colors duration-200 ease-in-out focus:outline-none ${
+                formData.isFullDay ? "theme-bg-accent" : "bg-black/15 dark:bg-white/15"
               }`}
             >
               <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                  formData.isFullDay ? "translate-x-5" : "translate-x-0"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                  formData.isFullDay ? "translate-x-5 rtl:-translate-x-5" : "translate-x-0"
                 }`}
               />
             </button>
@@ -1224,33 +1286,33 @@ export default function TimeScheduleDrawerForm({
           {!formData.isFullDay && (
             <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3 animate-fade-in">
               <InlineTimePicker
-                label="From"
+                label={t("fromTime", "From")}
                 value={formData.startTime}
                 onChange={(val) => setFormData({ ...formData, startTime: val })}
               />
               <InlineTimePicker
-                label="To"
+                label={t("toTime", "To")}
                 value={formData.endTime}
                 onChange={(val) => setFormData({ ...formData, endTime: val })}
               />
             </div>
           )}
 
-          {/* Repeats Toggle Switch (Matches All Day Toggle Design) */}
-          <div className="flex items-center justify-between p-3.5 rounded-2xl border-0 theme-bg-surface shadow-xs">
-            <div>
-              <div className="text-xs font-bold theme-text-primary">Repeats</div>
-            </div>
+          {/* Repeats Toggle Switch (Borderless project tokens) */}
+          <div className="flex items-center justify-between px-4 py-3 rounded-2xl border-0 theme-bg-surface shadow-xs">
+            <span className="text-xs font-bold theme-text-primary">{t("repeats", "Repeats")}</span>
             <button
               type="button"
+              role="switch"
+              aria-checked={Boolean(formData.repeats)}
               onClick={() => setFormData((prev) => ({ ...prev, repeats: !prev.repeats }))}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                formData.repeats ? "theme-bg-accent" : "bg-gray-300 dark:bg-gray-700"
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center px-0.5 cursor-pointer rounded-full border-0 transition-colors duration-200 ease-in-out focus:outline-none ${
+                formData.repeats ? "theme-bg-accent" : "bg-black/15 dark:bg-white/15"
               }`}
             >
               <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                  formData.repeats ? "translate-x-5" : "translate-x-0"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                  formData.repeats ? "translate-x-5 rtl:-translate-x-5" : "translate-x-0"
                 }`}
               />
             </button>
@@ -1261,8 +1323,10 @@ export default function TimeScheduleDrawerForm({
             <div className="space-y-3.5 pt-1 animate-fade-in">
               {/* What days? Circular day selector */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary mb-2">Days</label>
-                <div className="flex items-center justify-between gap-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary mb-2">
+                  {t("recurrenceDays", "Days")}
+                </label>
+                <div className="grid grid-cols-7 gap-1.5">
                   {WEEKDAY_INITIALS.map((item) => {
                     const isSelected = formData.repeatDays.includes(item.day);
                     return (
@@ -1270,10 +1334,10 @@ export default function TimeScheduleDrawerForm({
                         key={item.day}
                         type="button"
                         onClick={() => toggleRepeatDay(item.day)}
-                        className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full text-xs font-bold flex items-center justify-center transition cursor-pointer select-none border-0 ${
+                        className={`h-9 rounded-2xl text-xs font-bold flex items-center justify-center transition cursor-pointer select-none border-0 ring-0 ${
                           isSelected
-                            ? "theme-bg-accent text-white shadow-sm"
-                            : "theme-bg-surface theme-text-secondary hover:theme-bg-elevated/50 hover:theme-text-primary shadow-2xs"
+                            ? "theme-bg-accent theme-accent-text shadow-xs"
+                            : "theme-bg-surface theme-text-secondary hover:theme-bg-elevated/40 hover:theme-text-primary shadow-xs"
                         }`}
                         title={item.name}
                       >
@@ -1287,11 +1351,11 @@ export default function TimeScheduleDrawerForm({
               {/* How often */}
               <div>
                 <CustomSelect
-                  label="Repeat"
+                  label={t("repeatFrequency", "Repeat")}
                   value={formData.frequency}
                   onChange={(val) => setFormData({ ...formData, frequency: val })}
                   options={FREQUENCY_OPTIONS}
-                  placeholder="Select How Often"
+                  placeholder={t("repeatFrequency", "Select How Often")}
                 />
               </div>
             </div>
@@ -1300,51 +1364,55 @@ export default function TimeScheduleDrawerForm({
 
         {/* ─── 3. Visual Styling Section ─── */}
         <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-1.5 border-0">
+          <div className="flex items-center gap-2 pb-1 pt-2">
+            <ShapesIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
             <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
-              Visual Appearance
+              {t("visualAppearance", "Visual Appearance")}
             </h4>
           </div>
 
           <EventColorPickerDropdown
             value={formData.color}
-            onChange={(val) => setFormData({ ...formData, color: val })}
+            onChange={(val) => setFormData({ ...formData, color: resolveCanonicalEventColor(val) })}
           />
         </div>
 
-        {/* Apply Changes To Dropdown (Standard Reusable CustomSelect) */}
+        {/* Apply Changes To Dropdown */}
         {isRecurringOrMultiDay && (
           <div className="pt-2 animate-fade-in">
             <CustomSelect
-              label="Apply Changes To"
+              label={t("applyChangesTo", "Apply Changes To")}
               value={editScope}
               onChange={(val) => setEditScope(val)}
               options={editScopeOptions}
-              placeholder="Select update scope..."
+              placeholder={t("applyChangesTo", "Select update scope...")}
               showDescription={true}
               direction="auto"
             />
           </div>
         )}
 
-        {/* Bottom Action Buttons (Normal scrolling with content, not sticky) */}
+        {/* Bottom Action Buttons */}
         <div className="pt-4 border-0 flex items-center justify-end gap-2.5">
           {onCancel && (
-            <button
+            <CustomButton
               type="button"
+              variant="surface"
+              size="md"
               onClick={onCancel}
-              className="px-4 py-2.5 rounded-xl border-0 theme-bg-surface hover:theme-bg-elevated/50 theme-text-secondary text-sm font-semibold transition cursor-pointer shadow-xs"
             >
-              Cancel
-            </button>
+              {t("cancel", "Cancel")}
+            </CustomButton>
           )}
-          <button
+          <CustomButton
             type="submit"
-            className="flex-1 py-2.5 rounded-xl theme-bg-accent text-white font-bold text-sm uppercase tracking-wider shadow-md hover:opacity-90 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer border-0 ring-0"
+            variant="primary"
+            size="md"
+            icon={SaveIcon}
+            className="flex-1"
           >
-            <SaveIcon className="w-4 h-4" />
-            <span>SAVE</span>
-          </button>
+            {t("save", "Save Schedule")}
+          </CustomButton>
         </div>
       </form>
     </DrawerContainer>

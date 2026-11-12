@@ -16,7 +16,7 @@ import { createStaff, updateStaff } from '../../api/staff';
 import { useToast } from '../../context/ToastContext';
 import { useTenant } from '../../context/TenantContext';
 import { fetchWithAuth } from '../../utils/authService';
-import { staffRanksStore, STAFF_CATEGORY_OPTIONS } from '../../utils/localStore';
+import { useStaffRanks, useStaffCategories } from './hooks';
 import CustomSelect from '../../components/ui/CustomSelect';
 import CustomInput from '../../components/ui/CustomInput';
 import CustomCheckbox from '../../components/ui/CustomCheckbox';
@@ -32,7 +32,6 @@ import type {
   StaffType,
   EmploymentStatus,
   SalaryType,
-  StaffRankItem,
 } from '../../types/staff';
 
 interface StaffDrawerFormProps {
@@ -125,11 +124,14 @@ export const StaffDrawerForm: React.FC<StaffDrawerFormProps> = ({
   const [departments, setDepartments] = useState<DepartmentOptionItem[]>([]);
   const [usersList, setUsersList] = useState<UserOptionItem[]>([]);
   const [seniorStaffList, setSeniorStaffList] = useState<SeniorStaffOptionItem[]>([]);
-  const [ranksList, setRanksList] = useState<StaffRankItem[]>(() =>
-    staffRanksStore.getRanks(activeTenantId)
-  );
   const [isCustomDesignation, setIsCustomDesignation] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  const { ranksList, rankOptions, getRankByName } = useStaffRanks({
+    activeTenantId,
+    includeCustomOption: true,
+    customOptionLabel: '+ Enter Custom Designation / Title...',
+  });
 
   // Comprehensive Form State
   const [formData, setFormData] = useState<StaffFormValues>({
@@ -236,14 +238,10 @@ export const StaffDrawerForm: React.FC<StaffDrawerFormProps> = ({
     }
   };
 
-  // Listen for live rank updates from Developer Tools
-  useEffect(() => {
-    const handleRanksUpdated = () => {
-      setRanksList(staffRanksStore.getRanks(activeTenantId));
-    };
-    window.addEventListener('spr_staff_ranks_updated', handleRanksUpdated);
-    return () => window.removeEventListener('spr_staff_ranks_updated', handleRanksUpdated);
-  }, [activeTenantId]);
+  const { categoryOptions: staffTypeOptions } = useStaffCategories({
+    activeTenantId,
+    currentValue: formData.staff_type,
+  });
 
   // Fetch departments, users, and staff list for lookups
   useEffect(() => {
@@ -403,19 +401,6 @@ export const StaffDrawerForm: React.FC<StaffDrawerFormProps> = ({
     }
   };
 
-  const rankOptions = useMemo(() => {
-    const list = ranksList.map((r) => ({
-      value: r.name,
-      label: `${r.name_bn ? `${r.name_bn} (${r.name})` : r.name} — [Rank ${r.order}]`,
-      rank_order: r.order,
-      type: r.type,
-    }));
-    return [
-      ...list,
-      { value: '__CUSTOM__', label: '+ Enter Custom Designation / Title...' },
-    ];
-  }, [ranksList]);
-
   const userOptions = [
     { value: '', label: 'Select Existing System User...' },
     ...usersList.map((u) => ({
@@ -441,8 +426,6 @@ export const StaffDrawerForm: React.FC<StaffDrawerFormProps> = ({
         label: `${s.user_name || s.name || s.employee_id} — ${s.designation || 'Staff'}`,
       })),
   ];
-
-  const staffTypeOptions = STAFF_CATEGORY_OPTIONS;
 
   return (
     <DrawerContainer padding="none" spacing="normal">
@@ -579,7 +562,7 @@ export const StaffDrawerForm: React.FC<StaffDrawerFormProps> = ({
                               setIsCustomDesignation(true);
                               return;
                             }
-                            const matched = ranksList.find((r) => r.name === val);
+                            const matched = getRankByName(val);
                             setFormData((prev) => ({
                               ...prev,
                               designation: val,

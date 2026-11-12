@@ -31,6 +31,7 @@ export const ar = {
   actions: {
     saveChanges: 'حفظ التغييرات',
     saving: 'جارٍ الحفظ...',
+    discardChanges: 'إلغاء التغييرات',
     forceApply: 'حفظ وتجاوز الكل',
     forceApplyTitle: 'حفظ الإعدادات الافتراضية وتجاوز جميع تخصيصات الأدوار والمستخدمين فوراً.',
     applying: 'جارٍ الحفظ وتجاوز الكل...',
@@ -108,6 +109,7 @@ export const ar = {
 
   toasts: {
     noChanges: 'لا توجد تغييرات لحفظها.',
+    discardSuccess: 'تم تجاهل التغييرات غير المحفوظة.',
     saveSuccess: 'تم حفظ قواعد الميزات والوحدات بنجاح!',
     saveError: 'فشل حفظ تحديثات قواعد الميزات.',
     serverError: 'خطأ في تحديث القواعد على الخادم.',

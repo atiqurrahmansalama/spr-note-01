@@ -16,16 +16,9 @@ import { calendarEventTypesStore, calendarEventKindsStore, calendarSettings } fr
 import { useTenant } from "../../../../context/TenantContext";
 import { getHijriDateString, getHijriDetails } from "../../../../utils/hijriUtils";
 import type { CalendarEvent, CalendarCategory, CalendarDisplayMode, DeleteEventOptions } from "../types";
+import { EVENT_COLOR_MAP, resolveCanonicalEventColor, type EventColorStyle } from "../constants/eventColors";
 
-export interface EventColorStyle {
-  bg: string;
-  solidBg: string;
-  solidText: string;
-  border: string;
-  text: string;
-  dot: string;
-  hex: string;
-}
+export { EVENT_COLOR_MAP, type EventColorStyle };
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -36,34 +29,6 @@ const WEEKDAY_NAMES_SHORT = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const WEEKDAY_NAMES_FULL = [
   "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 ];
-
-export const EVENT_COLOR_MAP: Record<string, EventColorStyle> = {
-  emerald: { bg: "bg-emerald-500/15 dark:bg-emerald-500/20", solidBg: "bg-emerald-500", solidText: "text-white", border: "border-0", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500", hex: "#10b981" },
-  indigo: { bg: "bg-indigo-500/15 dark:bg-indigo-500/20", solidBg: "bg-indigo-500", solidText: "text-white", border: "border-0", text: "text-indigo-700 dark:text-indigo-300", dot: "bg-indigo-500", hex: "#6366f1" },
-  blue: { bg: "bg-blue-500/15 dark:bg-blue-500/20", solidBg: "bg-blue-500", solidText: "text-white", border: "border-0", text: "text-blue-700 dark:text-blue-300", dot: "bg-blue-500", hex: "#3b82f6" },
-  sky: { bg: "bg-sky-500/15 dark:bg-sky-500/20", solidBg: "bg-sky-500", solidText: "text-white", border: "border-0", text: "text-sky-700 dark:text-sky-300", dot: "bg-sky-500", hex: "#0ea5e9" },
-  cyan: { bg: "bg-cyan-500/15 dark:bg-cyan-500/20", solidBg: "bg-cyan-500", solidText: "text-white", border: "border-0", text: "text-cyan-700 dark:text-cyan-300", dot: "bg-cyan-500", hex: "#06b6d4" },
-  teal: { bg: "bg-teal-500/15 dark:bg-teal-500/20", solidBg: "bg-teal-500", solidText: "text-white", border: "border-0", text: "text-teal-700 dark:text-teal-300", dot: "bg-teal-500", hex: "#14b8a6" },
-  violet: { bg: "bg-violet-500/15 dark:bg-violet-500/20", solidBg: "bg-violet-500", solidText: "text-white", border: "border-0", text: "text-violet-700 dark:text-violet-300", dot: "bg-violet-500", hex: "#8b5cf6" },
-  purple: { bg: "bg-purple-500/15 dark:bg-purple-500/20", solidBg: "bg-purple-500", solidText: "text-white", border: "border-0", text: "text-purple-700 dark:text-purple-300", dot: "bg-purple-500", hex: "#a855f7" },
-  fuchsia: { bg: "bg-fuchsia-500/15 dark:bg-fuchsia-500/20", solidBg: "bg-fuchsia-500", solidText: "text-white", border: "border-0", text: "text-fuchsia-700 dark:text-fuchsia-300", dot: "bg-fuchsia-500", hex: "#d946ef" },
-  rose: { bg: "bg-rose-500/15 dark:bg-rose-500/20", solidBg: "bg-rose-500", solidText: "text-white", border: "border-0", text: "text-rose-700 dark:text-rose-300", dot: "bg-rose-500", hex: "#f43f5e" },
-  red: { bg: "bg-red-500/15 dark:bg-red-500/20", solidBg: "bg-red-500", solidText: "text-white", border: "border-0", text: "text-red-700 dark:text-red-300", dot: "bg-red-500", hex: "#ef4444" },
-  orange: { bg: "bg-orange-500/15 dark:bg-orange-500/20", solidBg: "bg-orange-500", solidText: "text-white", border: "border-0", text: "text-orange-700 dark:text-orange-300", dot: "bg-orange-500", hex: "#f97316" },
-  amber: { bg: "bg-amber-500/15 dark:bg-amber-500/20", solidBg: "bg-amber-500", solidText: "text-slate-950", border: "border-0", text: "text-amber-700 dark:text-amber-300", dot: "bg-amber-500", hex: "#f59e0b" },
-  lime: { bg: "bg-lime-500/15 dark:bg-lime-500/20", solidBg: "bg-lime-500", solidText: "text-slate-950", border: "border-0", text: "text-lime-700 dark:text-lime-300", dot: "bg-lime-500", hex: "#84cc16" },
-  slate: { bg: "bg-slate-500/15 dark:bg-slate-500/20", solidBg: "bg-slate-600", solidText: "text-white", border: "border-0", text: "text-slate-700 dark:text-slate-300", dot: "bg-slate-500", hex: "#64748b" },
-  // Soft & Light Pastel Colors
-  mint: { bg: "bg-emerald-400/15 dark:bg-emerald-400/20", solidBg: "bg-emerald-300", solidText: "text-emerald-950", border: "border-0", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-400", hex: "#6ee7b7" },
-  lavender: { bg: "bg-violet-400/15 dark:bg-violet-400/20", solidBg: "bg-violet-300", solidText: "text-violet-950", border: "border-0", text: "text-violet-700 dark:text-violet-300", dot: "bg-violet-400", hex: "#c4b5fd" },
-  peach: { bg: "bg-orange-400/15 dark:bg-orange-400/20", solidBg: "bg-orange-300", solidText: "text-orange-950", border: "border-0", text: "text-orange-700 dark:text-orange-300", dot: "bg-orange-400", hex: "#fdba74" },
-  coral: { bg: "bg-rose-400/15 dark:bg-rose-400/20", solidBg: "bg-rose-300", solidText: "text-rose-950", border: "border-0", text: "text-rose-700 dark:text-rose-300", dot: "bg-rose-400", hex: "#fca5a5" },
-  sage: { bg: "bg-green-400/15 dark:bg-green-400/20", solidBg: "bg-green-300", solidText: "text-green-950", border: "border-0", text: "text-green-700 dark:text-green-300", dot: "bg-green-400", hex: "#86efac" },
-  ice: { bg: "bg-sky-400/15 dark:bg-sky-400/20", solidBg: "bg-sky-300", solidText: "text-sky-950", border: "border-0", text: "text-sky-700 dark:text-sky-300", dot: "bg-sky-400", hex: "#7dd3fc" },
-  sand: { bg: "bg-slate-400/15 dark:bg-slate-400/20", solidBg: "bg-slate-300", solidText: "text-slate-900", border: "border-0", text: "text-slate-700 dark:text-slate-300", dot: "bg-slate-400", hex: "#cbd5e1" },
-  pink: { bg: "bg-pink-400/15 dark:bg-pink-400/20", solidBg: "bg-pink-400", solidText: "text-white", border: "border-0", text: "text-pink-700 dark:text-pink-300", dot: "bg-pink-400", hex: "#f472b6" },
-  cream: { bg: "bg-amber-300/20 dark:bg-amber-300/20", solidBg: "bg-amber-200", solidText: "text-amber-950", border: "border-0", text: "text-amber-700 dark:text-amber-300", dot: "bg-amber-400", hex: "#fde68a" },
-};
 
 /**
  * Resolves the precise display label for any calendar event or schedule.
@@ -120,7 +85,7 @@ const eventColorsCache = new Map<string, EventColorStyle>();
 
 export function getEventColors(evt?: CalendarEvent | null, tenantId?: string): EventColorStyle {
   if (!evt) {
-    return EVENT_COLOR_MAP.emerald;
+    return EVENT_COLOR_MAP.eucalyptus;
   }
   const cacheKey = `${tenantId || "def"}_${evt.id || evt.title || ""}_${evt.color || ""}_${evt.category || ""}_${evt.type || ""}`;
   if (eventColorsCache.has(cacheKey)) {
@@ -129,12 +94,15 @@ export function getEventColors(evt?: CalendarEvent | null, tenantId?: string): E
 
   const isWorkingHours = evt?.category === "WORKING_HOURS" || evt?.type === "WORKING_HOURS";
 
-  // 1. Direct explicit color on event
-  if (evt?.color && EVENT_COLOR_MAP[evt.color]) {
-    const base = EVENT_COLOR_MAP[evt.color];
-    const res: EventColorStyle = isWorkingHours ? { ...base, text: "theme-text-primary" } : base;
-    eventColorsCache.set(cacheKey, res);
-    return res;
+  // 1. Direct explicit color on event (supports canonical and legacy keys)
+  if (evt?.color) {
+    const canonicalColor = resolveCanonicalEventColor(evt.color, "");
+    const base = EVENT_COLOR_MAP[canonicalColor] || EVENT_COLOR_MAP[evt.color];
+    if (base) {
+      const res: EventColorStyle = isWorkingHours ? { ...base, text: "theme-text-primary" } : base;
+      eventColorsCache.set(cacheKey, res);
+      return res;
+    }
   }
 
   // 2. Dynamic lookup from Developer Tools Event Types & Kinds
@@ -150,11 +118,14 @@ export function getEventColors(evt?: CalendarEvent | null, tenantId?: string): E
         const matchedKind = kinds.find(
           (k: any) => k.value === rawType || k.id === rawType || String(k.value).toUpperCase() === String(rawType).toUpperCase()
         );
-        if (matchedKind?.color && EVENT_COLOR_MAP[matchedKind.color]) {
-          const base = EVENT_COLOR_MAP[matchedKind.color];
-          const res: EventColorStyle = isWorkingHours ? { ...base, text: "theme-text-primary" } : base;
-          eventColorsCache.set(cacheKey, res);
-          return res;
+        if (matchedKind?.color) {
+          const canonicalColor = resolveCanonicalEventColor(matchedKind.color);
+          const base = EVENT_COLOR_MAP[canonicalColor] || EVENT_COLOR_MAP[matchedKind.color];
+          if (base) {
+            const res: EventColorStyle = isWorkingHours ? { ...base, text: "theme-text-primary" } : base;
+            eventColorsCache.set(cacheKey, res);
+            return res;
+          }
         }
       }
     } catch {}
@@ -162,26 +133,21 @@ export function getEventColors(evt?: CalendarEvent | null, tenantId?: string): E
 
   if (isWorkingHours) {
     const res: EventColorStyle = {
-      bg: "theme-bg-accent-soft",
-      solidBg: "theme-bg-accent",
-      solidText: "theme-accent-text",
-      border: "border-[var(--accent-main)]/20",
+      ...EVENT_COLOR_MAP.blueberry,
       text: "theme-text-primary",
-      dot: "theme-bg-accent",
-      hex: "#6366f1",
     };
     eventColorsCache.set(cacheKey, res);
     return res;
   }
 
-  // 3. Fallback based on display type
+  // 3. Fallback based on display type using canonical 13-color palette
   const displayType = getEventDisplayType(evt, tenantId);
-  let fallback = EVENT_COLOR_MAP.emerald;
-  if (displayType === "Holiday") fallback = EVENT_COLOR_MAP.rose;
-  else if (displayType === "Exam") fallback = EVENT_COLOR_MAP.amber;
-  else if (displayType === "Meeting") fallback = EVENT_COLOR_MAP.blue;
-  else if (displayType === "Sports & Cultural") fallback = EVENT_COLOR_MAP.purple;
-  else if (displayType === "Academic") fallback = EVENT_COLOR_MAP.emerald;
+  let fallback = EVENT_COLOR_MAP.eucalyptus;
+  if (displayType === "Holiday") fallback = EVENT_COLOR_MAP.radicchio;
+  else if (displayType === "Exam") fallback = EVENT_COLOR_MAP.flamingo;
+  else if (displayType === "Meeting") fallback = EVENT_COLOR_MAP.peacock;
+  else if (displayType === "Sports & Cultural") fallback = EVENT_COLOR_MAP.amethyst;
+  else if (displayType === "Academic") fallback = EVENT_COLOR_MAP.eucalyptus;
 
   eventColorsCache.set(cacheKey, fallback);
   return fallback;
@@ -976,11 +942,11 @@ export default function MasterTimeCalendar({
         
         {/* ─── 1. Traditional 7-Column Month Grid View ─── */}
         {viewMode === "month" && displayMode === "grid" && (
-          <div className={`flex flex-col w-full min-w-0 ${embeddedSurface ? "p-0" : "p-2 sm:p-3"}`}>
+          <div className={`flex flex-col w-full min-w-0 ${embeddedSurface ? "p-0 pb-4" : "p-2 sm:p-3 pb-5 sm:pb-6"}`}>
             {/* Weekday Header Columns (SUN to SAT) */}
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5 text-center select-none shrink-0 mb-1.5">
               {WEEKDAY_NAMES_SHORT.map((wd) => (
-                <div key={wd} className="py-1.5 rounded-xl theme-bg-app text-[9px] @sm:text-[10px] @lg:text-xs font-bold tracking-wider uppercase border-0 theme-text-secondary">
+                <div key={wd} className="py-1.5 rounded-xl theme-bg-tile text-[9px] @sm:text-[10px] @lg:text-xs font-bold tracking-wider uppercase border-0 theme-text-secondary">
                   {wd}
                 </div>
               ))}
@@ -1025,10 +991,10 @@ export default function MasterTimeCalendar({
                             }}
                             className={`border-0 aspect-square @md:aspect-auto min-h-0 @md:min-h-[var(--week-min-h,88px)] w-full p-1 @sm:p-1.5 @xl:p-2 flex flex-col justify-between transition-colors cursor-pointer group select-none rounded-xl sm:rounded-2xl ${
                               isToday
-                                ? "bg-[var(--accent-main)]/15 dark:bg-[var(--accent-main)]/22 hover:bg-[var(--accent-main)]/20"
+                                ? "bg-[var(--accent-main)]/12 dark:bg-[var(--accent-main)]/18 hover:bg-[var(--accent-main)]/22"
                                 : cell.isCurrentMonth
-                                ? "theme-bg-app hover:theme-bg-elevated/60"
-                                : "theme-bg-app/50 opacity-45 hover:opacity-75"
+                                ? "theme-bg-tile hover:theme-bg-elevated/80"
+                                : "theme-bg-tile-muted opacity-50 hover:opacity-80"
                             }`}
                             title={dayEvents.length > 0 ? `${dayEvents.length} item(s) on ${cell.dateStr}. Click to view details.` : cell.dateStr}
                           >
@@ -1111,7 +1077,7 @@ export default function MasterTimeCalendar({
                               gridColumn: `${startCol} / span ${span}`,
                               gridRow: row,
                             }}
-                            className={`h-[22px] px-2 py-0.5 text-[10px] font-semibold truncate transition-all cursor-pointer select-none pointer-events-auto flex items-center shadow-2xs ${style.solidBg} ${style.solidText} hover:brightness-105 ${edgeClasses}`}
+                            className={`h-[22px] px-2 py-0.5 text-[10px] font-semibold truncate transition-all cursor-pointer select-none pointer-events-auto flex items-center shadow-2xs ${style.bannerBg || style.solidBg} ${style.bannerText || style.solidText} hover:brightness-105 ${edgeClasses}`}
                             title={`${evt.title}${!isAllDay ? ` (${formatTime12(evt.startTime)} - ${formatTime12(evt.endTime)})` : " (Full Day)"}${isMultiDay ? " (Multi-day Event)" : ""}`}
                           >
                             {/* Title rendered ONCE across the entire spanned width */}
@@ -1186,7 +1152,7 @@ export default function MasterTimeCalendar({
             </div>
 
             {/* Selected Day Main View: Vertical Timeline */}
-            <div className={`${embeddedSurface ? "pt-2" : "p-2 @sm:p-3 @md:p-4"} space-y-2.5 @sm:space-y-3.5 min-w-0`}>
+            <div className={`${embeddedSurface ? "pt-2 pb-4" : "p-2 @sm:p-3 @md:p-4 pb-5 @sm:pb-6"} space-y-2.5 @sm:space-y-3.5 min-w-0`}>
               
               {/* Top Selected Day Date Header with Hijri Date */}
               <div className="flex items-center justify-between gap-2 px-1 pb-1 border-0 flex-wrap">
@@ -1207,7 +1173,7 @@ export default function MasterTimeCalendar({
 
               {/* Timeline Cards Container */}
               {selectedDayEvents.length === 0 ? (
-                <div className="p-6 @sm:p-10 text-center border-0 rounded-2xl theme-bg-app shadow-2xs my-1 flex flex-col items-center justify-center gap-2">
+                <div className="p-6 @sm:p-10 text-center border-0 rounded-2xl theme-bg-tile shadow-2xs my-1 flex flex-col items-center justify-center gap-2">
                   <div className="p-2.5 rounded-xl theme-bg-surface border-0 theme-text-secondary opacity-60 shadow-xs">
                     <CalendarIcon className="w-5 h-5" />
                   </div>
@@ -1258,7 +1224,7 @@ export default function MasterTimeCalendar({
                         {/* Event Card (Distinct soft surface inside parent container) */}
                         <div
                           onClick={() => handleOpenEventDetail(evt, selectedDateStr)}
-                          className="flex-1 min-w-0 p-2 @sm:p-3 @md:p-3.5 rounded-2xl border-0 theme-bg-app hover:theme-bg-elevated/60 transition-all duration-200 cursor-pointer shadow-2xs relative overflow-hidden flex items-center justify-between gap-1.5 @sm:gap-2.5"
+                          className="flex-1 min-w-0 p-2 @sm:p-3 @md:p-3.5 rounded-2xl border-0 theme-bg-tile hover:theme-bg-elevated/75 transition-all duration-200 cursor-pointer shadow-2xs relative overflow-hidden flex items-center justify-between gap-1.5 @sm:gap-2.5"
                         >
                           {/* Left Accent Bar */}
                           <div className={`absolute left-0 top-0 bottom-0 w-1 @sm:w-1.5 ${style.dot}`} />
@@ -1304,9 +1270,9 @@ export default function MasterTimeCalendar({
 
         {/* ─── 3. Full Agenda / List View ─── */}
         {viewMode === "list" && (
-          <div className={`${embeddedSurface ? "p-0" : "p-3 @sm:p-4"} space-y-2.5 @sm:space-y-3`}>
+          <div className={`${embeddedSurface ? "p-0 pb-4" : "p-3 @sm:p-4 pb-5 @sm:pb-6"} space-y-2.5 @sm:space-y-3`}>
             {filteredEvents.length === 0 ? (
-              <div className="p-10 @sm:p-12 text-center text-xs theme-text-secondary border-0 rounded-2xl theme-bg-app shadow-2xs">
+              <div className="p-10 @sm:p-12 text-center text-xs theme-text-secondary border-0 rounded-2xl theme-bg-tile shadow-2xs">
                 No events or working hours matching the filter criteria.
               </div>
             ) : (
@@ -1318,7 +1284,7 @@ export default function MasterTimeCalendar({
                   <div
                     key={evt.id}
                     onClick={() => handleOpenEventDetail(evt)}
-                    className="p-3.5 @sm:p-4 rounded-2xl border-0 theme-bg-app hover:theme-bg-elevated/60 transition cursor-pointer flex flex-col @sm:flex-row items-start @sm:items-center justify-between gap-2.5 @sm:gap-4 shadow-2xs"
+                    className="p-3.5 @sm:p-4 rounded-2xl border-0 theme-bg-tile hover:theme-bg-elevated/75 transition cursor-pointer flex flex-col @sm:flex-row items-start @sm:items-center justify-between gap-2.5 @sm:gap-4 shadow-2xs"
                   >
                     <div className="flex items-start @sm:items-center gap-3 min-w-0 flex-1">
                       <div className={`w-2.5 h-2.5 @sm:w-3 @sm:h-3 rounded-full shrink-0 mt-1 @sm:mt-0 ${style.dot}`} />

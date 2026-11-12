@@ -60,5 +60,18 @@ export const bn = {
   workspaceRoleBuilder: 'ওয়ার্কস্পেস কাস্টমাইজার (রোল বিল্ডার)',
   widgetGovernance: 'উইজেট রোল ও অ্যাকাডেমি স্কোপ',
   doneCustomizing: 'কাস্টমাইজ সম্পন্ন',
+
+  // Approvals Widget
+  approvalsCenterTitle: 'অনুমোদন কেন্দ্র',
+  pendingQueueSub: 'প্রাতিষ্ঠানিক পর্যালোচনা ও সিদ্ধান্ত কিউ',
+  viewAll: 'সকল দেখুন',
+  totalPending: 'অপেক্ষমাণ',
+  staffDomain: 'স্টাফ',
+  studentDomain: 'শিক্ষার্থী',
+  financeDomain: 'অর্থ ও হিসাব',
+  urgentReview: 'পর্যালোচনা প্রয়োজন',
+  loadingQueue: 'অপেক্ষমাণ অনুমোদন লোড হচ্ছে...',
+  allCaughtUp: 'সবকিছু হালনাগাদ আছে!',
+  noPendingNotice: 'বর্তমানে পর্যালোচনার জন্য কোনো আবেদন বা অনুরোধ অপেক্ষমাণ নেই।',
 };
 

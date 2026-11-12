@@ -574,13 +574,21 @@ class PublicStaffOnboardingVerifyView(APIView):
                 msg = "This staff onboarding quota limit has been reached."
             return Response({"error": msg, "is_valid": False}, status=status.HTTP_400_BAD_REQUEST)
 
+        permitted_designations = [
+            str(d).strip() for d in (token_obj.allowed_designations or []) if str(d).strip()
+        ]
+        if not permitted_designations and token_obj.designation:
+            permitted_designations = [token_obj.designation]
+
         inst = token_obj.institution
         return Response({
             "valid": True,
             "token": token_obj.token,
             "title": token_obj.title,
+            "onboarding_mode": token_obj.onboarding_mode,
             "staff_type": token_obj.staff_type,
             "designation": token_obj.designation,
+            "allowed_designations": permitted_designations,
             "rank_order": token_obj.rank_order,
             "department_id": str(token_obj.department.id) if token_obj.department else None,
             "department_name": token_obj.department.name if token_obj.department else None,
@@ -591,6 +599,8 @@ class PublicStaffOnboardingVerifyView(APIView):
             "expires_at": token_obj.expires_at.isoformat() if token_obj.expires_at else None,
             "applied_count": token_obj.applied_count,
             "max_applications": token_obj.max_applications,
+            "include_payroll": token_obj.include_payroll,
+            "auto_approve": token_obj.auto_approve,
         }, status=status.HTTP_200_OK)
 
 
@@ -613,6 +623,21 @@ class StaffOnboardingApplyView(APIView):
             if not token_obj or not token_obj.is_valid():
                 return Response({"error": "Invalid or expired onboarding invitation link."}, status=status.HTTP_400_BAD_REQUEST)
             institution = token_obj.institution
+
+            permitted_designations = [
+                str(d).strip() for d in (token_obj.allowed_designations or []) if str(d).strip()
+            ]
+            if not permitted_designations and token_obj.designation:
+                permitted_designations = [token_obj.designation]
+
+            submitted_designation = str(data.get('designation') or '').strip()
+            if permitted_designations:
+                permitted_lower = {d.lower() for d in permitted_designations}
+                if submitted_designation and submitted_designation.lower() not in permitted_lower:
+                    return Response(
+                        {"designation": "Selected designation is not permitted for this onboarding link."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
         else:
             tenant_id = get_scoped_tenant_id(request)
             if tenant_id:
@@ -625,187 +650,24 @@ class StaffOnboardingApplyView(APIView):
         if not institution:
             return Response({"error": "An academic institution context is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Department resolution
-        dept = None
-        dept_id = data.get('department') or (str(token_obj.department.id) if token_obj and token_obj.department else None)
-        if dept_id:
-            dept = AcademicDepartment.objects.filter(id=dept_id).first()
+        source_mode = "PUBLIC_PORTAL" if token_obj else ("ADMIN_QUICK" if data.get('onboarding_mode') == 'QUICK' else "ADMIN_WIZARD")
+        form_mode = data.get('onboarding_mode') or (token_obj.onboarding_mode if token_obj else "QUICK")
+        # Public submissions follow the token's auto_approve flag; admin submissions auto-approve by default
+        auto_approve = token_obj.auto_approve if token_obj else True
 
-        with transaction.atomic():
-            # 1. Resolve or Create User Account
-            user = None
-            if data.get('user_id'):
-                user = User.objects.filter(id=data['user_id']).first()
-            elif token_obj and request.user.is_authenticated:
-                user = request.user
-            else:
-                email = data.get('email', '').strip()
-                phone = data.get('phone_number', '').strip() or f"staff_{uuid.uuid4().hex[:8]}"
-
-                user = User.objects.filter(
-                    Q(phone_number=phone) | (Q(email__iexact=email) & ~Q(email=''))
-                ).first()
-                if not user:
-                    import secrets
-                    temp_pwd = secrets.token_urlsafe(8)
-                    full_name = str(data.get('name', '') or '').strip()
-                    name_parts = full_name.split(None, 1) if full_name else []
-                    user = User.objects.create_user(
-                        phone_number=phone,
-                        password=temp_pwd,
-                        name=full_name,
-                        first_name=name_parts[0] if len(name_parts) > 0 else '',
-                        last_name=name_parts[1] if len(name_parts) > 1 else '',
-                        name_bn=data.get('bangla_name', '') or None,
-                        email=email,
-                        institution=institution,
-                        user_type='TEACHER' if data.get('staff_type') == 'TEACHING' else 'STAFF',
-                        is_staff=True,
-                    )
-
-            if user and StaffProfile.objects.filter(user=user).exists():
-                return Response(
-                    {"error": "A staff profile already exists for this phone number or email address."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            staff_type = data.get('staff_type') or (token_obj.staff_type if token_obj else 'TEACHING')
-
-            # Sync authenticated candidate profile (especially Google OAuth candidates who enter with placeholder phone / GUARDIAN default)
-            if user:
-                user_update_fields = []
-                submitted_name = (data.get('name') or '').strip()
-                submitted_name_bn = (data.get('bangla_name') or '').strip()
-                submitted_phone = (data.get('phone_number') or '').strip()
-                submitted_email = (data.get('email') or '').strip()
-                submitted_photo = (data.get('photo_url') or '').strip()
-
-                if not user.institution_id and institution:
-                    user.institution = institution
-                    user_update_fields.append('institution')
-
-                if submitted_name and not (user.name or '').strip():
-                    user.name = submitted_name
-                    user_update_fields.append('name')
-                    if not (user.first_name or '').strip():
-                        parts = submitted_name.split(None, 1)
-                        user.first_name = parts[0]
-                        user_update_fields.append('first_name')
-                        if len(parts) > 1 and not (user.last_name or '').strip():
-                            user.last_name = parts[1]
-                            user_update_fields.append('last_name')
-
-                if submitted_name_bn and not (user.name_bn or '').strip():
-                    user.name_bn = submitted_name_bn
-                    user_update_fields.append('name_bn')
-
-                current_phone = (user.phone_number or '').strip()
-                if submitted_phone and (not current_phone or current_phone.startswith('g_') or current_phone.startswith('user_')):
-                    if not User.objects.filter(phone_number=submitted_phone).exclude(pk=user.pk).exists():
-                        user.phone_number = submitted_phone
-                        user_update_fields.append('phone_number')
-
-                if submitted_email and not (user.email or '').strip():
-                    if not User.objects.filter(email__iexact=submitted_email).exclude(pk=user.pk).exists():
-                        user.email = submitted_email
-                        user_update_fields.append('email')
-
-                if submitted_photo.startswith(('http://', 'https://')) and not (user.avatar_url or '').strip():
-                    user.avatar_url = submitted_photo
-                    user_update_fields.append('avatar_url')
-
-                # Upgrade newly auto-provisioned public Google/default candidate accounts to Teacher/Staff,
-                # while strictly preserving existing privileged Admin/Super Admin roles.
-                protected_roles = {'SUPER_ADMIN', 'ADMIN', 'PRINCIPAL', 'DIRECTOR', 'HEADMASTER'}
-                current_role_code = (getattr(getattr(user, 'role', None), 'code', '') or '').strip().upper()
-                current_user_type = (user.user_type or '').strip().upper()
-                if (
-                    not user.is_superuser
-                    and current_role_code not in protected_roles
-                    and current_user_type not in protected_roles
-                    and current_user_type in ('', 'GUARDIAN', 'USER', 'STUDENT')
-                ):
-                    target_role_code = 'TEACHER' if staff_type == 'TEACHING' else 'STAFF'
-                    target_role_name = 'Teacher' if staff_type == 'TEACHING' else 'Staff'
-                    target_role, _ = UserRole.objects.get_or_create(
-                        code=target_role_code,
-                        defaults={'name': target_role_name, 'is_system_role': False},
-                    )
-                    user.user_type = target_role_code
-                    user.role = target_role
-                    user.is_staff = True
-                    user_update_fields.extend(['user_type', 'role', 'is_staff'])
-
-                if user_update_fields:
-                    user.save(update_fields=list(dict.fromkeys(user_update_fields)))
-
-            # 2. Generate Employee ID
-            from core.services import StaffOnboardingService
-            emp_id = StaffOnboardingService.generate_employee_id(institution, staff_type)
-
-            # 3. Create StaffProfile
-            staff_profile = StaffProfile.objects.create(
-                user=user,
-                institution=institution,
-                employee_id=emp_id,
-                staff_type=staff_type,
-                designation=data.get('designation') or (token_obj.designation if token_obj else 'Faculty Member'),
-                rank_order=data.get('rank_order', 99) if data.get('rank_order') is not None else (token_obj.rank_order if token_obj else 99),
-                department=dept,
-                employment_status=data.get('employment_status', 'PERMANENT'),
-                joining_date=data.get('joining_date') or timezone.localdate(),
-                nid_no=data.get('nid_no', ''),
-                blood_group=data.get('blood_group', ''),
-                emergency_contact=data.get('emergency_contact', ''),
-                address=data.get('address', ''),
-                division=data.get('division', ''),
-                district=data.get('district', ''),
-                upazila_thana=data.get('upazila_thana', ''),
-                postal_code=data.get('postal_code', ''),
-                salary_type=data.get('salary_type', 'MONTHLY_FIXED'),
-                base_salary=data.get('base_salary', Decimal('0.00')),
-                bank_name=data.get('bank_name', ''),
-                bank_account_no=data.get('bank_account_no', ''),
-                mobile_banking_no=data.get('mobile_banking_no', ''),
-                is_active=True,
-            )
-
-            # 4. Create Role-Specific Detail
-            if staff_type == 'TEACHING':
-                TeacherDetail.objects.create(
-                    staff=staff_profile,
-                    highest_degree=data.get('highest_degree', ''),
-                    specialization=data.get('specialization', ''),
-                    max_daily_periods=data.get('max_daily_periods', 4)
-                )
-            else:
-                GeneralStaffDetail.objects.create(
-                    staff=staff_profile,
-                    assigned_zone=data.get('division', '') or 'Campus Main'
-                )
-
-            # 5. Increment applied count on token if applicable
-            if token_obj:
-                token_obj.applied_count = F('applied_count') + 1
-                token_obj.save(update_fields=['applied_count', 'updated_at'])
-
-            return Response({
-                "status": "success",
-                "message": f"Staff profile created successfully with Employee ID '{emp_id}'.",
-                "staff": {
-                    "id": str(staff_profile.id),
-                    "employee_id": emp_id,
-                    "name": data.get('name', ''),
-                    "bangla_name": data.get('bangla_name', ''),
-                    "name_i18n": data.get('name_i18n', {}),
-                    "designation": staff_profile.designation,
-                    "rank_order": staff_profile.rank_order,
-                    "staff_type": staff_profile.staff_type,
-                    "institution_name": institution.name,
-                    "department_name": dept.name if dept else None,
-                    "joining_date": str(staff_profile.joining_date),
-                    "user_id": str(user.id) if user else None,
-                }
-            }, status=status.HTTP_201_CREATED)
+        from core.services.approval_engine import ApprovalService
+        result = ApprovalService.submit_request(
+            institution=institution,
+            domain="STAFF_ONBOARDING",
+            payload=data,
+            submitted_by=request.user if request.user.is_authenticated else None,
+            source_mode=source_mode,
+            form_mode=form_mode,
+            source_token_type="StaffOnboardingToken" if token_obj else None,
+            source_token_id=str(token_obj.id) if token_obj else None,
+            token_obj=token_obj,
+            auto_approve=auto_approve,
+        )
+        return Response(result, status=status.HTTP_201_CREATED)
 
 

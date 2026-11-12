@@ -14,6 +14,7 @@ import {
   isValidEmailAddress,
   isValidPhoneNumber,
 } from '@/components/auth';
+import { QuickStaffOnboardingForm } from './QuickStaffOnboardingForm';
 import { StaffOnboardingWizard } from './StaffOnboardingWizard';
 import { useStaffTranslation } from '../locales';
 import {
@@ -726,15 +727,24 @@ export const PublicStaffOnboardingView: React.FC = () => {
           </div>
         </div>
 
-        <div className="rounded-3xl theme-bg-surface shadow-xs p-5 sm:p-7 md:p-8 border-0">
-          <StaffOnboardingWizard
+        {tokenMeta?.onboarding_mode === 'QUICK' ? (
+          <QuickStaffOnboardingForm
             isPublic={true}
             initialData={candidateInitialData}
             tokenMeta={tokenMeta}
-            onCancel={() => window.location.reload()}
             onCompleted={(receipt) => setSubmittedReceipt(receipt)}
           />
-        </div>
+        ) : (
+          <div className="rounded-3xl theme-bg-surface shadow-xs p-5 sm:p-7 md:p-8 border-0">
+            <StaffOnboardingWizard
+              isPublic={true}
+              initialData={candidateInitialData}
+              tokenMeta={tokenMeta}
+              onCancel={() => window.location.reload()}
+              onCompleted={(receipt) => setSubmittedReceipt(receipt)}
+            />
+          </div>
+        )}
       </div>
     </PublicPortalShell>
   );

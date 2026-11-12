@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import PageContainer from '../../../components/layout/PageContainer';
 import PageHeader from '../../../components/ui/PageHeader';
 import TabSwitcher from '../../../components/ui/TabSwitcher';
+import CustomButton from '../../../components/ui/CustomButton';
 import {
   SectionControlIcon,
   GlobeIcon,
@@ -9,6 +10,8 @@ import {
   BuildingLibraryIcon,
   StudentIcon,
   TimerIcon,
+  CheckIcon,
+  UndoIcon,
 } from '../../../components/ui/Icons';
 import { useSectionTranslation } from './hooks/useSectionTranslation';
 import { useSectionControl } from './hooks/useSectionControl';
@@ -52,6 +55,7 @@ export const SectionControlView: React.FC = () => {
     loadingLogs,
     handleToggle,
     handleSaveBatch,
+    handleDiscardChanges,
     handleResetOverrides,
     handleClearOverridesGlobally,
     loadAuditLogs,
@@ -239,6 +243,47 @@ export const SectionControlView: React.FC = () => {
               />
             ))
           )}
+        </div>
+      )}
+
+      {/* 6. Floating Action Dock for Unsaved Changes (Rule 14: Borderless, soft-surface floating pill) */}
+      {modifiedCount > 0 && activeScope !== 'audit' && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 max-w-xl w-[calc(100%-2rem)] animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="p-3 sm:px-5 sm:py-3.5 rounded-2xl theme-bg-surface/95 backdrop-blur-md shadow-2xl border-0 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-main)] animate-pulse shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-semibold theme-text-primary truncate">
+                  {t('status.unsavedNotice', '{{count}} unsaved changes in this scope.', {
+                    count: formatNumber(modifiedCount),
+                  })}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <CustomButton
+                size="sm"
+                variant="sub"
+                disabled={saving}
+                icon={UndoIcon}
+                onClick={handleDiscardChanges}
+              >
+                {t('actions.discardChanges', 'Discard')}
+              </CustomButton>
+
+              <CustomButton
+                size="sm"
+                variant="primary"
+                loading={saving}
+                loadingText={t('actions.saving', 'Saving...')}
+                icon={CheckIcon}
+                onClick={handleSaveBatch}
+              >
+                {`${t('actions.saveChanges', 'Save Changes')} (${formatNumber(modifiedCount)})`}
+              </CustomButton>
+            </div>
+          </div>
         </div>
       )}
     </PageContainer>

@@ -13,3 +13,4 @@ from .templates import *
 from .system import *
 from .export_views import *
 from .finance import *
+from .approvals import *

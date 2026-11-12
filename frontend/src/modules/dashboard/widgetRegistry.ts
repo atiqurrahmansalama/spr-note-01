@@ -19,6 +19,7 @@ import {
   WorkingHoursWidget,
   AcademicEventsWidget,
   AgendaScheduleWidget,
+  ApprovalsSummaryWidget,
 } from './components/widgets';
 
 export interface KpiCardCatalogItem {
@@ -280,6 +281,19 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     requiredFeatureKey: 'nav_dashboard',
     component: QuickActionsWidget,
   },
+  approvals_summary: {
+    id: 'approvals_summary',
+    title: 'Approvals Center & Decision Queue',
+    description: 'Executive queue for reviewing and approving staff onboardings, student admissions, and financial requests.',
+    category: 'TOOLS',
+    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'STAFF'],
+    defaultColSpan: 2,
+    minColSpan: 1,
+    maxColSpan: 4,
+    widgetFeatureKey: 'dashboard_widget_approvals_summary',
+    requiredFeatureKey: 'app_approvals',
+    component: ApprovalsSummaryWidget,
+  },
 };
 
 /**
@@ -289,26 +303,28 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
 export const DEFAULT_ROLE_LAYOUTS: Record<string, DashboardLayoutItem[]> = {
   SUPER_ADMIN: [
     { widgetId: 'kpi_metrics', order: 1, colSpan: 4, isVisible: true },
-    { widgetId: 'system_gateways', order: 2, colSpan: 2, isVisible: true },
-    { widgetId: 'recent_activity', order: 3, colSpan: 2, isVisible: true },
-    { widgetId: 'finance_overview', order: 4, colSpan: 2, isVisible: true },
-    { widgetId: 'academic_events', order: 5, colSpan: 4, isVisible: true },
-    { widgetId: 'working_hours', order: 6, colSpan: 4, isVisible: true },
-    { widgetId: 'agenda_schedule', order: 7, colSpan: 2, isVisible: true },
-    { widgetId: 'notice_board', order: 8, colSpan: 4, isVisible: true },
+    { widgetId: 'approvals_summary', order: 2, colSpan: 2, isVisible: true },
+    { widgetId: 'system_gateways', order: 3, colSpan: 2, isVisible: true },
+    { widgetId: 'recent_activity', order: 4, colSpan: 2, isVisible: true },
+    { widgetId: 'finance_overview', order: 5, colSpan: 2, isVisible: true },
+    { widgetId: 'academic_events', order: 6, colSpan: 4, isVisible: true },
+    { widgetId: 'working_hours', order: 7, colSpan: 4, isVisible: true },
+    { widgetId: 'agenda_schedule', order: 8, colSpan: 2, isVisible: true },
+    { widgetId: 'notice_board', order: 9, colSpan: 4, isVisible: true },
   ],
   ADMIN: [
     { widgetId: 'kpi_metrics', order: 1, colSpan: 4, isVisible: true },
-    { widgetId: 'attendance_pulse', order: 2, colSpan: 2, isVisible: true },
-    { widgetId: 'finance_overview', order: 3, colSpan: 2, isVisible: true },
-    { widgetId: 'residential_occupancy', order: 4, colSpan: 2, isVisible: true },
-    { widgetId: 'admission_pipeline', order: 5, colSpan: 2, isVisible: true },
-    { widgetId: 'notice_board', order: 6, colSpan: 2, isVisible: true },
-    { widgetId: 'agenda_schedule', order: 7, colSpan: 2, isVisible: true },
-    { widgetId: 'academic_events', order: 8, colSpan: 4, isVisible: true },
-    { widgetId: 'working_hours', order: 9, colSpan: 4, isVisible: true },
-    { widgetId: 'recent_activity', order: 10, colSpan: 2, isVisible: true },
-    { widgetId: 'quick_actions', order: 11, colSpan: 4, isVisible: true },
+    { widgetId: 'approvals_summary', order: 2, colSpan: 2, isVisible: true },
+    { widgetId: 'attendance_pulse', order: 3, colSpan: 2, isVisible: true },
+    { widgetId: 'finance_overview', order: 4, colSpan: 2, isVisible: true },
+    { widgetId: 'residential_occupancy', order: 5, colSpan: 2, isVisible: true },
+    { widgetId: 'admission_pipeline', order: 6, colSpan: 2, isVisible: true },
+    { widgetId: 'notice_board', order: 7, colSpan: 2, isVisible: true },
+    { widgetId: 'agenda_schedule', order: 8, colSpan: 2, isVisible: true },
+    { widgetId: 'academic_events', order: 9, colSpan: 4, isVisible: true },
+    { widgetId: 'working_hours', order: 10, colSpan: 4, isVisible: true },
+    { widgetId: 'recent_activity', order: 11, colSpan: 2, isVisible: true },
+    { widgetId: 'quick_actions', order: 12, colSpan: 4, isVisible: true },
   ],
   TEACHER: [
     { widgetId: 'kpi_metrics', order: 1, colSpan: 4, isVisible: true },

@@ -503,13 +503,13 @@ export const DEFAULT_CALENDAR_EVENT_TYPES = [
 ];
 
 export const DEFAULT_EVENT_KINDS = [
-  { id: "HOLIDAY", value: "HOLIDAY", label: "Holiday", color: "rose" },
-  { id: "EXAM", value: "EXAM", label: "Exam", color: "amber" },
-  { id: "WORKING_HOURS", value: "WORKING_HOURS", label: "Working Hours", color: "indigo" },
-  { id: "ACADEMIC", value: "ACADEMIC", label: "Academic / Class", color: "emerald" },
-  { id: "MEETING", value: "MEETING", label: "Meeting", color: "blue" },
-  { id: "ACTIVITY", value: "ACTIVITY", label: "Sports & Cultural", color: "purple" },
-  { id: "GENERAL", value: "GENERAL", label: "General", color: "slate" },
+  { id: "HOLIDAY", value: "HOLIDAY", label: "Holiday", color: "radicchio" },
+  { id: "EXAM", value: "EXAM", label: "Exam", color: "flamingo" },
+  { id: "WORKING_HOURS", value: "WORKING_HOURS", label: "Working Hours", color: "blueberry" },
+  { id: "ACADEMIC", value: "ACADEMIC", label: "Academic / Class", color: "eucalyptus" },
+  { id: "MEETING", value: "MEETING", label: "Meeting", color: "peacock" },
+  { id: "ACTIVITY", value: "ACTIVITY", label: "Sports & Cultural", color: "amethyst" },
+  { id: "GENERAL", value: "GENERAL", label: "General", color: "cocoa" },
 ];
 
 export const calendarEventKindsStore = {
