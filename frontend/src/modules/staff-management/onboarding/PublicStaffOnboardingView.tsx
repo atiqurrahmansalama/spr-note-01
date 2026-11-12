@@ -453,15 +453,13 @@ export const PublicStaffOnboardingView: React.FC = () => {
         <div className="theme-bg-surface border-0 ring-0 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 animate-zoom-in transition-all duration-200 backdrop-blur-md">
           {/* Header Stack */}
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl theme-bg-accent-soft border-0 shadow-xs mx-auto">
-              <LockIcon className="w-6 h-6 theme-accent" />
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl theme-bg-app border-0 shadow-xs mx-auto">
+              <LockIcon className="w-6 h-6 theme-text-secondary" />
             </div>
             {tokenMeta?.institution_name && (
-              <div>
-                <span className="inline-flex items-center px-3 py-0.5 rounded-full text-[11px] font-semibold theme-bg-accent-soft theme-accent border-0">
-                  {tokenMeta.institution_name}
-                </span>
-              </div>
+              <h2 className="text-base sm:text-lg font-bold tracking-tight theme-text-primary">
+                {tokenMeta.institution_name}
+              </h2>
             )}
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary">
               {authMode === 'login'
@@ -695,17 +693,17 @@ export const PublicStaffOnboardingView: React.FC = () => {
       brandIcon={TeacherIcon}
       maxWidth="5xl"
     >
-      <div className="space-y-6 select-none border-0">
+      <div className="space-y-6 border-0">
         <div className="p-6 sm:p-8 rounded-3xl theme-bg-surface shadow-xs flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4 border-0">
           <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-start">
-            <div className="w-14 h-14 rounded-2xl theme-bg-accent-soft flex items-center justify-center theme-accent shrink-0 shadow-inner border-0">
+            <div className="w-14 h-14 rounded-2xl theme-bg-app flex items-center justify-center theme-text-secondary shrink-0 shadow-xs border-0">
               <TeacherIcon className="w-7 h-7" />
             </div>
             <div>
-              <div className="px-3 py-0.5 rounded-full text-[11px] font-bold theme-bg-accent-soft theme-accent inline-block border-0">
+              <div className="px-3 py-0.5 rounded-full text-[11px] font-bold theme-bg-app theme-text-secondary inline-block border-0">
                 {portalBrandBadge}
               </div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight mt-1 theme-text-primary">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight mt-1 theme-text-primary leading-tight">
                 {tokenMeta?.institution_name ||
                   tp('academicInstitutionFallback', 'Academic Institution')}
               </h1>
@@ -715,14 +713,15 @@ export const PublicStaffOnboardingView: React.FC = () => {
                 </p>
               )}
               {tokenMeta?.title && (
-                <p className="text-xs font-semibold theme-accent mt-1">{tokenMeta.title}</p>
+                <p className="text-xs font-semibold theme-text-secondary mt-1">{tokenMeta.title}</p>
               )}
             </div>
           </div>
 
           <div className="text-center sm:text-end shrink-0">
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-500 border-0 inline-block">
-              {tp('activeOnlinePortal', 'Active Online Portal')}
+            <span className="px-3 py-1 rounded-full text-xs font-semibold theme-bg-app theme-text-secondary border-0 inline-flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+              <span>{tp('activeOnlinePortal', 'Active Online Portal')}</span>
             </span>
           </div>
         </div>

@@ -11,7 +11,7 @@ from .auth_service import (
     build_user_role_payload,
     is_user_academy_admin,
 )
-from .tenant_service import provision_new_institution, update_tenant_taxonomy
+from .tenant_service import provision_new_institution, update_tenant_taxonomy, resolve_request_institution
 from .student_service import register_student, promote_student_class
 from .staff_service import onboard_staff_member, assign_teacher_periods, ensure_institution_staff_profile, sync_user_and_staff_roles
 from .exam_service import calculate_exam_tabulation_stats

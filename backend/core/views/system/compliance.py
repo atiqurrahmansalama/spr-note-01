@@ -56,7 +56,7 @@ class EnterpriseComplianceDataExportView(APIView):
             'institution': {
                 'id': inst.id if inst else 'ALL',
                 'name': inst.name if inst else 'All Institutions',
-                'code': inst.code if inst else '',
+                'code': inst.slug if inst else '',
             },
             'branches': [
                 {'id': b.id, 'name': b.name, 'code': b.code, 'is_active': b.is_active}

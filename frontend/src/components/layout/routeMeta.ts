@@ -116,7 +116,6 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
   "/appearance": { title: "Appearance", subCategory: "Preferences", category: "Settings" },
   "/date-time": { title: "Date & Time", subCategory: "Preferences", category: "Settings" },
   "/language": { title: "Language", subCategory: "Preferences", category: "Settings" },
-  "/data-backup": { title: "Data & Backup", category: "Settings" },
 
   "/shortcuts": { title: "Shortcuts", category: "Shortcuts" },
   "/guide": { title: "App Guide", category: "App Guide" },

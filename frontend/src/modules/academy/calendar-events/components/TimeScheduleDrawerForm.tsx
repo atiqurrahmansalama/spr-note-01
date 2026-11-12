@@ -550,7 +550,12 @@ export function EventColorPickerDropdown({ value, onChange }) {
   );
 }
 
-export function resolveEventFormColor(evt, targetCategory, kinds = [], types = []) {
+export function resolveEventFormColor(
+  evt: any,
+  targetCategory?: string,
+  kinds: any[] = [],
+  types: any[] = []
+): string {
   if (evt?.color) {
     return resolveCanonicalEventColor(evt.color);
   }

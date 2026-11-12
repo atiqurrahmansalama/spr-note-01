@@ -41,7 +41,7 @@ export default function PublicPortalShell({
   return (
     <div
       dir={isRTL ? "rtl" : "ltr"}
-      className="min-h-screen theme-bg-app flex flex-col justify-between p-4 sm:p-6 font-sans theme-text-primary selection:theme-bg-accent-soft relative overflow-hidden transition-colors duration-200 border-0"
+      className="min-h-screen theme-bg-app flex flex-col justify-between p-4 sm:p-6 font-sans theme-text-primary relative overflow-hidden transition-colors duration-200 border-0"
     >
       {/* Ambient soft background glow */}
       <div

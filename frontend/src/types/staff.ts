@@ -186,8 +186,12 @@ export interface StaffMetrics {
 }
 
 export interface StaffRankItem {
+  id?: string | number;
   name: string;
   name_bn?: string;
   order: number;
   type?: StaffType;
+  code?: string;
+  is_active?: boolean;
+  description?: string;
 }

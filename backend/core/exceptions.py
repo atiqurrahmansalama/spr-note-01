@@ -47,15 +47,22 @@ def custom_exception_handler(exc: Exception, context: Dict[str, Any]) -> Respons
         )
         exc_str = str(exc)
         clean_msg = "Database constraint violation occurred."
-        if "violates not-null constraint" in exc_str:
-            col = exc_str.split('column "')[-1].split('"')[0] if 'column "' in exc_str else "required field"
+        if "violates not-null constraint" in exc_str or "NOT NULL constraint failed" in exc_str:
+            if 'column "' in exc_str:
+                col = exc_str.split('column "')[-1].split('"')[0]
+            elif "NOT NULL constraint failed:" in exc_str:
+                col = exc_str.split("NOT NULL constraint failed:")[-1].strip().split(".")[-1]
+            else:
+                col = "required field"
             clean_msg = f"Missing required database field '{col}'."
         elif "duplicate key value" in exc_str or "UNIQUE constraint failed" in exc_str:
             clean_msg = "A record with this identifier already exists in the database."
-        elif "violates foreign key constraint" in exc_str:
+        elif "violates foreign key constraint" in exc_str or "FOREIGN KEY constraint failed" in exc_str:
             clean_msg = "Referenced entity does not exist in the database."
         elif is_debug and exc_str:
             clean_msg = f"Database error: {exc_str}"
+        elif exc_str:
+            clean_msg = f"Database constraint violation: {exc_str}"
 
         response = Response(
             {

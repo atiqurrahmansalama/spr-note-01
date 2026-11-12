@@ -13,7 +13,7 @@ import {
 import { useRightSidebar } from '@/context/RightSidebarContext';
 import { getApprovalSummary, getApprovals } from '@/api/approvals';
 import { useTranslation } from '@/i18n';
-import type { ApprovalSummaryStats, ApprovalRequestItem } from '@/modules/approvals/types';
+import type { ApprovalSummaryCounts, ApprovalRequestItem } from '@/modules/approvals/types';
 
 export interface ApprovalsSummaryWidgetProps {
   title?: string;
@@ -28,7 +28,7 @@ export default function ApprovalsSummaryWidget({
   const navigate = useNavigate();
   const { openDrawer } = useRightSidebar();
 
-  const [summary, setSummary] = useState<ApprovalSummaryStats | null>(null);
+  const [summary, setSummary] = useState<ApprovalSummaryCounts | null>(null);
   const [recentPending, setRecentPending] = useState<ApprovalRequestItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -59,9 +59,9 @@ export default function ApprovalsSummaryWidget({
   }, [loadData]);
 
   const totalPending = summary?.total_pending ?? 0;
-  const staffPending = summary?.by_domain?.STAFF_ONBOARDING ?? summary?.staff_pending ?? 0;
-  const studentPending = summary?.by_domain?.STUDENT_ADMISSION ?? summary?.student_pending ?? 0;
-  const financePending = summary?.by_domain?.FINANCE_REQUEST ?? summary?.finance_pending ?? 0;
+  const staffPending = summary?.by_domain?.STAFF_ONBOARDING ?? 0;
+  const studentPending = summary?.by_domain?.STUDENT_ADMISSION ?? 0;
+  const financePending = summary?.by_domain?.FINANCE_REQUEST ?? 0;
 
   const handleReviewItem = (item: ApprovalRequestItem) => {
     openDrawer('approval-review', {

@@ -26,6 +26,52 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
+def resolve_institution_instance(target_identifier):
+    """
+    Safely resolves an AcademicInstitution instance by primary key (UUID / string id),
+    slug, eiin_or_reg_no, or exact name, without crashing on non-existent fields.
+    """
+    if not target_identifier:
+        return None
+    raw_str = str(target_identifier).strip()
+    if not raw_str:
+        return None
+
+    # 1. Try by primary key (UUID / string id)
+    try:
+        inst = AcademicInstitution.objects.filter(pk=raw_str, is_deleted=False).first()
+        if inst:
+            return inst
+    except Exception:
+        pass
+
+    # 2. Try by slug (case-insensitive)
+    try:
+        inst = AcademicInstitution.objects.filter(slug__iexact=raw_str, is_deleted=False).first()
+        if inst:
+            return inst
+    except Exception:
+        pass
+
+    # 3. Try by EIIN or Registration Number
+    try:
+        inst = AcademicInstitution.objects.filter(eiin_or_reg_no__iexact=raw_str, is_deleted=False).first()
+        if inst:
+            return inst
+    except Exception:
+        pass
+
+    # 4. Try by Name
+    try:
+        inst = AcademicInstitution.objects.filter(name__iexact=raw_str, is_deleted=False).first()
+        if inst:
+            return inst
+    except Exception:
+        pass
+
+    return None
+
+
 class EvaluatedConfigView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = [FlexibleJWTAuthentication]
@@ -122,10 +168,20 @@ class ControlPanelRulesView(APIView):
 
         academy_overrides = {}
         if scope in ['ACADEMY', 'INSTITUTION'] and target_id:
-            inst_query = Q(code=target_id)
-            if str(target_id).isdigit():
-                inst_query |= Q(institution_id=int(target_id))
-            academy_overrides = {o.section.section_key: o.is_enabled for o in AcademySectionOverride.objects.filter(inst_query).select_related('section')}
+            inst_obj = resolve_institution_instance(target_id)
+            if inst_obj:
+                academy_overrides = {
+                    o.section.section_key: o.is_enabled
+                    for o in AcademySectionOverride.objects.filter(institution=inst_obj).select_related('section')
+                }
+            else:
+                try:
+                    academy_overrides = {
+                        o.section.section_key: o.is_enabled
+                        for o in AcademySectionOverride.objects.filter(institution_id=target_id).select_related('section')
+                    }
+                except Exception:
+                    academy_overrides = {}
 
         # 4-Tier Resolution Evaluation (Independent of hierarchy first)
         resolved_raw = {}
@@ -241,7 +297,20 @@ class ControlPanelSectionTreeView(APIView):
 
         academy_overrides = {}
         if scope in ['ACADEMY', 'INSTITUTION'] and target_id:
-            academy_overrides = {o.section.section_key: o.is_enabled for o in AcademySectionOverride.objects.filter(institution_id=target_id).select_related('section')}
+            inst_obj = resolve_institution_instance(target_id)
+            if inst_obj:
+                academy_overrides = {
+                    o.section.section_key: o.is_enabled
+                    for o in AcademySectionOverride.objects.filter(institution=inst_obj).select_related('section')
+                }
+            else:
+                try:
+                    academy_overrides = {
+                        o.section.section_key: o.is_enabled
+                        for o in AcademySectionOverride.objects.filter(institution_id=target_id).select_related('section')
+                    }
+                except Exception:
+                    academy_overrides = {}
 
         # 3. Resolve raw values (independent of hierarchy)
         resolved_raw = {}
@@ -480,9 +549,7 @@ class ControlPanelBatchUpdateView(APIView):
 
                     elif scope_type in ['ACADEMY', 'INSTITUTION']:
                         target_inst_id = target_identifier or request.data.get('target_institution_id', '') or request.data.get('selected_academy', '')
-                        inst_obj = AcademicInstitution.objects.filter(
-                            Q(pk=target_inst_id) | Q(code=target_inst_id)
-                        ).first() if target_inst_id else None
+                        inst_obj = resolve_institution_instance(target_inst_id)
                         if inst_obj:
                             perm, created = AcademySectionOverride.objects.update_or_create(
                                 section=sec, institution=inst_obj,
@@ -490,6 +557,8 @@ class ControlPanelBatchUpdateView(APIView):
                             )
                             prev_state = not enabled if created else (not perm.is_enabled)
                             changed_count += 1
+                        else:
+                            logger.warning(f"Could not resolve AcademicInstitution for target '{target_inst_id}' during batch update")
 
                     elif scope_type == 'USER':
                         target_user_id = target_identifier or request.data.get('target_user_id', '')
@@ -609,7 +678,14 @@ class ControlPanelResetRulesView(APIView):
             GroupSectionPermission.objects.filter(group_id=target_id).delete()
             return Response({'message': f'Reset all group overrides for "{target_id}" back to global defaults'}, status=status.HTTP_200_OK)
         elif scope in ['academy', 'institution'] and target_id:
-            AcademySectionOverride.objects.filter(institution_id=target_id).delete()
+            inst_obj = resolve_institution_instance(target_id)
+            if inst_obj:
+                AcademySectionOverride.objects.filter(institution=inst_obj).delete()
+            else:
+                try:
+                    AcademySectionOverride.objects.filter(institution_id=target_id).delete()
+                except Exception:
+                    pass
             return Response({'message': f'Reset all academy overrides for academy #{target_id} back to global defaults'}, status=status.HTTP_200_OK)
         elif scope == 'user' and target_id:
             user_obj = User.objects.filter(Q(pk=target_id) | Q(phone_number=target_id)).first()

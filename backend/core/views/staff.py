@@ -57,7 +57,7 @@ from core.permissions import (
     IsTeacher,
     IsStaffSelfOrAdmin,
 )
-from core.services import get_scoped_tenant_id
+from core.services import get_scoped_tenant_id, resolve_request_institution
 from core.notifications import (
     dispatch_notification,
     ping_gateway,
@@ -148,15 +148,7 @@ class StaffProfileViewSet(viewsets.ModelViewSet):
         return base_qs.order_by('rank_order', 'employee_id')
 
     def perform_create(self, serializer):
-        tenant_id = get_scoped_tenant_id(self.request)
-        inst = None
-        if tenant_id:
-            inst = AcademicInstitution.objects.filter(id=tenant_id).first()
-        elif self.request.user.institution:
-            inst = self.request.user.institution
-        else:
-            inst = AcademicInstitution.objects.first()
-
+        inst = resolve_request_institution(self.request, self.request.user)
         serializer.save(institution=inst)
 
     def destroy(self, request, *args, **kwargs):
@@ -176,12 +168,7 @@ class StaffProfileViewSet(viewsets.ModelViewSet):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        tenant_id = get_scoped_tenant_id(request)
-        institution = None
-        if tenant_id:
-            institution = AcademicInstitution.objects.filter(id=tenant_id).first()
-        if not institution:
-            institution = request.user.institution or AcademicInstitution.objects.first()
+        institution = resolve_request_institution(request, request.user)
 
         if not institution:
             return Response({"error": "An academic institution context is required to invite staff."}, status=status.HTTP_400_BAD_REQUEST)
@@ -386,12 +373,7 @@ class StaffAttendanceViewSet(viewsets.ModelViewSet):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        tenant_id = get_scoped_tenant_id(request)
-        institution = None
-        if tenant_id:
-            institution = AcademicInstitution.objects.filter(id=tenant_id).first()
-        if not institution:
-            institution = request.user.institution or AcademicInstitution.objects.first()
+        institution = resolve_request_institution(request, request.user)
 
         date_val = serializer.validated_data.get('date', timezone.now().date())
         records = serializer.validated_data.get('records', [])
@@ -414,12 +396,7 @@ class StaffAttendanceViewSet(viewsets.ModelViewSet):
         staff_id = request.query_params.get('staff')
         department_id = request.query_params.get('department')
 
-        tenant_id = get_scoped_tenant_id(request)
-        institution = None
-        if tenant_id:
-            institution = AcademicInstitution.objects.filter(id=tenant_id).first()
-        if not institution:
-            institution = request.user.institution or AcademicInstitution.objects.first()
+        institution = resolve_request_institution(request, request.user)
 
         summary = StaffAttendanceService.get_monthly_analytics_summary(
             institution=institution,
@@ -513,23 +490,20 @@ class StaffOnboardingTokenViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsInstitutionAdmin]
 
     def get_queryset(self):
+        user = self.request.user
         tenant_id = get_scoped_tenant_id(self.request)
         base_qs = super().get_queryset()
-        if tenant_id:
+        if tenant_id and AcademicInstitution.objects.filter(id=tenant_id).exists():
             base_qs = base_qs.filter(institution_id=tenant_id)
-        elif self.request.user.institution:
-            base_qs = base_qs.filter(institution=self.request.user.institution)
+        elif getattr(user, 'institution_id', None):
+            base_qs = base_qs.filter(institution_id=user.institution_id)
         return base_qs.order_by('-created_at')
 
     def perform_create(self, serializer):
-        tenant_id = get_scoped_tenant_id(self.request)
-        inst = None
-        if tenant_id:
-            inst = AcademicInstitution.objects.filter(id=tenant_id).first()
-        elif self.request.user.institution:
-            inst = self.request.user.institution
-        else:
-            inst = AcademicInstitution.objects.first()
+        inst = resolve_request_institution(self.request, self.request.user)
+        if not inst:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"institution": "No active institution could be resolved. Please configure an institution first."})
 
         import secrets
         generated_token = f"stf_{secrets.token_urlsafe(12)}"
@@ -639,13 +613,7 @@ class StaffOnboardingApplyView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
         else:
-            tenant_id = get_scoped_tenant_id(request)
-            if tenant_id:
-                institution = AcademicInstitution.objects.filter(id=tenant_id).first()
-            elif request.user.is_authenticated and getattr(request.user, 'institution', None):
-                institution = request.user.institution
-            else:
-                institution = AcademicInstitution.objects.first()
+            institution = resolve_request_institution(request, request.user)
 
         if not institution:
             return Response({"error": "An academic institution context is required."}, status=status.HTTP_400_BAD_REQUEST)
