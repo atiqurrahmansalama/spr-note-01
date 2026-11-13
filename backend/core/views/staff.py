@@ -528,6 +528,144 @@ class StaffOnboardingTokenViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_200_OK)
 
 
+def resolve_candidate_onboarding_status(user, token_obj, institution_address=""):
+    inst = token_obj.institution
+
+    # Step 1: Check active StaffProfile in this institution (Level 3: Approved)
+    active_profile = StaffProfile.objects.filter(
+        user=user,
+        institution=inst,
+        is_deleted=False
+    ).select_related('department', 'user').first()
+
+    if active_profile:
+        profile_user = active_profile.user or user
+        candidate_name = (
+            getattr(profile_user, 'name', None)
+            or (f"{getattr(profile_user, 'first_name', '')} {getattr(profile_user, 'last_name', '')}".strip() if profile_user else "")
+            or "Staff Member"
+        )
+        candidate_bn_name = (
+            getattr(profile_user, 'name_bn', '')
+            or getattr(user, 'name_bn', '')
+            or ''
+        )
+        return {
+            "status": "APPROVED",
+            "lifecycle_level": 3,
+            "tracking_code": active_profile.employee_id,
+            "staff": {
+                "id": str(active_profile.id),
+                "employee_id": active_profile.employee_id,
+                "tracking_code": active_profile.employee_id,
+                "name": candidate_name,
+                "bangla_name": candidate_bn_name,
+                "designation": active_profile.designation,
+                "rank_order": active_profile.rank_order,
+                "department_name": active_profile.department.name if active_profile.department else None,
+                "staff_type": active_profile.staff_type,
+                "joining_date": str(active_profile.joining_date),
+                "institution_name": inst.name,
+                "institution_address": institution_address,
+                "is_pending_review": False,
+            }
+        }
+
+    # Step 2: Existing Approval Request for this institution (Level 2 or 4)
+    from core.models.approvals import ApprovalRequest
+
+    filters = Q(submitted_by=user)
+    if getattr(user, 'phone_number', None):
+        filters |= Q(phone_number=user.phone_number)
+    if getattr(user, 'email', None):
+        filters |= Q(email__iexact=user.email)
+
+    existing_request = ApprovalRequest.objects.filter(
+        institution=inst,
+        domain="STAFF_ONBOARDING",
+    ).filter(filters).order_by('-created_at').first()
+
+    if existing_request:
+        payload = existing_request.payload or {}
+        candidate_name = (
+            existing_request.applicant_name
+            or payload.get("name")
+            or payload.get("name_en")
+            or getattr(user, 'name', None)
+            or (f"{getattr(user, 'first_name', '')} {getattr(user, 'last_name', '')}".strip() if user else "")
+            or "Applicant"
+        )
+        candidate_bn_name = (
+            payload.get("bangla_name", "")
+            or getattr(user, 'name_bn', '')
+            or ""
+        )
+        dept_name = payload.get("department_name")
+        if not dept_name and payload.get("department"):
+            d_obj = AcademicDepartment.objects.filter(id=payload.get("department"), institution=inst).first()
+            if d_obj:
+                dept_name = d_obj.name
+        if not dept_name and token_obj.department:
+            dept_name = token_obj.department.name
+
+        if existing_request.status in ("PENDING", "IN_REVIEW", "SCHEDULED"):
+            return {
+                "status": existing_request.status,
+                "lifecycle_level": 2,
+                "tracking_code": existing_request.tracking_code,
+                "submitted_at": existing_request.created_at.isoformat(),
+                "staff": {
+                    "id": str(existing_request.id),
+                    "employee_id": existing_request.tracking_code,
+                    "tracking_code": existing_request.tracking_code,
+                    "name": candidate_name,
+                    "bangla_name": candidate_bn_name,
+                    "designation": payload.get("designation") or token_obj.designation or "Faculty Member",
+                    "rank_order": payload.get("rank_order") or token_obj.rank_order or 99,
+                    "department_name": dept_name,
+                    "staff_type": payload.get("staff_type") or token_obj.staff_type or "TEACHING",
+                    "joining_date": str(payload.get("joining_date") or timezone.localdate()),
+                    "institution_name": inst.name,
+                    "institution_address": institution_address,
+                    "is_pending_review": True,
+                }
+            }
+        elif existing_request.status == "REJECTED":
+            return {
+                "status": "REJECTED",
+                "lifecycle_level": 4,
+                "tracking_code": existing_request.tracking_code,
+                "rejection_reason": existing_request.rejection_reason or "",
+                "submitted_at": existing_request.created_at.isoformat(),
+            }
+        elif existing_request.status == "APPROVED":
+            return {
+                "status": "APPROVED",
+                "lifecycle_level": 3,
+                "tracking_code": existing_request.tracking_code,
+                "staff": {
+                    "id": str(existing_request.id),
+                    "employee_id": existing_request.tracking_code,
+                    "tracking_code": existing_request.tracking_code,
+                    "name": candidate_name,
+                    "bangla_name": candidate_bn_name,
+                    "designation": payload.get("designation") or token_obj.designation or "Faculty Member",
+                    "rank_order": payload.get("rank_order") or token_obj.rank_order or 99,
+                    "department_name": dept_name,
+                    "staff_type": payload.get("staff_type") or token_obj.staff_type or "TEACHING",
+                    "joining_date": str(payload.get("joining_date") or timezone.localdate()),
+                    "institution_name": inst.name,
+                    "institution_address": institution_address,
+                    "is_pending_review": False,
+                }
+            }
+
+    return {
+        "status": "NOT_APPLIED",
+        "lifecycle_level": 1,
+    }
+
+
 class PublicStaffOnboardingVerifyView(APIView):
     permission_classes = [AllowAny]
 
@@ -554,20 +692,65 @@ class PublicStaffOnboardingVerifyView(APIView):
         if not permitted_designations and token_obj.designation:
             permitted_designations = [token_obj.designation]
 
+        permitted_staff_types = [
+            str(st).strip() for st in (token_obj.allowed_staff_types or []) if str(st).strip()
+        ]
+        if not permitted_staff_types and token_obj.staff_type:
+            permitted_staff_types = [token_obj.staff_type]
+
+        permitted_departments = [
+            str(dep).strip() for dep in (token_obj.allowed_departments or []) if str(dep).strip()
+        ]
+        if not permitted_departments and token_obj.department_id:
+            permitted_departments = [str(token_obj.department_id)]
+
+        dept_qs = token_obj.institution.departments.filter(is_active=True)
+        if permitted_departments:
+            dept_qs = dept_qs.filter(id__in=permitted_departments)
+        else:
+            dept_qs = dept_qs.none()
+        departments_data = [
+            {"id": str(d.id), "name": d.name, "code": getattr(d, 'code', '') or ''} for d in dept_qs
+        ]
+
         inst = token_obj.institution
+        inst_addr_parts = [
+            getattr(inst, 'street_address', '') or getattr(inst, 'address', '') or '',
+            getattr(inst, 'upazila_thana', '') or '',
+            getattr(inst, 'district', '') or '',
+            getattr(inst, 'division', '') or '',
+        ]
+        institution_address = ", ".join([p.strip() for p in inst_addr_parts if p and p.strip()])
+
+        candidate_app = None
+        if request.user and request.user.is_authenticated:
+            candidate_app = resolve_candidate_onboarding_status(
+                request.user, token_obj, institution_address=institution_address
+            )
+        else:
+            candidate_app = {
+                "status": "NOT_APPLIED",
+                "lifecycle_level": 1,
+            }
+
         return Response({
             "valid": True,
             "token": token_obj.token,
             "title": token_obj.title,
+            "subtitle": getattr(token_obj, 'subtitle', '') or '',
             "onboarding_mode": token_obj.onboarding_mode,
             "staff_type": token_obj.staff_type,
+            "allowed_staff_types": permitted_staff_types,
             "designation": token_obj.designation,
             "allowed_designations": permitted_designations,
             "rank_order": token_obj.rank_order,
             "department_id": str(token_obj.department.id) if token_obj.department else None,
             "department_name": token_obj.department.name if token_obj.department else None,
+            "allowed_departments": permitted_departments,
+            "departments": departments_data,
             "institution_id": str(inst.id),
             "institution_name": inst.name,
+            "institution_address": institution_address,
             "institution_code": getattr(inst, 'code', ''),
             "institution_logo": getattr(inst, 'logo_url', '') or '',
             "expires_at": token_obj.expires_at.isoformat() if token_obj.expires_at else None,
@@ -575,6 +758,7 @@ class PublicStaffOnboardingVerifyView(APIView):
             "max_applications": token_obj.max_applications,
             "include_payroll": token_obj.include_payroll,
             "auto_approve": token_obj.auto_approve,
+            "candidate_application": candidate_app,
         }, status=status.HTTP_200_OK)
 
 
@@ -607,9 +791,42 @@ class StaffOnboardingApplyView(APIView):
             submitted_designation = str(data.get('designation') or '').strip()
             if permitted_designations:
                 permitted_lower = {d.lower() for d in permitted_designations}
-                if submitted_designation and submitted_designation.lower() not in permitted_lower:
+                if not submitted_designation or submitted_designation in ('Faculty Member', 'Staff'):
+                    data['designation'] = permitted_designations[0]
+                elif submitted_designation.lower() not in permitted_lower:
                     return Response(
                         {"designation": "Selected designation is not permitted for this onboarding link."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            elif not submitted_designation:
+                data['designation'] = token_obj.designation or 'Faculty Member'
+
+            permitted_staff_types = [
+                str(st).strip() for st in (token_obj.allowed_staff_types or []) if str(st).strip()
+            ]
+            if not permitted_staff_types and token_obj.staff_type:
+                permitted_staff_types = [token_obj.staff_type]
+
+            submitted_staff_type = str(data.get('staff_type') or '').strip()
+            if permitted_staff_types and submitted_staff_type:
+                permitted_st_upper = {st.upper() for st in permitted_staff_types}
+                if submitted_staff_type.upper() not in permitted_st_upper:
+                    return Response(
+                        {"staff_type": "Selected staff category is not permitted for this onboarding link."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            permitted_departments = [
+                str(dep).strip() for dep in (token_obj.allowed_departments or []) if str(dep).strip()
+            ]
+            if not permitted_departments and token_obj.department_id:
+                permitted_departments = [str(token_obj.department_id)]
+
+            submitted_dept = str(data.get('department') or '').strip()
+            if permitted_departments and submitted_dept:
+                if submitted_dept not in permitted_departments:
+                    return Response(
+                        {"department": "Selected department is not permitted for this onboarding link."},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
         else:

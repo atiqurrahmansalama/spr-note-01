@@ -130,7 +130,11 @@ export const HARD_DEFAULTS: Record<string, boolean> = {
 
   // 10. App Management
   nav_app_management: true,
+  nav_action_helpdesk: true,
   app_approvals: true,
+  app_helpdesk: true,
+  app_communications: true,
+  app_bug_reporting: true,
   app_section_control: true,
   app_user_management: true,
   app_role_management: true,

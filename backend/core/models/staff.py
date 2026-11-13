@@ -39,10 +39,10 @@ class StaffProfile(models.Model):
     )
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.OneToOneField(
+    user = models.ForeignKey(
         'User',
         on_delete=models.CASCADE,
-        related_name='staff_profile',
+        related_name='staff_profiles',
         null=True,
         blank=True
     )
@@ -112,6 +112,13 @@ class StaffProfile(models.Model):
         indexes = [
             models.Index(fields=['institution', 'is_deleted', 'staff_type'], name='idx_stf_inst_del_type'),
             models.Index(fields=['institution', 'is_active'], name='idx_stf_inst_active'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'institution'],
+                condition=models.Q(is_deleted=False, user__isnull=False),
+                name='unique_active_staff_per_institution'
+            )
         ]
 
     def __str__(self):
@@ -375,6 +382,12 @@ class StaffOnboardingToken(models.Model):
     )
     token = models.CharField(max_length=64, unique=True, db_index=True)
     title = models.CharField(max_length=150, help_text="e.g. Senior Faculty Recruitment 2026")
+    subtitle = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Optional subtitle/description displayed below campaign title"
+    )
     onboarding_mode = models.CharField(
         max_length=16,
         choices=ONBOARDING_MODE_CHOICES,
@@ -385,6 +398,11 @@ class StaffOnboardingToken(models.Model):
         max_length=50,
         default='TEACHING',
         db_index=True
+    )
+    allowed_staff_types = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of permitted staff categories/types applicants may apply for"
     )
     designation = models.CharField(max_length=100, blank=True, default='', help_text="Preset designation/title")
     allowed_designations = models.JSONField(
@@ -399,6 +417,11 @@ class StaffOnboardingToken(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name='staff_onboarding_tokens'
+    )
+    allowed_departments = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of permitted academic department IDs applicants may apply for"
     )
     max_applications = models.PositiveIntegerField(default=0, help_text="0 for unlimited uses")
     applied_count = models.PositiveIntegerField(default=0)

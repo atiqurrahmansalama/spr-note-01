@@ -155,6 +155,28 @@ class User(AbstractUser):
         super().save(*args, **kwargs)
 
     @property
+    def staff_profile(self):
+        """
+        Backward-compatible resolution of the user's staff profile.
+        Prioritizes the staff profile matching the user's active/current institution,
+        falling back to the first non-deleted staff profile.
+        """
+        inst = getattr(self, 'institution', None)
+        if hasattr(self, 'staff_profiles'):
+            if inst:
+                sp = self.staff_profiles.filter(institution=inst, is_deleted=False).first()
+                if sp:
+                    return sp
+            return self.staff_profiles.filter(is_deleted=False).first()
+        return None
+
+    def get_staff_profile_for(self, institution):
+        """Returns the staff profile for a specific institution."""
+        if not institution or not hasattr(self, 'staff_profiles'):
+            return self.staff_profile
+        return self.staff_profiles.filter(institution=institution, is_deleted=False).first()
+
+    @property
     def role_code(self):
         if self.role:
             return self.role.code

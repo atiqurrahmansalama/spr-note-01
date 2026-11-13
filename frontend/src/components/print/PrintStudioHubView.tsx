@@ -1,17 +1,23 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import UniversalPrintStudio from '../../components/print/UniversalPrintStudio';
+import UniversalPrintStudio from './UniversalPrintStudio';
 import { useTranslation } from '../../i18n';
-import { PrintStudioProps } from './types';
-import type { TemplatePlaceholderKey } from '../../components/print/docxTemplateEngine';
+import type { TemplatePlaceholderKey } from './docxTemplateEngine';
 import {
   DAILY_PROGRESS_SCOPE_ID,
   DAILY_PROGRESS_DOCLAB_KEYS,
-} from '../learning/daily-classroom/progress-management';
+} from '../../modules/learning/daily-classroom/progress-management';
 import {
   SUBJECT_ROUTINE_SCOPE_ID,
   SUBJECT_ROUTINE_DOCLAB_KEYS,
-} from '../examinations/exam-schedules/subject-routine';
+} from '../../modules/examinations/exam-schedules/subject-routine';
+
+export type PrintStudioTab = 'canvas' | 'templates' | 'history' | 'settings';
+
+export interface PrintStudioProps {
+  initialTab?: PrintStudioTab;
+  className?: string;
+}
 
 /**
  * Enterprise DocLab Studio Hub View
@@ -152,3 +158,4 @@ export default function PrintStudioHubView({
     </div>
   );
 }
+

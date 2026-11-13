@@ -154,16 +154,26 @@ export function buildInitialStaffPayload(
     photo_url: initialData.photo_url || "",
 
     // Role & Hierarchy
-    staff_type: tokenMeta?.staff_type || initialData.staff_type || "TEACHING",
+    staff_type:
+      (Array.isArray(tokenMeta?.allowed_staff_types) && tokenMeta.allowed_staff_types.length > 0
+        ? tokenMeta.allowed_staff_types[0]
+        : tokenMeta?.staff_type) ||
+      initialData.staff_type ||
+      "TEACHING",
     designation:
       tokenMeta?.designation ||
       (Array.isArray(tokenMeta?.allowed_designations) && tokenMeta.allowed_designations.length === 1
         ? tokenMeta.allowed_designations[0]
         : '') ||
       initialData.designation ||
-      "",
+      "Faculty Member",
     rank_order: tokenMeta?.rank_order || initialData.rank_order || 99,
-    department: tokenMeta?.department_id || initialData.department || "",
+    department:
+      (Array.isArray(tokenMeta?.allowed_departments) && tokenMeta.allowed_departments.length === 1
+        ? tokenMeta.allowed_departments[0]
+        : tokenMeta?.department_id) ||
+      initialData.department ||
+      "",
     employment_status: initialData.employment_status || "PERMANENT",
     joining_date: initialData.joining_date || new Date().toISOString().split("T")[0],
 

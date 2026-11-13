@@ -729,6 +729,22 @@ export function ExternalLinkIcon({ className = "w-4 h-4", ...props }: IconProps)
   );
 }
 
+export function HeadsetIcon({ className = "w-4 h-4", ...props }: IconProps) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 00-14 0v5a3 3 0 003 3h1a1 1 0 001-1v-4a1 1 0 00-1-1H7v-2a5 5 0 0110 0v2h-2a1 1 0 00-1 1v4a1 1 0 001 1h1a3 3 0 003-3v-5z" />
+    </svg>
+  );
+}
+
+export function BugIcon({ className = "w-4 h-4", ...props }: IconProps) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v2m0 14v2m8-8h-2M6 12H4m13.657-5.657l-1.414 1.414M7.757 16.243l-1.414 1.414m0-11.314l1.414 1.414m8.486 8.486l1.414 1.414M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  );
+}
+
 export function DevicePhoneIcon({ className = "w-4 h-4", ...props }: IconProps) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.75} {...props}>

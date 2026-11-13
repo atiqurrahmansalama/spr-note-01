@@ -62,7 +62,7 @@ export default function PublicPortalShell({
       />
 
       {/* Main Content Slot */}
-      <main className={`relative z-10 w-full ${containerWidthClass} mx-auto my-auto py-4 sm:py-6`}>
+      <main className={`relative z-10 w-full ${containerWidthClass} mx-auto mt-2 sm:mt-4 mb-auto py-3 sm:py-5`}>
         {children}
       </main>
 

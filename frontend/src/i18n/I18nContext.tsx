@@ -18,8 +18,6 @@ import { LOCALES } from './locales';
 import { formatLocalizedNumber, formatLocalizedDate } from './formatters';
 import { getLanguageFromPath, buildLocalizedPath, stripLanguagePrefix } from './routing';
 
-const I18nContext = createContext<I18nContextType | null>(null);
-
 // Module-level dynamic translation registry for colocated module locales
 const MODULE_LOCALES: Record<string, Partial<Record<LanguageCode, any>>> = {};
 
@@ -32,6 +30,113 @@ export function registerModuleLocales(
     ...locales,
   };
 }
+
+/**
+ * Universal translation resolver function with full fallback chaining.
+ * Usable both inside I18nProvider and as safe standalone fallback.
+ */
+function resolveTranslation(
+  language: LanguageCode,
+  key: string,
+  defaultTextOrParams?: string | TranslationParams,
+  params?: TranslationParams
+): string {
+  let defaultText = '';
+  let interpolatedParams: TranslationParams = {};
+
+  if (typeof defaultTextOrParams === 'string') {
+    defaultText = defaultTextOrParams;
+    if (params && typeof params === 'object') {
+      interpolatedParams = params;
+    }
+  } else if (defaultTextOrParams && typeof defaultTextOrParams === 'object') {
+    interpolatedParams = defaultTextOrParams;
+  }
+
+  const keys = key.split('.');
+  const rootNs = keys[0];
+  const subKeys = keys.slice(1);
+
+  const getNested = (dict: any, pathKeys: string[]): string | null => {
+    if (!dict) return null;
+    let curr = dict;
+    for (const k of pathKeys) {
+      if (curr && typeof curr === 'object' && k in curr) {
+        curr = curr[k];
+      } else {
+        return null;
+      }
+    }
+    return typeof curr === 'string' ? curr : null;
+  };
+
+  // 1. Try active language in module-level registry
+  let translation: string | null = MODULE_LOCALES[rootNs]?.[language]
+    ? getNested(MODULE_LOCALES[rootNs]![language], subKeys)
+    : null;
+
+  // 2. Try active language in global LOCALES dictionary
+  if (!translation) {
+    translation = getNested(LOCALES[language], keys);
+  }
+
+  // 3. Fallback to English in module-level registry
+  if (!translation && language !== DEFAULT_LANGUAGE) {
+    translation = MODULE_LOCALES[rootNs]?.[DEFAULT_LANGUAGE]
+      ? getNested(MODULE_LOCALES[rootNs]![DEFAULT_LANGUAGE], subKeys)
+      : null;
+  }
+
+  // 4. Fallback to English dictionary if missing in active language
+  if (!translation && language !== DEFAULT_LANGUAGE) {
+    translation = getNested(LOCALES[DEFAULT_LANGUAGE], keys);
+  }
+
+  // 5. Fallback to provided default text or raw key
+  if (!translation) {
+    translation = defaultText || keys[keys.length - 1] || key;
+  }
+
+  // 6. Interpolate variables (supports both {name} and {{name}})
+  if (interpolatedParams && Object.keys(interpolatedParams).length > 0) {
+    return translation.replace(/\{\{?(\w+)\}?\}/g, (_, varName) => {
+      return varName in interpolatedParams ? String(interpolatedParams[varName]) : `{${varName}}`;
+    });
+  }
+
+  return translation;
+}
+
+/**
+ * Creates a fully functional, resilient default i18n context object.
+ * Guarantees zero white-screen crashes even if components mount before I18nProvider.
+ */
+export function createDefaultI18nContext(): I18nContextType {
+  const language: LanguageCode = DEFAULT_LANGUAGE;
+  const config = LANGUAGE_MAP[DEFAULT_LANGUAGE];
+  return {
+    language,
+    direction: config.dir,
+    isRTL: config.isRTL,
+    config,
+    supportedLanguages: SUPPORTED_LANGUAGES,
+    setLanguage: () => {},
+    numeralSystem: 'LATIN',
+    setNumeralSystem: () => {},
+    t: (key: string, defaultTextOrParams?: string | TranslationParams, params?: TranslationParams) =>
+      resolveTranslation(language, key, defaultTextOrParams, params),
+    formatNumber: (num: number | string, options?: Intl.NumberFormatOptions) =>
+      formatLocalizedNumber(num, language, options, 'LATIN'),
+    formatDate: (date: Date | string | number, options?: Intl.DateTimeFormatOptions) =>
+      formatLocalizedDate(date, language, options),
+    getLocalizedPath: (path: string, targetLang?: LanguageCode) =>
+      buildLocalizedPath(path, targetLang || language),
+  };
+}
+
+export const fallbackI18nContext: I18nContextType = createDefaultI18nContext();
+
+const I18nContext = createContext<I18nContextType>(fallbackI18nContext);
 
 function resolveInitialLanguage(): LanguageCode {
   if (typeof window === 'undefined') return DEFAULT_LANGUAGE;
@@ -304,8 +409,5 @@ export function I18nProvider({ children }: I18nProviderProps) {
 
 export function useI18n(): I18nContextType {
   const context = useContext(I18nContext);
-  if (!context) {
-    throw new Error('useI18n must be used within an <I18nProvider>');
-  }
-  return context;
+  return context || fallbackI18nContext;
 }

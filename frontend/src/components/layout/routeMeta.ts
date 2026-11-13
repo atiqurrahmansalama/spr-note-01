@@ -55,10 +55,10 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
   "/attendance/students/residential": { title: "Residential Attendance", category: "Student" },
   "/attendance/monthly-register": { title: "Class Attendance", category: "Daily Classroom" },
 
-  "/attendance/settings": { title: "Attendance Policies & Slots", category: "Institution Settings" },
-  "/institution-settings": { title: "Academic & Policy Standards", category: "Institution Settings" },
-  "/admin-tools": { title: "Academic & Policy Standards", category: "Institution Settings" },
-  "/developer-tools": { title: "Academic & Policy Standards", category: "Institution Settings" },
+  "/attendance/settings": { title: "Attendance Policies & Slots", category: "Settings" },
+  "/institution-settings": { title: "Academic & Policy Standards", category: "Settings" },
+  "/admin-tools": { title: "Academic & Policy Standards", category: "Settings" },
+  "/developer-tools": { title: "Academic & Policy Standards", category: "Settings" },
 
   "/student-management/departments": { title: "Department", category: "Academy" },
   "/student-management/classes": { title: "Class", category: "Academy" },
@@ -152,7 +152,10 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
   "/grading-rules": { title: "Grading Policies", category: "Examination & Results" },
 
   "/about": { title: "About", category: "About" },
-  "/approvals": { title: "Approvals Center", category: "App Management" },
+  "/approvals": { title: "Approvals & Decisions", category: "Action & Helpdesk" },
+  "/helpdesk": { title: "Institutional Helpdesk & Issues", category: "Action & Helpdesk" },
+  "/communications": { title: "Communications", category: "Action & Helpdesk" },
+  "/bug-reports": { title: "Bug Reporting", category: "Action & Helpdesk" },
   "/data-backup": { title: "Data & Backup", category: "App Management" },
   "/trash-restoration": { title: "Trash & Restoration", category: "App Management" },
   "/version-control": { title: "Version Control & Releases", category: "Settings" },

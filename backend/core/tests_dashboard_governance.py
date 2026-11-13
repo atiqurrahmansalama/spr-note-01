@@ -691,4 +691,128 @@ class DashboardGovernanceAndRoleSyncTestCase(TestCase):
         self.assertEqual(custom_cat_res.status_code, status.HTTP_201_CREATED, custom_cat_res.data)
         self.assertEqual(custom_cat_res.data["staff_type"], "VISITING_SCHOLAR")
 
+    def test_duplicate_staff_profile_identifies_phone_and_email_specifically(self):
+        self.client.force_authenticate(user=self.second_admin)
+
+        # 1. First onboarding succeeds
+        first_res = self.client.post(
+            "/api/v1/staff-onboarding/apply/",
+            {
+                "name": "Mufti Harun",
+                "phone_number": "01755554444",
+                "email": "mufti.harun@example.com",
+                "staff_type": "TEACHING",
+                "designation": "Senior Teacher",
+                "joining_date": "2026-11-13",
+            },
+            format="json",
+        )
+        self.assertEqual(first_res.status_code, status.HTTP_201_CREATED)
+
+        # 2. Duplicate Phone Only: error must be placed on 'phone_number', not on 'email'
+        dup_phone_res = self.client.post(
+            "/api/v1/staff-onboarding/apply/",
+            {
+                "name": "Different Name",
+                "phone_number": "01755554444",
+                "email": "unique.email@example.com",
+                "staff_type": "TEACHING",
+                "designation": "Senior Teacher",
+                "joining_date": "2026-11-13",
+            },
+            format="json",
+        )
+        self.assertEqual(dup_phone_res.status_code, status.HTTP_400_BAD_REQUEST)
+        dup_phone_data = dup_phone_res.data.get("details", dup_phone_res.data)
+        self.assertIn("phone_number", dup_phone_data)
+        self.assertNotIn("email", dup_phone_data)
+        phone_err_text = str(dup_phone_data["phone_number"])
+        self.assertIn("already registered", phone_err_text)
+
+        # 3. Duplicate Email Only: error must be placed on 'email', not on 'phone_number'
+        dup_email_res = self.client.post(
+            "/api/v1/staff-onboarding/apply/",
+            {
+                "name": "Another Person",
+                "phone_number": "01766665555",
+                "email": "mufti.harun@example.com",
+                "staff_type": "TEACHING",
+                "designation": "Senior Teacher",
+                "joining_date": "2026-11-13",
+            },
+            format="json",
+        )
+        self.assertEqual(dup_email_res.status_code, status.HTTP_400_BAD_REQUEST)
+        dup_email_data = dup_email_res.data.get("details", dup_email_res.data)
+        self.assertIn("email", dup_email_data)
+        self.assertNotIn("phone_number", dup_email_data)
+        email_err_text = str(dup_email_data["email"])
+        self.assertIn("already registered", email_err_text)
+
+        # 4. Both Duplicate: both 'phone_number' and 'email' keys must be present
+        dup_both_res = self.client.post(
+            "/api/v1/staff-onboarding/apply/",
+            {
+                "name": "Another Person",
+                "phone_number": "01755554444",
+                "email": "mufti.harun@example.com",
+                "staff_type": "TEACHING",
+                "designation": "Senior Teacher",
+                "joining_date": "2026-11-13",
+            },
+            format="json",
+        )
+        self.assertEqual(dup_both_res.status_code, status.HTTP_400_BAD_REQUEST)
+        dup_both_data = dup_both_res.data.get("details", dup_both_res.data)
+        self.assertIn("phone_number", dup_both_data)
+        self.assertIn("email", dup_both_data)
+
+        # 5. Changed name takes precedence: submitted name is accurately saved
+        name_test_res = self.client.post(
+            "/api/v1/staff-onboarding/apply/",
+            {
+                "name": "Updated Maulana Abdullah",
+                "phone_number": "01711112222",
+                "email": "abdullah.new@example.com",
+                "staff_type": "TEACHING",
+                "designation": "Senior Teacher",
+                "joining_date": "2026-11-13",
+            },
+            format="json",
+        )
+        self.assertEqual(name_test_res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(name_test_res.data["staff"]["name"], "Updated Maulana Abdullah")
+        user_rec = User.objects.get(phone_number="01711112222")
+        self.assertEqual(user_rec.name, "Updated Maulana Abdullah")
+
+        # 6. Multi-Institution Staff Support: Same person CAN be onboarded at a different institution
+        # Switch admin context to inst_beta
+        self.second_admin.institution = self.inst_beta
+        self.second_admin.save(update_fields=["institution"])
+
+        multi_inst_res = self.client.post(
+            "/api/v1/staff-onboarding/apply/",
+            {
+                "name": "Mufti Harun",
+                "phone_number": "01755554444",
+                "email": "mufti.harun@example.com",
+                "staff_type": "TEACHING",
+                "designation": "Visiting Scholar",
+                "joining_date": "2026-11-13",
+            },
+            format="json",
+        )
+        self.assertEqual(multi_inst_res.status_code, status.HTTP_201_CREATED, multi_inst_res.data)
+        harun_user = User.objects.get(phone_number="01755554444")
+        self.assertTrue(
+            StaffProfile.objects.filter(user=harun_user, institution=self.inst_alpha, is_deleted=False).exists()
+        )
+        self.assertTrue(
+            StaffProfile.objects.filter(user=harun_user, institution=self.inst_beta, is_deleted=False).exists()
+        )
+        # Restore admin institution
+        self.second_admin.institution = self.inst_alpha
+        self.second_admin.save(update_fields=["institution"])
+
+
 

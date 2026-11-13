@@ -99,25 +99,9 @@ export const SettingsSplitLayout: React.FC<SettingsSplitLayoutProps> = ({
     }, {});
   }, [filteredSections]);
 
-  const currentSectionObj = useMemo(() => {
-    return (
-      sections.find((s) => s.id === (activeSection || sections[0]?.id)) ||
-      sections[0]
-    );
-  }, [sections, activeSection]);
-
   const handleSelectSection = (secId: string) => {
     setShowCompactDetailLocal(true);
     if (onSectionChange) onSectionChange(secId);
-  };
-
-  const handleBackToList = () => {
-    setShowCompactDetailLocal(false);
-    if (onBackToMenu) {
-      onBackToMenu();
-    } else if (onSectionChange) {
-      onSectionChange(null);
-    }
   };
 
   /**

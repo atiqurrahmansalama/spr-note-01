@@ -190,6 +190,17 @@ export function useStaffOnboardingForm({
       return;
     }
 
+    if (field === 'phone_number' || field === 'email') {
+      setFormData((prev) => ({
+        ...prev,
+        user_id: '',
+        [field]: value,
+      }));
+      const fieldErr = validateField(field as string, value);
+      setErrors((prev) => ({ ...prev, [field]: fieldErr }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -251,8 +262,10 @@ export function useStaffOnboardingForm({
       }
 
       if (stepsToCheck.includes(2)) {
-        const desigErr = validateField('designation', formData.designation);
-        if (desigErr) newErrors.designation = desigErr;
+        if (!isPublic && !formData.department && !formData.designation) {
+          const desigErr = validateField('designation', formData.designation);
+          if (desigErr) newErrors.designation = desigErr;
+        }
       }
 
       setErrors(newErrors);
@@ -293,8 +306,20 @@ export function useStaffOnboardingForm({
         ).trim();
         const bnName = String(localizedMap.bn || formData.bangla_name || '').trim();
 
+        const tokenAllowedDesignation =
+          Array.isArray(tokenMeta?.allowed_designations) && tokenMeta.allowed_designations.length > 0
+            ? tokenMeta.allowed_designations[0]
+            : null;
+
+        const resolvedDesignation =
+          tokenAllowedDesignation ||
+          tokenMeta?.designation ||
+          formData.designation ||
+          'Faculty Member';
+
         const payload = {
           ...formData,
+          designation: resolvedDesignation,
           name: primaryName,
           name_en: primaryName,
           bangla_name: bnName,
@@ -318,8 +343,15 @@ export function useStaffOnboardingForm({
         };
 
         const result = await submitStaffOnboarding(payload);
+        const isPending =
+          result?.status === 'pending' ||
+          result?.approval_status === 'PENDING' ||
+          result?.staff?.is_pending_review;
+
         showToast(
-          t('onboardingCompletedToast', 'Staff profile onboarded successfully!'),
+          isPending
+            ? t('applicationSubmittedToast', 'Application submitted successfully and is pending review!')
+            : t('onboardingCompletedToast', 'Staff profile onboarded successfully!'),
           'success'
         );
 
@@ -328,6 +360,27 @@ export function useStaffOnboardingForm({
         }
       } catch (err: any) {
         console.error('Failed to submit staff onboarding:', err);
+        if (err?.fieldErrors && typeof err.fieldErrors === 'object' && Object.keys(err.fieldErrors).length > 0) {
+          setErrors((prev) => ({
+            ...prev,
+            ...err.fieldErrors,
+          }));
+          if (err.fieldErrors.phone_number || err.fieldErrors.email || err.fieldErrors.name) {
+            setCurrentStep(1);
+          } else if (err.fieldErrors.department || err.fieldErrors.designation || err.fieldErrors.staff_type) {
+            setCurrentStep(2);
+          }
+          const hasSpecificFieldErrors = Object.keys(err.fieldErrors).some(
+            (k) => !['error', 'non_field_errors', 'detail', 'message'].includes(k)
+          );
+          if (hasSpecificFieldErrors) {
+            showToast(
+              t('checkFormErrorsToast', 'Please check the highlighted fields below.'),
+              'error'
+            );
+            return;
+          }
+        }
         showToast(
           err?.message || t('onboardingFailedToast', 'Failed to complete staff onboarding'),
           'error'

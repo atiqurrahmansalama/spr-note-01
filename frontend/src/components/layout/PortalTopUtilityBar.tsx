@@ -75,17 +75,17 @@ export default function PortalTopUtilityBar({
   };
 
   return (
-    <header className="relative z-10 w-full max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3 py-2 px-1">
+    <header className="relative z-50 w-full max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3 py-2 px-1">
       {/* Brand / Institute Identity */}
-      <div className="flex items-center gap-2.5 min-w-0">
-        <div className="w-9 h-9 rounded-2xl theme-bg-surface border-0 flex items-center justify-center shadow-xs shrink-0">
-          <BrandIcon className="w-4 h-4 theme-text-secondary" />
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl theme-bg-surface border-0 flex items-center justify-center shadow-xs shrink-0">
+          <BrandIcon className="w-5 h-5 theme-text-secondary" />
         </div>
         <div className="flex flex-col min-w-0 text-start">
-          <span className="text-sm sm:text-base font-extrabold tracking-tight theme-text-primary truncate max-w-[240px] sm:max-w-[420px]">
+          <span className="text-base sm:text-lg md:text-xl font-black tracking-tight theme-text-primary truncate max-w-[280px] sm:max-w-[540px]">
             {resolvedBrandName}
           </span>
-          <span className="text-[10px] theme-text-secondary truncate max-w-[240px] sm:max-w-[420px]">
+          <span className="text-xs font-semibold theme-text-secondary truncate max-w-[280px] sm:max-w-[540px]">
             {resolvedBrandBadge}
           </span>
         </div>
@@ -116,7 +116,7 @@ export default function PortalTopUtilityBar({
           {isLangMenuOpen && (
             <div
               role="menu"
-              className="absolute end-0 mt-1.5 w-48 rounded-2xl theme-bg-surface shadow-xl p-1.5 z-50 border-0 ring-0 animate-in fade-in zoom-in-95 duration-150"
+              className="absolute end-0 mt-1.5 w-48 rounded-2xl theme-bg-surface shadow-xl p-1.5 z-[100] border-0 ring-0 animate-in fade-in zoom-in-95 duration-150"
             >
               {SUPPORTED_LANGUAGES.map((lang) => {
                 const isActive = language === lang.code;
@@ -167,9 +167,9 @@ export default function PortalTopUtilityBar({
           className="p-2.5 rounded-2xl theme-bg-surface border-0 ring-0 hover:theme-bg-elevated/50 theme-text-secondary hover:theme-text-primary transition shadow-xs cursor-pointer"
         >
           {isCurrentlyDark ? (
-            <SunIcon className="w-4 h-4 text-amber-400" />
+            <SunIcon className="w-4 h-4 theme-text-secondary" />
           ) : (
-            <MoonIcon className="w-4 h-4 theme-accent" />
+            <MoonIcon className="w-4 h-4 theme-text-secondary" />
           )}
         </button>
       </div>

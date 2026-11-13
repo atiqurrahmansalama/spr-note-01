@@ -25,17 +25,33 @@ function extractApiErrorMessage(errPayload, fallback) {
       ? errPayload.details
       : errPayload;
 
+  if (typeof fieldSource.error === 'string' && fieldSource.error.trim()) {
+    return fieldSource.error.trim();
+  }
+  if (typeof fieldSource.detail === 'string' && fieldSource.detail.trim()) {
+    return fieldSource.detail.trim();
+  }
+
   const ignoredMetaKeys = new Set(['success', 'status_code', 'error_type', 'request_id']);
+  const collectedMessages = [];
   for (const key of Object.keys(fieldSource)) {
     if (ignoredMetaKeys.has(key)) continue;
     const val = fieldSource[key];
-    if (Array.isArray(val) && val.length > 0) {
-      return key === 'detail' || key === 'non_field_errors' ? String(val[0]) : `${key}: ${val[0]}`;
-    }
-    if (typeof val === 'string' && val.trim()) {
-      return key === 'detail' || key === 'non_field_errors' ? val.trim() : `${key}: ${val.trim()}`;
+    const textVal =
+      Array.isArray(val) && val.length > 0
+        ? String(val[0]).trim()
+        : typeof val === 'string'
+        ? val.trim()
+        : '';
+    if (textVal) {
+      collectedMessages.push(textVal);
     }
   }
+
+  if (collectedMessages.length > 0) {
+    return collectedMessages.join(' ');
+  }
+
   return fallback;
 }
 
@@ -101,11 +117,8 @@ export const deleteStaffOnboardingToken = async (id) => {
 // ==========================================
 
 export const verifyPublicStaffToken = async (token) => {
-  const targetUrl = API_BASE_URL
-    ? `${API_BASE_URL}/api/v1/public/staff-onboard/verify/?token=${encodeURIComponent(token)}`
-    : `/api/v1/public/staff-onboard/verify/?token=${encodeURIComponent(token)}`;
-
-  const response = await fetch(targetUrl);
+  const endpoint = `/api/v1/public/staff-onboard/verify/?token=${encodeURIComponent(token)}`;
+  const response = await fetchWithAuth(endpoint);
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
     throw new Error(extractApiErrorMessage(err, 'Invalid or expired staff invitation link'));
@@ -120,7 +133,28 @@ export const submitStaffOnboarding = async (payload) => {
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(extractApiErrorMessage(err, 'Failed to submit staff onboarding application'));
+    const message = extractApiErrorMessage(err, 'Failed to submit staff onboarding application');
+    const apiError = new Error(message);
+
+    const fieldSource =
+      err?.details && typeof err.details === 'object'
+        ? err.details
+        : err;
+    const fieldErrors = {};
+    if (fieldSource && typeof fieldSource === 'object') {
+      const ignoredMetaKeys = new Set(['success', 'status_code', 'error_type', 'request_id']);
+      for (const [k, v] of Object.entries(fieldSource)) {
+        if (ignoredMetaKeys.has(k)) continue;
+        if (Array.isArray(v) && v.length > 0) {
+          fieldErrors[k] = String(v[0]).trim();
+        } else if (typeof v === 'string') {
+          fieldErrors[k] = v.trim();
+        }
+      }
+    }
+    apiError.fieldErrors = fieldErrors;
+    apiError.details = fieldSource;
+    throw apiError;
   }
   return await response.json();
 };

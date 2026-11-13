@@ -42,6 +42,9 @@ import {
   InvoiceIcon,
   RefreshIcon,
   ChecklistIcon,
+  HeadsetIcon,
+  BugIcon,
+  MessageSquareIcon,
   AdjustmentsHorizontalIcon,
   ShieldCheckIcon,
 } from "../ui/Icons";
@@ -102,14 +105,18 @@ export default function SidebarContainer({
       key: "nav_dashboard"
     },
     {
-      id: "Approvals Center",
-      name: "Approvals Center",
-      i18nKey: "approvalsCenter",
-      path: "/approvals",
-      matchPaths: ["/approvals"],
+      id: "Action & Helpdesk",
+      name: "Action & Helpdesk",
+      i18nKey: "actionHelpdesk",
       Icon: ChecklistIcon,
-      key: "app_approvals",
-      adminOnly: true,
+      hasSub: true,
+      key: "nav_action_helpdesk",
+      subItems: [
+        { id: "Approvals & Decisions", name: "Approvals & Decisions", i18nKey: "approvalsDecisions", path: "/approvals", matchPaths: ["/approvals"], Icon: ChecklistIcon, key: "app_approvals", adminOnly: true },
+        { id: "Institutional Helpdesk & Issues", name: "Institutional Helpdesk & Issues", i18nKey: "institutionalHelpdesk", path: "/helpdesk", matchPaths: ["/helpdesk"], Icon: HeadsetIcon, key: "app_helpdesk" },
+        { id: "Communications", name: "Communications", i18nKey: "communications", path: "/communications", matchPaths: ["/communications"], Icon: MessageSquareIcon, key: "app_communications" },
+        { id: "Bug Reporting", name: "Bug Reporting", i18nKey: "bugReporting", path: "/bug-reports", matchPaths: ["/bug-reports"], Icon: BugIcon, key: "app_bug_reporting" },
+      ]
     },
     {
       id: "Academy",
@@ -333,10 +340,10 @@ export default function SidebarContainer({
         { id: "Profile Settings", name: "Profile Settings", i18nKey: "profileSettings", path: "/profile-settings", matchPaths: ["/profile-settings"], Icon: SettingsIcon, key: "settings_profile" },
         { 
           id: "Institution Settings", 
-          name: "Institution Settings", 
-          i18nKey: "institutionSettings", 
-          path: "/admin-tools", 
-          matchPaths: ["/admin-tools", "/developer-tools", "/institution-settings", "/sp-management", "/attendance/settings"], 
+          name: "Academic & Policy Standards", 
+          i18nKey: "masterPolicies", 
+          path: "/institution-settings", 
+          matchPaths: ["/institution-settings", "/admin-tools", "/developer-tools", "/sp-management", "/attendance/settings"], 
           Icon: AdjustmentsHorizontalIcon, 
           key: "admin_tools", 
           adminOnly: true 
@@ -371,7 +378,7 @@ export default function SidebarContainer({
         const visibleSubItems = item.subItems.filter((sub) => {
           if (sub.superAdminOnly && !isSuper) return false;
           if (sub.adminOnly && !isAcademyAdministrator && !isSuper) return false;
-          if (isAcademyAdministrator && item.id === "Academy") return true;
+          if (isAcademyAdministrator && (item.id === "Academy" || item.id === "Action & Helpdesk")) return true;
           return isSectionEnabled(sub.key);
         });
         return { ...item, subItems: visibleSubItems };
@@ -384,7 +391,7 @@ export default function SidebarContainer({
       if (item.adminOnly && !isAcademyAdministrator && !isSuper) return false;
       
       const isVisible = isSectionEnabled(item.key);
-      if (!isVisible && !(isAcademyAdministrator && (item.id === "Dashboard" || item.id === "Academy"))) return false;
+      if (!isVisible && !(isAcademyAdministrator && (item.id === "Dashboard" || item.id === "Academy" || item.id === "Action & Helpdesk"))) return false;
       
       if (item.hasSub && item.subItems.length === 0) return false;
       

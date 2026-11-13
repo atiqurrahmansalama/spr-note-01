@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import CustomButton from '@/components/ui/CustomButton';
 import CustomInput from '@/components/ui/CustomInput';
 import CustomSelect from '@/components/ui/CustomSelect';
 import ReusableCalendar from '@/components/common/ReusableCalendar';
 import {
+  AlertCircleIcon,
   CheckCircleIcon,
   SparklesIcon,
 } from '@/components/ui/Icons';
 import { hasAnyLanguageContent } from '@/i18n/localizedEntity';
-import { useStaffRanks, useStaffCategories } from '../hooks';
+import { getDepartments } from '@/api/academy';
+import { useStaffCategories } from '../hooks';
 import { useStaffOnboardingForm } from './hooks/useStaffOnboardingForm';
 import { useStaffTranslation } from '../locales';
 import type { StaffOnboardingPayload } from '../types';
@@ -52,25 +54,85 @@ export const QuickStaffOnboardingForm: React.FC<QuickStaffOnboardingFormProps> =
   });
 
   const { categoryOptions } = useStaffCategories({ currentValue: formData.staff_type });
-  const { rankOptions, getRankByName } = useStaffRanks({
-    allowedDesignations: tokenMeta?.allowed_designations,
+
+  const filteredCategoryOptions = useMemo(() => {
+    if (
+      tokenMeta?.allowed_staff_types &&
+      Array.isArray(tokenMeta.allowed_staff_types) &&
+      tokenMeta.allowed_staff_types.length > 0
+    ) {
+      const allowedSet = new Set(
+        tokenMeta.allowed_staff_types.map((st: string) => String(st).trim().toUpperCase())
+      );
+      return categoryOptions.filter((opt) => allowedSet.has(opt.value.toUpperCase()));
+    }
+    return categoryOptions;
+  }, [categoryOptions, tokenMeta?.allowed_staff_types]);
+
+  useEffect(() => {
+    if (filteredCategoryOptions.length > 0) {
+      const isCurrentValid = filteredCategoryOptions.some((opt) => opt.value === formData.staff_type);
+      if (!isCurrentValid) {
+        handleChange('staff_type', filteredCategoryOptions[0].value);
+      }
+    }
+  }, [filteredCategoryOptions, formData.staff_type]);
+
+  const [departmentsList, setDepartmentsList] = useState<any[]>(() => {
+    if (tokenMeta?.departments && Array.isArray(tokenMeta.departments)) {
+      return tokenMeta.departments;
+    }
+    return [];
   });
+
+  useEffect(() => {
+    if (tokenMeta?.departments && Array.isArray(tokenMeta.departments)) {
+      setDepartmentsList(tokenMeta.departments);
+      return;
+    }
+    if (!isPublic) {
+      let isMounted = true;
+      getDepartments({ page_size: 500, all: true })
+        .then((data: any) => {
+          if (isMounted) {
+            const list = Array.isArray(data) ? data : data?.results || [];
+            setDepartmentsList(list);
+          }
+        })
+        .catch((err) => console.warn('Failed to load departments in quick onboarding form:', err));
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [tokenMeta?.departments, isPublic]);
+
+  const departmentOptions = useMemo(() => {
+    let list = departmentsList;
+    if (
+      tokenMeta?.allowed_departments &&
+      Array.isArray(tokenMeta.allowed_departments) &&
+      tokenMeta.allowed_departments.length > 0
+    ) {
+      const allowedSet = new Set(tokenMeta.allowed_departments.map((d: any) => String(d).trim()));
+      list = list.filter((dept) => allowedSet.has(String(dept.id)));
+    }
+    return list.map((dept: any) => ({
+      value: String(dept.id),
+      label: dept.name,
+      badge: dept.code || undefined,
+    }));
+  }, [departmentsList, tokenMeta?.allowed_departments]);
+
+  useEffect(() => {
+    if (departmentOptions.length === 1 && (!formData.department || formData.department !== departmentOptions[0].value)) {
+      handleChange('department', departmentOptions[0].value);
+    }
+  }, [departmentOptions, formData.department]);
 
   const nameFieldValue =
     formData.name_i18n && hasAnyLanguageContent(formData.name_i18n)
       ? formData.name_i18n
       : formData.name;
-
-  const handleRankSelect = (selectedName: string) => {
-    const matched = getRankByName(selectedName);
-    handleChange('designation', selectedName);
-    if (matched) {
-      handleChange('rank_order', matched.order);
-      if (matched.type && matched.type !== formData.staff_type) {
-        handleChange('staff_type', matched.type);
-      }
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -102,6 +164,19 @@ export const QuickStaffOnboardingForm: React.FC<QuickStaffOnboardingFormProps> =
             </p>
           </div>
         </div>
+
+        {/* Server Level General Error Banner */}
+        {(errors.error || errors.non_field_errors) && (
+          <div
+            role="alert"
+            className="p-3.5 rounded-2xl theme-bg-danger-soft text-[var(--danger-text)] border-0 text-xs flex items-center gap-2.5 animate-fade-in"
+          >
+            <AlertCircleIcon className="w-4 h-4 shrink-0" />
+            <span className="font-semibold text-start leading-relaxed">
+              {errors.error || errors.non_field_errors}
+            </span>
+          </div>
+        )}
 
         {/* Unified 2-Column Grid for All Inputs (Including Multilang Full Name) */}
         <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-4 items-start border-0">
@@ -137,24 +212,24 @@ export const QuickStaffOnboardingForm: React.FC<QuickStaffOnboardingFormProps> =
 
           <CustomSelect
             label={t('staffType', 'Staff Category')}
-            options={categoryOptions}
+            options={filteredCategoryOptions}
             value={formData.staff_type}
             onChange={(val) => handleChange('staff_type', val)}
           />
 
           <CustomSelect
-            label={t('designation', 'Designation / Official Rank')}
-            options={rankOptions}
-            value={formData.designation}
-            onChange={(val) => handleRankSelect(val)}
-            placeholder={t('selectInstitutionalRank', 'Select Institutional Rank')}
-            searchable={true}
-            error={errors.designation}
+            label={t('department', 'Department')}
+            options={departmentOptions}
+            value={formData.department}
+            onChange={(val) => handleChange('department', val)}
+            placeholder={t('selectDepartment', 'Select Department')}
+            searchable={false}
+            error={errors.department}
           />
 
           <div>
             <label className="text-xs font-bold theme-text-secondary block mb-1.5 text-start">
-              {t('joiningDate', 'JOINING DATE')}
+              {t('joiningDate', 'Joining Date')}
             </label>
             <ReusableCalendar
               selectedDate={formData.joining_date}
@@ -186,11 +261,17 @@ export const QuickStaffOnboardingForm: React.FC<QuickStaffOnboardingFormProps> =
             variant="primary"
             size="md"
             loading={isSubmitting}
-            loadingText={t('submitting', 'Submitting Registration...')}
+            loadingText={
+              tokenMeta?.auto_approve === false
+                ? t('submittingApplication', 'Submitting Application...')
+                : t('submitting', 'Submitting Registration...')
+            }
             icon={CheckCircleIcon}
             className="w-full @[540px]:w-auto"
           >
-            {t('quickSubmitOnboarding', 'Complete Quick Onboarding')}
+            {tokenMeta?.auto_approve === false
+              ? t('submitApplication', 'Submit Application')
+              : t('quickSubmitOnboarding', 'Complete Quick Onboarding')}
           </CustomButton>
         </div>
       </form>

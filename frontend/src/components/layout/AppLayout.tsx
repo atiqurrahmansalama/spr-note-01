@@ -314,6 +314,33 @@ export default function AppLayout() {
     }
   };
 
+  const handleBlockViewBack = () => {
+    // If a drawer/right sidebar is currently active, back navigation dismisses the drawer first
+    if (isRightSidebarOpen) {
+      closeRightSidebar();
+      return;
+    }
+
+    // If inside any section or content tab of Institution Settings / Developer Tools, return to the menu first
+    const path = window.location.pathname;
+    const search = new URLSearchParams(window.location.search);
+    if (
+      (path.startsWith("/institution-settings") ||
+        path.startsWith("/admin-tools") ||
+        path.startsWith("/developer-tools")) &&
+      (search.get("tab") || search.get("section"))
+    ) {
+      navigate("/institution-settings", { replace: false });
+      return;
+    }
+
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/dashboard");
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden theme-bg-app theme-text-primary">
       {/* Global Top Navigation Bar */}
@@ -360,6 +387,7 @@ export default function AppLayout() {
                 title={routeMeta.title}
                 category={routeMeta.category || "Navigation"}
                 subCategory={routeMeta.subCategory}
+                onBack={handleBlockViewBack}
                 onClose={() => {
                   closeRightSidebar();
                   navigate("/dashboard");

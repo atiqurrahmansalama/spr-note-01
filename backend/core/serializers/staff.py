@@ -573,6 +573,8 @@ class StaffOnboardingTokenSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.name', read_only=True)
     is_valid = serializers.BooleanField(read_only=True)
     staff_type = serializers.CharField(max_length=50, required=False, default='TEACHING')
+    allowed_staff_types = serializers.JSONField(required=False, default=list)
+    allowed_departments = serializers.JSONField(required=False, default=list)
 
     class Meta:
         model = StaffOnboardingToken
@@ -582,13 +584,16 @@ class StaffOnboardingTokenSerializer(serializers.ModelSerializer):
             'institution_name',
             'token',
             'title',
+            'subtitle',
             'onboarding_mode',
             'staff_type',
+            'allowed_staff_types',
             'designation',
             'allowed_designations',
             'rank_order',
             'department',
             'department_name',
+            'allowed_departments',
             'max_applications',
             'applied_count',
             'expires_at',
@@ -634,8 +639,8 @@ class StaffOnboardingApplicationSerializer(serializers.Serializer):
 
     # Staff Role & Hierarchy
     staff_type = serializers.CharField(max_length=50, required=False, default='TEACHING')
-    designation = serializers.CharField(max_length=100)
-    rank_order = serializers.IntegerField(default=99)
+    designation = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    rank_order = serializers.IntegerField(default=99, required=False)
     department = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     employment_status = serializers.ChoiceField(choices=StaffProfile.EMPLOYMENT_STATUS_CHOICES, default='PERMANENT')
     joining_date = serializers.DateField(

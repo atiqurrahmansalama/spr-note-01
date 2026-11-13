@@ -99,34 +99,61 @@ class StaffOnboardingApprovalHandler(BaseApprovalHandler):
         if not email and not phone and not payload.get("user_id"):
             raise ValidationError({"error": "Either email, phone number, or user account is required."})
 
-        # Check existing staff profile duplicate
-        existing_user = None
-        if payload.get("user_id"):
-            existing_user = User.objects.filter(id=payload["user_id"]).first()
-        elif email or phone:
-            q = Q()
-            if phone:
-                q |= Q(phone_number=phone)
-            if email:
-                q |= Q(email__iexact=email)
-            existing_user = User.objects.filter(q).first()
+        validation_errors: Dict[str, str] = {}
 
-        if existing_user and StaffProfile.objects.filter(user=existing_user, is_deleted=False).exists():
-            raise ValidationError(
-                {"error": "A staff profile already exists for this phone number or email address."}
-            )
-
-        # Check duplicate active pending request
-        pending_dup_q = Q(institution=institution, domain="STAFF_ONBOARDING", status__in=["PENDING", "IN_REVIEW"])
-        contact_q = Q()
-        if email:
-            contact_q |= Q(email__iexact=email)
+        # 1. Check duplicate against existing active StaffProfile records strictly within THIS institution
+        # Duplicate check is strictly driven by phone_number and email (never leaks employee IDs or other institutions)
         if phone:
-            contact_q |= Q(phone_number=phone)
-        if contact_q and ApprovalRequest.objects.filter(pending_dup_q & contact_q).exists():
-            raise ValidationError(
-                {"error": "An active pending onboarding request already exists for this email or phone."}
-            )
+            phone_user = User.objects.filter(phone_number=phone).first()
+            if phone_user:
+                sp_phone = (
+                    StaffProfile.objects.filter(user=phone_user, institution=institution, is_deleted=False)
+                    .first()
+                )
+                if sp_phone:
+                    validation_errors["phone_number"] = (
+                        "This mobile number is already registered for an active staff member in this institution."
+                    )
+
+        if email:
+            email_user = User.objects.filter(email__iexact=email).first()
+            if email_user:
+                sp_email = (
+                    StaffProfile.objects.filter(user=email_user, institution=institution, is_deleted=False)
+                    .first()
+                )
+                if sp_email:
+                    validation_errors["email"] = (
+                        "This email address is already registered for an active staff member in this institution."
+                    )
+
+        # 2. Check duplicate against active pending onboarding requests in THIS institution
+        if phone and "phone_number" not in validation_errors:
+            pending_phone_req = ApprovalRequest.objects.filter(
+                institution=institution,
+                domain="STAFF_ONBOARDING",
+                status__in=["PENDING", "IN_REVIEW"],
+                phone_number=phone,
+            ).first()
+            if pending_phone_req:
+                validation_errors["phone_number"] = (
+                    "An onboarding application with this mobile number is already pending administrative review."
+                )
+
+        if email and "email" not in validation_errors:
+            pending_email_req = ApprovalRequest.objects.filter(
+                institution=institution,
+                domain="STAFF_ONBOARDING",
+                status__in=["PENDING", "IN_REVIEW"],
+                email__iexact=email,
+            ).first()
+            if pending_email_req:
+                validation_errors["email"] = (
+                    "An onboarding application with this email address is already pending administrative review."
+                )
+
+        if validation_errors:
+            raise ValidationError(validation_errors)
 
         if token_obj:
             permitted_designations = list(token_obj.allowed_designations or [])
@@ -134,12 +161,16 @@ class StaffOnboardingApprovalHandler(BaseApprovalHandler):
                 permitted_designations = [token_obj.designation]
 
             submitted_designation = str(payload.get("designation") or "").strip()
-            if permitted_designations and submitted_designation:
+            if permitted_designations:
                 permitted_lower = {str(d).strip().lower() for d in permitted_designations if d}
-                if submitted_designation.lower() not in permitted_lower:
+                if not submitted_designation or submitted_designation in ('Faculty Member', 'Staff'):
+                    payload["designation"] = permitted_designations[0]
+                elif submitted_designation.lower() not in permitted_lower:
                     raise ValidationError(
                         {"designation": "Selected designation is not permitted for this onboarding link."}
                     )
+            elif not submitted_designation:
+                payload["designation"] = token_obj.designation or "Faculty Member"
 
     def build_summary_meta(self, payload: Dict[str, Any], token_obj: Optional[Any] = None) -> Dict[str, Any]:
         return {
@@ -175,17 +206,25 @@ class StaffOnboardingApprovalHandler(BaseApprovalHandler):
 
         # 1. Resolve or Create User
         user = None
+        email = str(data.get("email") or "").strip()
+        phone = str(data.get("phone_number") or "").strip() or f"staff_{uuid.uuid4().hex[:8]}"
+
         if data.get("user_id"):
-            user = User.objects.filter(id=data["user_id"]).first()
+            matched_user = User.objects.filter(id=data["user_id"]).first()
+            if matched_user:
+                u_phone = (matched_user.phone_number or "").strip()
+                u_email = (matched_user.email or "").strip().lower()
+                submitted_raw_phone = str(data.get("phone_number") or "").strip()
+                phone_matches = bool(submitted_raw_phone and u_phone == submitted_raw_phone)
+                email_matches = bool(email and u_email == email.lower())
+                if phone_matches or email_matches or (not submitted_raw_phone and not email):
+                    user = matched_user
         elif approval_request.submitted_by and approval_request.source_mode == "PUBLIC_PORTAL":
             # Only bind submitted_by if it wasn't an admin submitting on behalf of someone else
             candidate_email = str(data.get("email") or "").strip().lower()
             submitter_email = str(getattr(approval_request.submitted_by, "email", "") or "").strip().lower()
             if candidate_email and submitter_email and candidate_email == submitter_email:
                 user = approval_request.submitted_by
-
-        email = str(data.get("email") or "").strip()
-        phone = str(data.get("phone_number") or "").strip() or f"staff_{uuid.uuid4().hex[:8]}"
 
         if not user:
             user = User.objects.filter(
@@ -209,14 +248,27 @@ class StaffOnboardingApprovalHandler(BaseApprovalHandler):
                 is_staff=True,
             )
 
-        if StaffProfile.objects.filter(user=user, is_deleted=False).exists():
-            raise ValidationError(
-                {"error": "A staff profile already exists for this phone number or email address."}
-            )
+        existing_sp = (
+            StaffProfile.objects.filter(user=user, institution=institution, is_deleted=False)
+            .first()
+        )
+        if existing_sp:
+            err_map: Dict[str, str] = {}
+            if phone:
+                err_map["phone_number"] = (
+                    "This mobile number is already registered for an active staff member in this institution."
+                )
+            if email:
+                err_map["email"] = (
+                    "This email address is already registered for an active staff member in this institution."
+                )
+            if not err_map:
+                err_map["error"] = "An active staff profile already exists for this user in this institution."
+            raise ValidationError(err_map)
 
         staff_type = data.get("staff_type") or (token_obj.staff_type if token_obj else "TEACHING")
 
-        # Sync user attributes safely
+        # Sync user attributes safely (updated name always takes precedence)
         user_update_fields = []
         submitted_name = str(data.get("name") or "").strip()
         submitted_name_bn = str(data.get("bangla_name") or "").strip()
@@ -228,18 +280,16 @@ class StaffOnboardingApprovalHandler(BaseApprovalHandler):
             user.institution = institution
             user_update_fields.append("institution")
 
-        if submitted_name and not (user.name or "").strip():
+        if submitted_name and user.name != submitted_name:
             user.name = submitted_name
             user_update_fields.append("name")
-            if not (user.first_name or "").strip():
-                parts = submitted_name.split(None, 1)
-                user.first_name = parts[0]
-                user_update_fields.append("first_name")
-                if len(parts) > 1 and not (user.last_name or "").strip():
-                    user.last_name = parts[1]
-                    user_update_fields.append("last_name")
+            parts = submitted_name.split(None, 1)
+            user.first_name = parts[0]
+            user_update_fields.append("first_name")
+            user.last_name = parts[1] if len(parts) > 1 else ""
+            user_update_fields.append("last_name")
 
-        if submitted_name_bn and not (user.name_bn or "").strip():
+        if submitted_name_bn and user.name_bn != submitted_name_bn:
             user.name_bn = submitted_name_bn
             user_update_fields.append("name_bn")
 
@@ -338,14 +388,25 @@ class StaffOnboardingApprovalHandler(BaseApprovalHandler):
             token_obj.applied_count = F("applied_count") + 1
             token_obj.save(update_fields=["applied_count", "updated_at"])
 
+        submitted_name = (
+            str(data.get("name") or "").strip()
+            or str(data.get("name_en") or "").strip()
+            or str(getattr(user, "name", "") or "").strip()
+        )
+        submitted_name_bn = (
+            str(data.get("bangla_name") or "").strip()
+            or str(getattr(user, "name_bn", "") or "").strip()
+        )
+
         return {
             "target_model": "StaffProfile",
             "target_object_id": str(staff_profile.id),
             "staff": {
                 "id": str(staff_profile.id),
                 "employee_id": emp_id,
-                "name": data.get("name", ""),
-                "bangla_name": data.get("bangla_name", ""),
+                "tracking_code": approval_request.tracking_code,
+                "name": submitted_name,
+                "bangla_name": submitted_name_bn,
                 "name_i18n": data.get("name_i18n", {}),
                 "designation": staff_profile.designation,
                 "rank_order": staff_profile.rank_order,
@@ -354,6 +415,7 @@ class StaffOnboardingApprovalHandler(BaseApprovalHandler):
                 "department_name": dept.name if dept else None,
                 "joining_date": str(staff_profile.joining_date),
                 "user_id": str(user.id) if user else None,
+                "is_pending_review": False,
             },
         }
 
@@ -588,12 +650,42 @@ class ApprovalService:
                 admin_remarks="Auto-approved by system policy",
             )
 
+        dept_name = None
+        dept_id = clean_payload.get("department") or (
+            str(token_obj.department.id) if token_obj and token_obj.department else None
+        )
+        if dept_id:
+            dept_obj = AcademicDepartment.objects.filter(id=dept_id, institution=institution).first()
+            if dept_obj:
+                dept_name = dept_obj.name
+
+        submitted_name = (
+            str(clean_payload.get("name") or "").strip()
+            or str(clean_payload.get("name_en") or "").strip()
+            or req.applicant_name
+        )
+
         return {
             "status": "pending",
             "approval_status": req.status,
             "approval_request_id": str(req.id),
             "tracking_code": req.tracking_code,
             "message": "Your application has been submitted and is pending administrative review.",
+            "staff": {
+                "id": str(req.id),
+                "employee_id": req.tracking_code,
+                "tracking_code": req.tracking_code,
+                "name": submitted_name,
+                "bangla_name": clean_payload.get("bangla_name", ""),
+                "name_i18n": clean_payload.get("name_i18n", {}),
+                "designation": clean_payload.get("designation") or (token_obj.designation if token_obj else "Faculty Member"),
+                "rank_order": clean_payload.get("rank_order") or (token_obj.rank_order if token_obj else 99),
+                "staff_type": clean_payload.get("staff_type") or (token_obj.staff_type if token_obj else "TEACHING"),
+                "institution_name": institution.name,
+                "department_name": dept_name,
+                "joining_date": str(clean_payload.get("joining_date") or timezone.localdate()),
+                "is_pending_review": True,
+            },
         }
 
     @classmethod

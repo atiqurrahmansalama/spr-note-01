@@ -1,5 +1,6 @@
 import React from 'react';
 import Stepper from '@/components/ui/Stepper';
+import { AlertCircleIcon } from '@/components/ui/Icons';
 import {
   StaffOnboardingStepProfile,
   StaffOnboardingStepRole,
@@ -74,7 +75,18 @@ export const StaffOnboardingWizard: React.FC<StaffOnboardingWizardProps> = ({
       </div>
 
       {/* 2. Step Container Surface (Borderless & Soft-Toned) */}
-      <div className="p-6 sm:p-8 rounded-3xl theme-bg-surface shadow-xs border-0">
+      <div className="p-6 sm:p-8 rounded-3xl theme-bg-surface shadow-xs border-0 space-y-6">
+        {(errors.error || errors.non_field_errors) && (
+          <div
+            role="alert"
+            className="p-3.5 rounded-2xl theme-bg-danger-soft text-[var(--danger-text)] border-0 text-xs flex items-center gap-2.5 animate-fade-in"
+          >
+            <AlertCircleIcon className="w-4 h-4 shrink-0" />
+            <span className="font-semibold text-start leading-relaxed">
+              {errors.error || errors.non_field_errors}
+            </span>
+          </div>
+        )}
         {currentStep === 1 && (
           <StaffOnboardingStepProfile
             formData={formData}
@@ -92,6 +104,7 @@ export const StaffOnboardingWizard: React.FC<StaffOnboardingWizardProps> = ({
             ranksList={ranksList}
             errors={errors}
             onChange={handleChange}
+            tokenMeta={tokenMeta}
             allowedDesignations={tokenMeta?.allowed_designations}
           />
         )}
@@ -162,8 +175,12 @@ export const StaffOnboardingWizard: React.FC<StaffOnboardingWizardProps> = ({
                 className="px-7 py-2.5 rounded-2xl theme-bg-accent theme-accent-text hover:opacity-95 text-xs font-bold transition cursor-pointer shadow-xs active:scale-98 border-0 disabled:opacity-50"
               >
                 {isSubmitting
-                  ? t('submitting', 'Submitting Registration...')
-                  : t('submitOnboarding', 'Complete Onboarding')}
+                  ? (tokenMeta?.auto_approve === false
+                      ? t('submittingApplication', 'Submitting Application...')
+                      : t('submitting', 'Submitting Registration...'))
+                  : (tokenMeta?.auto_approve === false
+                      ? t('submitApplication', 'Submit Application')
+                      : t('submitOnboarding', 'Complete Onboarding'))}
               </button>
             )}
           </div>

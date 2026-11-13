@@ -111,12 +111,12 @@ export function useStaffRanks(options?: UseStaffRanksOptions | string | null) {
 
     const opts: StaffRankOption[] = filtered.map((r) => ({
       value: r.name,
-      label: `${r.name_bn ? `${r.name_bn} (${r.name})` : r.name} — [${formatNumber(r.order)}]`,
+      label: r.name,
       rank_order: r.order,
       type: r.type,
       staff_type: r.type,
       badge: `#${formatNumber(r.order)}`,
-      description: r.description || '',
+      description: '',
     }));
 
     // If allowed designations has custom names not in local store, preserve them cleanly
@@ -131,7 +131,7 @@ export function useStaffRanks(options?: UseStaffRanksOptions | string | null) {
             rank_order: 99,
             staff_type: staffTypeFilter || 'TEACHING',
             badge: '#99',
-            description: clean,
+            description: '',
           });
         }
       });

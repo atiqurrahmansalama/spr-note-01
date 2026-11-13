@@ -129,6 +129,28 @@ export const PublicStaffOnboardingView: React.FC = () => {
         const meta = await verifyPublicStaffToken(token);
         if (!isCancelled) {
           setTokenMeta(meta);
+          if (meta?.candidate_application) {
+            const app = meta.candidate_application;
+            if (app.lifecycle_level === 2 || app.lifecycle_level === 3) {
+              setSubmittedReceipt({
+                status: app.status.toLowerCase(),
+                approval_status: app.status,
+                tracking_code: app.tracking_code,
+                staff: app.staff,
+                lifecycle_level: app.lifecycle_level,
+              });
+            } else if (app.lifecycle_level === 4) {
+              setSubmittedReceipt({
+                status: 'rejected',
+                approval_status: 'REJECTED',
+                tracking_code: app.tracking_code,
+                rejection_reason: app.rejection_reason,
+                lifecycle_level: 4,
+              });
+            } else {
+              setSubmittedReceipt(null);
+            }
+          }
         }
       } catch (err: any) {
         if (!isCancelled) {
@@ -148,7 +170,7 @@ export const PublicStaffOnboardingView: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [token, tp]);
+  }, [token, isAuthenticated, tp]);
 
   // Deferred validation errors (shown strictly after blur or failed submit)
   const nameError =
@@ -216,6 +238,32 @@ export const PublicStaffOnboardingView: React.FC = () => {
             tp('loginSuccess', 'Authenticated successfully. You may now complete onboarding.'),
             'success'
           );
+          try {
+            const updatedMeta = await verifyPublicStaffToken(token);
+            setTokenMeta(updatedMeta);
+            if (updatedMeta?.candidate_application) {
+              const app = updatedMeta.candidate_application;
+              if (app.lifecycle_level === 2 || app.lifecycle_level === 3) {
+                setSubmittedReceipt({
+                  status: app.status.toLowerCase(),
+                  approval_status: app.status,
+                  tracking_code: app.tracking_code,
+                  staff: app.staff,
+                  lifecycle_level: app.lifecycle_level,
+                });
+              } else if (app.lifecycle_level === 4) {
+                setSubmittedReceipt({
+                  status: 'rejected',
+                  approval_status: 'REJECTED',
+                  tracking_code: app.tracking_code,
+                  rejection_reason: app.rejection_reason,
+                  lifecycle_level: 4,
+                });
+              }
+            }
+          } catch {
+            // fallback
+          }
         } else {
           const msg =
             res.error ||
@@ -250,6 +298,12 @@ export const PublicStaffOnboardingView: React.FC = () => {
             tp('registerSuccess', 'Account created and authenticated successfully.'),
             'success'
           );
+          try {
+            const updatedMeta = await verifyPublicStaffToken(token);
+            setTokenMeta(updatedMeta);
+          } catch {
+            // fallback
+          }
         } else {
           const msg =
             loginRes.error ||
@@ -266,23 +320,297 @@ export const PublicStaffOnboardingView: React.FC = () => {
   const handleCopyReceipt = () => {
     if (!submittedReceipt) return;
     const staff = submittedReceipt.staff || submittedReceipt;
+    const isPending =
+      submittedReceipt.status === 'pending' ||
+      submittedReceipt.approval_status === 'PENDING' ||
+      Boolean(staff.is_pending_review);
+
+    const candidateName =
+      staff.name ||
+      staff.name_en ||
+      submittedReceipt.applicant_name ||
+      staff.applicant_name ||
+      '';
+    const employeeIdOrRef =
+      staff.employee_id || staff.tracking_code || submittedReceipt.tracking_code || '';
+    const designation = staff.designation || tokenMeta?.designation || 'Staff';
+    const departmentName = staff.department_name || tokenMeta?.department_name || '';
+    const staffCategory = staff.staff_type || tokenMeta?.staff_type || 'Faculty';
+    const formattedJoiningDate = formatDate(staff.joining_date || new Date());
     const institutionLabel =
-      tokenMeta?.institution_name || tp('academicInstitutionFallback', 'Academic Institution');
-    const text = `Staff Onboarding Confirmation Receipt\nCandidate: ${staff.name}\nEmployee ID: ${staff.employee_id}\nDesignation: ${staff.designation}\nInstitution: ${institutionLabel}`;
-    navigator.clipboard.writeText(text);
+      tokenMeta?.institution_name ||
+      staff.institution_name ||
+      tp('academicInstitutionFallback', 'Academic Institution');
+
+    const lines = [
+      isPending
+        ? tp('applicationSubmittedBadge', 'Staff Onboarding Application Receipt')
+        : tp('receiptBadge', 'Staff Onboarding Confirmation Receipt'),
+      `Candidate: ${candidateName || 'N/A'}`,
+      `${isPending ? tp('applicationRef', 'Application Reference') : tp('officialEmployeeId', 'Employee ID')}: ${employeeIdOrRef || 'N/A'}`,
+      `Designation: ${designation}`,
+      departmentName ? `Department: ${departmentName}` : null,
+      `Staff Category: ${staffCategory}`,
+      `Joining Date: ${formattedJoiningDate}`,
+      `Institution: ${institutionLabel}`,
+      `Status: ${isPending ? tp('pendingReview', 'Pending Review') : tp('activeRegistered', 'Active Registered')}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    navigator.clipboard.writeText(lines);
     showToast(tp('copiedReceiptToast', 'Onboarding receipt copied to clipboard'), 'success');
   };
 
   const handlePrintSlip = () => {
-    window.print();
+    const cardEl = document.getElementById('onboarding-slip-printable-card');
+    if (!cardEl) {
+      window.print();
+      return;
+    }
+
+    const staff = submittedReceipt?.staff || submittedReceipt || {};
+    const isPending =
+      submittedReceipt?.status === 'pending' ||
+      submittedReceipt?.approval_status === 'PENDING' ||
+      Boolean(staff.is_pending_review);
+
+    const candidateName =
+      staff.name ||
+      staff.name_en ||
+      submittedReceipt?.applicant_name ||
+      staff.applicant_name ||
+      '';
+    const candidateBnName = staff.bangla_name || '';
+    const employeeIdOrRef =
+      staff.employee_id || staff.tracking_code || submittedReceipt?.tracking_code || '';
+    const designation = staff.designation || tokenMeta?.designation || 'Staff';
+    const departmentName = staff.department_name || tokenMeta?.department_name || '';
+    const staffCategory = staff.staff_type || tokenMeta?.staff_type || 'Faculty';
+    const formattedJoiningDate = formatDate(staff.joining_date || new Date());
+    const hasCustomRank = Boolean(
+      (staff.rank_order && staff.rank_order !== 99) ||
+      (tokenMeta?.rank_order && tokenMeta.rank_order !== 99)
+    );
+    const rankOrder = staff.rank_order || tokenMeta?.rank_order;
+    const institutionLabel =
+      tokenMeta?.institution_name ||
+      staff.institution_name ||
+      tp('academicInstitutionFallback', 'Academic Institution');
+    const institutionAddress =
+      tokenMeta?.institution_address || tokenMeta?.address || '';
+
+    const qrSvg = cardEl.querySelector('svg')?.outerHTML || '';
+
+    const printFrame = document.createElement('iframe');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+
+    const frameDoc = printFrame.contentWindow?.document;
+    if (frameDoc) {
+      frameDoc.open();
+      frameDoc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Application Slip - ${candidateName || 'Staff'}</title>
+            <style>
+              @page { size: auto; margin: 12mm; }
+              * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                margin: 0;
+                padding: 16px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                background: #ffffff;
+                color: #0f172a;
+              }
+              .slip-wrapper {
+                width: 100%;
+                max-width: 440px;
+                margin: 0 auto;
+                border: 1px solid #cbd5e1;
+                border-radius: 20px;
+                padding: 28px 24px;
+                text-align: center;
+                background: #ffffff;
+              }
+              .check-icon {
+                width: 48px;
+                height: 48px;
+                border-radius: 50%;
+                background: #f1f5f9;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 12px;
+              }
+              .check-icon svg {
+                width: 28px;
+                height: 28px;
+                color: #10b981;
+              }
+              .slip-badge {
+                display: inline-block;
+                padding: 4px 12px;
+                border-radius: 9999px;
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                background: #f1f5f9;
+                color: #475569;
+                margin-bottom: 10px;
+              }
+              .slip-title {
+                font-size: 22px;
+                font-weight: 800;
+                color: #0f172a;
+                margin: 0 0 4px 0;
+                line-height: 1.25;
+              }
+              .slip-subtitle {
+                font-size: 13px;
+                font-weight: 600;
+                color: #4338ca;
+                margin: 0 0 2px 0;
+              }
+              .slip-address {
+                font-size: 11px;
+                color: #64748b;
+                margin: 0 0 16px 0;
+              }
+              .slip-table {
+                width: 100%;
+                background: #f8fafc;
+                border-radius: 14px;
+                padding: 14px 16px;
+                margin-bottom: 16px;
+                text-align: left;
+                font-size: 12px;
+              }
+              .slip-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 6px 0;
+                border-bottom: 1px solid #f1f5f9;
+              }
+              .slip-row:last-child {
+                border-bottom: none;
+              }
+              .slip-label {
+                color: #64748b;
+                font-weight: 500;
+              }
+              .slip-val {
+                color: #0f172a;
+                font-weight: 700;
+                text-align: right;
+              }
+              .slip-val-accent {
+                color: #4338ca;
+                font-family: monospace;
+                font-weight: 800;
+                font-size: 13px;
+              }
+              .slip-qr {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                margin-top: 10px;
+                padding-top: 8px;
+              }
+              .slip-qr svg {
+                max-width: 90px;
+                max-height: 90px;
+              }
+              .slip-footer {
+                margin-top: 14px;
+                font-size: 10px;
+                color: #94a3b8;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="slip-wrapper">
+              <div class="check-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+              </div>
+              <div>
+                <div class="slip-badge">${isPending ? 'Application Submitted for Review' : 'Staff Profile Onboarded Successfully'}</div>
+                <h1 class="slip-title">${candidateName || 'Candidate'}</h1>
+                ${candidateBnName ? `<div style="font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 4px;">${candidateBnName}</div>` : ''}
+                <div class="slip-subtitle">${institutionLabel}</div>
+                ${institutionAddress ? `<div class="slip-address">${institutionAddress}</div>` : ''}
+              </div>
+              <div class="slip-table">
+                <div class="slip-row">
+                  <span class="slip-label">${isPending ? 'Application Reference' : 'Official Employee ID'}:</span>
+                  <span class="slip-val slip-val-accent">${employeeIdOrRef || 'REGISTERED'}</span>
+                </div>
+                <div class="slip-row">
+                  <span class="slip-label">Designation & Rank:</span>
+                  <span class="slip-val">${designation} ${hasCustomRank ? `[${rankOrder}]` : ''}</span>
+                </div>
+                ${departmentName ? `
+                <div class="slip-row">
+                  <span class="slip-label">Department:</span>
+                  <span class="slip-val">${departmentName}</span>
+                </div>` : ''}
+                <div class="slip-row">
+                  <span class="slip-label">Staff Category:</span>
+                  <span class="slip-val">${staffCategory}</span>
+                </div>
+                <div class="slip-row">
+                  <span class="slip-label">Joining Date:</span>
+                  <span class="slip-val">${formattedJoiningDate}</span>
+                </div>
+                <div class="slip-row">
+                  <span class="slip-label">Status:</span>
+                  <span class="slip-val" style="color: #4338ca;">${isPending ? 'Pending Review' : 'Active Registered'}</span>
+                </div>
+                <div class="slip-qr">
+                  ${qrSvg}
+                  <div style="font-size: 10px; font-family: monospace; color: #64748b; margin-top: 4px;">${employeeIdOrRef}</div>
+                </div>
+              </div>
+              <div class="slip-footer">
+                Official Institutional Onboarding Record • Generated on ${new Date().toLocaleDateString()}
+              </div>
+            </div>
+          </body>
+        </html>
+      `);
+      frameDoc.close();
+      printFrame.contentWindow?.focus();
+      setTimeout(() => {
+        printFrame.contentWindow?.print();
+        setTimeout(() => {
+          if (document.body.contains(printFrame)) {
+            document.body.removeChild(printFrame);
+          }
+        }, 1500);
+      }, 300);
+    }
   };
 
   const portalBrandName =
     tokenMeta?.institution_name || tp('facultyPortalBadge', 'Faculty Recruitment Portal');
   const portalBrandBadge =
-    tokenMeta?.designation ||
-    tokenMeta?.staff_type ||
-    tp('facultyPortalBadge', 'Faculty Recruitment Portal');
+    tokenMeta?.institution_address || tokenMeta?.address || '';
 
   // Render Loading Screen
   if (loading) {
@@ -332,12 +660,13 @@ export const PublicStaffOnboardingView: React.FC = () => {
     );
   }
 
-  // Render Confirmation Receipt / Voucher
-  if (submittedReceipt) {
-    const staff = submittedReceipt.staff || submittedReceipt;
-    const formattedJoiningDate = formatDate(staff.joining_date || new Date());
-    const hasCustomRank = Boolean(tokenMeta?.rank_order && tokenMeta.rank_order !== 99);
-
+  // Render Step: Rejected Status Screen (Level 4)
+  if (
+    submittedReceipt &&
+    (submittedReceipt.status === 'rejected' ||
+      submittedReceipt.approval_status === 'REJECTED' ||
+      submittedReceipt.lifecycle_level === 4)
+  ) {
     return (
       <PublicPortalShell
         brandName={portalBrandName}
@@ -346,36 +675,135 @@ export const PublicStaffOnboardingView: React.FC = () => {
         maxWidth="lg"
       >
         <div className="rounded-3xl theme-bg-surface shadow-2xl p-6 sm:p-8 space-y-6 animate-zoom-in text-center border-0 ring-0">
-          <div className="w-16 h-16 rounded-3xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center mx-auto shadow-inner border-0">
-            <CheckCircleIcon className="w-8 h-8" />
+          <div className="w-16 h-16 rounded-3xl bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto shadow-inner border-0">
+            <AlertTriangleIcon className="w-8 h-8" />
+          </div>
+          <div>
+            <span className="px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-rose-500/10 text-rose-500 border-0 inline-block shadow-xs">
+              {tp('applicationRejectedBadge', 'Application Not Approved')}
+            </span>
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight mt-2.5 theme-text-primary">
+              {tp('applicationDeclinedTitle', 'Onboarding Application Declined')}
+            </h1>
+            <p className="text-xs sm:text-sm theme-text-secondary mt-1.5 leading-relaxed max-w-md mx-auto">
+              {submittedReceipt.rejection_reason ||
+                tp(
+                  'applicationDeclinedNotice',
+                  'Your onboarding application could not be approved by the institutional administration at this time.'
+                )}
+            </p>
+          </div>
+          <div className="p-4 rounded-2xl theme-bg-app text-xs text-start space-y-2 border-0 shadow-xs max-w-sm mx-auto">
+            <div className="flex justify-between items-center">
+              <span className="theme-text-secondary">{tp('referenceCode', 'Reference Code')}:</span>
+              <span className="font-mono font-bold theme-text-primary">
+                {submittedReceipt.tracking_code || 'N/A'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </PublicPortalShell>
+    );
+  }
+
+  // Render Confirmation Receipt / Voucher (Level 2: Pending Review, Level 3: Approved)
+  if (submittedReceipt) {
+    const staff = submittedReceipt.staff || submittedReceipt;
+    const isPending =
+      submittedReceipt.status === 'pending' ||
+      submittedReceipt.approval_status === 'PENDING' ||
+      submittedReceipt.lifecycle_level === 2 ||
+      Boolean(staff.is_pending_review);
+
+    const isApproved =
+      submittedReceipt.status === 'approved' ||
+      submittedReceipt.approval_status === 'APPROVED' ||
+      submittedReceipt.lifecycle_level === 3 ||
+      (!isPending && Boolean(staff.employee_id && String(staff.employee_id).startsWith('STF-')));
+
+    const candidateName =
+      staff.name ||
+      staff.name_en ||
+      submittedReceipt.applicant_name ||
+      staff.applicant_name ||
+      activeUser?.name ||
+      activeUser?.full_name ||
+      tp('candidateFallback', 'Applicant');
+    const candidateBnName = staff.bangla_name || activeUser?.name_bn || '';
+    const employeeIdOrRef =
+      staff.employee_id ||
+      staff.tracking_code ||
+      submittedReceipt.tracking_code ||
+      submittedReceipt.employee_id ||
+      (isPending ? 'PENDING' : 'REGISTERED');
+    const designation = staff.designation || tokenMeta?.designation || 'Faculty Member';
+    const departmentName = staff.department_name || tokenMeta?.department_name || '';
+    const staffCategory = staff.staff_type || tokenMeta?.staff_type || 'Faculty';
+    const formattedJoiningDate = formatDate(staff.joining_date || new Date());
+    const hasCustomRank = Boolean(
+      (staff.rank_order && staff.rank_order !== 99) ||
+      (tokenMeta?.rank_order && tokenMeta.rank_order !== 99)
+    );
+    const rankOrder = staff.rank_order || tokenMeta?.rank_order;
+    const institutionLabel =
+      tokenMeta?.institution_name ||
+      staff.institution_name ||
+      submittedReceipt.institution_name ||
+      tp('academicInstitutionFallback', 'Academic Institution');
+    const institutionAddress =
+      tokenMeta?.institution_address || tokenMeta?.address || staff.institution_address || '';
+
+    return (
+      <PublicPortalShell
+        brandName={portalBrandName}
+        brandBadge={portalBrandBadge}
+        brandIcon={TeacherIcon}
+        maxWidth="lg"
+      >
+        <div
+          id="onboarding-slip-printable-card"
+          className="rounded-3xl theme-bg-surface shadow-2xl p-6 sm:p-8 space-y-6 animate-zoom-in text-center border-0 ring-0"
+        >
+          {/* Circle wrapper: Theme background, icon green as requested */}
+          <div className="w-16 h-16 rounded-3xl theme-bg-app flex items-center justify-center mx-auto shadow-xs border-0">
+            <CheckCircleIcon className="w-8 h-8 text-emerald-500" />
           </div>
 
           <div>
-            <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-500 border-0 inline-block">
-              {tp('receiptBadge', 'Staff Profile Onboarded Successfully')}
+            {/* Status badge: Theme background & theme text */}
+            <span className="px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider theme-bg-app theme-text-secondary border-0 inline-block shadow-xs">
+              {isPending
+                ? tp('applicationSubmittedBadge', 'Application Submitted for Review')
+                : tp('receiptBadge', 'Staff Profile Onboarded Successfully')}
             </span>
-            <h1 className="text-2xl font-black tracking-tight mt-2 theme-text-primary">
-              {staff.name}
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight mt-2.5 theme-text-primary">
+              {candidateName}
             </h1>
-            {staff.bangla_name && (
+            {candidateBnName && (
               <p className="text-sm font-semibold theme-text-secondary mt-0.5">
-                {staff.bangla_name}
+                {candidateBnName}
               </p>
             )}
-            <p className="text-xs font-medium theme-accent mt-1">
-              {tokenMeta?.institution_name ||
-                tp('academicInstitutionFallback', 'Academic Institution')}
+            <p className="text-xs font-bold theme-accent mt-1.5">
+              {institutionLabel}
             </p>
+            {institutionAddress && (
+              <p className="text-[11px] theme-text-secondary mt-0.5">
+                {institutionAddress}
+              </p>
+            )}
           </div>
 
           {/* Receipt Breakdown Card */}
-          <div className="p-5 rounded-2xl theme-bg-app text-xs text-start space-y-3 border-0">
-            <div className="flex justify-between items-center pb-2 gap-3 border-0">
+          <div className="p-5 rounded-2xl theme-bg-app text-xs text-start space-y-3.5 border-0 shadow-xs">
+            <div className="flex justify-between items-center pb-2.5 gap-3 border-b theme-border">
               <span className="theme-text-secondary">
-                {tp('officialEmployeeId', 'Official Employee ID')}:
+                {isPending
+                  ? tp('applicationRef', 'Application Reference')
+                  : tp('officialEmployeeId', 'Official Employee ID')}:
               </span>
               <span className="font-mono font-black text-sm theme-accent">
-                {staff.employee_id || tp('registeredFallback', 'REGISTERED')}
+                {employeeIdOrRef}
               </span>
             </div>
             <div className="flex justify-between items-center gap-3">
@@ -383,49 +811,88 @@ export const PublicStaffOnboardingView: React.FC = () => {
                 {tp('designationAndRank', 'Designation & Rank')}:
               </span>
               <span className="font-bold theme-text-primary text-end">
-                {staff.designation || tokenMeta?.designation || 'Staff'}{' '}
-                {hasCustomRank ? `[${formatNumber(tokenMeta.rank_order)}]` : ''}
+                {designation}{' '}
+                {hasCustomRank ? `[${formatNumber(rankOrder)}]` : ''}
               </span>
             </div>
+            {departmentName && (
+              <div className="flex justify-between items-center gap-3">
+                <span className="theme-text-secondary">
+                  {tp('department', 'Department')}:
+                </span>
+                <span className="font-bold theme-text-primary text-end">
+                  {departmentName}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center gap-3">
               <span className="theme-text-secondary">
                 {tp('staffCategory', 'Staff Category')}:
               </span>
               <span className="font-bold theme-text-primary text-end">
-                {staff.staff_type || tokenMeta?.staff_type || 'Faculty'}
+                {staffCategory}
               </span>
             </div>
             <div className="flex justify-between items-center gap-3">
               <span className="theme-text-secondary">
-                {tp('joiningDate', 'JOINING DATE')}:
+                {tp('joiningDate', 'Joining Date')}:
               </span>
               <span className="font-bold theme-text-primary text-end">
                 {formattedJoiningDate}
               </span>
             </div>
+            <div className="flex justify-between items-center gap-3">
+              <span className="theme-text-secondary">
+                {tp('status', 'Status')}:
+              </span>
+              <span className="font-bold theme-accent text-end">
+                {isPending
+                  ? tp('pendingReview', 'Pending Review')
+                  : tp('activeRegistered', 'Active Registered')}
+              </span>
+            </div>
 
             {/* QR Verification Badge */}
-            <div className="flex items-center justify-center pt-2">
-              <QRCodeSVG
-                value={`${window.location.origin}/verify-staff/${staff.employee_id || staff.id}`}
-                size={90}
-                level="M"
-                includeMargin={true}
-                bgColor="#FFFFFF"
-                fgColor="#0F172A"
-              />
+            <div className="flex flex-col items-center justify-center pt-2 gap-1.5 border-t theme-border">
+              <div className="p-2 rounded-2xl bg-white shadow-xs inline-block">
+                <QRCodeSVG
+                  value={`${window.location.origin}/verify-staff/${employeeIdOrRef || staff.id}`}
+                  size={96}
+                  level="M"
+                  includeMargin={false}
+                  bgColor="#FFFFFF"
+                  fgColor="#0F172A"
+                />
+              </div>
+              <span className="text-[10px] theme-text-secondary font-mono tracking-wider">
+                {employeeIdOrRef}
+              </span>
             </div>
           </div>
 
+          {/* Pending Review Guidance Note */}
+          {isPending && (
+            <p className="text-[11px] theme-text-secondary max-w-md mx-auto leading-relaxed">
+              {tp(
+                'pendingReviewNotice',
+                'Your onboarding application has been submitted and is currently under administrative review. Please keep your Application Reference for future tracking.'
+              )}
+            </p>
+          )}
+
           {/* Actions */}
-          <div className="flex flex-col sm:flex-row items-center gap-3 border-0">
+          <div className="flex flex-col sm:flex-row items-center gap-3 border-0 no-print">
             <button
               type="button"
               onClick={handlePrintSlip}
               className="w-full sm:flex-1 py-3 rounded-2xl theme-bg-accent font-bold text-xs theme-accent-text hover:opacity-95 transition cursor-pointer shadow-md flex items-center justify-center gap-2 border-0"
             >
               <DownloadIcon className="w-4 h-4 shrink-0" />
-              <span>{tp('printSlip', 'Print Application Slip')}</span>
+              <span>
+                {isPending
+                  ? tp('printSlip', 'Print Application Slip')
+                  : tp('printOfficialSlip', 'Print Official Slip')}
+              </span>
             </button>
             <button
               type="button"
@@ -435,6 +902,17 @@ export const PublicStaffOnboardingView: React.FC = () => {
               <CopyIcon className="w-4 h-4 shrink-0" />
               <span>{tp('copy', 'Copy')}</span>
             </button>
+            {isApproved && (
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = '/dashboard';
+                }}
+                className="w-full sm:w-auto px-5 py-3 rounded-2xl theme-bg-app font-bold text-xs theme-accent hover:theme-bg-elevated/40 transition cursor-pointer flex items-center justify-center gap-2 border-0 shadow-xs"
+              >
+                <span>{tp('goToDashboard', 'Go to Staff Dashboard')}</span>
+              </button>
+            )}
           </div>
         </div>
       </PublicPortalShell>
@@ -456,11 +934,6 @@ export const PublicStaffOnboardingView: React.FC = () => {
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl theme-bg-app border-0 shadow-xs mx-auto">
               <LockIcon className="w-6 h-6 theme-text-secondary" />
             </div>
-            {tokenMeta?.institution_name && (
-              <h2 className="text-base sm:text-lg font-bold tracking-tight theme-text-primary">
-                {tokenMeta.institution_name}
-              </h2>
-            )}
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary">
               {authMode === 'login'
                 ? tp('loginTitle', 'Faculty Portal Login')
@@ -700,21 +1173,16 @@ export const PublicStaffOnboardingView: React.FC = () => {
               <TeacherIcon className="w-7 h-7" />
             </div>
             <div>
-              <div className="px-3 py-0.5 rounded-full text-[11px] font-bold theme-bg-app theme-text-secondary inline-block border-0">
-                {portalBrandBadge}
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight mt-1 theme-text-primary leading-tight">
-                {tokenMeta?.institution_name ||
-                  tp('academicInstitutionFallback', 'Academic Institution')}
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight theme-text-primary leading-tight">
+                {tokenMeta?.title || tp('staffOnboardingPortal', 'Staff & Faculty Onboarding')}
               </h1>
-              {tokenMeta?.institution_bangla_name && (
-                <p className="text-xs theme-text-secondary mt-0.5">
-                  {tokenMeta.institution_bangla_name}
-                </p>
-              )}
-              {tokenMeta?.title && (
-                <p className="text-xs font-semibold theme-text-secondary mt-1">{tokenMeta.title}</p>
-              )}
+              <p className="text-xs sm:text-sm theme-text-secondary mt-1">
+                {tokenMeta?.subtitle ||
+                  tp(
+                    'onboardingHeroSubtitle',
+                    'Personnel registration, credential verification, and academic onboarding.'
+                  )}
+              </p>
             </div>
           </div>
 

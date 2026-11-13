@@ -478,7 +478,7 @@ class SessionViewSet(viewsets.ModelViewSet):
         if tenant_id:
             return self.queryset.filter(
                 Q(created_by__institution_id=tenant_id) |
-                Q(created_by__staff_profile__institution_id=tenant_id) |
+                Q(created_by__staff_profiles__institution_id=tenant_id) |
                 Q(created_by__isnull=True) |
                 Q(created_by__institution__isnull=True)
             ).distinct()

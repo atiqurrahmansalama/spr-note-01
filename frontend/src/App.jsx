@@ -37,7 +37,7 @@ const StaffOnboardingView = lazy(() => import("./modules/staff-management/onboar
 const StaffProfileDetailView = lazy(() => import("./modules/staff-management/StaffProfileDetailView"));
 
 // ─── Protected Print Studio Views (TypeScript Views) ─────────────────────────
-const PrintStudioHubView = lazy(() => import("./modules/print-studio/PrintStudioHubView"));
+const PrintStudioHubView = lazy(() => import("./components/print/PrintStudioHubView"));
 
 
 // ─── Protected Attendance Views (Lazy Loaded with Auto-Retry) ─────────────────
@@ -92,6 +92,9 @@ const FinanceHubView = lazy(() => import("./modules/finance/FinanceHubView"));
 const PublicVerifyReceiptView = lazy(() => import("./modules/finance/components/public-verification/PublicVerifyReceiptView"));
 const ReleaseManagementView = lazy(() => import("./modules/version-control/views/ReleaseManagementView"));
 const ApprovalsHubView = lazy(() => import("./modules/approvals/ApprovalsHubView"));
+const HelpdeskHubView = lazy(() => import("./modules/helpdesk/HelpdeskHubView"));
+const CommunicationsHubView = lazy(() => import("./modules/communications/CommunicationsHubView"));
+const BugReportingHubView = lazy(() => import("./modules/bug-reporting/BugReportingHubView"));
 
 function ProtectedRoute({ children }) {
   const urlParams = new URLSearchParams(window.location.search);
@@ -160,6 +163,9 @@ export default function App() {
                 <Route path="/dashboard" element={<DashboardHubView />} />
                 <Route path="/dashboard/:roleSlug" element={<DashboardHubView />} />
                 <Route path="/approvals" element={<ApprovalsHubView />} />
+                <Route path="/helpdesk" element={<HelpdeskHubView />} />
+                <Route path="/communications" element={<CommunicationsHubView />} />
+                <Route path="/bug-reports" element={<BugReportingHubView />} />
                 <Route path="/report-builder" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/student-reports" element={<Navigate to="/studies/progress-reports" replace />} />
                 <Route path="/students" element={<FeatureGuard sectionKey="student_roster"><StudentDirectoryView viewMode="students" /></FeatureGuard>} />

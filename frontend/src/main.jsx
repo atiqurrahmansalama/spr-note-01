@@ -41,6 +41,7 @@ import { TenantProvider } from './context/TenantContext'
 import { FeatureControlProvider } from './context/FeatureControlContext'
 import { RightSidebarProvider } from './context/RightSidebarContext'
 import { AcademicSessionProvider } from './context/AcademicSessionContext'
+import { I18nProvider } from './i18n'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
@@ -49,23 +50,25 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
       <GoogleOAuthProvider clientId={googleClientId}>
-        <AuthProvider>
-          <TenantProvider>
-            <FeatureControlProvider>
-              <AcademicSessionProvider>
-                <ToastProvider>
-                <ThemeProvider>
-                  <FontProvider>
-                    <RightSidebarProvider>
-                      <App />
-                    </RightSidebarProvider>
-                  </FontProvider>
-                </ThemeProvider>
-                </ToastProvider>
-              </AcademicSessionProvider>
-            </FeatureControlProvider>
-          </TenantProvider>
-        </AuthProvider>
+        <I18nProvider>
+          <AuthProvider>
+            <TenantProvider>
+              <FeatureControlProvider>
+                <AcademicSessionProvider>
+                  <ToastProvider>
+                  <ThemeProvider>
+                    <FontProvider>
+                      <RightSidebarProvider>
+                        <App />
+                      </RightSidebarProvider>
+                    </FontProvider>
+                  </ThemeProvider>
+                  </ToastProvider>
+                </AcademicSessionProvider>
+              </FeatureControlProvider>
+            </TenantProvider>
+          </AuthProvider>
+        </I18nProvider>
       </GoogleOAuthProvider>
     </ErrorBoundary>
   </React.StrictMode>,
