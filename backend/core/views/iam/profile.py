@@ -114,6 +114,8 @@ class UserProfileView(APIView):
             'has_google_linked': bool(getattr(user, 'google_sub_id', None)),
             'google_sub_id': getattr(user, 'google_sub_id', "") or "",
             'has_password': user.has_usable_password(),
+            'has_usable_password': user.has_usable_password(),
+            'auth_provider': 'GOOGLE' if bool(getattr(user, 'google_sub_id', None)) else 'LOCAL',
             'passkeys_count': user.passkeys.count() if hasattr(user, 'passkeys') else 0,
             'date_joined': user.date_joined.strftime("%Y-%m-%d %I:%M %p") if user.date_joined else "--",
         }, status=status.HTTP_200_OK)

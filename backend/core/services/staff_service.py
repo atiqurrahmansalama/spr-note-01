@@ -127,7 +127,7 @@ def sync_user_and_staff_roles(user, institution=None):
             user_updated_fields.add('institution')
         else:
             primary_inst = AcademicInstitution.objects.filter(
-                Q(name__icontains='Darus Salam') | Q(code__iexact='DS')
+                Q(name__icontains='Darus Salam') | Q(slug__iexact='inst-075759') | Q(slug__icontains='ds')
             ).first() or AcademicInstitution.objects.filter(is_deleted=False).first()
             if primary_inst:
                 user.institution = primary_inst

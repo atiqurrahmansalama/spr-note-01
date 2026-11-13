@@ -79,20 +79,29 @@ export const ProfileSettingsView: React.FC = () => {
     [user, setUser, closeDrawer, t]
   );
 
+  const isPasswordUsable = user?.has_password !== false && user?.has_usable_password !== false;
+
   useDrawerRegistration(
     'profile-password',
     () => ({
-      title: t('drawerPasswordTitle', 'Update Account Password'),
+      title: isPasswordUsable
+        ? t('drawerPasswordTitle', 'Update Account Password')
+        : t('drawerSetPasswordTitle', 'Set Account Password'),
       category: t('title', 'Profile & Account Settings'),
       size: 'sm',
       content: (
         <ChangePasswordDrawer
-          key="drawer-profile-password"
+          key={`drawer-profile-password-${isPasswordUsable ? 'change' : 'set'}`}
+          hasPassword={isPasswordUsable}
+          hasGoogleLinked={Boolean(user?.has_google_linked || user?.google_sub_id)}
+          onPasswordSet={() => {
+            setUser((prev: any) => ({ ...prev, has_password: true, has_usable_password: true }));
+          }}
           onClose={closeDrawer}
         />
       ),
     }),
-    [closeDrawer, t]
+    [user, setUser, isPasswordUsable, closeDrawer, t]
   );
 
   useDrawerRegistration(
@@ -292,8 +301,18 @@ export const ProfileSettingsView: React.FC = () => {
             <ProfileOptionGroup title={t('groupSecurityManagement', 'Security & Device Management')}>
               <ProfileOptionRow
                 icon={<LockIcon className="w-4 h-4 theme-accent" />}
-                title={t('changePasswordTitle', 'Change Password')}
-                subtitle={t('changePasswordSubtitle', 'Update your account login password credentials')}
+                title={
+                  isPasswordUsable
+                    ? t('changePasswordTitle', 'Change Password')
+                    : t('saveSetPasswordLabel', 'Set Password')
+                }
+                subtitle={
+                  isPasswordUsable
+                    ? t('changePasswordSubtitle', 'Update your account login password credentials')
+                    : t('drawerSetPasswordSubtitle', 'Choose a strong password to enable password sign-in alongside Google.')
+                }
+                badgeText={!isPasswordUsable ? t('notSetBadge', 'Not Set') : undefined}
+                badgeVariant={!isPasswordUsable ? 'warning' : undefined}
                 isActive={activeDrawerKey === 'profile-password'}
                 onClick={() => openDrawer('profile-password')}
               />

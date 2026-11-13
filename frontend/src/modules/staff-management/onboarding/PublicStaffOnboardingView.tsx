@@ -326,13 +326,18 @@ export const PublicStaffOnboardingView: React.FC = () => {
       Boolean(staff.is_pending_review);
 
     const candidateName =
-      staff.name ||
-      staff.name_en ||
-      submittedReceipt.applicant_name ||
-      staff.applicant_name ||
+      (staff.name && String(staff.name).trim()) ||
+      (staff.name_en && String(staff.name_en).trim()) ||
+      (submittedReceipt.applicant_name && String(submittedReceipt.applicant_name).trim()) ||
+      (staff.applicant_name && String(staff.applicant_name).trim()) ||
+      (activeUser?.name && String(activeUser?.name).trim()) ||
       '';
     const employeeIdOrRef =
-      staff.employee_id || staff.tracking_code || submittedReceipt.tracking_code || '';
+      staff.employee_id ||
+      staff.tracking_code ||
+      submittedReceipt.employee_id ||
+      submittedReceipt.tracking_code ||
+      (isPending ? 'PENDING-REVIEW' : 'OFFICIAL-STAFF');
     const designation = staff.designation || tokenMeta?.designation || 'Staff';
     const departmentName = staff.department_name || tokenMeta?.department_name || '';
     const staffCategory = staff.staff_type || tokenMeta?.staff_type || 'Faculty';
@@ -376,14 +381,19 @@ export const PublicStaffOnboardingView: React.FC = () => {
       Boolean(staff.is_pending_review);
 
     const candidateName =
-      staff.name ||
-      staff.name_en ||
-      submittedReceipt?.applicant_name ||
-      staff.applicant_name ||
+      (staff.name && String(staff.name).trim()) ||
+      (staff.name_en && String(staff.name_en).trim()) ||
+      (submittedReceipt?.applicant_name && String(submittedReceipt.applicant_name).trim()) ||
+      (staff.applicant_name && String(staff.applicant_name).trim()) ||
+      (activeUser?.name && String(activeUser.name).trim()) ||
       '';
-    const candidateBnName = staff.bangla_name || '';
+    const candidateBnName = staff.bangla_name || activeUser?.name_bn || '';
     const employeeIdOrRef =
-      staff.employee_id || staff.tracking_code || submittedReceipt?.tracking_code || '';
+      staff.employee_id ||
+      staff.tracking_code ||
+      submittedReceipt?.employee_id ||
+      submittedReceipt?.tracking_code ||
+      (isPending ? 'PENDING-REVIEW' : 'OFFICIAL-STAFF');
     const designation = staff.designation || tokenMeta?.designation || 'Staff';
     const departmentName = staff.department_name || tokenMeta?.department_name || '';
     const staffCategory = staff.staff_type || tokenMeta?.staff_type || 'Faculty';
@@ -559,11 +569,11 @@ export const PublicStaffOnboardingView: React.FC = () => {
               <div class="slip-table">
                 <div class="slip-row">
                   <span class="slip-label">${isPending ? 'Application Reference' : 'Official Employee ID'}:</span>
-                  <span class="slip-val slip-val-accent">${employeeIdOrRef || 'REGISTERED'}</span>
+                  <span class="slip-val slip-val-accent">${employeeIdOrRef || (isPending ? 'PENDING-REVIEW' : 'OFFICIAL-STAFF')}</span>
                 </div>
                 <div class="slip-row">
-                  <span class="slip-label">Designation & Rank:</span>
-                  <span class="slip-val">${designation} ${hasCustomRank ? `[${rankOrder}]` : ''}</span>
+                  <span class="slip-label">Designation:</span>
+                  <span class="slip-val">${designation}</span>
                 </div>
                 ${departmentName ? `
                 <div class="slip-row">
@@ -722,29 +732,24 @@ export const PublicStaffOnboardingView: React.FC = () => {
       (!isPending && Boolean(staff.employee_id && String(staff.employee_id).startsWith('STF-')));
 
     const candidateName =
-      staff.name ||
-      staff.name_en ||
-      submittedReceipt.applicant_name ||
-      staff.applicant_name ||
-      activeUser?.name ||
-      activeUser?.full_name ||
-      tp('candidateFallback', 'Applicant');
+      (staff.name && String(staff.name).trim()) ||
+      (staff.name_en && String(staff.name_en).trim()) ||
+      (submittedReceipt.applicant_name && String(submittedReceipt.applicant_name).trim()) ||
+      (staff.applicant_name && String(staff.applicant_name).trim()) ||
+      (activeUser?.name && String(activeUser?.name).trim()) ||
+      (activeUser?.full_name && String(activeUser?.full_name).trim()) ||
+      tp('candidateFallback', 'Staff Member');
     const candidateBnName = staff.bangla_name || activeUser?.name_bn || '';
     const employeeIdOrRef =
       staff.employee_id ||
       staff.tracking_code ||
-      submittedReceipt.tracking_code ||
       submittedReceipt.employee_id ||
-      (isPending ? 'PENDING' : 'REGISTERED');
+      submittedReceipt.tracking_code ||
+      (isPending ? 'PENDING-REVIEW' : 'OFFICIAL-STAFF');
     const designation = staff.designation || tokenMeta?.designation || 'Faculty Member';
     const departmentName = staff.department_name || tokenMeta?.department_name || '';
     const staffCategory = staff.staff_type || tokenMeta?.staff_type || 'Faculty';
     const formattedJoiningDate = formatDate(staff.joining_date || new Date());
-    const hasCustomRank = Boolean(
-      (staff.rank_order && staff.rank_order !== 99) ||
-      (tokenMeta?.rank_order && tokenMeta.rank_order !== 99)
-    );
-    const rankOrder = staff.rank_order || tokenMeta?.rank_order;
     const institutionLabel =
       tokenMeta?.institution_name ||
       staff.institution_name ||
@@ -808,11 +813,10 @@ export const PublicStaffOnboardingView: React.FC = () => {
             </div>
             <div className="flex justify-between items-center gap-3">
               <span className="theme-text-secondary">
-                {tp('designationAndRank', 'Designation & Rank')}:
+                {tp('designation', 'Designation')}:
               </span>
               <span className="font-bold theme-text-primary text-end">
-                {designation}{' '}
-                {hasCustomRank ? `[${formatNumber(rankOrder)}]` : ''}
+                {designation}
               </span>
             </div>
             {departmentName && (

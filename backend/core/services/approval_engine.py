@@ -401,6 +401,7 @@ class StaffOnboardingApprovalHandler(BaseApprovalHandler):
         return {
             "target_model": "StaffProfile",
             "target_object_id": str(staff_profile.id),
+            "employee_id": emp_id,
             "staff": {
                 "id": str(staff_profile.id),
                 "employee_id": emp_id,
@@ -670,6 +671,7 @@ class ApprovalService:
             "approval_status": req.status,
             "approval_request_id": str(req.id),
             "tracking_code": req.tracking_code,
+            "employee_id": req.tracking_code,
             "message": "Your application has been submitted and is pending administrative review.",
             "staff": {
                 "id": str(req.id),

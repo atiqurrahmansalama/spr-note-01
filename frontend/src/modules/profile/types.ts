@@ -21,6 +21,9 @@ export interface UserProfile {
   is_2fa_enabled?: boolean;
   has_google_linked?: boolean;
   google_sub_id?: string;
+  has_password?: boolean;
+  has_usable_password?: boolean;
+  auth_provider?: string;
   passkeys_count?: number;
   branch?: string;
   campus?: string;

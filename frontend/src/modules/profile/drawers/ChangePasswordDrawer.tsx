@@ -1,16 +1,24 @@
 import React, { useState } from 'react';
 import { useToast } from '../../../context/ToastContext';
 import { fetchWithAuth } from '../../../utils/authService';
-import { AlertCircleIcon, CheckIcon, LockIcon } from '../../../components/ui/Icons';
+import { AlertCircleIcon, CheckIcon, KeyIcon, LockIcon } from '../../../components/ui/Icons';
 import CustomInput from '../../../components/ui/CustomInput';
 import { DrawerContainer, DrawerFooter, DrawerSection } from '../../../components/layout';
 import { useTranslation } from '../../../i18n';
 
 interface ChangePasswordDrawerProps {
+  hasPassword?: boolean;
+  hasGoogleLinked?: boolean;
+  onPasswordSet?: () => void;
   onClose: () => void;
 }
 
-export const ChangePasswordDrawer: React.FC<ChangePasswordDrawerProps> = ({ onClose }) => {
+export const ChangePasswordDrawer: React.FC<ChangePasswordDrawerProps> = ({
+  hasPassword = true,
+  hasGoogleLinked = false,
+  onPasswordSet,
+  onClose,
+}) => {
   const { showToast } = useToast();
   const { t } = useTranslation('profile');
 
@@ -56,7 +64,7 @@ export const ChangePasswordDrawer: React.FC<ChangePasswordDrawerProps> = ({ onCl
     if (e) e.preventDefault();
     setErrorMsg('');
 
-    if (!form.old_password) {
+    if (hasPassword && !form.old_password) {
       setErrorMsg(t('enterCurrentPassword', 'Please enter your current password.'));
       return;
     }
@@ -71,18 +79,25 @@ export const ChangePasswordDrawer: React.FC<ChangePasswordDrawerProps> = ({ onCl
 
     setSaving(true);
     try {
+      const payload: Record<string, string> = {
+        new_password: form.new_password,
+      };
+      if (hasPassword && form.old_password) {
+        payload.old_password = form.old_password;
+      }
+
       const res = await fetchWithAuth('/api/v1/auth/change-password/', {
         method: 'POST',
-        body: JSON.stringify({
-          old_password: form.old_password,
-          new_password: form.new_password,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
-        if (data.email_notification_sent) {
+        if (!hasPassword) {
+          showToast(t('pwdSetSuccess', 'Account password set successfully!'), 'success');
+          onPasswordSet?.();
+        } else if (data.email_notification_sent) {
           showToast(t('pwdUpdatedWithEmailAlert', 'Password updated! A security alert was dispatched to your email.'), 'success');
         } else {
           showToast(t('pwdUpdatedSuccess', 'Password changed successfully!'), 'success');
@@ -107,7 +122,11 @@ export const ChangePasswordDrawer: React.FC<ChangePasswordDrawerProps> = ({ onCl
         <DrawerFooter
           onCancel={onClose}
           onSubmit={handleSubmit}
-          saveLabel={t('changePasswordTitle', 'Change Password')}
+          saveLabel={
+            hasPassword
+              ? t('changePasswordTitle', 'Change Password')
+              : t('saveSetPasswordLabel', 'Set Password')
+          }
           cancelLabel={t('cancel', 'Cancel')}
           isSubmitting={saving}
         />
@@ -115,29 +134,60 @@ export const ChangePasswordDrawer: React.FC<ChangePasswordDrawerProps> = ({ onCl
     >
       <form onSubmit={handleSubmit} className="@container space-y-5 pt-2 pb-6 px-1">
         <DrawerSection
-          title={t('drawerPasswordTitle', 'Update Account Password')}
-          subtitle={t('drawerPasswordSubtitle', 'Choose a strong password to safeguard account access.')}
-          icon={LockIcon}
+          title={
+            hasPassword
+              ? t('drawerPasswordTitle', 'Update Account Password')
+              : t('drawerSetPasswordTitle', 'Set Account Password')
+          }
+          subtitle={
+            hasPassword
+              ? t('drawerPasswordSubtitle', 'Choose a strong password to safeguard account access.')
+              : t(
+                  'drawerSetPasswordSubtitle',
+                  'Choose a strong password to enable password sign-in alongside Google.'
+                )
+          }
+          icon={hasPassword ? LockIcon : KeyIcon}
           className="pt-0 first:pt-0"
         >
           {errorMsg && (
-            <div className="p-3 rounded-xl theme-bg-danger-soft border border-rose-500/20 theme-danger text-xs flex items-center gap-2">
+            <div className="p-3 rounded-2xl theme-bg-danger-soft theme-danger border-0 text-xs flex items-center gap-2">
               <AlertCircleIcon className="w-4 h-4 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          {/* Current Password */}
-          <CustomInput
-            type="password"
-            label={t('currentPassword', 'Current Password')}
-            value={form.old_password}
-            onChange={(val: any) =>
-              setForm((prev) => ({ ...prev, old_password: typeof val === 'string' ? val : val?.target?.value || '' }))
-            }
-            placeholder={t('enterCurrentPassword', 'Enter current password')}
-            autoFocus
-          />
+          {/* Google Linked Informative Banner for Social SSO Accounts */}
+          {!hasPassword && (
+            <div className="p-4 rounded-2xl theme-bg-app border-0 shadow-xs flex items-start gap-3 animate-fade-in">
+              <div className="w-8 h-8 rounded-xl theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0 shadow-xs">
+                <KeyIcon className="w-4 h-4" />
+              </div>
+              <p className="text-xs theme-text-secondary leading-relaxed">
+                {t(
+                  'googleLinkedNotice',
+                  'Your account is linked to Google sign-in. Creating an account password will allow you to sign in using your email and password as well.'
+                )}
+              </p>
+            </div>
+          )}
+
+          {/* Current Password (rendered strictly for standard accounts with existing password) */}
+          {hasPassword && (
+            <CustomInput
+              type="password"
+              label={t('currentPassword', 'Current Password')}
+              value={form.old_password}
+              onChange={(val: any) =>
+                setForm((prev) => ({
+                  ...prev,
+                  old_password: typeof val === 'string' ? val : val?.target?.value || '',
+                }))
+              }
+              placeholder={t('enterCurrentPassword', 'Enter current password')}
+              autoFocus
+            />
+          )}
 
           {/* New Password */}
           <CustomInput
@@ -145,19 +195,23 @@ export const ChangePasswordDrawer: React.FC<ChangePasswordDrawerProps> = ({ onCl
             label={t('newPassword', 'New Password')}
             value={form.new_password}
             onChange={(val: any) =>
-              setForm((prev) => ({ ...prev, new_password: typeof val === 'string' ? val : val?.target?.value || '' }))
+              setForm((prev) => ({
+                ...prev,
+                new_password: typeof val === 'string' ? val : val?.target?.value || '',
+              }))
             }
             placeholder={t('enterNewPassword', 'Minimum 6 characters')}
+            autoFocus={!hasPassword}
           />
 
           {/* Strength Meter Bar */}
           {form.new_password && (
-            <div className="space-y-1.5 p-3.5 rounded-xl theme-bg-sub/50 border theme-border">
+            <div className="space-y-1.5 p-3.5 rounded-2xl theme-bg-app border-0 shadow-xs">
               <div className="flex items-center justify-between text-[11px]">
                 <span className="theme-text-secondary">{t('passwordStrength', 'Password Strength')}:</span>
                 <span className={`font-semibold ${strength.color}`}>{strength.text}</span>
               </div>
-              <div className="h-1.5 w-full theme-bg-sub rounded-full overflow-hidden border theme-border">
+              <div className="h-1.5 w-full theme-bg-sub rounded-full overflow-hidden border-0">
                 <div
                   className={`h-full transition-all duration-300 rounded-full ${
                     score <= 1
@@ -191,7 +245,10 @@ export const ChangePasswordDrawer: React.FC<ChangePasswordDrawerProps> = ({ onCl
             label={t('confirmPassword', 'Confirm New Password')}
             value={form.confirm_password}
             onChange={(val: any) =>
-              setForm((prev) => ({ ...prev, confirm_password: typeof val === 'string' ? val : val?.target?.value || '' }))
+              setForm((prev) => ({
+                ...prev,
+                confirm_password: typeof val === 'string' ? val : val?.target?.value || '',
+              }))
             }
             placeholder={t('retypeNewPassword', 'Retype new password')}
           />

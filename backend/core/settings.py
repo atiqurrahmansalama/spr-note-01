@@ -106,10 +106,17 @@ ASGI_APPLICATION = "core.asgi.application"
 
 USE_SQLITE = os.getenv("USE_SQLITE", "False").lower() in ("true", "1", "t")
 DATABASE_URL = os.getenv("DATABASE_URL")
+# Auto-heal Supabase connection string: enforce port 6543 (Transaction Mode)
+# Port 5432 is Session Mode (limited to 15 clients max, causes EMAXCONNSESSION exhaustion)
+if DATABASE_URL and "pooler.supabase.com" in DATABASE_URL:
+    if ":5432" in DATABASE_URL:
+        DATABASE_URL = DATABASE_URL.replace(":5432", ":6543")
+
 DB_SSL_REQUIRE = os.getenv("DB_SSL_REQUIRE", "False").lower() in ("true", "1", "t")
 # Connection pooler optimization (Supavisor / PgBouncer):
 is_pooler = bool(DATABASE_URL and ("pooler" in DATABASE_URL or ":6543" in DATABASE_URL))
-default_conn_max_age = "60" if is_pooler else "600"
+# Transaction poolers require conn_max_age=0 so connections release back to pool instantly
+default_conn_max_age = "0" if is_pooler else "600"
 DB_CONN_MAX_AGE = int(os.getenv("DB_CONN_MAX_AGE", default_conn_max_age))
 
 if DATABASE_URL and not USE_SQLITE:

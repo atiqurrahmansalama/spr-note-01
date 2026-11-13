@@ -71,3 +71,8 @@
     - **সিলেকশন নির্দেশক হিসেবে শুধুই চেক আইকন ব্যাজ (Pure Check Icon Badge Indicator):** অ্যাক্টিভ কার্ড নির্দেশ করার জন্য কোনো বর্ডার বা রিংয়ের বদলে কেবল একটি পরিচ্ছন্ন বৃত্তাকার ফিল্ড চেক আইকন ব্যাজ (`w-5 h-5 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center shadow-xs shrink-0` সাথে `<CheckIcon className="w-3 h-3" />`) ব্যবহার করতে হবে।
     - **পিকার ও কালার ডটে জিরো বর্ডার (Borderless Color Swatches & Clean Badges):** কালার প্যালেট বা সোয়াচ পিকারের কালার ডটে কোনো প্রকার রিং বা বর্ডার থাকবে না (`w-5 h-5 rounded-full shrink-0 shadow-xs border-0`)। অপ্রয়োজনীয় টেক্সট/টোন ব্যাজ (যেমন `[D]`, `[L]`) সম্পূর্ণ পরিহার করে ইন্টারফেসকে সর্বোচ্চ পরিচ্ছন্ন রাখতে হবে।
     - **Apple & Linear Minimalist Aesthetics:** পর্যাপ্ত ব্রেদিং স্পেস (`space-y-5`, `p-6`), পরিচ্ছন্ন রাউন্ডেড শেপ (`rounded-3xl`, `rounded-2xl`), স্পষ্ট ব্যাকগ্রাউন্ড কনট্রাস্ট ও সাবলীল টাইপোগ্রাফিক হায়ারার্কি নিশ্চিত করতে হবে।
+15. **Mandatory Dual-Database Schema Synchronization (উভয় ডেটাবেজে বাধ্যতামূলক যুগপৎ মাইগ্রেশন নীতি):**
+    - **Dual-Database Parity:** যখনই কোনো ডেটাবেজ স্কিমা পরিবর্তন করা হবে বা নতুন মাইগ্রেশন তৈরি করা হবে (`makemigrations`), সাথে সাথে **উভয় ডেটাবেজেই** যুগপৎভাবে মাইগ্রেশন রান করতে হবে:
+      1. **Local SQLite Engine:** `python backend/manage.py migrate` (লোকাল এনভায়রনমেন্ট সিঙ্কের জন্য)।
+      2. **Live Supabase PostgreSQL Engine:** `$env:USE_SQLITE="False"; python backend/manage.py migrate` (লাইভ ক্লাউড ডেটাবেজে সরাসরি স্কিমা আপডেট নিশ্চিত করতে)।
+    - **Zero Out-of-Sync Guarantee:** কখনোই শুধু লোকাল ডেটাবেজে মাইগ্রেশন চালিয়ে কাজ শেষ করা যাবে না। প্রতিটি স্কিমা পরিবর্তনে লোকাল SQLite ও লাইভ Supabase PostgreSQL উভয় ডেটাবেজের স্কিমা ১০০% অভিন্ন ও যুগপৎ সিঙ্কে রাখতে হবে।

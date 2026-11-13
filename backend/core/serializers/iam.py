@@ -423,7 +423,7 @@ class UserAdminSerializer(serializers.ModelSerializer):
 
 
 class ChangePasswordSerializer(serializers.Serializer):
-    old_password = serializers.CharField(required=True)
+    old_password = serializers.CharField(required=False, allow_blank=True, default='')
     new_password = serializers.CharField(required=True, min_length=6)
 
 
@@ -438,6 +438,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
     institution_bangla_name = serializers.CharField(source='institution.bangla_name', read_only=True, default='')
     institution_slug = serializers.CharField(source='institution.slug', read_only=True, default='')
     institution_details = serializers.SerializerMethodField()
+    has_password = serializers.SerializerMethodField()
+    has_usable_password = serializers.SerializerMethodField()
+    auth_provider = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -445,9 +448,24 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'phone_number', 'email', 'first_name', 'last_name',
             'name_bn', 'avatar_url', 'user_type', 'assigned_group',
             'institution', 'institution_name', 'institution_bangla_name', 'institution_slug',
-            'institution_details',
+            'institution_details', 'has_password', 'has_usable_password', 'auth_provider',
         ]
-        read_only_fields = ['id', 'phone_number', 'user_type', 'institution', 'institution_name', 'institution_bangla_name', 'institution_slug', 'institution_details']
+        read_only_fields = [
+            'id', 'phone_number', 'user_type', 'institution',
+            'institution_name', 'institution_bangla_name', 'institution_slug',
+            'institution_details', 'has_password', 'has_usable_password', 'auth_provider'
+        ]
+
+    def get_has_password(self, obj):
+        return obj.has_usable_password()
+
+    def get_has_usable_password(self, obj):
+        return obj.has_usable_password()
+
+    def get_auth_provider(self, obj):
+        if getattr(obj, 'google_sub_id', None):
+            return 'GOOGLE'
+        return 'LOCAL'
 
     @extend_schema_field(OpenApiTypes.OBJECT)
     def get_institution_details(self, obj):

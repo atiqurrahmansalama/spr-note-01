@@ -532,13 +532,26 @@ def resolve_candidate_onboarding_status(user, token_obj, institution_address="")
     inst = token_obj.institution
 
     # Step 1: Check active StaffProfile in this institution (Level 3: Approved)
+    active_profile_filter = Q(user=user)
+    if getattr(user, 'phone_number', None):
+        active_profile_filter |= Q(user__phone_number=user.phone_number)
+    if getattr(user, 'email', None):
+        active_profile_filter |= Q(user__email__iexact=user.email)
+
     active_profile = StaffProfile.objects.filter(
-        user=user,
+        active_profile_filter,
         institution=inst,
         is_deleted=False
     ).select_related('department', 'user').first()
 
     if active_profile:
+        if not active_profile.user or active_profile.user_id != user.id:
+            try:
+                active_profile.user = user
+                active_profile.save(update_fields=['user'])
+            except Exception:
+                pass
+
         profile_user = active_profile.user or user
         candidate_name = (
             getattr(profile_user, 'name', None)
@@ -554,6 +567,7 @@ def resolve_candidate_onboarding_status(user, token_obj, institution_address="")
             "status": "APPROVED",
             "lifecycle_level": 3,
             "tracking_code": active_profile.employee_id,
+            "employee_id": active_profile.employee_id,
             "staff": {
                 "id": str(active_profile.id),
                 "employee_id": active_profile.employee_id,
@@ -613,6 +627,7 @@ def resolve_candidate_onboarding_status(user, token_obj, institution_address="")
                 "status": existing_request.status,
                 "lifecycle_level": 2,
                 "tracking_code": existing_request.tracking_code,
+                "employee_id": existing_request.tracking_code,
                 "submitted_at": existing_request.created_at.isoformat(),
                 "staff": {
                     "id": str(existing_request.id),
@@ -643,6 +658,7 @@ def resolve_candidate_onboarding_status(user, token_obj, institution_address="")
                 "status": "APPROVED",
                 "lifecycle_level": 3,
                 "tracking_code": existing_request.tracking_code,
+                "employee_id": existing_request.tracking_code,
                 "staff": {
                     "id": str(existing_request.id),
                     "employee_id": existing_request.tracking_code,
