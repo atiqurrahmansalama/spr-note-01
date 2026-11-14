@@ -425,8 +425,8 @@ export function buildDailyProgressReportData(
 
 /**
  * Daily Progress Domain Filter Interceptor:
- * - When only a single Juz is evaluated: Indent filter is completely skipped (all lines remain flush left).
- * - When multiple Juz exist: The 1st line (header line) of each Juz remains unindented,
+ * - Single Juz: Indentation is intentionally NOT applied (keep flush left).
+ * - Multiple Juz: The 1st line (header line) of each Juz remains unindented,
  *   while subsequent sub-item lines under that Juz are indented with the requested spaces.
  */
 let isDailyProgressInterceptorRegistered = false;
@@ -437,6 +437,17 @@ export function registerDailyProgressDocLabInterceptor(): void {
   registerTokenFilterInterceptor((tokenKey, filterName, args, value, lookup, mode) => {
     const isDetailKey = tokenKey === 'detailmis' || tokenKey === 'detailstuck';
     if (!isDetailKey || filterName !== 'indent') {
+      return null;
+    }
+
+    const isDailyProgressContext =
+      lookup.has('juz_page') ||
+      lookup.has('juz_number') ||
+      lookup.has('total_pages') ||
+      lookup.has('is_multi_juz') ||
+      lookup.has('has_multiple_juz');
+
+    if (!isDailyProgressContext) {
       return null;
     }
 
@@ -460,7 +471,7 @@ export function registerDailyProgressDocLabInterceptor(): void {
       hasMultipleJuz = true;
     }
 
-    // 1. Single Juz: Indentation is NOT applied (keep flush left)
+    // 1. Single Juz: Indentation is intentionally NOT applied (keep flush left)
     if (!hasMultipleJuz || headerLines.length === 0) {
       return { handled: true, skipFilter: true };
     }
@@ -494,3 +505,5 @@ export function registerDailyProgressDocLabInterceptor(): void {
 
 // Automatically register interceptor on module load
 registerDailyProgressDocLabInterceptor();
+
+

@@ -75,7 +75,7 @@ export const navigation = {
   communications: 'التواصل والتعاميم',
   bugReporting: 'الإبلاغ عن الأخطاء البرمجية',
   institutionSettings: 'إعدادات المؤسسة',
-  masterPolicies: 'المعايير والسياسات الأكاديمية',
+  masterPolicies: 'إعدادات المؤسسة',
   developerConsole: 'وحدة تحكم المطور',
   roleInvites: 'دعوات الانضمام',
   trashRestoration: 'سلة المحذوفات',

@@ -78,7 +78,14 @@ export default function GoogleSignInButton({
     <div className="space-y-4">
       <button
         type="button"
-        onClick={() => handleGoogleSignIn()}
+        onClick={() => {
+          try {
+            if (typeof window !== "undefined" && window.location) {
+              sessionStorage.setItem("spr_auth_return_url", window.location.href);
+            }
+          } catch {}
+          handleGoogleSignIn();
+        }}
         disabled={googleLoading || disabled || !isGoogleConfigured}
         title={
           !isGoogleConfigured

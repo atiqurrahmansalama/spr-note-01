@@ -265,7 +265,7 @@ def ensure_institution_staff_profile(user, institution=None):
             TeacherDetail.objects.get_or_create(
                 staff=staff_profile,
                 defaults={
-                    'qualifications': 'Faculty Member',
+                    'highest_degree': 'Faculty Member',
                     'specialization': 'Classroom Instructor'
                 }
             )

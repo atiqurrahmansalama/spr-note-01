@@ -75,7 +75,7 @@ export const navigation = {
   communications: 'مواصلات اور اعلانات',
   bugReporting: 'بگ اور تکنیکی مسائل کی رپورٹ',
   institutionSettings: 'ادارہ جاتی ترتیبات',
-  masterPolicies: 'تعلیمی اور پالیسی کے معیارات',
+  masterPolicies: 'ادارہ جاتی ترتیبات',
   developerConsole: 'ڈویلپر کنسول',
   roleInvites: 'دعوتی لنکس',
   trashRestoration: 'ری سائیکل بن',

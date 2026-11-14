@@ -91,7 +91,7 @@ class LogActivityView(APIView):
             return Response({"detail": "User not identified"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Deduplicate consecutive identical activity states to prevent database row ballooning & egress waste
-        latest_log = UserActivityLog.objects.filter(user=user_obj).order_by('-created_at').first()
+        latest_log = UserActivityLog.objects.filter(user=user_obj).order_by('-timestamp').first()
         if latest_log and latest_log.status == status_val:
             return Response({"status": "unchanged", "log_id": latest_log.id}, status=status.HTTP_200_OK)
 

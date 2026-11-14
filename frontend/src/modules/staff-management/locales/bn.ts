@@ -275,6 +275,7 @@ export const bn = {
     passwordLengthError: 'পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে।',
     authFailed: 'সাইন ইন ব্যর্থ হয়েছে। অনুগ্রহ করে তথ্য যাচাই করে আবার চেষ্টা করুন।',
     registrationFailed: 'নিবন্ধন ব্যর্থ হয়েছে। অনুগ্রহ করে তথ্য যাচাই করুন।',
+    accountAlreadyExistsLoginPrompt: 'এই ইমেল অ্যাড্রেসে ইতিমধ্যে একটি অ্যাকাউন্ট রয়েছে। দয়া করে আপনার পাসওয়ার্ড দিয়ে লগ ইন করুন অথবা গুগল দিয়ে কন্টিনিউ করুন।',
     receiptBadge: 'স্টাফ প্রোফাইল সফলভাবে অনবোর্ড হয়েছে',
     applicationSubmittedBadge: 'আবেদন পর্যালোচনার জন্য জমা হয়েছে',
     academicInstitutionFallback: 'শিক্ষা প্রতিষ্ঠান',

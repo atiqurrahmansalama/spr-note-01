@@ -275,6 +275,7 @@ export const ur = {
     passwordLengthError: 'پاس ورڈ کم از کم 8 حروف کا ہونا ضروری ہے۔',
     authFailed: 'تصدیق ناکام ہو گئی۔ براہ کرم اپنی تفصیلات چیک کر کے دوبارہ کوشش کریں۔',
     registrationFailed: 'رجسٹریشن ناکام ہو گئی۔ براہ کرم اپنی تفصیلات چیک کریں۔',
+    accountAlreadyExistsLoginPrompt: 'اس ای میل ایڈریس کے ساتھ پہلے سے ایک اکاؤنٹ موجود ہے۔ براہ کرم اپنے پاس ورڈ سے لاگ ان کریں یا گوگل کے ساتھ جاری رکھیں۔',
     receiptBadge: 'اسٹاف پروفائل کامیابی سے آن بورڈ ہو گیا',
     applicationSubmittedBadge: 'درخواست جائزے کے لیے جمع کرا دی گئی ہے',
     academicInstitutionFallback: 'تعلیمی ادارہ',

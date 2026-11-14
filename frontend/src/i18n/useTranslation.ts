@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useI18n, registerModuleLocales } from './I18nContext';
 import type { LanguageCode, TranslationNamespace, TranslationParams } from './types';
 
@@ -21,13 +21,16 @@ export function useTranslation(namespace?: TranslationNamespace) {
       const fullKey = namespace && !key.includes('.') ? `${namespace}.${key}` : key;
       return i18n.t(fullKey, defaultTextOrParams, params);
     },
-    [i18n, namespace]
+    [i18n.t, namespace]
   );
 
-  return {
-    ...i18n,
-    t: scopedT,
-  };
+  return useMemo(
+    () => ({
+      ...i18n,
+      t: scopedT,
+    }),
+    [i18n, scopedT]
+  );
 }
 
 /**

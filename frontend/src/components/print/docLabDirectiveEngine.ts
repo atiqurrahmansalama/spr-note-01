@@ -284,12 +284,12 @@ export function healMangledToken(raw: string): string {
 
   let directiveStr = '';
 
-  // 1. Check if there is a pipe followed by directives
-  const pipeIdx = s.lastIndexOf('|');
-  if (pipeIdx !== -1) {
-    const candidate = s.slice(pipeIdx + 1).replace(/[>}]*$/, '').trim();
+  // 1. Check if there is a pipe followed by directives (use first pipe so chained directives are preserved)
+  const firstPipeIdx = s.indexOf('|');
+  if (firstPipeIdx !== -1) {
+    const candidate = s.slice(firstPipeIdx + 1).replace(/[>}]*$/, '').trim();
     if (directiveKeywordPattern.test(candidate)) {
-      directiveStr = candidate;
+      directiveStr = candidate.replace(/\s*\|\s*/g, ', ');
     }
   }
 

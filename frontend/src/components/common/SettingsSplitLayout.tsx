@@ -71,6 +71,12 @@ export const SettingsSplitLayout: React.FC<SettingsSplitLayoutProps> = ({
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (!activeSection) {
+      setShowCompactDetailLocal(false);
+    }
+  }, [activeSection]);
+
   const isCompact = containerWidth < 740;
 
   // On compact/mobile (<740px): show detail view if activeSection is explicitly provided or locally toggled

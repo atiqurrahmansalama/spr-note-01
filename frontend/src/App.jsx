@@ -219,13 +219,13 @@ export default function App() {
                 <Route path="/academy/groups" element={<ClassesGroupsHubView />} />
                 <Route path="/academy/branches" element={<FeatureGuard sectionKey="academic_branches"><BranchManagementView /></FeatureGuard>} />
                 <Route path="/academy/periods" element={<FeatureGuard sectionKey="class_period_slots"><RoutineCurriculumHubView /></FeatureGuard>} />
-                <Route path="/academy/calendar-events" element={<CalendarEventsHubView />} />
-                <Route path="/academy/calendar-schedule" element={<CalendarEventsHubView />} />
-                <Route path="/academy/working-hours" element={<CalendarEventsHubView />} />
-                <Route path="/academy/residential-quarters" element={<ResidentialHubView />} />
-                <Route path="/academy/residential" element={<ResidentialHubView />} />
-                <Route path="/academy/dormitory" element={<ResidentialHubView />} />
-                <Route path="/residential-quarters" element={<ResidentialHubView />} />
+                <Route path="/academy/calendar-events" element={<FeatureGuard sectionKey="academy_calendar_events"><CalendarEventsHubView /></FeatureGuard>} />
+                <Route path="/academy/calendar-schedule" element={<FeatureGuard sectionKey="academy_calendar_events"><CalendarEventsHubView /></FeatureGuard>} />
+                <Route path="/academy/working-hours" element={<FeatureGuard sectionKey="academy_calendar_events"><CalendarEventsHubView /></FeatureGuard>} />
+                <Route path="/academy/residential-quarters" element={<FeatureGuard sectionKey="residential_quarters"><ResidentialHubView /></FeatureGuard>} />
+                <Route path="/academy/residential" element={<FeatureGuard sectionKey="residential_quarters"><ResidentialHubView /></FeatureGuard>} />
+                <Route path="/academy/dormitory" element={<FeatureGuard sectionKey="residential_quarters"><ResidentialHubView /></FeatureGuard>} />
+                <Route path="/residential-quarters" element={<FeatureGuard sectionKey="residential_quarters"><ResidentialHubView /></FeatureGuard>} />
 
                 {/* Academic Studies — Lesson Management Routes */}
                 <Route path="/studies" element={<DailyClassroomHubView hubType="LESSON_MANAGEMENT" defaultTab="LESSON" />} />

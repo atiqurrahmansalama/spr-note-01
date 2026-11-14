@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchWithAuth } from '../../../../utils/authService';
 import { useToast } from '../../../../context/ToastContext';
@@ -269,8 +269,10 @@ export function useSectionControl() {
   }, [activeScope, selectedRole, selectedAcademy, selectedUser]);
 
   // 3. Fetch Rules for selected scope and target
+  const isLoadingRulesRef = useRef(false);
   const loadRules = useCallback(async () => {
-    if (activeScope === 'audit') return;
+    if (activeScope === 'audit' || isLoadingRulesRef.current) return;
+    isLoadingRulesRef.current = true;
     setLoading(true);
     setModifiedFlags({});
     try {
@@ -323,6 +325,7 @@ export function useSectionControl() {
         setCategories([]);
       }
     } finally {
+      isLoadingRulesRef.current = false;
       setLoading(false);
     }
   }, [activeScope, currentTargetId]);
@@ -332,9 +335,11 @@ export function useSectionControl() {
   }, [loadRules]);
 
   // 4. Fetch Audit Logs when Audit tab is active with optional scope/search filtering
+  const isLoadingLogsRef = useRef(false);
   const loadAuditLogs = useCallback(
     async (filterScope?: string, search?: string) => {
-      if (activeScope !== 'audit') return;
+      if (activeScope !== 'audit' || isLoadingLogsRef.current) return;
+      isLoadingLogsRef.current = true;
       setLoadingLogs(true);
       try {
         let url = `/api/v1/control-panel/audit-logs/?_t=${Date.now()}`;
@@ -352,10 +357,11 @@ export function useSectionControl() {
       } catch {
         showToast(t('toasts.loadAuditError', 'Failed to load audit logs'), 'error');
       } finally {
+        isLoadingLogsRef.current = false;
         setLoadingLogs(false);
       }
     },
-    [activeScope, showToast, t]
+    [activeScope]
   );
 
   useEffect(() => {

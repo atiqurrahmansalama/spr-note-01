@@ -7,7 +7,12 @@ const TenantContext = createContext(null);
 
 export function TenantProvider({ children }) {
   const { user } = useAuth();
-  const [institutions, setInstitutions] = useState([]);
+  const [institutions, setInstitutions] = useState(() => {
+    if (user?.available_institutions && Array.isArray(user.available_institutions) && user.available_institutions.length > 0) {
+      return user.available_institutions;
+    }
+    return [];
+  });
   const [activeTenantId, setActiveTenantId] = useState(() => {
     return localStorage.getItem('active_tenant_id') || '';
   });
@@ -20,6 +25,17 @@ export function TenantProvider({ children }) {
 
   const isTenantAdmin = isMultiTenantAdmin || isAcademyAdmin;
   const isAdmin = isMultiTenantAdmin || isAcademyAdmin;
+
+  const availableInstitutions = useMemo(() => {
+    if (institutions && institutions.length > 0) return institutions;
+    if (user?.available_institutions && user.available_institutions.length > 0) return user.available_institutions;
+    if (currentInstitution) return [currentInstitution];
+    return [];
+  }, [institutions, user?.available_institutions, currentInstitution]);
+
+  const hasMultipleInstitutions = useMemo(() => {
+    return availableInstitutions.length > 1 || Boolean(user?.is_multi_institution);
+  }, [availableInstitutions, user?.is_multi_institution]);
 
   // Fetch institutions list for multi-tenant admins, academy admins, and institutional personnel
   const fetchInstitutionsList = useCallback(async () => {
@@ -115,8 +131,6 @@ export function TenantProvider({ children }) {
     fetchInstitutionsList();
   }, [fetchInstitutionsList]);
 
-  const [pendingSwitchInstitution, setPendingSwitchInstitution] = useState(null);
-
   // Handle switching active institution
   const switchInstitution = useCallback((targetId) => {
     let targetName = 'All Institutions';
@@ -129,7 +143,8 @@ export function TenantProvider({ children }) {
       localStorage.setItem('active_tenant_id', targetId);
       localStorage.setItem('spr_active_tenant_id', targetId);
       setActiveTenantId(targetId);
-      const found = institutions.find(i => String(i.id) === String(targetId));
+      const allPool = institutions.length > 0 ? institutions : (user?.available_institutions || []);
+      const found = allPool.find(i => String(i.id) === String(targetId));
       if (found) {
         setCurrentInstitution(found);
         targetName = found.name;
@@ -138,43 +153,18 @@ export function TenantProvider({ children }) {
 
     // Dispatch sync event for active views to reload data
     window.dispatchEvent(new CustomEvent('spr_tenant_changed', { detail: { tenantId: targetId, targetName } }));
-  }, [institutions]);
+  }, [institutions, user?.available_institutions]);
 
   const requestSwitchInstitution = useCallback((target) => {
-    if (!target) return;
-    if (target === 'ALL') {
-      if (activeTenantId === 'ALL') return;
-      setPendingSwitchInstitution({
-        id: 'ALL',
-        name: 'All Institutions',
-        slug: 'global',
-        institution_type: 'GLOBAL',
-        description: 'Viewing aggregate data across all registered institutions.',
-      });
-      return;
-    }
-
-    const instObj = typeof target === 'object' ? target : institutions.find(i => String(i.id) === String(target));
-    if (instObj) {
-      if (String(instObj.id) === String(activeTenantId)) return;
-      setPendingSwitchInstitution(instObj);
-    }
-  }, [institutions, activeTenantId]);
-
-  const confirmSwitchInstitution = useCallback(() => {
-    if (!pendingSwitchInstitution) return;
-    const targetId = pendingSwitchInstitution.id;
-    switchInstitution(targetId);
-    setPendingSwitchInstitution(null);
-  }, [pendingSwitchInstitution, switchInstitution]);
-
-  const cancelSwitchInstitution = useCallback(() => {
-    setPendingSwitchInstitution(null);
-  }, []);
+    const targetId = typeof target === 'object' && target ? target.id : target;
+    if (targetId) switchInstitution(targetId);
+  }, [switchInstitution]);
 
   const value = useMemo(
     () => ({
       institutions,
+      availableInstitutions,
+      hasMultipleInstitutions,
       currentInstitution,
       activeTenant: currentInstitution,
       activeTenantId: activeTenantId || (currentInstitution?.id ? String(currentInstitution.id) : 'default'),
@@ -184,14 +174,13 @@ export function TenantProvider({ children }) {
       isAdmin,
       isLoadingInstitutions,
       switchInstitution,
-      pendingSwitchInstitution,
       requestSwitchInstitution,
-      confirmSwitchInstitution,
-      cancelSwitchInstitution,
       refreshInstitutions: fetchInstitutionsList,
     }),
     [
       institutions,
+      availableInstitutions,
+      hasMultipleInstitutions,
       currentInstitution,
       activeTenantId,
       isMultiTenantAdmin,
@@ -200,10 +189,7 @@ export function TenantProvider({ children }) {
       isAdmin,
       isLoadingInstitutions,
       switchInstitution,
-      pendingSwitchInstitution,
       requestSwitchInstitution,
-      confirmSwitchInstitution,
-      cancelSwitchInstitution,
       fetchInstitutionsList,
     ]
   );
@@ -220,6 +206,8 @@ export function useTenant() {
   if (!context) {
     return {
       institutions: [],
+      availableInstitutions: [],
+      hasMultipleInstitutions: false,
       currentInstitution: null,
       activeTenantId: typeof localStorage !== 'undefined' ? (localStorage.getItem('active_tenant_id') || 'default') : 'default',
       isMultiTenantAdmin: false,
@@ -228,10 +216,7 @@ export function useTenant() {
       isAdmin: false,
       isLoadingInstitutions: false,
       switchInstitution: () => {},
-      pendingSwitchInstitution: null,
       requestSwitchInstitution: () => {},
-      confirmSwitchInstitution: () => {},
-      cancelSwitchInstitution: () => {},
       refreshInstitutions: async () => {},
     };
   }

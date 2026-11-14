@@ -631,7 +631,7 @@ class GroupSectionPermissionAdmin(admin.ModelAdmin):
 class AcademySectionOverrideAdmin(admin.ModelAdmin):
     list_display = ('institution', 'section', 'is_enabled')
     list_filter = ('is_enabled', 'institution')
-    search_fields = ('institution__name', 'institution__code', 'section__title', 'section__section_key')
+    search_fields = ('institution__name', 'institution__slug', 'section__title', 'section__section_key')
 
 
 @admin.register(UserSectionOverride)

@@ -586,5 +586,35 @@ export async function runSkipDataRemoveLineDirectivesUnitTests(): Promise<{
     assert(mergedDiff.includes('MI Tawfiq'), 'Non-matching data renders section value cleanly');
   }
 
+  // 16. Chained Indent and RemoveLine Directives (e.g. {{detail-stuck | indent: 7, removeLine: b}})
+  {
+    const token = 'detail-stuck | indent: 7, removeLine: b';
+    const parsed = parseTokenDirective(token);
+    assert(parsed.baseKey === 'detail-stuck', 'Extracts baseKey "detail-stuck"');
+    assert(parsed.options.indent === 7, 'Extracts indent: 7');
+    assert(parsed.options.removeLine === 'b', 'Extracts removeLine: b');
+
+    // Test with non-empty multi-line data: preserves line and indents subsequent lines by 7 non-breaking spaces
+    const templateWithLabel = '<p>Mistakes: None</p><p>Stuck: {{detail-stuck | indent: 7, removeLine: b}}</p>';
+    const mergedPresent = mergeTemplateWithData(templateWithLabel, {
+      'detail-stuck': 'Page 15 Ayah 3\nPage 15 Ayah 7\nPage 16 Ayah 1',
+    });
+    assert(mergedPresent.includes('Stuck: Page 15 Ayah 3'), 'Line 1 is flush after Stuck:');
+    assert(
+      mergedPresent.includes('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Page 15 Ayah 7'),
+      'Line 2 is indented by exactly 7 non-breaking spaces'
+    );
+    assert(
+      mergedPresent.includes('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Page 16 Ayah 1'),
+      'Line 3 is indented by exactly 7 non-breaking spaces'
+    );
+
+    // Test with empty data: removeLine: b removes the Stuck paragraph and line before it
+    const mergedEmpty = mergeTemplateWithData(templateWithLabel, {
+      'detail-stuck': '',
+    });
+    assert(!mergedEmpty.includes('Stuck:'), 'Empty detail-stuck removes the Stuck line when removeLine: b is set');
+  }
+
   return { passed, failed, suiteName };
 }

@@ -152,7 +152,7 @@ export const DeveloperToolsHubView: React.FC = () => {
           next.delete("section");
           return next;
         },
-        { replace: false }
+        { replace: true }
       );
       return;
     }
@@ -164,7 +164,7 @@ export const DeveloperToolsHubView: React.FC = () => {
         next.delete("section");
         return next;
       },
-      { replace: false }
+      { replace: true }
     );
   };
 

@@ -88,17 +88,30 @@ class InstitutionViewSet(viewsets.ModelViewSet):
         tenant_id = get_scoped_tenant_id(self.request)
 
         if not is_super:
-            if tenant_id:
+            is_strictly_scoped = self.request.query_params.get('scoped') == 'true'
+            if is_strictly_scoped and tenant_id:
                 qs = qs.filter(id=tenant_id)
-            elif user.institution_id:
-                qs = qs.filter(id=user.institution_id)
-            elif hasattr(user, 'staff_profile') and user.staff_profile and user.staff_profile.institution_id:
-                qs = qs.filter(id=user.staff_profile.institution_id)
-            # If neither tenant_id nor user.institution_id, allow institutional access for admins/staff
-            elif getattr(user, 'user_type', '').upper() in ['ADMIN', 'HEADMASTER', 'DIRECTOR']:
-                pass
             else:
-                qs = qs.none()
+                user_inst_ids = set()
+                if user.institution_id:
+                    user_inst_ids.add(user.institution_id)
+
+                # Collect from all associated staff profiles (by user or email/phone)
+                staff_filter = Q(user=user)
+                if getattr(user, 'email', None):
+                    staff_filter |= Q(email__iexact=user.email)
+                if getattr(user, 'phone_number', None):
+                    staff_filter |= Q(phone__iexact=user.phone_number)
+
+                staff_inst_ids = StaffProfile.objects.filter(staff_filter).values_list('institution_id', flat=True)
+                user_inst_ids.update(staff_inst_ids)
+
+                if user_inst_ids:
+                    qs = qs.filter(id__in=user_inst_ids)
+                elif getattr(user, 'user_type', '').upper() in ['ADMIN', 'HEADMASTER', 'DIRECTOR']:
+                    pass
+                else:
+                    qs = qs.none()
 
         search = self.request.query_params.get('search')
         if search:

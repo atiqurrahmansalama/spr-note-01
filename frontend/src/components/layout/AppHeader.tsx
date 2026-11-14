@@ -1,11 +1,20 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { SunIcon, MoonIcon, SystemModeIcon, MenuIcon } from "../ui/Icons";
+import {
+  SunIcon,
+  MoonIcon,
+  SystemModeIcon,
+  MenuIcon,
+  BuildingOfficeIcon,
+} from "../ui/Icons";
 import IconButton from "../ui/IconButton";
+import ActionMenu, { ActionMenuItem, ActionMenuHeader } from "../ui/ActionMenu";
 import SaveStatusBadge from "../common/SaveStatusBadge";
 import { LanguageSelector } from "../../i18n";
 import NotificationBellDropdown from "./NotificationBellDropdown";
 import { useTheme } from "../../context/useTheme";
+import { useTenant } from "../../context/TenantContext";
+import { useToast } from "../../context/ToastContext";
 import { getBranchDisplayName } from "../../utils/localStore";
 import { UpdateBadge } from "../../modules/version-control/components/UpdateBadge";
 
@@ -40,6 +49,79 @@ export default function AppHeader({
 }: AppHeaderProps) {
   const navigate = useNavigate();
   const themeContext = useTheme();
+  const {
+    availableInstitutions,
+    hasMultipleInstitutions,
+    switchInstitution,
+    activeTenantId,
+    isMultiTenantAdmin,
+  } = useTenant();
+  const { showToast } = useToast();
+
+  const handleSelectInstitution = (inst: any) => {
+    const targetId = String(inst.id);
+    if (targetId === String(activeTenantId)) {
+      return;
+    }
+    switchInstitution(targetId);
+    showToast(`Switched academic workspace to ${inst.name}`, "success");
+  };
+
+  const handleSelectGlobal = () => {
+    if (activeTenantId === "ALL") {
+      return;
+    }
+    switchInstitution("ALL");
+    showToast("Switched to Global All-Institutions view", "success");
+  };
+
+  const academyMenuItems = useMemo<ActionMenuItem[]>(() => {
+    const items: ActionMenuItem[] = [];
+
+    if (isMultiTenantAdmin) {
+      items.push({
+        label: "All Academies (Global Scope)",
+        subtitle: "Aggregate multi-campus workspace",
+        active: activeTenantId === "ALL",
+        icon: BuildingOfficeIcon,
+        iconClassName: "theme-accent",
+        onClick: handleSelectGlobal,
+      });
+      items.push({ divider: true });
+    }
+
+    availableInstitutions.forEach((inst: any) => {
+      const isActive = String(inst.id) === String(activeTenantId);
+      const subParts: string[] = [];
+      if (inst.bangla_name) subParts.push(inst.bangla_name);
+      if (inst.code) subParts.push(inst.code);
+      if (inst.district) subParts.push(inst.district);
+
+      items.push({
+        label: inst.name || "Academic Institution",
+        subtitle: subParts.join(" • "),
+        active: isActive,
+        icon: () => (
+          <div className="w-7 h-7 rounded-lg theme-bg-elevated flex items-center justify-center font-bold text-xs theme-text-primary shrink-0 overflow-hidden shadow-2xs">
+            {inst.logo_url ? (
+              <img src={inst.logo_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              (inst.name || "A").charAt(0).toUpperCase()
+            )}
+          </div>
+        ),
+        onClick: () => handleSelectInstitution(inst),
+      });
+    });
+
+    return items;
+  }, [availableInstitutions, activeTenantId, isMultiTenantAdmin]);
+
+  const institutionDisplayName =
+    currentInstitution?.name ||
+    user?.institution_name ||
+    user?.institution_details?.name ||
+    (user?.staff_profile ? "Darus Salam Islamic School (DS)" : "");
 
   return (
     <header className="theme-bg-surface border-b theme-border px-4 py-2.5 flex justify-between items-center z-30 shadow-md shrink-0 relative">
@@ -65,37 +147,85 @@ export default function AppHeader({
         </button>
       </div>
 
-      {/* Selected Active Institution, Branch & Academic Year in Header Middle - Absolutely Centered to prevent shifting (Hidden on small screens) */}
-      {(currentInstitution?.name || user?.institution_name || user?.institution_details?.name || (user?.staff_profile && 'Darus Salam Islamic School (DS)')) && (
-        <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 justify-center items-center px-4 max-w-[calc(100%-420px)] pointer-events-none text-center">
-          <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap min-w-0 max-w-full">
-            <span className="text-sm sm:text-base md:text-lg font-bold theme-text-primary truncate tracking-tight">
-              {currentInstitution?.name || user?.institution_name || user?.institution_details?.name || 'Darus Salam Islamic School (DS)'}
-            </span>
-            {(() => {
-              const branchName = getBranchDisplayName(activeBranch);
-              const instName = currentInstitution?.name || "";
-              if (branchName && instName && String(branchName).toLowerCase() !== String(instName).toLowerCase()) {
-                return (
-                  <>
-                    <span className="text-xs theme-text-secondary opacity-40 font-bold select-none">•</span>
-                    <span className="text-xs sm:text-sm font-medium theme-text-secondary truncate max-w-[140px] sm:max-w-[240px]">
-                      {branchName}
-                    </span>
-                  </>
-                );
+      {/* Selected Active Institution, Branch & Academic Year in Header Middle (Hidden on small screens) */}
+      {institutionDisplayName && (
+        <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 justify-center items-center px-4 max-w-[calc(100%-420px)] text-center">
+          {hasMultipleInstitutions ? (
+            <ActionMenu
+              align="center"
+              showChevron={false}
+              size="md"
+              menuClassName="w-80 sm:w-96 rounded-3xl p-2.5 shadow-2xl border theme-border"
+              buttonClassName="group/inst flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-2xl hover:theme-bg-elevated/70 active:scale-[0.98] transition cursor-pointer max-w-full border-0 outline-hidden focus:outline-hidden"
+              header={
+                <ActionMenuHeader
+                  title="Switch Academy"
+                  icon={BuildingOfficeIcon}
+                  count={availableInstitutions.length}
+                />
               }
-              return null;
-            })()}
-            {activeYear?.name && (
-              <>
-                <span className="text-xs theme-text-secondary opacity-40 font-bold select-none">•</span>
-                <span className="text-xs sm:text-sm font-semibold font-mono theme-accent truncate">
-                  {activeYear.name}
+              label={
+                <>
+                  <span className="text-xs sm:text-sm md:text-[14.5px] font-bold theme-text-primary group-hover/inst:theme-accent transition-colors truncate tracking-tight">
+                    {institutionDisplayName}
+                  </span>
+                  {(() => {
+                    const branchName = getBranchDisplayName(activeBranch);
+                    const instName = currentInstitution?.name || "";
+                    if (branchName && instName && String(branchName).toLowerCase() !== String(instName).toLowerCase()) {
+                      return (
+                        <span className="inline-flex items-center gap-1.5 sm:gap-2 shrink-0">
+                          <span className="text-xs theme-text-secondary opacity-40 font-bold select-none">•</span>
+                          <span className="text-xs sm:text-sm font-medium theme-text-secondary truncate max-w-[140px] sm:max-w-[200px]">
+                            {branchName}
+                          </span>
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
+                  {activeYear?.name && (
+                    <span className="inline-flex items-center gap-1.5 sm:gap-2 shrink-0">
+                      <span className="text-xs theme-text-secondary opacity-40 font-bold select-none">•</span>
+                      <span className="text-xs sm:text-sm font-semibold font-mono theme-accent truncate">
+                        {activeYear.name}
+                      </span>
+                    </span>
+                  )}
+                </>
+              }
+              items={academyMenuItems}
+            />
+          ) : (
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap min-w-0 max-w-full select-none pointer-events-none">
+              <span className="text-xs sm:text-sm md:text-[14.5px] font-bold theme-text-primary truncate tracking-tight">
+                {institutionDisplayName}
+              </span>
+              {(() => {
+                const branchName = getBranchDisplayName(activeBranch);
+                const instName = currentInstitution?.name || "";
+                if (branchName && instName && String(branchName).toLowerCase() !== String(instName).toLowerCase()) {
+                  return (
+                    <span className="inline-flex items-center gap-1.5 sm:gap-2 shrink-0">
+                      <span className="text-xs theme-text-secondary opacity-40 font-bold select-none">•</span>
+                      <span className="text-xs sm:text-sm font-medium theme-text-secondary truncate max-w-[140px] sm:max-w-[240px]">
+                        {branchName}
+                      </span>
+                    </span>
+                  );
+                }
+                return null;
+              })()}
+              {activeYear?.name && (
+                <span className="inline-flex items-center gap-1.5 sm:gap-2 shrink-0">
+                  <span className="text-xs theme-text-secondary opacity-40 font-bold select-none">•</span>
+                  <span className="text-xs sm:text-sm font-semibold font-mono theme-accent truncate">
+                    {activeYear.name}
+                  </span>
                 </span>
-              </>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

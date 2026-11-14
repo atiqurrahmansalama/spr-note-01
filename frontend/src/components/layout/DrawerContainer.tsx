@@ -3,21 +3,79 @@ import CustomButton from "../ui/CustomButton";
 import AutoSaveBadge from "../ui/AutoSaveBadge";
 import { ChevronIcon } from "../ui/Icons";
 
+export interface DrawerContainerProps {
+  children?: React.ReactNode;
+  header?: React.ReactNode;
+  footer?: React.ReactNode;
+  spacing?: 'normal' | 'compact' | 'relaxed' | 'none' | string;
+  padding?: 'normal' | 'compact' | 'none' | string;
+  animate?: boolean;
+  className?: string;
+  [key: string]: any;
+}
+
+export interface DrawerBannerProps {
+  icon?: React.ComponentType<{ className?: string }>;
+  title?: React.ReactNode;
+  subtitle?: React.ReactNode;
+  badge?: React.ReactNode;
+  actions?: React.ReactNode;
+  className?: string;
+  children?: React.ReactNode;
+  [key: string]: any;
+}
+
+export interface DrawerSectionProps {
+  title?: React.ReactNode;
+  subtitle?: React.ReactNode;
+  icon?: React.ComponentType<{ className?: string }>;
+  badge?: React.ReactNode;
+  headerRight?: React.ReactNode;
+  children?: React.ReactNode;
+  className?: string;
+  bodyClassName?: string;
+  variant?: 'streamlined' | 'card' | string;
+  collapsible?: boolean;
+  defaultExpanded?: boolean;
+  expanded?: boolean;
+  storageKey?: string;
+  onToggle?: (expanded: boolean) => void;
+  [key: string]: any;
+}
+
+export interface DrawerFooterProps {
+  onCancel?: () => void;
+  onSubmit?: ((e?: any) => void) | boolean;
+  onSave?: ((e?: any) => void) | boolean;
+  onConfirm?: ((e?: any) => void) | boolean;
+  cancelLabel?: string;
+  cancelText?: string;
+  saveLabel?: string;
+  saveText?: string;
+  confirmText?: string;
+  saveIcon?: React.ComponentType<{ className?: string }>;
+  confirmIcon?: React.ComponentType<{ className?: string }>;
+  isSubmitting?: boolean;
+  confirmLoading?: boolean;
+  isSaveDisabled?: boolean;
+  saveDisabled?: boolean;
+  confirmDisabled?: boolean;
+  isDisabled?: boolean;
+  autoSaveStatus?: any;
+  lastSavedAt?: any;
+  showAutoSave?: boolean;
+  extraButtons?: React.ReactNode;
+  className?: string;
+  children?: React.ReactNode;
+  [key: string]: any;
+}
+
 /**
- * Enterprise Reusable Right Sidebar / Drawer Content Container
+ * Enterprise Reusable Right Sidebar / Drawer Content Container (TypeScript)
  * Standardizes padding, spacing, typography, theme tokens, and action footers
  * across all right sidebar drawers, slide-overs, and forms.
- *
- * @param {Object} props
- * @param {React.ReactNode} props.children - Main drawer content
- * @param {React.ReactNode} [props.header] - Optional Header element / Banner
- * @param {React.ReactNode} [props.footer] - Optional Sticky / Bottom Action Footer
- * @param {'normal'|'compact'|'relaxed'|'none'} [props.spacing='normal'] - Vertical spacing between sections
- * @param {'normal'|'compact'|'none'} [props.padding='normal'] - Outer container padding
- * @param {boolean} [props.animate=true] - Whether to apply smooth fade-in animation
- * @param {string} [props.className=''] - Additional custom CSS classes
  */
-export default function DrawerContainer({
+export function DrawerContainer({
   children,
   header,
   footer,
@@ -26,7 +84,7 @@ export default function DrawerContainer({
   animate = false,
   className = "",
   ...rest
-}) {
+}: DrawerContainerProps): React.JSX.Element {
   const spacingClass = {
     normal: "space-y-6 sm:space-y-7",
     compact: "space-y-4 sm:space-y-5",
@@ -57,7 +115,7 @@ export default function DrawerContainer({
 
       {/* Optional Bottom Action Footer Slot */}
       {footer && (
-        <div className="w-full shrink-0">
+        <div className="w-full shrink-0 pt-2 pb-6 sm:pb-8">
           {footer}
         </div>
       )}
@@ -76,10 +134,12 @@ export function DrawerBanner({
   actions,
   className = "",
   children,
-}) {
+  ...rest
+}: DrawerBannerProps): React.JSX.Element {
   return (
     <div
       className={`p-3.5 sm:p-4 rounded-2xl theme-bg-sub border theme-border flex items-center justify-between gap-3 shadow-2xs ${className}`}
+      {...rest}
     >
       <div className="flex items-start gap-3 min-w-0 flex-1">
         {Icon && (
@@ -89,9 +149,11 @@ export function DrawerBanner({
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="text-xs sm:text-sm font-bold theme-text-primary leading-snug break-words">
-              {title}
-            </h4>
+            {title && (
+              <h4 className="text-xs sm:text-sm font-bold theme-text-primary leading-snug break-words">
+                {title}
+              </h4>
+            )}
             {badge && (
               <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20">
                 {badge}
@@ -124,22 +186,22 @@ export function DrawerSection({
   children,
   className = "",
   bodyClassName = "",
-  variant = "streamlined", // "streamlined" (default) | "card"
+  variant = "streamlined",
   collapsible = false,
   defaultExpanded = true,
   expanded: controlledExpanded,
   storageKey,
   onToggle,
   ...rest
-}) {
-  const [internalExpanded, setInternalExpanded] = useState(() => {
+}: DrawerSectionProps): React.JSX.Element {
+  const [internalExpanded, setInternalExpanded] = useState<boolean>(() => {
     if (typeof window !== "undefined" && storageKey && collapsible) {
       try {
         const saved = localStorage.getItem(storageKey);
         if (saved !== null) {
           return JSON.parse(saved) === true;
         }
-      } catch (err) {
+      } catch {
         // Fallback to default
       }
     }
@@ -158,7 +220,7 @@ export function DrawerSection({
       if (typeof window !== "undefined" && storageKey) {
         try {
           localStorage.setItem(storageKey, JSON.stringify(next));
-        } catch (err) {
+        } catch {
           // Ignore
         }
       }
@@ -260,28 +322,31 @@ export function DrawerFooter({
   isSaveDisabled = false,
   saveDisabled = false,
   confirmDisabled = false,
+  isDisabled = false,
   autoSaveStatus = null,
   lastSavedAt = null,
   showAutoSave = false,
   extraButtons,
   className = "",
   children,
-}) {
+  ...rest
+}: DrawerFooterProps): React.JSX.Element {
   const resolvedCancelLabel = cancelLabel || cancelText || "Cancel";
   const resolvedSaveLabel = saveLabel || saveText || confirmText || "Save Changes";
   const resolvedSaveIcon = saveIcon || confirmIcon;
   const resolvedIsSubmitting = Boolean(isSubmitting || confirmLoading);
-  const resolvedIsSaveDisabled = Boolean(isSaveDisabled || saveDisabled || confirmDisabled);
+  const resolvedIsSaveDisabled = Boolean(isSaveDisabled || saveDisabled || confirmDisabled || isDisabled);
   const hasSaveAction = Boolean(onSubmit || onSave || onConfirm || confirmText || saveText || saveLabel);
+  const formattedLastSavedAt = lastSavedAt instanceof Date ? lastSavedAt.toISOString() : (lastSavedAt ? String(lastSavedAt) : null);
 
   const hasStandardActions = Boolean(onCancel || hasSaveAction);
 
   if (!hasStandardActions && children) {
     return (
-      <div className={`pt-4 border-t theme-border w-full flex items-center justify-between gap-2.5 ${className}`}>
-        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+      <div className={`pt-4 border-t theme-border w-full flex items-center justify-between gap-2.5 ${className}`} {...rest}>
+        <div className="flex items-center gap-2 min-w-0 flex-wrap w-full">
           {showAutoSave && (
-            <AutoSaveBadge status={autoSaveStatus || 'saved'} lastSavedAt={lastSavedAt} size="sm" variant="badge" />
+            <AutoSaveBadge status={autoSaveStatus || 'saved'} lastSavedAt={formattedLastSavedAt} size="sm" variant="badge" />
           )}
           {extraButtons}
           {children}
@@ -290,10 +355,10 @@ export function DrawerFooter({
     );
   }
 
-  const handleSaveClick = (e) => {
-    if (onSave) {
+  const handleSaveClick = (e: React.MouseEvent) => {
+    if (typeof onSave === "function") {
       onSave(e);
-    } else if (onConfirm) {
+    } else if (typeof onConfirm === "function") {
       onConfirm(e);
     } else if (typeof onSubmit === "function") {
       onSubmit(e);
@@ -303,6 +368,7 @@ export function DrawerFooter({
   return (
     <div
       className={`flex items-center justify-between gap-2.5 pt-4 border-t theme-border w-full ${className}`}
+      {...rest}
     >
       <div className="flex items-center gap-2 min-w-0 flex-wrap">
         {onCancel && (
@@ -317,7 +383,7 @@ export function DrawerFooter({
           </CustomButton>
         )}
         {showAutoSave && (
-          <AutoSaveBadge status={autoSaveStatus || 'saved'} lastSavedAt={lastSavedAt} size="sm" variant="badge" />
+          <AutoSaveBadge status={autoSaveStatus || 'saved'} lastSavedAt={formattedLastSavedAt} size="sm" variant="badge" />
         )}
         {extraButtons}
         {children}
@@ -349,3 +415,5 @@ DrawerContainer.Footer = DrawerFooter;
 
 // Aliases for convenience
 export const RightSidebarContainer = DrawerContainer;
+
+export default DrawerContainer;

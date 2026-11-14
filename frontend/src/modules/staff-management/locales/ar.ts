@@ -275,6 +275,7 @@ export const ar = {
     passwordLengthError: 'يجب أن تتكون كلمة المرور من 8 أحرف على الأقل.',
     authFailed: 'فشلت المصادقة. يرجى التحقق من البيانات والمحاولة مجدداً.',
     registrationFailed: 'فشل التسجيل. يرجى التحقق من التفاصيل المدخلة.',
+    accountAlreadyExistsLoginPrompt: 'يوجد حساب بالفعل بعنوان البريد الإلكتروني هذا. يرجى تسجيل الدخول باستخدام كلمة المرور الخاصة بك أو المتابعة باستخدام Google.',
     receiptBadge: 'تم استكمال تسجيل ملف الموظف بنجاح',
     applicationSubmittedBadge: 'تم تقديم الطلب للمراجعة الإدارية',
     academicInstitutionFallback: 'مؤسسة تعليمية',

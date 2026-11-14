@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { auth as authStore } from "../../utils/localStore";
 import { useFeatureControl } from "../../context/FeatureControlContext";
@@ -22,10 +22,8 @@ import {
   ClassIcon,
   StudentIcon,
   AdmissionIcon,
-  SparklesIcon,
   BuildingOfficeIcon,
   TeacherIcon,
-  AttendanceIcon,
   DutyIcon,
   MatrixIcon,
   TimerIcon,
@@ -49,16 +47,50 @@ import {
   ShieldCheckIcon,
 } from "../ui/Icons";
 
+export interface SidebarContainerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  activePath?: string;
+  sidebarMode?: 'inline' | 'collapsed' | 'overlay' | string;
+  setSidebarMode?: (mode: string) => void;
+  isProfileOpen?: boolean;
+  setIsProfileOpen?: (open: boolean) => void;
+}
+
+export interface SidebarSubItem {
+  id: string;
+  name: string;
+  i18nKey: string;
+  path: string;
+  matchPaths?: string[];
+  exactMatchPaths?: string[];
+  Icon: React.ComponentType<{ className?: string }>;
+  key: string;
+  adminOnly?: boolean;
+  superAdminOnly?: boolean;
+}
+
+export interface SidebarMenuItem {
+  id: string;
+  name: string;
+  i18nKey: string;
+  path?: string;
+  matchPaths?: string[];
+  exactMatchPaths?: string[];
+  Icon: React.ComponentType<{ className?: string }>;
+  key: string;
+  hasSub?: boolean;
+  subItems?: SidebarSubItem[];
+  adminOnly?: boolean;
+  superAdminOnly?: boolean;
+}
 
 export default function SidebarContainer({ 
   isOpen, 
   onClose, 
   activePath: propActivePath,
   sidebarMode = "inline",
-  setSidebarMode,
-  isProfileOpen,
-  setIsProfileOpen 
-}) {
+}: SidebarContainerProps): React.JSX.Element | null {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = propActivePath || location.pathname;
@@ -66,9 +98,9 @@ export default function SidebarContainer({
 
   const { isMultiTenantAdmin, isAcademyAdmin } = useTenant();
   // Parent options are collapsed by default
-  const [openSubMenus, setOpenSubMenus] = useState({});
+  const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
 
-  const toggleSubMenu = (menuName, currentEffectiveOpen) => {
+  const toggleSubMenu = (menuName: string, currentEffectiveOpen?: boolean) => {
     setOpenSubMenus((prev) => {
       const isCurrentlyOpen = currentEffectiveOpen !== undefined 
         ? currentEffectiveOpen 
@@ -94,7 +126,7 @@ export default function SidebarContainer({
         .toLowerCase()
         .replace(/[_\s]+/g, '-');
 
-  const menuItems = [
+  const menuItems: SidebarMenuItem[] = [
     {
       id: "Dashboard",
       name: "Dashboard",
@@ -340,8 +372,8 @@ export default function SidebarContainer({
         { id: "Profile Settings", name: "Profile Settings", i18nKey: "profileSettings", path: "/profile-settings", matchPaths: ["/profile-settings"], Icon: SettingsIcon, key: "settings_profile" },
         { 
           id: "Institution Settings", 
-          name: "Academic & Policy Standards", 
-          i18nKey: "masterPolicies", 
+          name: "Institution Settings", 
+          i18nKey: "institutionSettings", 
           path: "/institution-settings", 
           matchPaths: ["/institution-settings", "/admin-tools", "/developer-tools", "/sp-management", "/attendance/settings"], 
           Icon: AdjustmentsHorizontalIcon, 
@@ -357,7 +389,7 @@ export default function SidebarContainer({
     { id: "About", name: "About", i18nKey: "about", path: "/about", matchPaths: ["/about"], Icon: AboutIcon, key: "nav_about" },
   ];
 
-  const handleNavigate = (path) => {
+  const handleNavigate = (path?: string) => {
     if (path) {
       navigate(path);
       if (sidebarMode === "overlay" && isOpen) {
@@ -374,11 +406,10 @@ export default function SidebarContainer({
 
   const displayMenuItems = menuItems
     .map((item) => {
-      if (item.hasSub) {
+      if (item.hasSub && item.subItems) {
         const visibleSubItems = item.subItems.filter((sub) => {
           if (sub.superAdminOnly && !isSuper) return false;
           if (sub.adminOnly && !isAcademyAdministrator && !isSuper) return false;
-          if (isAcademyAdministrator && (item.id === "Academy" || item.id === "Action & Helpdesk")) return true;
           return isSectionEnabled(sub.key);
         });
         return { ...item, subItems: visibleSubItems };
@@ -393,12 +424,12 @@ export default function SidebarContainer({
       const isVisible = isSectionEnabled(item.key);
       if (!isVisible && !(isAcademyAdministrator && (item.id === "Dashboard" || item.id === "Academy" || item.id === "Action & Helpdesk"))) return false;
       
-      if (item.hasSub && item.subItems.length === 0) return false;
+      if (item.hasSub && item.subItems && item.subItems.length === 0) return false;
       
       return true;
     });
 
-  const checkIsActive = (path, item = null) => {
+  const checkIsActive = (path?: string, item: SidebarMenuItem | SidebarSubItem | null = null) => {
     if (!path && !item) return false;
     if (path === "/") {
       return currentPath === "/" || currentPath === "/dashboard";
@@ -456,12 +487,12 @@ export default function SidebarContainer({
           {displayMenuItems.map((item) => {
             const isParentActive = checkIsActive(item.path, item);
             const ItemIcon = item.Icon;
-            const isAnySubActive = item.hasSub ? item.subItems.some((sub) => checkIsActive(sub.path, sub)) : false;
+            const isAnySubActive = item.hasSub && item.subItems ? item.subItems.some((sub) => checkIsActive(sub.path, sub)) : false;
             const isSubOpen = openSubMenus[item.id] !== undefined
               ? openSubMenus[item.id]
               : isAnySubActive;
 
-            if (item.hasSub) {
+            if (item.hasSub && item.subItems) {
               return (
                 <div key={item.id} className="space-y-1">
                   <button
@@ -602,4 +633,3 @@ export default function SidebarContainer({
     </>
   );
 }
-

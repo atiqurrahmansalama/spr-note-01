@@ -41,6 +41,24 @@ export function parseIndentDirectiveArgs(rawInner: string): string {
   let spec = `indent: ${spaces}`;
   if (from !== null) spec += `, from: ${from}`;
   if (to !== null) spec += `, to: ${to}`;
+
+  // Preserve other chained directives if present (e.g. removeLine, skipData, fallback)
+  const skipMatch = clean.match(/\b(?:skipdata|skip_data|skip)\s*:\s*(?:"([^"]*)"|'([^']*)'|([^,>|"]+))/i);
+  if (skipMatch) {
+    const v = (skipMatch[1] ?? skipMatch[2] ?? skipMatch[3] ?? '').trim();
+    spec += `, skipData: "${v}"`;
+  }
+  const removeMatch = clean.match(/\b(?:removeline|remove_line)\s*:\s*(?:"([^"]*)"|'([^']*)'|([^,>|"]+))/i);
+  if (removeMatch) {
+    const v = (removeMatch[1] ?? removeMatch[2] ?? removeMatch[3] ?? '').trim();
+    spec += `, removeLine: ${v}`;
+  }
+  const defMatch = clean.match(/\b(?:default|fallback)\s*:\s*(?:"([^"]*)"|'([^']*)'|([^,>|"]+))/i);
+  if (defMatch) {
+    const v = (defMatch[1] ?? defMatch[2] ?? defMatch[3] ?? '').trim();
+    spec += `, default: "${v}"`;
+  }
+
   return spec;
 }
 

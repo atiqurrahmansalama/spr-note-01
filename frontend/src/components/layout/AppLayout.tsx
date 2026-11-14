@@ -5,7 +5,6 @@ import Sidebar from "./SidebarContainer";
 import SidebarScreenBlockView from "./SidebarScreenBlockView";
 import RightSidebarPanel from "../ui/RightSidebarPanel";
 import PanelResizer from "../ui/PanelResizer";
-import InstitutionSwitchModal from "./InstitutionSwitchModal";
 import { useRightSidebar, useDrawerRegistration } from "../../context/RightSidebarContext";
 import { useTenant } from "../../context/TenantContext";
 import NotificationCenterDrawer from "./NotificationCenterDrawer";
@@ -330,7 +329,7 @@ export default function AppLayout() {
         path.startsWith("/developer-tools")) &&
       (search.get("tab") || search.get("section"))
     ) {
-      navigate("/institution-settings", { replace: false });
+      navigate(path, { replace: true });
       return;
     }
 
@@ -496,9 +495,6 @@ export default function AppLayout() {
           style={{ cursor: 'col-resize' }}
         />
       )}
-
-      {/* Global Institution Workspace Switch Alert Modal */}
-      <InstitutionSwitchModal />
 
       {/* High-Priority Security Gating Modal for Outdated Client Versions */}
       <ForceUpdateModal

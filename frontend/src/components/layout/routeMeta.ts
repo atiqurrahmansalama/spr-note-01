@@ -56,9 +56,9 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
   "/attendance/monthly-register": { title: "Class Attendance", category: "Daily Classroom" },
 
   "/attendance/settings": { title: "Attendance Policies & Slots", category: "Settings" },
-  "/institution-settings": { title: "Academic & Policy Standards", category: "Settings" },
-  "/admin-tools": { title: "Academic & Policy Standards", category: "Settings" },
-  "/developer-tools": { title: "Academic & Policy Standards", category: "Settings" },
+  "/institution-settings": { title: "Institution Settings", category: "Settings" },
+  "/admin-tools": { title: "Institution Settings", category: "Settings" },
+  "/developer-tools": { title: "Institution Settings", category: "Settings" },
 
   "/student-management/departments": { title: "Department", category: "Academy" },
   "/student-management/classes": { title: "Class", category: "Academy" },

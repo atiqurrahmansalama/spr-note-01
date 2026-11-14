@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { DotsVerticalIcon, ChevronIcon } from './Icons';
+import { DotsVerticalIcon, ChevronIcon, CheckIcon } from './Icons';
 import IconButton from './IconButton';
 
 export interface ActionMenuItem {
@@ -16,13 +16,51 @@ export interface ActionMenuItem {
   badgeClassName?: string;
   title?: string;
   hidden?: boolean;
+  active?: boolean;
+  subtitle?: React.ReactNode;
+  rightElement?: React.ReactNode;
   [key: string]: any;
+}
+
+export interface ActionMenuHeaderProps {
+  title: string;
+  icon?: React.ComponentType<{ className?: string }> | null;
+  count?: number | string | null;
+  badge?: React.ReactNode;
+  className?: string;
+}
+
+/**
+ * Reusable Header sub-component for ActionMenu dropdowns
+ * Provides consistent typography, icon, and count pill without double borders
+ */
+export function ActionMenuHeader({
+  title,
+  icon: Icon = null,
+  count = null,
+  badge = null,
+  className = '',
+}: ActionMenuHeaderProps): React.JSX.Element {
+  return (
+    <div className={`flex items-center justify-between py-0.5 px-0.5 select-none ${className}`}>
+      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider theme-text-secondary">
+        {Icon && <Icon className="w-3.5 h-3.5 theme-accent shrink-0" />}
+        <span>{title}</span>
+      </div>
+      {count !== null && count !== undefined && (
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full theme-bg-app theme-text-secondary">
+          {count}
+        </span>
+      )}
+      {badge}
+    </div>
+  );
 }
 
 export interface ActionMenuProps {
   items?: ActionMenuItem[];
   actions?: ActionMenuItem[] | null;
-  align?: 'left' | 'right';
+  align?: 'left' | 'right' | 'center';
   buttonClassName?: string;
   menuClassName?: string;
   icon?: React.ComponentType<{ className?: string }>;
@@ -62,7 +100,7 @@ export default function ActionMenu({
   align = 'right',
   buttonClassName = '',
   menuClassName = '',
-  icon: TriggerIcon = DotsVerticalIcon,
+  icon = undefined,
   label = null,
   disabled = false,
   size = 'md',
@@ -82,6 +120,7 @@ export default function ActionMenu({
   headless = false,
   children = null,
 }: ActionMenuProps) {
+  const EffectiveIcon = icon !== undefined ? icon : (label ? null : DotsVerticalIcon);
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const isControlled = controlledIsOpen !== undefined;
   const isMenuOpen = isControlled ? Boolean(controlledIsOpen) : internalIsOpen;
@@ -146,11 +185,11 @@ export default function ActionMenu({
     const isFlipped = spaceBelow < menuHeight && rect.top > menuHeight;
 
     const top = isFlipped ? rect.top - padding : rect.bottom + padding;
-    const left = rect.left;
+    const left = align === 'center' ? rect.left + rect.width / 2 : rect.left;
     const right = window.innerWidth - rect.right;
 
     setCoords({ top, left, right, isFlipped, isCustomCoord: false });
-  }, [isCoordMode, x, y, externalCoords]);
+  }, [isCoordMode, x, y, externalCoords, align]);
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -283,10 +322,10 @@ export default function ActionMenu({
             } ${buttonClassName}`}
           >
             {renderIcon(
-              TriggerIcon,
+              EffectiveIcon,
               `w-3.5 h-3.5 shrink-0 ${variant === 'primary' ? '' : 'theme-accent'}`
             )}
-            <span className="truncate">{label}</span>
+            <div className="flex items-center gap-1.5 sm:gap-2 truncate min-w-0">{label}</div>
             {showChevron && (
               <ChevronIcon
                 isOpen={isMenuOpen}
@@ -302,7 +341,7 @@ export default function ActionMenu({
             onClick={handleToggle}
             ariaLabel={ariaLabel}
             aria-expanded={isMenuOpen}
-            icon={TriggerIcon}
+            icon={EffectiveIcon || DotsVerticalIcon}
             size={size === 'xs' ? 'xs' : size === 'sm' ? 'sm' : 'md'}
             variant={
               variant === 'ghost'
@@ -351,6 +390,8 @@ export default function ActionMenu({
                 : undefined,
               left: coords.isCustomCoord
                 ? `${coords.left}px`
+                : align === 'center'
+                ? `${coords.left}px`
                 : align === 'left'
                 ? `${coords.left}px`
                 : undefined,
@@ -359,9 +400,10 @@ export default function ActionMenu({
                 : align === 'right'
                 ? `${coords.right}px`
                 : undefined,
+              transform: !coords.isCustomCoord && align === 'center' ? 'translateX(-50%)' : undefined,
               zIndex: 99999,
             }}
-            className={`min-w-[190px] max-w-[280px] max-h-[340px] overflow-y-auto scrollbar-none no-scrollbar rounded-2xl theme-bg-surface border theme-border shadow-2xl p-1.5 space-y-0.5 animate-scale-in text-left focus:outline-none backdrop-blur-md select-none print:hidden print-studio-no-print ${menuClassName}`}
+            className={`min-w-[190px] max-w-[min(92vw,420px)] max-h-[380px] overflow-y-auto scrollbar-none no-scrollbar rounded-3xl theme-bg-surface border theme-border shadow-2xl p-1.5 space-y-0.5 animate-scale-in text-left focus:outline-none backdrop-blur-md select-none print:hidden print-studio-no-print ${menuClassName}`}
           >
             {/* Header: title/subtitle or header label */}
             {(title || subtitle) ? (
@@ -410,18 +452,31 @@ export default function ActionMenu({
                       ? 'text-rose-400 hover:bg-rose-500/15 focus:bg-rose-500/15 active:bg-rose-500/20'
                       : isWarning
                       ? 'text-amber-400 hover:bg-amber-500/15 focus:bg-amber-500/15 active:bg-amber-500/20'
-                      : 'theme-text-primary hover:bg-[var(--accent-main)]/15 hover:theme-accent focus:bg-[var(--accent-main)]/15 focus:theme-accent'
+                      : item.active
+                      ? 'bg-[var(--accent-main)]/15 dark:bg-[var(--accent-main)]/25 theme-accent font-bold'
+                      : 'theme-text-primary hover:theme-bg-elevated focus:theme-bg-elevated'
                   }`}
                   title={item.title || item.label}
                 >
                   {renderIcon(
                     item.icon,
-                    `w-3.5 h-3.5 shrink-0 transition-transform duration-150 group-hover/item:scale-110 ${
+                    `w-4 h-4 shrink-0 transition-transform duration-150 group-hover/item:scale-110 ${
                       item.iconClassName || (isDanger ? 'text-rose-400' : isWarning ? 'text-amber-400' : 'theme-accent')
                     }`
                   )}
-                  <span className="flex-1 truncate">{item.label}</span>
-                  {item.badge && (
+                  <div className="flex-1 min-w-0">
+                    <span className="truncate block font-semibold">{item.label}</span>
+                    {item.subtitle && (
+                      <span className="text-[10px] theme-text-secondary truncate block font-normal opacity-85 mt-0.5">
+                        {item.subtitle}
+                      </span>
+                    )}
+                  </div>
+                  {item.rightElement || (item.active ? (
+                    <div className="w-4 h-4 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center shadow-xs shrink-0 ml-1.5">
+                      <CheckIcon className="w-2.5 h-2.5" />
+                    </div>
+                  ) : item.badge ? (
                     <span
                       className={`text-[10px] font-mono tracking-tight opacity-70 px-1.5 py-0.5 rounded theme-bg-sub border theme-border ${
                         item.badgeClassName || ''
@@ -429,7 +484,7 @@ export default function ActionMenu({
                     >
                       {item.badge}
                     </span>
-                  )}
+                  ) : null)}
                 </button>
               );
             })}

@@ -275,6 +275,7 @@ export const en = {
     passwordLengthError: 'Password must be at least 8 characters.',
     authFailed: 'Authentication failed. Please check your credentials and try again.',
     registrationFailed: 'Registration failed. Please verify your details.',
+    accountAlreadyExistsLoginPrompt: 'An account with this email address already exists. Please log in with your password or Continue with Google.',
     receiptBadge: 'Staff Profile Onboarded Successfully',
     applicationSubmittedBadge: 'Application Submitted for Review',
     academicInstitutionFallback: 'Academic Institution',

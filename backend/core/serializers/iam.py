@@ -438,6 +438,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
     institution_bangla_name = serializers.CharField(source='institution.bangla_name', read_only=True, default='')
     institution_slug = serializers.CharField(source='institution.slug', read_only=True, default='')
     institution_details = serializers.SerializerMethodField()
+    available_institutions = serializers.SerializerMethodField()
+    is_multi_institution = serializers.SerializerMethodField()
     has_password = serializers.SerializerMethodField()
     has_usable_password = serializers.SerializerMethodField()
     auth_provider = serializers.SerializerMethodField()
@@ -448,12 +450,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'phone_number', 'email', 'first_name', 'last_name',
             'name_bn', 'avatar_url', 'user_type', 'assigned_group',
             'institution', 'institution_name', 'institution_bangla_name', 'institution_slug',
-            'institution_details', 'has_password', 'has_usable_password', 'auth_provider',
+            'institution_details', 'available_institutions', 'is_multi_institution',
+            'has_password', 'has_usable_password', 'auth_provider',
         ]
         read_only_fields = [
             'id', 'phone_number', 'user_type', 'institution',
             'institution_name', 'institution_bangla_name', 'institution_slug',
-            'institution_details', 'has_password', 'has_usable_password', 'auth_provider'
+            'institution_details', 'available_institutions', 'is_multi_institution',
+            'has_password', 'has_usable_password', 'auth_provider'
         ]
 
     def get_has_password(self, obj):
@@ -466,6 +470,47 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if getattr(obj, 'google_sub_id', None):
             return 'GOOGLE'
         return 'LOCAL'
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_available_institutions(self, obj):
+        is_super = obj.is_superuser or getattr(obj, 'user_type', '').upper() == 'SUPER_ADMIN'
+        if is_super:
+            insts = AcademicInstitution.objects.filter(is_deleted=False).order_by('name')
+        else:
+            inst_ids = set()
+            if obj.institution_id:
+                inst_ids.add(obj.institution_id)
+            staff_filter = Q(user=obj)
+            if getattr(obj, 'email', None):
+                staff_filter |= Q(email__iexact=obj.email)
+            if getattr(obj, 'phone_number', None):
+                staff_filter |= Q(phone__iexact=obj.phone_number)
+            staff_inst_ids = StaffProfile.objects.filter(staff_filter).values_list('institution_id', flat=True)
+            inst_ids.update(staff_inst_ids)
+            if not inst_ids and getattr(obj, 'user_type', '').upper() in ['ADMIN', 'HEADMASTER', 'DIRECTOR']:
+                insts = AcademicInstitution.objects.filter(is_deleted=False).order_by('name')
+            else:
+                insts = AcademicInstitution.objects.filter(id__in=inst_ids, is_deleted=False).order_by('name')
+
+        return [
+            {
+                'id': str(inst.id),
+                'name': inst.name,
+                'bangla_name': inst.bangla_name,
+                'slug': inst.slug,
+                'code': inst.code or '',
+                'institution_type': inst.institution_type,
+                'logo_url': inst.logo_url,
+                'district': inst.district,
+                'is_verified': inst.is_verified,
+            }
+            for inst in insts
+        ]
+
+    @extend_schema_field(OpenApiTypes.BOOL)
+    def get_is_multi_institution(self, obj):
+        available = self.get_available_institutions(obj)
+        return len(available) > 1
 
     @extend_schema_field(OpenApiTypes.OBJECT)
     def get_institution_details(self, obj):

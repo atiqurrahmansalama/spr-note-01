@@ -75,7 +75,7 @@ export const navigation = {
   communications: 'যোগাযোগ ও নোটিশ',
   bugReporting: 'বাগ ও ত্রুটি রিপোর্ট',
   institutionSettings: 'প্রাতিষ্ঠানিক সেটিংস',
-  masterPolicies: 'অ্যাকাডেমিক ও পলিসি স্ট্যান্ডার্ড',
+  masterPolicies: 'প্রাতিষ্ঠানিক সেটিংস',
   developerConsole: 'ডেভেলপার কনসোল',
   roleInvites: 'ইনভাইটেশন লিংক',
   trashRestoration: 'রিসাইকেল বিন',

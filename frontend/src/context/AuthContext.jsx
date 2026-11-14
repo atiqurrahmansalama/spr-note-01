@@ -29,7 +29,10 @@ export function AuthProvider({ children }) {
         sessionStorage.setItem('spr_auth_error', errorDesc);
       } catch {}
       window.history.replaceState({}, document.title, window.location.pathname);
-      if (!window.location.pathname.startsWith('/login')) {
+      const returnUrl = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('spr_auth_return_url') : null;
+      if (returnUrl) {
+        window.location.href = returnUrl;
+      } else if (!window.location.pathname.startsWith('/login')) {
         window.location.href = '/login';
       }
       return;
@@ -63,7 +66,13 @@ export function AuthProvider({ children }) {
           try {
             sessionStorage.removeItem('spr_auth_error');
           } catch {}
-          window.location.href = '/dashboard';
+          const returnUrl = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('spr_auth_return_url') : null;
+          if (returnUrl) {
+            try { sessionStorage.removeItem('spr_auth_return_url'); } catch {}
+            window.location.href = returnUrl;
+          } else {
+            window.location.href = '/dashboard';
+          }
         })
         .catch(err => {
           console.error('[AuthProvider] Direct Google Exchange Error:', err?.response?.data || err?.message);
@@ -71,7 +80,10 @@ export function AuthProvider({ children }) {
           try {
             sessionStorage.setItem('spr_auth_error', errorMsg);
           } catch {}
-          if (!window.location.pathname.startsWith('/login')) {
+          const returnUrl = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('spr_auth_return_url') : null;
+          if (returnUrl) {
+            window.location.href = returnUrl;
+          } else if (!window.location.pathname.startsWith('/login')) {
             window.location.href = '/login';
           }
         })

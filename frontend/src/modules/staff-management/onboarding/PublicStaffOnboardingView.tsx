@@ -286,6 +286,20 @@ export const PublicStaffOnboardingView: React.FC = () => {
             regRes.errors,
             tp('registrationFailed', 'Registration failed. Please verify your details.')
           );
+          if (
+            typeof msg === 'string' &&
+            (msg.toLowerCase().includes('already exists') || msg.toLowerCase().includes('already registered'))
+          ) {
+            setAuthMode('login');
+            const existPrompt = tp(
+              'accountAlreadyExistsLoginPrompt',
+              'An account with this email address already exists. Please log in with your password or Continue with Google.'
+            );
+            setAuthError(existPrompt);
+            showToast(existPrompt, 'warning');
+            passwordInputRef.current?.focus();
+            return;
+          }
           setAuthError(msg);
           showToast(msg, 'error');
           return;
@@ -1014,7 +1028,7 @@ export const PublicStaffOnboardingView: React.FC = () => {
             connectingLabel={tp('connectingToGoogle', 'Connecting to Google...')}
             dividerLabel={tp('orContinueWithEmail', 'OR CONTINUE WITH EMAIL')}
             disabled={authLoading}
-            onSuccess={() => {
+            onSuccess={async () => {
               setAuthError('');
               showToast(
                 tp(
@@ -1023,6 +1037,34 @@ export const PublicStaffOnboardingView: React.FC = () => {
                 ),
                 'success'
               );
+              if (token) {
+                try {
+                  const updatedMeta = await verifyPublicStaffToken(token);
+                  setTokenMeta(updatedMeta);
+                  if (updatedMeta?.candidate_application) {
+                    const app = updatedMeta.candidate_application;
+                    if (app.lifecycle_level === 2 || app.lifecycle_level === 3) {
+                      setSubmittedReceipt({
+                        status: app.status.toLowerCase(),
+                        approval_status: app.status,
+                        tracking_code: app.tracking_code,
+                        staff: app.staff,
+                        lifecycle_level: app.lifecycle_level,
+                      });
+                    } else if (app.lifecycle_level === 4) {
+                      setSubmittedReceipt({
+                        status: 'rejected',
+                        approval_status: 'REJECTED',
+                        tracking_code: app.tracking_code,
+                        rejection_reason: app.rejection_reason,
+                        lifecycle_level: 4,
+                      });
+                    }
+                  }
+                } catch {
+                  // Fallback
+                }
+              }
             }}
             onError={(msg) => {
               setAuthError(msg);

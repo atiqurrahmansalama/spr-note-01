@@ -75,7 +75,7 @@ export const navigation = {
   communications: 'Communications',
   bugReporting: 'Bug Reporting',
   institutionSettings: 'Institution Settings',
-  masterPolicies: 'Academic & Policy Standards',
+  masterPolicies: 'Institution Settings',
   developerConsole: 'Developer Console',
   roleInvites: 'Role Invites',
   trashRestoration: 'Trash Restoration',

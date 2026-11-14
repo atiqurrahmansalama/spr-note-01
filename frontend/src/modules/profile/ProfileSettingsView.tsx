@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useFeatureControl } from '../../context/FeatureControlContext';
+import { useTenant } from '../../context/TenantContext';
 import { useTranslation } from '../../i18n';
 import { useRightSidebar, useDrawerRegistration } from '../../context/RightSidebarContext';
 import {
@@ -11,6 +12,7 @@ import {
   LockIcon,
   UserCheckIcon,
   MailIcon,
+  BuildingOfficeIcon,
 } from '../../components/ui/Icons';
 import { ConfirmModal } from '../../components/ui/Modal';
 import RouteLoadingFallback from '../../components/ui/RouteLoadingFallback';
@@ -33,6 +35,7 @@ import {
   Setup2FADrawer,
   PasskeysDrawer,
   ChangeEmailDrawer,
+  SwitchAcademyDrawer,
 } from './drawers';
 
 import './locales';
@@ -40,6 +43,7 @@ import './locales';
 export const ProfileSettingsView: React.FC = () => {
   const { t, formatNumber } = useTranslation('profile');
   const { isSectionEnabled } = useFeatureControl();
+  const { currentInstitution, activeTenantId, hasMultipleInstitutions } = useTenant();
   const { openDrawer, closeDrawer, isRightSidebarOpen, rightSidebarConfig } = useRightSidebar();
   const activeDrawerKey = isRightSidebarOpen ? rightSidebarConfig?.drawerKey : null;
 
@@ -224,6 +228,22 @@ export const ProfileSettingsView: React.FC = () => {
     [user?.email, user?.is_email_verified, closeDrawer, t]
   );
 
+  useDrawerRegistration(
+    'profile-academy-switch',
+    () => ({
+      title: t('drawerSwitchAcademyTitle', 'Switch Academic Workspace'),
+      category: t('title', 'Profile & Account Settings'),
+      size: 'md',
+      content: (
+        <SwitchAcademyDrawer
+          key={`drawer-profile-academy-switch-${activeTenantId}`}
+          onClose={closeDrawer}
+        />
+      ),
+    }),
+    [activeTenantId, closeDrawer, t]
+  );
+
   if (loading) {
     return (
       <RouteLoadingFallback
@@ -265,6 +285,21 @@ export const ProfileSettingsView: React.FC = () => {
         <div className="@[960px]:col-span-7 @[1140px]:col-span-8 space-y-6 @[960px]:h-full @[960px]:overflow-y-auto no-scrollbar pb-12 flex-1">
           {/* 1. Account Access & Security (Unified Section) */}
           <ProfileOptionGroup title={t('groupAccessSecurity', 'Account Access & Security')}>
+            {hasMultipleInstitutions && (
+              <ProfileOptionRow
+                icon={<BuildingOfficeIcon className="w-4 h-4 theme-accent" />}
+                title={t('switchAcademyTitle', 'Switch Academic Institution')}
+                subtitle={
+                  currentInstitution?.name
+                    ? `${currentInstitution.name} • ${t('switchAcademySubtitle', 'Change your active academic workspace')}`
+                    : t('switchAcademySubtitle', 'Change your active academic workspace')
+                }
+                badgeText={currentInstitution ? currentInstitution.code || currentInstitution.institution_type : undefined}
+                isActive={activeDrawerKey === 'profile-academy-switch'}
+                onClick={() => openDrawer('profile-academy-switch')}
+              />
+            )}
+
             <ProfileOptionRow
               icon={<UserCheckIcon className="w-4 h-4 theme-accent" />}
               title={t('accountSwitcherTitle', 'Switch or Add Account')}

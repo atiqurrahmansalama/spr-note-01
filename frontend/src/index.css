@@ -2,6 +2,8 @@
 @import "tailwindcss";
 
 
+
+
 @layer base {
   :root {
     --bg-app: #121315;
@@ -149,16 +151,9 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Custom theme utility classes (Tailwind v4 @utility directives for variant support) */
+/* Custom theme utility classes */
 @utility theme-bg-app {
   background-color: var(--bg-app);
-}
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-  &::-webkit-scrollbar {
-    display: none;
-  }
 }
 @utility theme-bg-surface {
   background-color: var(--bg-surface);
@@ -174,6 +169,85 @@ body {
 }
 @utility theme-bg-tile-muted {
   background-color: var(--bg-tile-muted);
+}
+@utility theme-bg-accent {
+  background-color: var(--accent-main);
+}
+@utility theme-bg-accent-soft {
+  background-color: var(--accent-soft);
+}
+
+/* Explicit theme background opacity modifier classes */
+.theme-bg-app\/90 { background-color: color-mix(in srgb, var(--bg-app) 90%, transparent); }
+.theme-bg-sub\/10 { background-color: color-mix(in srgb, var(--bg-surface-sub) 10%, transparent); }
+.theme-bg-sub\/15 { background-color: color-mix(in srgb, var(--bg-surface-sub) 15%, transparent); }
+.theme-bg-sub\/20 { background-color: color-mix(in srgb, var(--bg-surface-sub) 20%, transparent); }
+.theme-bg-sub\/25 { background-color: color-mix(in srgb, var(--bg-surface-sub) 25%, transparent); }
+.theme-bg-sub\/30 { background-color: color-mix(in srgb, var(--bg-surface-sub) 30%, transparent); }
+.theme-bg-sub\/35 { background-color: color-mix(in srgb, var(--bg-surface-sub) 35%, transparent); }
+.theme-bg-sub\/40 { background-color: color-mix(in srgb, var(--bg-surface-sub) 40%, transparent); }
+.theme-bg-sub\/45 { background-color: color-mix(in srgb, var(--bg-surface-sub) 45%, transparent); }
+.theme-bg-sub\/50 { background-color: color-mix(in srgb, var(--bg-surface-sub) 50%, transparent); }
+.theme-bg-sub\/60 { background-color: color-mix(in srgb, var(--bg-surface-sub) 60%, transparent); }
+.theme-bg-sub\/70 { background-color: color-mix(in srgb, var(--bg-surface-sub) 70%, transparent); }
+.theme-bg-sub\/80 { background-color: color-mix(in srgb, var(--bg-surface-sub) 80%, transparent); }
+.theme-bg-sub\/90 { background-color: color-mix(in srgb, var(--bg-surface-sub) 90%, transparent); }
+
+.theme-bg-surface\/20 { background-color: color-mix(in srgb, var(--bg-surface) 20%, transparent); }
+.theme-bg-surface\/50 { background-color: color-mix(in srgb, var(--bg-surface) 50%, transparent); }
+.theme-bg-surface\/60 { background-color: color-mix(in srgb, var(--bg-surface) 60%, transparent); }
+.theme-bg-surface\/70 { background-color: color-mix(in srgb, var(--bg-surface) 70%, transparent); }
+.theme-bg-surface\/80 { background-color: color-mix(in srgb, var(--bg-surface) 80%, transparent); }
+.theme-bg-surface\/85 { background-color: color-mix(in srgb, var(--bg-surface) 85%, transparent); }
+.theme-bg-surface\/90 { background-color: color-mix(in srgb, var(--bg-surface) 90%, transparent); }
+.theme-bg-surface\/95 { background-color: color-mix(in srgb, var(--bg-surface) 95%, transparent); }
+
+.theme-bg-elevated\/40 { background-color: color-mix(in srgb, var(--bg-elevated) 40%, transparent); }
+.theme-bg-elevated\/60 { background-color: color-mix(in srgb, var(--bg-elevated) 60%, transparent); }
+.theme-bg-elevated\/70 { background-color: color-mix(in srgb, var(--bg-elevated) 70%, transparent); }
+.theme-bg-elevated\/95 { background-color: color-mix(in srgb, var(--bg-elevated) 95%, transparent); }
+
+.theme-bg-accent\/10 { background-color: color-mix(in srgb, var(--accent-main) 10%, transparent); }
+.theme-bg-accent\/15 { background-color: color-mix(in srgb, var(--accent-main) 15%, transparent); }
+.theme-bg-accent-soft\/10 { background-color: color-mix(in srgb, var(--accent-soft) 10%, transparent); }
+.theme-bg-accent-soft\/20 { background-color: color-mix(in srgb, var(--accent-soft) 20%, transparent); }
+.theme-bg-accent-soft\/30 { background-color: color-mix(in srgb, var(--accent-soft) 30%, transparent); }
+.theme-bg-accent-soft\/35 { background-color: color-mix(in srgb, var(--accent-soft) 35%, transparent); }
+.theme-bg-accent-soft\/40 { background-color: color-mix(in srgb, var(--accent-soft) 40%, transparent); }
+.theme-bg-accent-soft\/70 { background-color: color-mix(in srgb, var(--accent-soft) 70%, transparent); }
+
+/* Explicit hover modifier classes */
+.hover\:theme-bg-app\/90:hover { background-color: color-mix(in srgb, var(--bg-app) 90%, transparent); }
+.hover\:theme-bg-sub\/10:hover { background-color: color-mix(in srgb, var(--bg-surface-sub) 10%, transparent); }
+.hover\:theme-bg-sub\/20:hover { background-color: color-mix(in srgb, var(--bg-surface-sub) 20%, transparent); }
+.hover\:theme-bg-sub\/30:hover { background-color: color-mix(in srgb, var(--bg-surface-sub) 30%, transparent); }
+.hover\:theme-bg-sub\/40:hover { background-color: color-mix(in srgb, var(--bg-surface-sub) 40%, transparent); }
+.hover\:theme-bg-sub\/50:hover { background-color: color-mix(in srgb, var(--bg-surface-sub) 50%, transparent); }
+.hover\:theme-bg-sub\/60:hover { background-color: color-mix(in srgb, var(--bg-surface-sub) 60%, transparent); }
+.hover\:theme-bg-sub\/80:hover { background-color: color-mix(in srgb, var(--bg-surface-sub) 80%, transparent); }
+
+.hover\:theme-bg-surface\/50:hover { background-color: color-mix(in srgb, var(--bg-surface) 50%, transparent); }
+.hover\:theme-bg-surface\/60:hover { background-color: color-mix(in srgb, var(--bg-surface) 60%, transparent); }
+
+.hover\:theme-bg-elevated\/40:hover { background-color: color-mix(in srgb, var(--bg-elevated) 40%, transparent); }
+.hover\:theme-bg-elevated\/50:hover { background-color: color-mix(in srgb, var(--bg-elevated) 50%, transparent); }
+.hover\:theme-bg-elevated\/60:hover { background-color: color-mix(in srgb, var(--bg-elevated) 60%, transparent); }
+.hover\:theme-bg-elevated\/70:hover { background-color: color-mix(in srgb, var(--bg-elevated) 70%, transparent); }
+.hover\:theme-bg-elevated\/75:hover { background-color: color-mix(in srgb, var(--bg-elevated) 75%, transparent); }
+.hover\:theme-bg-elevated\/80:hover { background-color: color-mix(in srgb, var(--bg-elevated) 80%, transparent); }
+
+.hover\:theme-bg-accent-soft\/20:hover { background-color: color-mix(in srgb, var(--accent-soft) 20%, transparent); }
+.hover\:theme-bg-accent-soft\/35:hover { background-color: color-mix(in srgb, var(--accent-soft) 35%, transparent); }
+.hover\:theme-bg-accent-soft\/90:hover { background-color: color-mix(in srgb, var(--accent-soft) 90%, transparent); }
+.hover\:theme-bg-danger-soft\/50:hover { background-color: color-mix(in srgb, var(--danger-soft) 50%, transparent); }
+
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 @utility theme-border {
   border-color: var(--border-color);
@@ -208,12 +282,6 @@ body {
 }
 @utility theme-text-accent {
   color: var(--accent-main);
-}
-@utility theme-bg-accent {
-  background-color: var(--accent-main);
-}
-@utility theme-bg-accent-soft {
-  background-color: var(--accent-soft);
 }
 @utility theme-accent-text {
   color: var(--accent-text);
@@ -689,10 +757,10 @@ button[data-component="icon-button"] {
 }
 .theme-icon-btn:where(:not([class*="hover:bg-"])):hover,
 button[data-component="icon-button"]:where(:not([class*="hover:bg-"])):hover {
-  background-color: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  background-color: var(--bg-elevated);
 }
 .theme-icon-btn:where(:not([class*="active:bg-"])):active,
 button[data-component="icon-button"]:where(:not([class*="active:bg-"])):active {
-  background-color: color-mix(in srgb, var(--text-primary) 18%, transparent);
+  background-color: var(--bg-elevated);
   transform: scale(0.95);
 }

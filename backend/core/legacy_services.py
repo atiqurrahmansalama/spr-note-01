@@ -527,15 +527,16 @@ def verify_google_token_or_code(id_token_input=None, access_token_input=None, co
 def get_or_create_google_user(profile_data):
     """
     Finds existing user by Google sub_id or email, or auto-registers with dynamic default role.
-    Handles deactivated accounts and profile sync.
+    Handles deactivated accounts, safe Google identity linking, and profile sync.
+    Prevents duplicate key / unique constraint crashes (sub_id, phone_number) via self-healing resolution.
     """
     from core.models import UserRole, SystemSetting
 
-    sub = profile_data.get('sub')
-    email = profile_data.get('email')
-    first_name = profile_data.get('first_name', '')
-    last_name = profile_data.get('last_name', '')
-    picture = profile_data.get('picture', '')
+    sub = str(profile_data.get('sub') or '').strip() or None
+    email = str(profile_data.get('email') or '').strip().lower() or None
+    first_name = (profile_data.get('first_name') or '').strip()
+    last_name = (profile_data.get('last_name') or '').strip()
+    picture = (profile_data.get('picture') or '').strip()
 
     user = None
     if sub:
@@ -549,7 +550,9 @@ def get_or_create_google_user(profile_data):
 
         user.auth_provider = 'google'
         user.is_email_verified = True
-        if sub and not user.google_sub_id:
+        if sub and user.google_sub_id != sub:
+            # Self-healing: Disassociate collision on another record before saving
+            User.objects.filter(google_sub_id=sub).exclude(id=user.id).update(google_sub_id=None)
             user.google_sub_id = sub
         if picture and not user.avatar_url:
             user.avatar_url = picture
@@ -577,7 +580,11 @@ def get_or_create_google_user(profile_data):
     except Exception as role_ex:
         logger.warning(f"Default UserRole fetch warning: {role_ex}")
 
+    # Generate collision-free unique phone dummy
     phone_dummy = f"g_{sub[:12]}" if sub else f"g_{uuid.uuid4().hex[:10]}"
+    while User.objects.filter(phone_number=phone_dummy).exists():
+        phone_dummy = f"g_{uuid.uuid4().hex[:10]}"
+
     defaults_dict = {
         'phone_number': phone_dummy,
         'first_name': first_name,
@@ -593,12 +600,26 @@ def get_or_create_google_user(profile_data):
     }
 
     if email:
-        user, created = User.objects.get_or_create(
-            email=email,
-            defaults=defaults_dict
-        )
+        user = User.objects.filter(email__iexact=email).first()
+        if user:
+            if sub and user.google_sub_id != sub:
+                User.objects.filter(google_sub_id=sub).exclude(id=user.id).update(google_sub_id=None)
+                user.google_sub_id = sub
+            user.auth_provider = 'google'
+            user.is_email_verified = True
+            if picture and not user.avatar_url:
+                user.avatar_url = picture
+            user.save()
+            created = False
+        else:
+            if sub:
+                User.objects.filter(google_sub_id=sub).update(google_sub_id=None)
+            user = User.objects.create(email=email, **defaults_dict)
+            created = True
     else:
-        user = User.objects.create_user(**defaults_dict)
+        if sub:
+            User.objects.filter(google_sub_id=sub).update(google_sub_id=None)
+        user = User.objects.create(**defaults_dict)
         created = True
 
     if not user.is_active or getattr(user, 'is_deactivated', False):
