@@ -1308,8 +1308,7 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
               {hoveredIndex !== null && trendPoints[hoveredIndex] && (() => {
                 const pt = trendPoints[hoveredIndex];
                 const leftPx = ((hoveredIndex + 0.5) / trendPoints.length) * containerWidth;
-                const tooltipWidth = 220;
-                const clampedLeft = Math.max(tooltipWidth / 2 + 10, Math.min(containerWidth - tooltipWidth / 2 - 10, leftPx));
+                const clampedLeft = Math.max(100, Math.min(containerWidth - 100, leftPx));
 
                 return (
                   <div
@@ -1320,15 +1319,17 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
                       transform: "translateX(-50%)",
                     }}
                   >
-                    <div className="bg-[var(--bg-elevated)] theme-bg-elevated border theme-border rounded-xl px-3 py-2.5 shadow-xl text-xs space-y-1.5 w-56 backdrop-blur-md">
-                      <div className="font-bold theme-text-primary border-b theme-border pb-1 flex items-center justify-between">
-                        <span>{pt.label}</span>
-                        <span className="text-[10px] font-mono theme-text-secondary">{pt.dateStr}</span>
+                    <div className="bg-white dark:bg-[#18191c] dark:theme-bg-surface rounded-2xl p-3.5 theme-shadow-popover text-xs space-y-2 border-0 ring-0 w-max min-w-[170px] max-w-[280px] select-none">
+                      <div className="font-bold theme-text-primary flex items-center justify-between gap-3 text-[12px]">
+                        <span className="truncate">{pt.label}</span>
+                        <span className="text-[10px] font-mono theme-text-secondary opacity-80 shrink-0">{pt.dateStr}</span>
                       </div>
 
-                      <div className="space-y-1 text-[11px] pt-0.5">
+                      <div className="h-px w-full theme-bg-sub/80 border-0" />
+
+                      <div className="space-y-1.5 text-[11px]">
                         {(currentMetric === "combined" || currentMetric === "pages") && (
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between gap-4">
                             <span className="theme-text-secondary">Pages Recited:</span>
                             <span className="font-mono font-bold theme-accent">
                               {Number(Number(pt.totalPages || 0).toFixed(1))}p
@@ -1338,21 +1339,22 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
 
                         {(currentMetric === "combined" || currentMetric === "mistakes") && (
                           <>
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between gap-4">
                               <span className="flex items-center gap-1.5 text-[var(--color-danger)] font-semibold">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-danger)] inline-block" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-danger)] inline-block shrink-0" />
                                 Mistakes:
                               </span>
                               <span className="font-mono font-bold theme-text-primary">{pt.totalMistakes}</span>
                             </div>
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between gap-4">
                               <span className="flex items-center gap-1.5 text-amber-500 font-semibold">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block shrink-0" />
                                 Stucks:
                               </span>
                               <span className="font-mono font-bold theme-text-primary">{pt.totalStucks}</span>
                             </div>
-                            <div className="flex items-center justify-between pt-1 border-t theme-border font-bold">
+                            <div className="h-px w-full theme-bg-sub/80 border-0" />
+                            <div className="flex items-center justify-between gap-4 font-bold">
                               <span className="theme-text-secondary">Total Errors:</span>
                               <span className="font-mono theme-text-primary">{pt.totalErrors}</span>
                             </div>
@@ -1428,11 +1430,6 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
             ) : (
               <span className="text-xs font-medium theme-text-secondary">
                 {footerStudents.length} Total Students
-              </span>
-            )}
-            {activeHoverPoint && (
-              <span className="text-[10px] theme-accent font-mono ml-0.5 font-semibold shrink-0">
-                ({activeHoverPoint.label})
               </span>
             )}
           </div>

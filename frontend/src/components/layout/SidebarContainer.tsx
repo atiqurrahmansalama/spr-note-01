@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { auth as authStore } from "../../utils/localStore";
 import { useFeatureControl } from "../../context/FeatureControlContext";
@@ -6,6 +6,7 @@ import { useTenant } from "../../context/TenantContext";
 import { useAuth } from "../../context/AuthContext";
 import { useTranslation } from "../../i18n";
 import { extractRoleCode, isUserSuperAdmin, isUserAcademyAdmin } from "../../utils/roleUtils";
+import { preloadRouteChunk } from "../../utils/routePreloader";
 import { 
   DashboardIcon, 
   AppearanceIcon, 
@@ -85,48 +86,11 @@ export interface SidebarMenuItem {
   superAdminOnly?: boolean;
 }
 
-export default function SidebarContainer({ 
-  isOpen, 
-  onClose, 
-  activePath: propActivePath,
-  sidebarMode = "inline",
-}: SidebarContainerProps): React.JSX.Element | null {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const currentPath = propActivePath || location.pathname;
-  const { t } = useTranslation('navigation');
-
-  const { isMultiTenantAdmin, isAcademyAdmin } = useTenant();
-  // Parent options are collapsed by default
-  const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
-
-  const toggleSubMenu = (menuName: string, currentEffectiveOpen?: boolean) => {
-    setOpenSubMenus((prev) => {
-      const isCurrentlyOpen = currentEffectiveOpen !== undefined 
-        ? currentEffectiveOpen 
-        : Boolean(prev[menuName]);
-      return {
-        ...prev,
-        [menuName]: !isCurrentlyOpen,
-      };
-    });
-  };
-
-  const { isSectionEnabled } = useFeatureControl();
-
-  const { user: authUser } = useAuth();
-  const currentUser = (authUser && typeof authUser === 'object' ? authUser : null) || authStore.getUser() || {};
-  const isSuper = isUserSuperAdmin(currentUser, isMultiTenantAdmin);
-  const isAcademyAdministrator = isUserAcademyAdmin(currentUser, isMultiTenantAdmin, isAcademyAdmin);
-
-  const resolvedCode = extractRoleCode(currentUser);
-  const dashboardRoleSlug = isSuper
-    ? 'super-admin'
-    : (resolvedCode || (isAcademyAdministrator ? 'ADMIN' : 'TEACHER'))
-        .toLowerCase()
-        .replace(/[_\s]+/g, '-');
-
-  const menuItems: SidebarMenuItem[] = [
+/**
+ * Creates canonical sidebar navigation structure
+ */
+function createMenuItems(dashboardRoleSlug: string): SidebarMenuItem[] {
+  return [
     {
       id: "Dashboard",
       name: "Dashboard",
@@ -388,61 +352,123 @@ export default function SidebarContainer({
     { id: "App Guide", name: "App Guide", i18nKey: "appGuide", path: "/guide", matchPaths: ["/guide"], Icon: AppGuideIcon, key: "nav_app_guide" },
     { id: "About", name: "About", i18nKey: "about", path: "/about", matchPaths: ["/about"], Icon: AboutIcon, key: "nav_about" },
   ];
+}
 
-  const handleNavigate = (path?: string) => {
-    if (path) {
-      navigate(path);
-      if (sidebarMode === "overlay" && isOpen) {
-        onClose();
-      }
-    }
-  };
+function SidebarContainerComponent({ 
+  isOpen, 
+  onClose, 
+  activePath: propActivePath,
+  sidebarMode = "inline",
+}: SidebarContainerProps): React.JSX.Element | null {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentPath = propActivePath || location.pathname;
+  const { t } = useTranslation('navigation');
 
-  if (!isOpen) return null;
+  const { isMultiTenantAdmin, isAcademyAdmin } = useTenant();
+  // Parent options are collapsed by default
+  const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
+
+  // Optimistic active path for 0ms instantaneous active state feedback on click
+  const [optimisticActivePath, setOptimisticActivePath] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOptimisticActivePath(null);
+  }, [currentPath]);
+
+  const effectivePath = optimisticActivePath || currentPath;
+
+  const toggleSubMenu = useCallback((menuName: string, currentEffectiveOpen?: boolean) => {
+    setOpenSubMenus((prev) => {
+      const isCurrentlyOpen = currentEffectiveOpen !== undefined 
+        ? currentEffectiveOpen 
+        : Boolean(prev[menuName]);
+      return {
+        ...prev,
+        [menuName]: !isCurrentlyOpen,
+      };
+    });
+  }, []);
+
+  const { isSectionEnabled } = useFeatureControl();
+
+  const { user: authUser } = useAuth();
+  const currentUser = (authUser && typeof authUser === 'object' ? authUser : null) || authStore.getUser() || {};
+  const isSuper = isUserSuperAdmin(currentUser, isMultiTenantAdmin);
+  const isAcademyAdministrator = isUserAcademyAdmin(currentUser, isMultiTenantAdmin, isAcademyAdmin);
+
+  const resolvedCode = extractRoleCode(currentUser);
+  const dashboardRoleSlug = isSuper
+    ? 'super-admin'
+    : (resolvedCode || (isAcademyAdministrator ? 'ADMIN' : 'TEACHER'))
+        .toLowerCase()
+        .replace(/[_\s]+/g, '-');
+
+  const menuItems = useMemo(() => createMenuItems(dashboardRoleSlug), [dashboardRoleSlug]);
 
   const isCollapsed = sidebarMode === "collapsed";
   const isOverlay = sidebarMode === "overlay";
   const isMobileScreen = typeof window !== "undefined" && window.innerWidth < 768;
 
-  const displayMenuItems = menuItems
-    .map((item) => {
-      if (item.hasSub && item.subItems) {
-        const visibleSubItems = item.subItems.filter((sub) => {
-          if (sub.superAdminOnly && !isSuper) return false;
-          if (sub.adminOnly && !isAcademyAdministrator && !isSuper) return false;
-          return isSectionEnabled(sub.key);
-        });
-        return { ...item, subItems: visibleSubItems };
-      }
-      return item;
-    })
-    .filter((item) => {
-      if (isMobileScreen && item.id === "Shortcuts") return false;
-      if (item.superAdminOnly && !isSuper) return false;
-      if (item.adminOnly && !isAcademyAdministrator && !isSuper) return false;
-      
-      const isVisible = isSectionEnabled(item.key);
-      if (!isVisible && !(isAcademyAdministrator && (item.id === "Dashboard" || item.id === "Academy" || item.id === "Action & Helpdesk"))) return false;
-      
-      if (item.hasSub && item.subItems && item.subItems.length === 0) return false;
-      
-      return true;
-    });
+  const displayMenuItems = useMemo(() => {
+    return menuItems
+      .map((item) => {
+        if (item.hasSub && item.subItems) {
+          const visibleSubItems = item.subItems.filter((sub) => {
+            if (sub.superAdminOnly && !isSuper) return false;
+            if (sub.adminOnly && !isAcademyAdministrator && !isSuper) return false;
+            return isSectionEnabled(sub.key);
+          });
+          return { ...item, subItems: visibleSubItems };
+        }
+        return item;
+      })
+      .filter((item) => {
+        if (isMobileScreen && item.id === "Shortcuts") return false;
+        if (item.superAdminOnly && !isSuper) return false;
+        if (item.adminOnly && !isAcademyAdministrator && !isSuper) return false;
+        
+        const isVisible = isSectionEnabled(item.key);
+        if (!isVisible && !(isAcademyAdministrator && (item.id === "Dashboard" || item.id === "Academy" || item.id === "Action & Helpdesk"))) return false;
+        
+        if (item.hasSub && item.subItems && item.subItems.length === 0) return false;
+        
+        return true;
+      });
+  }, [menuItems, isSuper, isAcademyAdministrator, isSectionEnabled, isMobileScreen]);
 
-  const checkIsActive = (path?: string, item: SidebarMenuItem | SidebarSubItem | null = null) => {
+  const checkIsActive = useCallback((path?: string, item: SidebarMenuItem | SidebarSubItem | null = null) => {
     if (!path && !item) return false;
     if (path === "/") {
-      return currentPath === "/" || currentPath === "/dashboard";
+      return effectivePath === "/" || effectivePath === "/dashboard";
     }
-    if (currentPath === path) return true;
+    if (effectivePath === path) return true;
     if (item && Array.isArray(item.exactMatchPaths)) {
-      if (item.exactMatchPaths.some((p) => currentPath === p)) return true;
+      if (item.exactMatchPaths.some((p) => effectivePath === p)) return true;
     }
     if (item && Array.isArray(item.matchPaths)) {
-      return item.matchPaths.some((p) => currentPath === p || currentPath.startsWith(p + '/'));
+      return item.matchPaths.some((p) => effectivePath === p || effectivePath.startsWith(p + '/'));
     }
     return false;
-  };
+  }, [effectivePath]);
+
+  const handleNavigate = useCallback((path?: string) => {
+    if (!path) return;
+    if (path === currentPath) return;
+
+    // Optimistically update active state immediately (0ms visual latency)
+    setOptimisticActivePath(path);
+
+    // Use React concurrent transition for smooth, non-blocking route change
+    React.startTransition(() => {
+      navigate(path);
+      if (sidebarMode === "overlay" && isOpen) {
+        onClose();
+      }
+    });
+  }, [currentPath, navigate, sidebarMode, isOpen, onClose]);
+
+  if (!isOpen) return null;
 
   return (
     <>
@@ -457,7 +483,7 @@ export default function SidebarContainer({
         className={`
           ${isOverlay ? "fixed top-0 left-0 z-50 shadow-2xl h-full" : "relative z-20 h-full"}
           ${isCollapsed ? "w-16 sm:w-20" : "w-[280px] sm:w-[275px] max-w-[88vw]"}
-          theme-bg-surface theme-text-secondary shrink-0 flex flex-col justify-between transition-all duration-200 ease-out select-none
+          theme-bg-surface theme-text-secondary shrink-0 flex flex-col justify-between transition-colors duration-150 ease-out select-none
         `}
       >
         {/* App Name Header at the top of Sidebar when open in Overlay Mode */}
@@ -499,7 +525,7 @@ export default function SidebarContainer({
                     type="button"
                     onClick={() => toggleSubMenu(item.id, isSubOpen)}
                     title={t(item.i18nKey, item.name)}
-                    className={`w-full flex items-center ${isCollapsed ? "justify-center p-2.5" : "justify-between px-3 sm:px-3.5 py-2.5 sm:py-2.5"} rounded-xl transition-all cursor-pointer select-none ${
+                    className={`w-full flex items-center ${isCollapsed ? "justify-center p-2.5" : "justify-between px-3 sm:px-3.5 py-2.5 sm:py-2.5"} rounded-xl transition-colors duration-150 cursor-pointer select-none ${
                       isParentActive || isAnySubActive
                         ? "theme-bg-elevated theme-text-primary font-semibold shadow-sm"
                         : "hover:theme-bg-sub theme-text-secondary hover:theme-text-primary"
@@ -532,8 +558,10 @@ export default function SidebarContainer({
                             key={sub.id}
                             type="button"
                             onClick={() => handleNavigate(sub.path)}
+                            onMouseEnter={() => preloadRouteChunk(sub.path)}
+                            onFocus={() => preloadRouteChunk(sub.path)}
                             title={t(sub.i18nKey, sub.name)}
-                            className={`w-full flex items-center gap-3 relative ${isCollapsed ? "justify-center p-2" : "px-3 sm:px-3 py-2 sm:py-2"} rounded-xl transition-all cursor-pointer select-none ${
+                            className={`w-full flex items-center gap-3 relative ${isCollapsed ? "justify-center p-2" : "px-3 sm:px-3 py-2 sm:py-2"} rounded-xl transition-colors duration-150 cursor-pointer select-none ${
                               isSubActive
                                 ? "theme-bg-elevated theme-text-primary font-semibold shadow-sm"
                                 : "hover:theme-bg-sub theme-text-secondary hover:theme-text-primary"
@@ -558,8 +586,10 @@ export default function SidebarContainer({
                 key={item.id}
                 type="button"
                 onClick={() => handleNavigate(item.path)}
+                onMouseEnter={() => preloadRouteChunk(item.path)}
+                onFocus={() => preloadRouteChunk(item.path)}
                 title={t(item.i18nKey, item.name)}
-                className={`w-full flex items-center ${isCollapsed ? "justify-center p-2.5" : "px-3 sm:px-3.5 py-2.5 sm:py-2.5"} rounded-xl transition-all cursor-pointer select-none ${
+                className={`w-full flex items-center ${isCollapsed ? "justify-center p-2.5" : "px-3 sm:px-3.5 py-2.5 sm:py-2.5"} rounded-xl transition-colors duration-150 cursor-pointer select-none ${
                   isActive
                     ? "theme-bg-elevated theme-text-primary font-semibold shadow-sm"
                     : "hover:theme-bg-sub theme-text-secondary hover:theme-text-primary"
@@ -585,7 +615,7 @@ export default function SidebarContainer({
             title={t('officialWebsite', 'Official Website')}
             className={`w-full flex items-center ${
               isCollapsed ? "justify-center p-2" : "justify-start px-3 py-2.5 gap-3"
-            } rounded-xl theme-bg-sub/60 hover:theme-bg-elevated border theme-border theme-text-primary transition-all cursor-pointer shadow-xs group`}
+            } rounded-xl theme-bg-sub/60 hover:theme-bg-elevated border theme-border theme-text-primary transition-colors duration-150 cursor-pointer shadow-xs group`}
           >
             <div className="w-7 h-7 rounded-lg theme-bg-accent-soft text-[var(--accent-main)] flex items-center justify-center shrink-0">
               <GlobeIcon className="w-4 h-4" />
@@ -607,7 +637,7 @@ export default function SidebarContainer({
                   if (isOverlay) onClose();
                   navigate('/version-control');
                 }}
-                className="font-mono font-semibold px-2 py-0.5 rounded-md theme-bg-sub/80 border theme-border hover:theme-accent hover:border-[var(--accent-main)] transition cursor-pointer select-none"
+                className="font-mono font-semibold px-2 py-0.5 rounded-md theme-bg-sub/80 border theme-border hover:theme-accent hover:border-[var(--accent-main)] transition-colors duration-150 cursor-pointer select-none"
                 title="View Release Notes"
               >
                 v1.4.0
@@ -621,7 +651,7 @@ export default function SidebarContainer({
                   if (isOverlay) onClose();
                   navigate('/version-control');
                 }}
-                className="font-mono text-[9px] font-semibold px-1 py-0.5 rounded theme-bg-sub border theme-border hover:theme-accent"
+                className="font-mono text-[9px] font-semibold px-1 py-0.5 rounded theme-bg-sub border theme-border hover:theme-accent transition-colors duration-150"
                 title="v1.4.0 • Release Notes"
               >
                 v1.4
@@ -633,3 +663,6 @@ export default function SidebarContainer({
     </>
   );
 }
+
+const SidebarContainer = React.memo(SidebarContainerComponent);
+export default SidebarContainer;

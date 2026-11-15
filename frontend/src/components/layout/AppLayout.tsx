@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { calendarSettings, sidebarSettings } from "../../utils/localStore";
 import Sidebar from "./SidebarContainer";
@@ -272,6 +272,12 @@ export default function AppLayout() {
     return () => window.removeEventListener("spr_navigate_dashboard", handleNavDashboard);
   }, [navigate]);
 
+  // Memoized Outlet Context to prevent cascading re-renders across child routes
+  const outletContext = useMemo(
+    () => ({ timeZone, setTimeZone, dateFormat, setDateFormat }),
+    [timeZone, dateFormat]
+  );
+
   // Route Meta Resolution
   const currentPath = location.pathname;
   const isDashboardRoute = currentPath === "/" || currentPath.startsWith("/dashboard");
@@ -306,12 +312,12 @@ export default function AppLayout() {
     }
   };
 
-  const handleCloseSidebar = () => {
+  const handleCloseSidebar = useCallback(() => {
     setIsSidebarOpen(false);
     if (!isMobile) {
       try { localStorage.setItem("spr_sidebar_is_open", "false"); } catch {}
     }
-  };
+  }, [isMobile]);
 
   const handleBlockViewBack = () => {
     // If a drawer/right sidebar is currently active, back navigation dismisses the drawer first
@@ -373,8 +379,8 @@ export default function AppLayout() {
 
         {/* Center / Dashboard Main Content Area */}
         {isDashboardRoute && (
-          <main className="flex-1 h-full overflow-y-auto transition-all duration-300 min-w-0">
-            <Outlet context={{ timeZone, setTimeZone, dateFormat, setDateFormat }} />
+          <main className="flex-1 h-full overflow-y-auto min-w-0">
+            <Outlet context={outletContext} />
           </main>
         )}
 
@@ -393,7 +399,7 @@ export default function AppLayout() {
                 }}
                 dockPosition="left"
               >
-                <Outlet context={{ timeZone, setTimeZone, dateFormat, setDateFormat }} />
+                <Outlet context={outletContext} />
               </SidebarScreenBlockView>
             </div>
           </div>
