@@ -7,6 +7,7 @@ import { useHorizontalScroll } from '../../../../hooks';
 import { useSectionTranslation } from '../hooks/useSectionTranslation';
 import { ScopeType, RoleOption, UserSearchResult, AcademyOption } from '../types';
 import SectionSearchInput from './SectionSearchInput';
+import SectionStatsMetaCard from './SectionStatsMetaCard';
 
 export interface SectionTargetBarProps {
   activeScope: ScopeType;
@@ -26,8 +27,12 @@ export interface SectionTargetBarProps {
   onAuditScopeFilterChange?: (scope: string) => void;
   onRefreshAuditLogs?: () => void;
   loadingAuditLogs?: boolean;
-  // New prop: total number of feature switches (sections) across all categories
   totalSectionsCount?: number;
+  // Real-time authoritative feature stats props for metacard
+  enabledSectionsCount?: number;
+  disabledSectionsCount?: number;
+  activePercentage?: number;
+  modifiedCount?: number;
 }
 
 export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
@@ -47,7 +52,11 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
   onAuditScopeFilterChange,
   onRefreshAuditLogs,
   loadingAuditLogs = false,
-  totalSectionsCount,
+  totalSectionsCount = 0,
+  enabledSectionsCount = 0,
+  disabledSectionsCount = 0,
+  activePercentage = 0,
+  modifiedCount = 0,
 }) => {
   const { t, formatNumber } = useSectionTranslation();
   const rolesScrollRef = useHorizontalScroll();
@@ -87,22 +96,35 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
 
   return (
     <div className="p-3 sm:p-4 theme-bg-surface border theme-border rounded-2xl shadow-xs transition-all w-full">
-      {/* 1. Global Scope: Global Defaults Label (Left) + Single Medium Search Bar (Right) */}
+      {/* 1. Global Scope: Global Defaults Label (Left) + Search & Stats More Button (Right) */}
       {activeScope === 'global' && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
-          <div className="flex items-center gap-1 text-xs font-bold theme-text-secondary uppercase tracking-wider">
-            {t('tabs.totalFeatures', 'Total Features:')}
-            {typeof totalSectionsCount === 'number' && (
-              <span className="text-xs theme-text-secondary ml-1">{formatNumber(totalSectionsCount)}</span>
-            )}
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xs font-bold theme-text-secondary uppercase tracking-wider">
+              {t('tabs.global', 'Global Defaults')}
+            </span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold theme-bg-sub theme-text-secondary shrink-0">
+              {formatNumber(enabledSectionsCount)} / {formatNumber(totalSectionsCount)} {t('stats.enabled', 'Active')}
+            </span>
           </div>
-          <div className="w-full sm:w-80 shrink-0">
-            <SectionSearchInput value={searchFilter} onChange={onSearchFilterChange} />
+
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+            <div className="w-full sm:w-80">
+              <SectionSearchInput value={searchFilter} onChange={onSearchFilterChange} />
+            </div>
+            <SectionStatsMetaCard
+              activeScope={activeScope}
+              totalCount={totalSectionsCount}
+              enabledCount={enabledSectionsCount}
+              disabledCount={disabledSectionsCount}
+              percentage={activePercentage}
+              modifiedCount={modifiedCount}
+            />
           </div>
         </div>
       )}
 
-      {/* 2. Target Role Scope: Scrollable Role Pills (Left) + Single Medium Search Bar (Right) */}
+      {/* 2. Target Role Scope: Scrollable Role Pills (Left) + Search & Stats More Button (Right) */}
       {activeScope === 'role' && (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
@@ -137,13 +159,25 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
               )}
             </div>
           </div>
-          <div className="w-full sm:w-80 shrink-0">
-            <SectionSearchInput value={searchFilter} onChange={onSearchFilterChange} />
+
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+            <div className="w-full sm:w-80">
+              <SectionSearchInput value={searchFilter} onChange={onSearchFilterChange} />
+            </div>
+            <SectionStatsMetaCard
+              activeScope={activeScope}
+              totalCount={totalSectionsCount}
+              enabledCount={enabledSectionsCount}
+              disabledCount={disabledSectionsCount}
+              percentage={activePercentage}
+              activeRole={selectedRole}
+              modifiedCount={modifiedCount}
+            />
           </div>
         </div>
       )}
 
-      {/* 3. Target Academy Scope: Academy Dropdown (Left) + Single Medium Search Bar (Right) */}
+      {/* 3. Target Academy Scope: Academy Dropdown (Left) + Search & Stats More Button (Right) */}
       {activeScope === 'academy' && (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
@@ -163,13 +197,24 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
             </div>
           </div>
 
-          <div className="w-full sm:w-80 shrink-0">
-            <SectionSearchInput value={searchFilter} onChange={onSearchFilterChange} />
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+            <div className="w-full sm:w-80">
+              <SectionSearchInput value={searchFilter} onChange={onSearchFilterChange} />
+            </div>
+            <SectionStatsMetaCard
+              activeScope={activeScope}
+              totalCount={totalSectionsCount}
+              enabledCount={enabledSectionsCount}
+              disabledCount={disabledSectionsCount}
+              percentage={activePercentage}
+              activeAcademy={selectedAcademy}
+              modifiedCount={modifiedCount}
+            />
           </div>
         </div>
       )}
 
-      {/* 4. Target User Scope: User Dropdown (Left) + Single Medium Search Bar (Right) */}
+      {/* 4. Target User Scope: User Dropdown (Left) + Search & Stats More Button (Right) */}
       {activeScope === 'user' && (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
@@ -204,8 +249,19 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
             )}
           </div>
 
-          <div className="w-full sm:w-80 shrink-0">
-            <SectionSearchInput value={searchFilter} onChange={onSearchFilterChange} />
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+            <div className="w-full sm:w-80">
+              <SectionSearchInput value={searchFilter} onChange={onSearchFilterChange} />
+            </div>
+            <SectionStatsMetaCard
+              activeScope={activeScope}
+              totalCount={totalSectionsCount}
+              enabledCount={enabledSectionsCount}
+              disabledCount={disabledSectionsCount}
+              percentage={activePercentage}
+              activeUser={selectedUser}
+              modifiedCount={modifiedCount}
+            />
           </div>
         </div>
       )}

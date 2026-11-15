@@ -15,7 +15,7 @@ export const navigation = {
   residentialAttendance: 'حضور السكن الداخلي',
   adhocHeadcount: 'الإحصاء الميداني',
   attendanceSettings: 'إعدادات الحضور',
-  academy: 'الهيكل الأكاديمي',
+  academy: 'التنظيم الأكاديمي',
   campusProfile: 'هيكل الحرم الجامعي',
   classesGroups: 'الصفوف والأقسام',
   departments: 'الأقسام',

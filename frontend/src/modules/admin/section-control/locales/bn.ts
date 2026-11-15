@@ -28,6 +28,16 @@ export const bn = {
     totalFeatures: 'মোট ফিচার:',
   },
 
+  stats: {
+    title: 'ফিচার কন্ট্রোল পর্যালোচনা',
+    total: 'মোট ফিচার কন্ট্রোলার',
+    enabled: 'চালু ও সক্রিয়',
+    disabled: 'বন্ধ / নিষ্ক্রিয়',
+    activeRate: 'সক্রিয়তার হার',
+    liveSynced: 'সিঙ্ক্রোনাইজড ও লাইভ',
+    unsavedChanges: 'এই স্কোপে {{count}} টি অসংরক্ষিত পরিবর্তন',
+  },
+
   actions: {
     saveChanges: 'পরিবর্তন সংরক্ষণ করুন',
     saving: 'সংরক্ষণ হচ্ছে...',

@@ -15,7 +15,7 @@ export const navigation = {
   residentialAttendance: 'اقامتی حاضری',
   adhocHeadcount: 'ہنگامی گنتی',
   attendanceSettings: 'حاضری کی ترتیبات',
-  academy: 'تعلیمی ڈھانچہ',
+  academy: 'تعلیمی تنظیم',
   campusProfile: 'کیمپس ڈھانچہ',
   classesGroups: 'کلاسز اور سیکشنز',
   departments: 'شعبہ جات',

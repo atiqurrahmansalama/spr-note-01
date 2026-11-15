@@ -15,7 +15,7 @@ export const navigation = {
   residentialAttendance: 'Residential Attendance',
   adhocHeadcount: 'Ad-hoc Headcount',
   attendanceSettings: 'Attendance Settings',
-  academy: 'Academy Structure',
+  academy: 'Academic Organization',
   campusProfile: 'Campus Structure',
   classesGroups: 'Classes & Sections',
   departments: 'Departments',

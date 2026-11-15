@@ -23,7 +23,6 @@ import {
 
 export const CONFIGURABLE_WIDGET_IDS = new Set([
   'kpi_metrics',
-  'recitation_trends',
   'quick_actions',
   'working_hours',
   'academic_events',
@@ -89,8 +88,8 @@ export default function DashboardWidgetCardItem({
       });
       return combined;
     }
-    return getKpiCardsForRole(role as DashboardRole);
-  }, [role]);
+    return getKpiCardsForRole(role as DashboardRole, isFeatureEnabled);
+  }, [role, isFeatureEnabled]);
 
   return (
     <div
@@ -180,14 +179,18 @@ export default function DashboardWidgetCardItem({
         <div className="px-4 pb-4 pt-2 border-t theme-border space-y-3.5 animate-fade-in">
           {/* 1. KPI Metrics & Executive Counters */}
           {widgetDef.id === 'kpi_metrics' && (() => {
-            const allRoleIds = roleKpis
-              .filter((i) => !i.requiredFeatureKey || isFeatureEnabled(i.requiredFeatureKey))
-              .map((i) => i.id);
-            const currentIds = settings.visibleMetricIds || allRoleIds;
+            // Strictly filter by Feature & Module Control: unpermitted cards must never show in customizer
+            const permittedKpis = roleKpis.filter(
+              (i) => !i.requiredFeatureKey || isFeatureEnabled(i.requiredFeatureKey)
+            );
+            const allPermittedIds = permittedKpis.map((i) => i.id);
+            const currentIds = settings.visibleMetricIds
+              ? settings.visibleMetricIds.filter((id: string) => allPermittedIds.includes(id))
+              : allPermittedIds;
 
-            // Group KPI cards by module for structured clean subheadings
-            const moduleGroups = new Map<string, typeof roleKpis>();
-            roleKpis.forEach((item) => {
+            // Group KPI cards by module for structured clean subheadings (only permitted cards!)
+            const moduleGroups = new Map<string, typeof permittedKpis>();
+            permittedKpis.forEach((item) => {
               const mod = item.module || 'General Metrics';
               if (!moduleGroups.has(mod)) {
                 moduleGroups.set(mod, []);
@@ -207,100 +210,59 @@ export default function DashboardWidgetCardItem({
                   </span>
                 </div>
 
-                <div className="space-y-3.5 pr-1">
-                  {Array.from(moduleGroups.entries()).map(([modTitle, items]) => (
-                    <div key={modTitle} className="space-y-1.5">
-                      {moduleGroups.size > 1 && (
-                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--accent-main)] pt-2 pb-1 border-b theme-border select-none">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-main)]" />
-                          <span>{modTitle}</span>
-                          <span className="ml-auto text-[9px] font-mono theme-text-secondary font-semibold">
-                            {items.length} {items.length === 1 ? 'card' : 'cards'}
-                          </span>
-                        </div>
-                      )}
-                      <div className="space-y-1">
-                        {items.map((kpiItem) => {
-                          const isCardBlocked =
-                            kpiItem.requiredFeatureKey && !isFeatureEnabled(kpiItem.requiredFeatureKey);
-                          if (!isSuperAdmin && isCardBlocked) return null;
+                {permittedKpis.length === 0 ? (
+                  <div className="p-3 text-center text-xs theme-text-secondary">
+                    No executive KPI cards are enabled for this role under Feature &amp; Module Control.
+                  </div>
+                ) : (
+                  <div className="space-y-3.5 pr-1">
+                    {Array.from(moduleGroups.entries()).map(([modTitle, items]) => {
+                      if (items.length === 0) return null;
 
-                          const isChecked = currentIds.includes(kpiItem.id) && !isCardBlocked;
-
-                          return (
-                            <div key={kpiItem.id} className="py-1 flex items-center justify-between">
-                              <CustomCheckbox
-                                checked={isChecked}
-                                onChange={(kpiChecked: boolean) => {
-                                  if (isCardBlocked || !onUpdateSettings) return;
-                                  const nextIds = kpiChecked
-                                    ? [...currentIds, kpiItem.id]
-                                    : currentIds.filter((id: string) => id !== kpiItem.id);
-                                  onUpdateSettings({ visibleMetricIds: nextIds });
-                                }}
-                                label={kpiItem.label}
-                                disabled={isCardBlocked || disabled}
-                                size="sm"
-                              />
-                              {isCardBlocked && (
-                                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                                  (Feature Disabled)
-                                </span>
-                              )}
+                      return (
+                        <div key={modTitle} className="space-y-1.5">
+                          {moduleGroups.size > 1 && (
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--accent-main)] pt-2 pb-1 border-b theme-border select-none">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-main)]" />
+                              <span>{modTitle}</span>
+                              <span className="ml-auto text-[9px] font-mono theme-text-secondary font-semibold">
+                                {items.length} {items.length === 1 ? 'card' : 'cards'}
+                              </span>
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                          )}
+                          <div className="space-y-1">
+                            {items.map((kpiItem) => {
+                              const isChecked = currentIds.includes(kpiItem.id);
+
+                              return (
+                                <div key={kpiItem.id} className="py-1 flex items-center justify-between">
+                                  <CustomCheckbox
+                                    checked={isChecked}
+                                    onChange={(kpiChecked: boolean) => {
+                                      if (!onUpdateSettings) return;
+                                      const nextIds = kpiChecked
+                                        ? [...currentIds, kpiItem.id]
+                                        : currentIds.filter((id: string) => id !== kpiItem.id);
+                                      onUpdateSettings({ visibleMetricIds: nextIds });
+                                    }}
+                                    label={kpiItem.label}
+                                    disabled={disabled}
+                                    size="sm"
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })()}
 
-          {/* 2. Recitation Trends Analytics */}
-          {widgetDef.id === 'recitation_trends' && (
-            <div className="space-y-3 pt-1">
-              <div className="text-xs font-bold theme-text-primary flex items-center gap-1.5 pb-1 border-b theme-border">
-                <TrendingUpIcon className="w-3.5 h-3.5 theme-accent" />
-                <span>Recitation Analytics Display Options</span>
-              </div>
-
-              <div className="space-y-2.5 pt-1">
-                <CustomCheckbox
-                  checked={settings.showKpis !== false}
-                  onChange={(checkVal: boolean) =>
-                    onUpdateSettings?.({ showKpis: checkVal })
-                  }
-                  disabled={disabled}
-                  label="Show Top Sparkline KPI Cards"
-                  size="sm"
-                />
-
-                <CustomCheckbox
-                  checked={settings.showTrendsChart !== false}
-                  onChange={(checkVal: boolean) =>
-                    onUpdateSettings?.({ showTrendsChart: checkVal })
-                  }
-                  disabled={disabled}
-                  label="Show Daily Recitation Trends Chart"
-                  size="sm"
-                />
-
-                <CustomCheckbox
-                  checked={settings.showBreakdown !== false}
-                  onChange={(checkVal: boolean) =>
-                    onUpdateSettings?.({ showBreakdown: checkVal })
-                  }
-                  disabled={disabled}
-                  label="Show Right Session Distribution Gauge"
-                  size="sm"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* 3. Quick Actions Shortcuts */}
+          {/* 2. Quick Actions Shortcuts */}
           {widgetDef.id === 'quick_actions' && (
             <div className="space-y-3 pt-1">
               <div className="flex items-center justify-between pb-1 border-b theme-border">
@@ -380,7 +342,7 @@ export default function DashboardWidgetCardItem({
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="grid grid-cols-1 gap-2 pt-1">
                 <button
                   type="button"
                   onClick={(e) => {
@@ -431,7 +393,7 @@ export default function DashboardWidgetCardItem({
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="grid grid-cols-1 gap-2 pt-1">
                 <button
                   type="button"
                   onClick={(e) => {

@@ -27,7 +27,7 @@ export default function SystemGatewaysWidget({
   ];
 
   return (
-    <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-3.5 select-none ${className}`}>
+    <div className={`@container p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-3.5 select-none ${className}`}>
       <div className="flex items-center justify-between pb-1">
         <div className="flex items-center gap-2 min-w-0">
           <SparklesIcon className="w-4 h-4 text-[var(--accent-main)] shrink-0" />
@@ -50,7 +50,7 @@ export default function SystemGatewaysWidget({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 @[420px]:grid-cols-2 gap-3">
         {GATEWAYS.map((gw) => {
           const Icon = gw.icon;
 

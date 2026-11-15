@@ -4,3 +4,4 @@ export { SectionToggleCard } from './SectionToggleCard';
 export { SectionCategoryGroup } from './SectionCategoryGroup';
 export { SectionAuditLogTable } from './SectionAuditLogTable';
 export { SectionSearchInput } from './SectionSearchInput';
+export { SectionStatsMetaCard } from './SectionStatsMetaCard';

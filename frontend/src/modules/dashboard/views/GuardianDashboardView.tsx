@@ -121,7 +121,7 @@ export default function GuardianDashboardView({
     },
     finance_overview: {},
     notice_board: {},
-    hifz_tracker: {},
+    recitation_trends_chart: {},
   };
 
   return (

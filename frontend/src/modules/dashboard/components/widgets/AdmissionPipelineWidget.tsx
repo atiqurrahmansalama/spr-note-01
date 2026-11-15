@@ -34,7 +34,7 @@ export default function AdmissionPipelineWidget({
   ];
 
   return (
-    <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs h-full flex flex-col justify-start space-y-4 select-none ${className}`}>
+    <div className={`@container p-5 rounded-2xl theme-bg-surface shadow-xs h-full flex flex-col justify-start space-y-4 select-none ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between pb-1">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -66,7 +66,7 @@ export default function AdmissionPipelineWidget({
       </div>
 
       {/* Pipeline 4-Stage Grid (Borderless) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 @[400px]:grid-cols-4 gap-2">
         {stages.map((stage) => (
           <div
             key={stage.label}

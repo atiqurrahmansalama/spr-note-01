@@ -28,6 +28,16 @@ export const ar = {
     totalFeatures: 'إجمالي الميزات:',
   },
 
+  stats: {
+    title: 'نظرة عامة على عناصر التحكم',
+    total: 'إجمالي عناصر التحكم',
+    enabled: 'مفعل ونشط',
+    disabled: 'معطل / غير نشط',
+    activeRate: 'معدل التفعيل',
+    liveSynced: 'متزامن ومباشر',
+    unsavedChanges: '{{count}} تغييرات غير محفوظة في هذا النطاق',
+  },
+
   actions: {
     saveChanges: 'حفظ التغييرات',
     saving: 'جارٍ الحفظ...',

@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from '../../../../../i18n';
+import { useFeatureControl } from '../../../../../context/FeatureControlContext';
+import { getRequiredFeatureKeyForMetric } from '../../../widgetRegistry';
+import { MetricCard } from '@/components/ui/MetricsGrid';
 import type { DashboardMetric } from '../../../types';
 
 export interface KpiMetricsWidgetProps {
@@ -32,6 +35,7 @@ export default function KpiMetricsWidget({
   className = '',
 }: KpiMetricsWidgetProps) {
   const { formatNumber } = useTranslation();
+  const { isFeatureEnabled } = useFeatureControl();
 
   // Internal order state to enable fluid in-place dragging
   const [internalOrder, setInternalOrder] = useState<string[]>(metricOrder || []);
@@ -46,6 +50,17 @@ export default function KpiMetricsWidget({
 
   const displayedMetrics = useMemo(() => {
     let list = [...(metrics || [])];
+
+    // 1. Strictly filter by Feature & Module Control (Single Source of Truth)
+    list = list.filter((m) => {
+      const featureKey = m.requiredFeatureKey || getRequiredFeatureKeyForMetric(m.id);
+      if (featureKey && !isFeatureEnabled(featureKey)) {
+        return false;
+      }
+      return true;
+    });
+
+    // 2. Filter by user customized visibleMetricIds
     if (visibleMetricIds && visibleMetricIds.length > 0) {
       list = list.filter((m) => visibleMetricIds.includes(m.id));
     }
@@ -63,7 +78,7 @@ export default function KpiMetricsWidget({
     }
 
     return list;
-  }, [metrics, visibleMetricIds, internalOrder, metricOrder]);
+  }, [metrics, isFeatureEnabled, visibleMetricIds, internalOrder, metricOrder]);
 
   if (!displayedMetrics || displayedMetrics.length === 0) return null;
 
@@ -109,20 +124,21 @@ export default function KpiMetricsWidget({
     setDragOverIndex(null);
   };
 
-  const effectiveCols = cols || (displayedMetrics.length <= 3 ? 3 : 4);
+  const effectiveCols = cols || (displayedMetrics.length <= 3 ? displayedMetrics.length : 4);
 
-  let gridCols = 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 @sm:grid-cols-2 @2xl:grid-cols-4';
-  if (effectiveCols === 2) gridCols = 'grid-cols-1 sm:grid-cols-2 @sm:grid-cols-2';
-  else if (effectiveCols === 3) gridCols = 'grid-cols-1 sm:grid-cols-3 @sm:grid-cols-3';
-  else if (effectiveCols === 4) gridCols = 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 @sm:grid-cols-2 @2xl:grid-cols-4';
-  else if (displayedMetrics.length === 3) gridCols = 'grid-cols-1 sm:grid-cols-3 @sm:grid-cols-3';
-  else if (displayedMetrics.length === 2) gridCols = 'grid-cols-1 sm:grid-cols-2 @sm:grid-cols-2';
+  let gridCols = 'grid-cols-2 @[580px]:grid-cols-4';
+  if (effectiveCols === 2 || displayedMetrics.length === 2) {
+    gridCols = 'grid-cols-2';
+  } else if (effectiveCols === 3 || displayedMetrics.length === 3) {
+    gridCols = 'grid-cols-2 @[580px]:grid-cols-3';
+  } else {
+    // 4 metrics: 2 per line on small, 4 per line on mid & large
+    gridCols = 'grid-cols-2 @[580px]:grid-cols-4';
+  }
 
   return (
-    <div className={`grid ${gridCols} gap-3 sm:gap-4 w-full select-none ${className}`}>
+    <div className={`@container grid ${gridCols} gap-2 @[480px]:gap-2.5 @[1100px]:gap-3.5 w-full select-none ${className}`}>
       {displayedMetrics.map((item, index) => {
-        const Icon = item.icon;
-        const theme = COLOR_THEMES[item.color || 'accent'] || COLOR_THEMES.accent;
         const displayVal = typeof item.value === 'number' ? formatNumber(item.value) : item.value;
         const isDragging = draggedIndex === index;
         const isDragOver = dragOverIndex === index;
@@ -135,47 +151,44 @@ export default function KpiMetricsWidget({
             onDragOver={isEditMode ? (e) => handleDragOver(e, index) : undefined}
             onDrop={isEditMode ? (e) => handleDrop(e, index) : undefined}
             onDragEnd={isEditMode ? handleDragEnd : undefined}
-            onClick={item.onClick}
-            className={`p-4 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md flex flex-col justify-between transition-all min-w-0 relative select-none ${
+            className={`transition-all duration-150 min-w-0 relative select-none ${
               isEditMode
-                ? 'cursor-grab active:cursor-grabbing ring-1 ring-[var(--accent-main)]/20 hover:ring-[var(--accent-main)]/40'
-                : item.onClick
-                ? 'cursor-pointer'
-                : 'cursor-default'
+                ? 'cursor-grab active:cursor-grabbing ring-1 ring-[var(--accent-main)]/20 hover:ring-[var(--accent-main)]/40 rounded-2xl'
+                : ''
             } ${
               isDragging ? 'opacity-40 scale-[0.98]' : 'opacity-100'
             } ${
-              isDragOver && isEditMode ? 'ring-2 ring-[var(--accent-main)] scale-[1.01]' : ''
+              isDragOver && isEditMode ? 'ring-2 ring-[var(--accent-main)] scale-[1.01] rounded-2xl' : ''
             }`}
           >
-            {/* Top Row: Bare Icon & Trend Badge */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="shrink-0 flex items-center justify-center">
-                <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${theme.iconColor}`} />
-              </div>
-
-              {item.trend && (
-                <span className="text-[11px] font-mono font-bold flex items-center gap-0.5 theme-text-secondary shrink-0">
-                  <span>{item.trend.isPositive !== false ? '↑' : '↓'}</span>
-                  <span>{item.trend.value}</span>
-                </span>
-              )}
-            </div>
-
-            {/* Bottom Row: Normal theme colors (No saturated bright text, normal theme-text-primary) */}
-            <div className="mt-3 space-y-0.5">
-              <div className="text-xl sm:text-2xl font-black tracking-tight leading-none theme-text-primary">
-                {displayVal}
-              </div>
-              <div className="text-xs font-semibold theme-text-secondary truncate mt-1">
-                {item.label}
-              </div>
-              {item.subLabel && (
-                <div className="text-[10px] theme-text-secondary truncate">
-                  {item.subLabel}
-                </div>
-              )}
-            </div>
+            <MetricCard
+              variant="kpi"
+              label={item.label}
+              value={displayVal}
+              subLabel={item.subLabel}
+              icon={item.icon}
+              onClick={item.onClick}
+              badge={
+                item.trend ? (
+                  <span
+                    className={`font-mono font-bold text-[10px] @[1100px]:text-[11px] flex items-center gap-1 truncate ${
+                      item.trend.isPositive !== false
+                        ? 'theme-accent'
+                        : 'text-amber-600 dark:text-amber-400'
+                    }`}
+                  >
+                    <span>{item.trend.isPositive !== false ? '↑' : '↓'}</span>
+                    <span>{item.trend.value}</span>
+                    {item.trend.label && (
+                      <span className="theme-text-secondary font-normal ml-0.5 truncate">
+                        {item.trend.label}
+                      </span>
+                    )}
+                  </span>
+                ) : undefined
+              }
+              className="h-full"
+            />
           </div>
         );
       })}

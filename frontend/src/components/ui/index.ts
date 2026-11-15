@@ -66,5 +66,7 @@ export { default as FilterBox } from './FilterBox';
 export type { FilterBoxProps, FilterBoxScopeItem, FilterBoxRenderProps } from './FilterBox';
 export { default as NavigationBackButton, NavigationBackButton as NamedNavigationBackButton } from './NavigationBackButton';
 export type { NavigationBackButtonProps, NavigationHistoryCustomItem } from './NavigationBackButton';
+export { default as FloatingActionDock } from './FloatingActionDock';
+export type { FloatingActionDockProps } from './FloatingActionDock';
 export * from './Icons';
 

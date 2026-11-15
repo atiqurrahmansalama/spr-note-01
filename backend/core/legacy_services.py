@@ -127,7 +127,8 @@ def sync_feature_registry_to_db():
     # Automatically map categories keys to titles in exact sidebar order
     category_titles = {
         "NAVIGATION": "Dashboard",
-        "INSTITUTIONS": "Academy Structure",
+        "ACTION_HELPDESK": "Action & Helpdesk",
+        "INSTITUTIONS": "Academic Organization",
         "ACADEMIC": "Daily Classroom",
         "EXAMINATIONS": "Examination & Results",
         "STUDENTS": "Student",

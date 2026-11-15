@@ -43,7 +43,7 @@ export default function AttendancePulseWidget({
   const leavePct = total > 0 ? Math.round((onLeave / total) * 100) : 0;
 
   return (
-    <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs h-full flex flex-col justify-start space-y-4 select-none ${className}`}>
+    <div className={`@container p-5 rounded-2xl theme-bg-surface shadow-xs h-full flex flex-col justify-start space-y-4 select-none ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between gap-2 pb-1">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -101,7 +101,7 @@ export default function AttendancePulseWidget({
       </div>
 
       {/* 4 Status Pills (Borderless) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-2 @[380px]:grid-cols-4 gap-2.5">
         {/* Present */}
         <div className="p-2.5 rounded-xl bg-emerald-500/10 space-y-0.5 text-left rtl:text-right">
           <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 truncate">

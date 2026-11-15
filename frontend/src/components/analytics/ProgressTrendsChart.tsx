@@ -828,12 +828,12 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
   return (
     <div
       ref={chartContainerRef}
-      className={`theme-bg-surface border theme-border rounded-2xl p-3.5 sm:p-5 shadow-2xs space-y-4 select-none relative w-full min-w-0 overflow-hidden ${className}`}
+      className={`@container theme-bg-surface border theme-border rounded-2xl p-3.5 sm:p-5 shadow-2xs space-y-4 select-none relative w-full min-w-0 overflow-hidden ${className}`}
     >
       {/* 1. Header Toolbar: Left Title + Right Unified Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b theme-border pb-3 w-full min-w-0">
+      <div className="flex flex-col @[680px]:flex-row @[680px]:items-center justify-between gap-2.5 border-b theme-border pb-3 w-full min-w-0">
         {/* Row 1 on mobile: Left Title + Right 3-Dot ActionMenu */}
-        <div className="flex items-center justify-between w-full sm:w-auto min-w-0">
+        <div className="flex items-center justify-between w-full @[680px]:w-auto min-w-0">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0">
               <TrendingUpIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -861,7 +861,7 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
           </div>
 
           {/* Mobile 3-dot button: stays on the exact same line as Recitation Trends */}
-          <div className="sm:hidden shrink-0">
+          <div className="@[680px]:hidden shrink-0">
             <ActionMenu
               items={exportMenuItems}
               size="sm"
@@ -875,7 +875,7 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
         </div>
 
         {/* Row 2 on mobile: All Pages Errors Bars Line on ONE single line */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-nowrap overflow-x-auto no-scrollbar justify-start sm:justify-end w-full sm:w-auto">
+        <div className="flex items-center gap-1.5 @[680px]:gap-2 shrink-0 flex-nowrap overflow-x-auto no-scrollbar justify-start @[680px]:justify-end w-full @[680px]:w-auto">
           <SegmentedSwitch
             options={metricOptions}
             value={currentMetric}
@@ -893,7 +893,7 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
           />
 
           {/* Desktop 3-dot button: sits at the end of the controls bar */}
-          <div className="hidden sm:block shrink-0">
+          <div className="hidden @[680px]:block shrink-0">
             <ActionMenu
               items={exportMenuItems}
               size="sm"
@@ -911,8 +911,8 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
       <div
         className={`grid gap-3 pt-1 ${
           currentMetric === "combined"
-            ? "grid-cols-2 sm:grid-cols-4"
-            : "grid-cols-2 sm:grid-cols-3"
+            ? "grid-cols-2 @[580px]:grid-cols-4"
+            : "grid-cols-2 @[580px]:grid-cols-3"
         }`}
       >
         {kpiItems.map((item) => (

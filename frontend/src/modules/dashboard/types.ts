@@ -24,6 +24,7 @@ export interface DashboardMetric {
   };
   icon: React.ComponentType<{ className?: string }>;
   color?: 'accent' | 'emerald' | 'purple' | 'amber' | 'rose' | 'sky' | 'indigo';
+  requiredFeatureKey?: string;
   onClick?: () => void;
   path?: string;
 }

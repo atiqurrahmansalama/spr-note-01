@@ -75,10 +75,10 @@ export default function AgendaScheduleWidget({
 
   return (
     <div
-      className={`p-5 rounded-3xl theme-bg-surface shadow-xs h-full flex flex-col justify-start space-y-4 select-none min-w-0 border-0 ${className}`}
+      className={`@container p-5 rounded-3xl theme-bg-surface shadow-xs h-full flex flex-col justify-start space-y-4 select-none min-w-0 border-0 ${className}`}
     >
       {/* Top Header Row with Action Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1 shrink-0">
+      <div className="flex flex-col @[480px]:flex-row @[480px]:items-center @[480px]:justify-between gap-3 pb-1 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
             <ClockIcon className="w-4 h-4" />

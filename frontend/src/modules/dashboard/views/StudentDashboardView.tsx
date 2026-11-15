@@ -114,7 +114,7 @@ export default function StudentDashboardView({
       items: upcomingEvents,
       title: 'Upcoming Assessments & Holidays',
     },
-    hifz_tracker: {},
+    recitation_trends_chart: {},
     notice_board: {},
   };
 

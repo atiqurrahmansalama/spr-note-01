@@ -5,17 +5,17 @@ import { normalizeRoleCode } from '../../utils/roleUtils';
 import {
   KpiMetricsWidget,
   AttendancePulseWidget,
-  AcademicProgressWidget,
   TimetableScheduleWidget,
   QuickActionsWidget,
   RecentActivityFeedWidget,
   SystemGatewaysWidget,
-  HifzQuranProgressWidget,
   FinanceCollectionWidget,
   AdmissionPipelineWidget,
   ResidentialOccupancyWidget,
   NoticeBoardWidget,
-  RecitationTrendsWidget,
+  RecitationKpiCardsWidget,
+  RecitationTrendsChartWidget,
+  RecitationSessionBreakdownWidget,
   WorkingHoursWidget,
   AcademicEventsWidget,
   AgendaScheduleWidget,
@@ -72,10 +72,60 @@ export const ROLE_KPI_CARDS_CATALOG: Record<string, KpiCardCatalogItem[]> = {
   ],
 };
 
+/**
+ * Returns the required feature key for an executive KPI metric ID if one is assigned.
+ */
+export function getRequiredFeatureKeyForMetric(metricId: string): string | undefined {
+  for (const list of Object.values(ROLE_KPI_CARDS_CATALOG)) {
+    const found = list.find((item) => item.id === metricId);
+    if (found?.requiredFeatureKey) return found.requiredFeatureKey;
+  }
+  return undefined;
+}
+
 export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
+  recitation_kpis: {
+    id: 'recitation_kpis',
+    title: 'Recitation Performance KPIs',
+    description: 'Sparkline KPI metric cards for total sessions, pages recited, recitation accuracy rate, and stucks.',
+    category: 'ACADEMIC',
+    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STAFF', 'STUDENT', 'GUARDIAN'],
+    defaultColSpan: 4,
+    minColSpan: 2,
+    maxColSpan: 4,
+    widgetFeatureKey: 'dashboard_widget_recitation_kpis',
+    requiredFeatureKey: 'progress_management',
+    component: RecitationKpiCardsWidget,
+  },
+  recitation_trends_chart: {
+    id: 'recitation_trends_chart',
+    title: 'Recitation Progress Trends Chart',
+    description: 'Chronological bar and area chart of daily recitation volume, pages, mistakes, and stucks.',
+    category: 'ACADEMIC',
+    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STAFF', 'STUDENT', 'GUARDIAN'],
+    defaultColSpan: 2,
+    minColSpan: 2,
+    maxColSpan: 4,
+    widgetFeatureKey: 'dashboard_widget_recitation_trends',
+    requiredFeatureKey: 'progress_management',
+    component: RecitationTrendsChartWidget,
+  },
+  recitation_session_breakdown: {
+    id: 'recitation_session_breakdown',
+    title: 'Recitation Session Distribution',
+    description: 'Visual circular breakdown and volume gauge of recitations across daily prayer sessions (Fajr, Zuhr, Asr, Maghrib, Isha).',
+    category: 'ACADEMIC',
+    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STAFF', 'STUDENT', 'GUARDIAN'],
+    defaultColSpan: 2,
+    minColSpan: 1,
+    maxColSpan: 4,
+    widgetFeatureKey: 'dashboard_widget_recitation_breakdown',
+    requiredFeatureKey: 'progress_management',
+    component: RecitationSessionBreakdownWidget,
+  },
   recitation_trends: {
     id: 'recitation_trends',
-    title: 'Recitation Trends & Analytics',
+    title: 'Recitation Progress Trends Chart',
     description: 'Chronological student recitation volume, pages recited, mistakes, and stucks analysis from Progress Reports.',
     category: 'ACADEMIC',
     allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STAFF', 'STUDENT', 'GUARDIAN'],
@@ -84,7 +134,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     maxColSpan: 4,
     widgetFeatureKey: 'dashboard_widget_recitation_trends',
     requiredFeatureKey: 'progress_management',
-    component: RecitationTrendsWidget,
+    component: RecitationTrendsChartWidget,
   },
   kpi_metrics: {
     id: 'kpi_metrics',
@@ -111,32 +161,6 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     widgetFeatureKey: 'dashboard_widget_attendance_pulse',
     requiredFeatureKey: 'monthly_attendance_matrix',
     component: AttendancePulseWidget,
-  },
-  hifz_tracker: {
-    id: 'hifz_tracker',
-    title: 'Hifz Quran Tracker (Sabaq, Sabqi, Dawr)',
-    description: 'Daily Quran memorization status, completed Juz, and mistake counts.',
-    category: 'ACADEMIC',
-    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STAFF', 'STUDENT', 'GUARDIAN'],
-    defaultColSpan: 2,
-    minColSpan: 1,
-    maxColSpan: 4,
-    widgetFeatureKey: 'dashboard_widget_hifz_tracker',
-    requiredFeatureKey: 'progress_management',
-    component: HifzQuranProgressWidget,
-  },
-  academic_progress: {
-    id: 'academic_progress',
-    title: 'Academic & Syllabus Velocity',
-    description: 'Syllabus completion percentage across subjects, lessons, and term goals.',
-    category: 'ACADEMIC',
-    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STAFF', 'STUDENT', 'GUARDIAN'],
-    defaultColSpan: 2,
-    minColSpan: 1,
-    maxColSpan: 4,
-    widgetFeatureKey: 'dashboard_widget_academic_progress',
-    requiredFeatureKey: 'lesson_management',
-    component: AcademicProgressWidget,
   },
   timetable_schedule: {
     id: 'timetable_schedule',
@@ -328,14 +352,15 @@ export const DEFAULT_ROLE_LAYOUTS: Record<string, DashboardLayoutItem[]> = {
   ],
   TEACHER: [
     { widgetId: 'kpi_metrics', order: 1, colSpan: 4, isVisible: true },
-    { widgetId: 'recitation_trends', order: 2, colSpan: 4, isVisible: true },
-    { widgetId: 'hifz_tracker', order: 3, colSpan: 2, isVisible: true },
-    { widgetId: 'attendance_pulse', order: 4, colSpan: 2, isVisible: true },
-    { widgetId: 'timetable_schedule', order: 5, colSpan: 2, isVisible: true },
-    { widgetId: 'agenda_schedule', order: 6, colSpan: 2, isVisible: true },
-    { widgetId: 'academic_events', order: 7, colSpan: 4, isVisible: true },
-    { widgetId: 'quick_actions', order: 8, colSpan: 4, isVisible: true },
-    { widgetId: 'notice_board', order: 9, colSpan: 4, isVisible: true },
+    { widgetId: 'recitation_kpis', order: 2, colSpan: 4, isVisible: true },
+    { widgetId: 'recitation_trends_chart', order: 3, colSpan: 2, isVisible: true },
+    { widgetId: 'recitation_session_breakdown', order: 4, colSpan: 2, isVisible: true },
+    { widgetId: 'attendance_pulse', order: 5, colSpan: 2, isVisible: true },
+    { widgetId: 'timetable_schedule', order: 6, colSpan: 2, isVisible: true },
+    { widgetId: 'agenda_schedule', order: 7, colSpan: 2, isVisible: true },
+    { widgetId: 'academic_events', order: 8, colSpan: 4, isVisible: true },
+    { widgetId: 'quick_actions', order: 9, colSpan: 4, isVisible: true },
+    { widgetId: 'notice_board', order: 10, colSpan: 4, isVisible: true },
   ],
   STAFF: [
     { widgetId: 'kpi_metrics', order: 1, colSpan: 4, isVisible: true },
@@ -349,7 +374,7 @@ export const DEFAULT_ROLE_LAYOUTS: Record<string, DashboardLayoutItem[]> = {
   ],
   STUDENT: [
     { widgetId: 'kpi_metrics', order: 1, colSpan: 4, isVisible: true },
-    { widgetId: 'hifz_tracker', order: 2, colSpan: 2, isVisible: true },
+    { widgetId: 'recitation_trends_chart', order: 2, colSpan: 2, isVisible: true },
     { widgetId: 'attendance_pulse', order: 3, colSpan: 2, isVisible: true },
     { widgetId: 'timetable_schedule', order: 4, colSpan: 2, isVisible: true },
     { widgetId: 'notice_board', order: 5, colSpan: 2, isVisible: true },
@@ -357,7 +382,7 @@ export const DEFAULT_ROLE_LAYOUTS: Record<string, DashboardLayoutItem[]> = {
   ],
   GUARDIAN: [
     { widgetId: 'kpi_metrics', order: 1, colSpan: 4, isVisible: true },
-    { widgetId: 'hifz_tracker', order: 2, colSpan: 2, isVisible: true },
+    { widgetId: 'recitation_trends_chart', order: 2, colSpan: 2, isVisible: true },
     { widgetId: 'attendance_pulse', order: 3, colSpan: 2, isVisible: true },
     { widgetId: 'finance_overview', order: 4, colSpan: 2, isVisible: true },
     { widgetId: 'notice_board', order: 5, colSpan: 2, isVisible: true },
@@ -484,8 +509,45 @@ export function getSavedLayout(tenantId: string, role: DashboardRole, userId?: s
   const globalTemplateKey = `spr_dashboard_template_GLOBAL_${roleCode}_v1`;
 
   const normalizeLayoutItems = (items: any[]): DashboardLayoutItem[] => {
-    // 1. Remove legacy monolithic academic_calendar and upcoming_events widgets
-    const filtered = items.filter((i) => i && i.widgetId !== 'academic_calendar' && i.widgetId !== 'upcoming_events');
+    // 1. Remove legacy monolithic widgets and removed widgets (hifz_tracker, academic_progress)
+    const rawFiltered = items.filter(
+      (i) =>
+        i &&
+        i.widgetId !== 'academic_calendar' &&
+        i.widgetId !== 'upcoming_events' &&
+        i.widgetId !== 'hifz_tracker' &&
+        i.widgetId !== 'academic_progress'
+    );
+
+    // 2. Expand legacy monolithic recitation_trends into 3 standalone widgets
+    const filtered: any[] = [];
+    rawFiltered.forEach((i) => {
+      if (i.widgetId === 'recitation_trends') {
+        const showKpis = i.settings?.showKpis !== false;
+        const showChart = i.settings?.showTrendsChart !== false;
+        const showBreakdown = i.settings?.showBreakdown !== false;
+        filtered.push({
+          widgetId: 'recitation_kpis',
+          order: i.order || 1,
+          colSpan: 4,
+          isVisible: i.isVisible !== false && showKpis,
+        });
+        filtered.push({
+          widgetId: 'recitation_trends_chart',
+          order: (i.order || 1) + 1,
+          colSpan: 2,
+          isVisible: i.isVisible !== false && showChart,
+        });
+        filtered.push({
+          widgetId: 'recitation_session_breakdown',
+          order: (i.order || 1) + 2,
+          colSpan: 2,
+          isVisible: i.isVisible !== false && showBreakdown,
+        });
+      } else {
+        filtered.push(i);
+      }
+    });
 
     // 2. Ensure separated widgets (working_hours, academic_events, agenda_schedule) exist for roles
     const hasWorkingHours = filtered.some((i) => i.widgetId === 'working_hours');

@@ -46,7 +46,7 @@ export const MODULE_CATEGORIES: ModuleCategoryDef[] = [
     title: 'Daily Classroom & Hifz Progress',
     moduleName: 'Daily Classroom',
     icon: BookOpenIcon,
-    widgetIds: ['recitation_trends', 'hifz_tracker', 'academic_progress'],
+    widgetIds: ['recitation_kpis', 'recitation_trends_chart', 'recitation_session_breakdown'],
   },
   {
     id: 'ROUTINE_CURRICULUM',

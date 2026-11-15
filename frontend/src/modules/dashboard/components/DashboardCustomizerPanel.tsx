@@ -196,8 +196,6 @@ export default function DashboardCustomizerPanel({
 
   // Instant Reset to Defaults
   const handleReset = () => {
-    const defaultLayout = resetLayout(activeTenantId || 'default', role);
-    setDraftLayout(defaultLayout);
     onResetLayout(role);
   };
 
@@ -238,10 +236,10 @@ export default function DashboardCustomizerPanel({
       padding="none"
       className="space-y-6 pt-2 pb-16 @container text-left rtl:text-right"
       footer={
-        <div className="p-3.5 rounded-2xl border-0 ring-0 theme-bg-surface shadow-md flex flex-col gap-3">
+        <div className="w-full flex flex-col gap-3 pt-3 border-t theme-border">
           {/* Canonical CustomCheckbox for Super Admin Default Layout Save */}
           {isSuperAdmin && (
-            <div className="pb-1">
+            <div className="px-0.5">
               <CustomCheckbox
                 checked={saveAsDefault}
                 onChange={handleSaveAsDefaultToggle}
@@ -251,55 +249,41 @@ export default function DashboardCustomizerPanel({
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-2.5">
-            {/* Live Sync Active Status Indicator */}
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 select-none">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span>Live Synced</span>
-            </div>
+          {/* Bottom Action Line outside any card box */}
+          <div className="flex items-center justify-between gap-3 w-full">
+            <CustomButton
+              type="button"
+              variant="sub"
+              size="sm"
+              icon={RefreshIcon}
+              onClick={handleReset}
+              className="rounded-xl px-4"
+            >
+              Reset Defaults
+            </CustomButton>
 
-            <div className="flex items-center gap-2">
-              <CustomButton
-                type="button"
-                variant="primary"
-                size="sm"
-                icon={CheckCircleIcon}
-                onClick={onClose}
-                className="rounded-xl px-5"
-              >
-                Done
-              </CustomButton>
-            </div>
+            <CustomButton
+              type="button"
+              variant="primary"
+              size="sm"
+              icon={CheckCircleIcon}
+              onClick={onClose}
+              className="rounded-xl px-6"
+            >
+              Done
+            </CustomButton>
           </div>
         </div>
       }
     >
-      {/* 1. Top Description Banner with Reset Defaults Action Button */}
-      <div className="p-3.5 sm:p-4 rounded-2xl theme-bg-app border-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-xl theme-bg-accent-soft text-[var(--accent-main)] flex items-center justify-center shrink-0">
-            <AdjustmentsHorizontalIcon className="w-4 h-4" />
-          </div>
-          <div className="space-y-0.5 text-xs min-w-0">
-            <div className="font-bold theme-text-primary">
-              Workspace Customizer for {roleDisplayName}
-            </div>
-            <div className="text-[11px] theme-text-secondary truncate">
-              Changes reflect live on your workspace in real-time
-            </div>
-          </div>
-        </div>
-
-        <CustomButton
-          type="button"
-          variant="sub"
-          size="xs"
-          icon={RefreshIcon}
-          onClick={handleReset}
-          className="shrink-0 rounded-xl"
-        >
-          Reset Defaults
-        </CustomButton>
+      {/* 1. Top Description Header - Flush with start margin */}
+      <div className="space-y-1 pb-1">
+        <h3 className="text-xs font-bold theme-text-primary">
+          Workspace Customizer for {roleDisplayName}
+        </h3>
+        <p className="text-[11px] theme-text-secondary leading-relaxed">
+          Changes reflect live on your workspace in real-time
+        </p>
       </div>
 
       {/* 2. Module-Wise Categorized Sections or Empty State */}
@@ -345,17 +329,12 @@ export default function DashboardCustomizerPanel({
 
             return (
               <div key={moduleCat.id} className="space-y-3">
-                {/* Clean Module Section Header */}
-                <div className="flex items-center justify-between pb-1.5">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <ModuleIcon className="w-4 h-4 theme-accent shrink-0" />
-                    <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary truncate">
-                      {moduleCat.title}
-                    </h4>
-                  </div>
-                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full theme-bg-sub theme-text-secondary shrink-0">
-                    {eligibleModuleWidgets.length} {eligibleModuleWidgets.length === 1 ? 'widget' : 'widgets'}
-                  </span>
+                {/* Canonical Streamlined Section Header */}
+                <div className="flex items-center gap-2 pb-2 border-b theme-border">
+                  <ModuleIcon className="w-4 h-4 theme-accent shrink-0" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary truncate">
+                    {moduleCat.title}
+                  </h4>
                 </div>
 
                 {/* Render Clean Widget Cards List */}
@@ -369,16 +348,11 @@ export default function DashboardCustomizerPanel({
           {/* Safeguard: Uncategorized Widgets Section */}
           {uncategorizedWidgets.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between pb-1.5">
-                <div className="flex items-center gap-2 min-w-0">
-                  <SparklesIcon className="w-4 h-4 theme-accent shrink-0" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary truncate">
-                    Additional Widgets
-                  </h4>
-                </div>
-                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full theme-bg-sub theme-text-secondary shrink-0">
-                  {uncategorizedWidgets.length}
-                </span>
+              <div className="flex items-center gap-2 pb-2 border-b theme-border">
+                <SparklesIcon className="w-4 h-4 theme-accent shrink-0" />
+                <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary truncate">
+                  Additional Widgets
+                </h4>
               </div>
 
               <div className="space-y-2.5">

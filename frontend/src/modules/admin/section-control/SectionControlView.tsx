@@ -1,10 +1,8 @@
 import React, { useMemo } from 'react';
 import PageContainer from '../../../components/layout/PageContainer';
-import PageHeader from '../../../components/ui/PageHeader';
 import TabSwitcher from '../../../components/ui/TabSwitcher';
-import CustomButton from '../../../components/ui/CustomButton';
+import FloatingActionDock from '../../../components/ui/FloatingActionDock';
 import {
-  SectionControlIcon,
   GlobeIcon,
   UsersIcon,
   BuildingLibraryIcon,
@@ -17,7 +15,6 @@ import { useSectionTranslation } from './hooks/useSectionTranslation';
 import { useSectionControl } from './hooks/useSectionControl';
 import { ScopeType } from './types';
 import {
-  SectionHeaderActions,
   SectionTargetBar,
   SectionCategoryGroup,
   SectionAuditLogTable,
@@ -57,7 +54,6 @@ export const SectionControlView: React.FC = () => {
     handleSaveBatch,
     handleDiscardChanges,
     handleResetOverrides,
-    handleClearOverridesGlobally,
     loadAuditLogs,
   } = useSectionControl();
 
@@ -133,35 +129,49 @@ export const SectionControlView: React.FC = () => {
     return categories.some((cat) => cat.sections.some(checkMatch));
   }, [categories, searchFilter]);
 
-  return (
-    <PageContainer maxWidth="7xl" className="space-y-4 sm:space-y-6">
-      {/* 1. Page Header */}
-      <PageHeader
-        icon={SectionControlIcon}
-        title={t('header.title', 'Feature & Module Control')}
-        subtitle={t(
-          'header.subtitle',
-          'Configure feature visibility, module access, and multi-tier override scopes across your institution.'
-        )}
-      />
+  // Real-time authoritative feature stats across all active sections
+  const featureStats = useMemo(() => {
+    let total = 0;
+    let enabled = 0;
 
-      {/* 2. Scope Tabs with Save Changes Action on the right line */}
+    const countSection = (sec: any) => {
+      total += 1;
+      const isItemEnabled =
+        modifiedFlags[sec.section_key] !== undefined
+          ? Boolean(modifiedFlags[sec.section_key])
+          : Boolean(sec.effective_enabled ?? sec.is_enabled);
+      if (isItemEnabled) {
+        enabled += 1;
+      }
+      if (Array.isArray(sec.children)) {
+        sec.children.forEach(countSection);
+      }
+    };
+
+    categories.forEach((cat) => {
+      if (Array.isArray(cat.sections)) {
+        cat.sections.forEach(countSection);
+      }
+    });
+
+    return {
+      total,
+      enabled,
+      disabled: Math.max(0, total - enabled),
+      percentage: total > 0 ? Math.round((enabled / total) * 100) : 0,
+    };
+  }, [categories, modifiedFlags]);
+
+  return (
+    <PageContainer maxWidth="7xl" className="space-y-4 sm:space-y-6 pb-32 sm:pb-36">
+      {/* 1. Scope Tabs */}
       <TabSwitcher
         tabs={tabs}
         activeTab={activeScope}
         onChange={(scopeId: string) => setActiveScope(scopeId as ScopeType)}
-        rightContent={
-          <SectionHeaderActions
-            activeScope={activeScope}
-            modifiedCount={modifiedCount}
-            saving={saving}
-            onSaveBatch={handleSaveBatch}
-            onClearOverridesGlobally={handleClearOverridesGlobally}
-          />
-        }
       />
 
-      {/* 3. Reusable Scope Target & Section Filter Toolbar below tabs (Reused across ALL tabs including Audit Trail) */}
+      {/* 2. Reusable Scope Target & Section Filter Toolbar below tabs (Reused across ALL tabs including Audit Trail) */}
       <SectionTargetBar
         activeScope={activeScope}
         selectedRole={selectedRole}
@@ -179,10 +189,14 @@ export const SectionControlView: React.FC = () => {
         onAuditScopeFilterChange={setAuditScopeFilter}
         onRefreshAuditLogs={() => loadAuditLogs(auditScopeFilter, auditSearchQuery)}
         loadingAuditLogs={loadingLogs}
-        totalSectionsCount={totalSectionsCount}
+        totalSectionsCount={featureStats.total || totalSectionsCount}
+        enabledSectionsCount={featureStats.enabled}
+        disabledSectionsCount={featureStats.disabled}
+        activePercentage={featureStats.percentage}
+        modifiedCount={modifiedCount}
       />
 
-      {/* 5. Main Content Viewport */}
+      {/* 3. Main Content Viewport */}
       {activeScope === 'audit' ? (
         <SectionAuditLogTable
           logs={filteredAuditLogs}
@@ -246,46 +260,22 @@ export const SectionControlView: React.FC = () => {
         </div>
       )}
 
-      {/* 6. Floating Action Dock for Unsaved Changes (Rule 14: Borderless, soft-surface floating pill) */}
-      {modifiedCount > 0 && activeScope !== 'audit' && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 max-w-xl w-[calc(100%-2rem)] animate-in fade-in slide-in-from-bottom-4 duration-200">
-          <div className="p-3 sm:px-5 sm:py-3.5 rounded-2xl theme-bg-surface/95 backdrop-blur-md shadow-2xl border-0 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-main)] animate-pulse shrink-0" />
-              <div className="min-w-0">
-                <p className="text-xs sm:text-sm font-semibold theme-text-primary truncate">
-                  {t('status.unsavedNotice', '{{count}} unsaved changes in this scope.', {
-                    count: formatNumber(modifiedCount),
-                  })}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <CustomButton
-                size="sm"
-                variant="sub"
-                disabled={saving}
-                icon={UndoIcon}
-                onClick={handleDiscardChanges}
-              >
-                {t('actions.discardChanges', 'Discard')}
-              </CustomButton>
-
-              <CustomButton
-                size="sm"
-                variant="primary"
-                loading={saving}
-                loadingText={t('actions.saving', 'Saving...')}
-                icon={CheckIcon}
-                onClick={handleSaveBatch}
-              >
-                {`${t('actions.saveChanges', 'Save Changes')} (${formatNumber(modifiedCount)})`}
-              </CustomButton>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 4. Reusable Floating Action Dock for Unsaved Changes (Rule 14: Borderless, soft-surface floating pill) */}
+      <FloatingActionDock
+        visible={modifiedCount > 0 && activeScope !== 'audit'}
+        title={t('status.unsavedNotice', '{{count}} unsaved changes in this scope.', {
+          count: formatNumber(modifiedCount),
+        })}
+        onSecondaryClick={handleDiscardChanges}
+        secondaryLabel={t('actions.discardChanges', 'Discard')}
+        secondaryIcon={UndoIcon}
+        isSecondaryDisabled={saving}
+        onPrimaryClick={handleSaveBatch}
+        primaryLabel={`${t('actions.saveChanges', 'Save Changes')} (${formatNumber(modifiedCount)})`}
+        primaryIcon={CheckIcon}
+        isPrimaryLoading={saving}
+        primaryLoadingText={t('actions.saving', 'Saving...')}
+      />
     </PageContainer>
   );
 };

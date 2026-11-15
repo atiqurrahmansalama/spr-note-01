@@ -287,7 +287,9 @@ export default function TeacherUstadhDashboardView({
     working_hours: {},
     academic_events: {},
     agenda_schedule: {},
-    hifz_tracker: {},
+    recitation_kpis: {},
+    recitation_trends_chart: {},
+    recitation_session_breakdown: {},
   };
 
   return (

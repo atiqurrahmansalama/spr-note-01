@@ -119,12 +119,12 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       <div
         onClick={onClick}
         title={title}
-        className={`theme-bg-surface border theme-border rounded-2xl p-3 sm:p-4.5 space-y-2 sm:space-y-3 transition-all duration-200 hover:border-[var(--border-hover)] select-none min-w-0 ${
+        className={`theme-bg-surface border theme-border rounded-2xl p-2.5 @[480px]:p-3 @[1100px]:p-4 space-y-1.5 @[1100px]:space-y-2.5 transition-all duration-200 hover:border-[var(--border-hover)] select-none min-w-0 ${
           onClick ? 'cursor-pointer hover:theme-bg-sub/30 active:scale-[0.99]' : ''
         } ${className}`}
       >
         {/* 1. Header: Label + Info Indicator / Icon */}
-        <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-bold tracking-wider uppercase theme-text-secondary">
+        <div className="flex items-center justify-between text-[10px] @[1100px]:text-[11px] font-bold tracking-wider uppercase theme-text-secondary">
           <span className={`truncate ${labelClassName}`}>{label}</span>
           {Icon ? (
             <Icon className={`w-3.5 h-3.5 theme-text-secondary opacity-50 shrink-0 ml-1 ${iconClassName}`} />
@@ -134,16 +134,16 @@ export const MetricCard: React.FC<MetricCardProps> = ({
         </div>
 
         {/* 2. Middle Row: Big Bold Metric + subLabel */}
-        <div className="flex items-end justify-between gap-3">
+        <div className="flex items-end justify-between gap-2 @[1100px]:gap-3">
           <div className="space-y-0.5 min-w-0 flex-1">
             <span
-              className={`text-xl sm:text-2xl font-extrabold theme-text-primary tracking-tight font-mono block truncate ${valueClassName}`}
+              className={`text-lg @[480px]:text-xl @[1100px]:text-2xl font-extrabold theme-text-primary tracking-tight font-mono block truncate ${valueClassName}`}
             >
               {value ?? 0}
             </span>
             {subLabel && (
               <span
-                className={`text-[11px] theme-text-secondary block truncate ${subLabelClassName}`}
+                className={`text-[10px] @[1100px]:text-[11px] theme-text-secondary block truncate ${subLabelClassName}`}
                 title={subLabel}
               >
                 {subLabel}
@@ -155,10 +155,10 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 
         {/* 3. Footer: Trend Delta Indicator or Badge */}
         {(badge || footer) && (
-          <div className="flex items-center gap-1.5 pt-2 text-[11px] font-mono border-t theme-border">
+          <div className="flex items-center gap-1.5 pt-1.5 @[1100px]:pt-2 text-[10px] @[1100px]:text-[11px] font-mono border-t theme-border truncate">
             {footer || (
               typeof badge === 'string' ? (
-                <span className="theme-accent font-bold">{badge}</span>
+                <span className="theme-accent font-bold truncate">{badge}</span>
               ) : (
                 badge
               )
@@ -317,26 +317,35 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({
   if (!items || items.length === 0) return null;
 
   let gridColsClass = 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 @sm:grid-cols-2 @2xl:grid-cols-4';
-  if (cols === 1) gridColsClass = 'grid-cols-1';
-  else if (cols === 2) gridColsClass = 'grid-cols-2 sm:grid-cols-2 @sm:grid-cols-2';
-  else if (cols === 3) gridColsClass = 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 @sm:grid-cols-2 @xl:grid-cols-3';
-  else if (cols === 4) gridColsClass = 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 @sm:grid-cols-2 @2xl:grid-cols-4';
-  else if (cols === 5) gridColsClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 @sm:grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-5';
-  else if (cols === 6) gridColsClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 @sm:grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-6';
-  else if (items.length === 6) gridColsClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 @sm:grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-6';
-  else if (items.length === 5) gridColsClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 @sm:grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-5';
-  else if (items.length === 3) gridColsClass = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 @sm:grid-cols-2 @xl:grid-cols-3';
-  else if (items.length === 2) gridColsClass = 'grid-cols-1 sm:grid-cols-2 @sm:grid-cols-2';
+  if (variant === 'kpi') {
+    if (cols === 1 || items.length === 1) gridColsClass = 'grid-cols-1';
+    else if (cols === 2 || items.length === 2) gridColsClass = 'grid-cols-2';
+    else if (cols === 3 || items.length === 3) gridColsClass = 'grid-cols-2 @[580px]:grid-cols-3';
+    else gridColsClass = 'grid-cols-2 @[580px]:grid-cols-4';
+  } else {
+    if (cols === 1) gridColsClass = 'grid-cols-1';
+    else if (cols === 2) gridColsClass = 'grid-cols-2 sm:grid-cols-2 @sm:grid-cols-2';
+    else if (cols === 3) gridColsClass = 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 @sm:grid-cols-2 @xl:grid-cols-3';
+    else if (cols === 4) gridColsClass = 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 @sm:grid-cols-2 @2xl:grid-cols-4';
+    else if (cols === 5) gridColsClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 @sm:grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-5';
+    else if (cols === 6) gridColsClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 @sm:grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-6';
+    else if (items.length === 6) gridColsClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 @sm:grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-6';
+    else if (items.length === 5) gridColsClass = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 @sm:grid-cols-2 @md:grid-cols-3 @2xl:grid-cols-5';
+    else if (items.length === 3) gridColsClass = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 @sm:grid-cols-2 @xl:grid-cols-3';
+    else if (items.length === 2) gridColsClass = 'grid-cols-1 sm:grid-cols-2 @sm:grid-cols-2';
+  }
 
-  const gapClass = {
-    xs: 'gap-1.5 @sm:gap-2',
-    sm: 'gap-2 @sm:gap-2.5',
-    md: 'gap-2.5 @sm:gap-3.5',
-    lg: 'gap-3.5 @sm:gap-5',
-  }[gap as 'xs' | 'sm' | 'md' | 'lg'] || gap;
+  const gapClass = variant === 'kpi'
+    ? 'gap-2 @[480px]:gap-2.5 @[1100px]:gap-3.5'
+    : ({
+        xs: 'gap-1.5 @sm:gap-2',
+        sm: 'gap-2 @sm:gap-2.5',
+        md: 'gap-2.5 @sm:gap-3.5',
+        lg: 'gap-3.5 @sm:gap-5',
+      }[gap as 'xs' | 'sm' | 'md' | 'lg'] || gap);
 
   return (
-    <div className={`grid ${gridColsClass} ${gapClass} w-full min-w-0 ${className}`}>
+    <div className={`@container grid ${gridColsClass} ${gapClass} w-full min-w-0 ${className}`}>
       {items.map((item, idx) => (
         <MetricCard
           key={item.id || item.label || idx}

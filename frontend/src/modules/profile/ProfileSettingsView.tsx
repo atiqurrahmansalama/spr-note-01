@@ -254,14 +254,7 @@ export const ProfileSettingsView: React.FC = () => {
   }
 
   return (
-    <div className="@container w-full max-w-6xl mx-auto px-4 sm:px-6 font-sans theme-text-primary animate-fade-in select-none h-full flex flex-col min-h-0 overflow-hidden">
-      {/* Page Header */}
-      <div className="pt-2 sm:pt-4 pb-3 sm:pb-4 shrink-0">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary">
-          {t('title', 'Profile & Account Settings')}
-        </h1>
-      </div>
-
+    <div className="@container w-full max-w-6xl mx-auto px-4 sm:px-6 pt-2 sm:pt-4 font-sans theme-text-primary animate-fade-in select-none h-full flex flex-col min-h-0 overflow-hidden">
       {/* Main Responsive Layout: Automatically stacks to 1 column with side-by-side hero/scorecard when drawer is open (< 960px) */}
       <div className="grid grid-cols-1 @[960px]:grid-cols-12 gap-6 @[960px]:gap-8 items-stretch flex-1 min-h-0 overflow-y-auto @[960px]:overflow-hidden no-scrollbar">
         {/* Left Column: Hero Card & Security Scorecard (Independent Scroll on Desktop @[960px]) */}
@@ -294,7 +287,6 @@ export const ProfileSettingsView: React.FC = () => {
                     ? `${currentInstitution.name} • ${t('switchAcademySubtitle', 'Change your active academic workspace')}`
                     : t('switchAcademySubtitle', 'Change your active academic workspace')
                 }
-                badgeText={currentInstitution ? currentInstitution.code || currentInstitution.institution_type : undefined}
                 isActive={activeDrawerKey === 'profile-academy-switch'}
                 onClick={() => openDrawer('profile-academy-switch')}
               />

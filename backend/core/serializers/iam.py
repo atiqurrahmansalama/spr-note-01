@@ -425,6 +425,7 @@ class UserAdminSerializer(serializers.ModelSerializer):
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=False, allow_blank=True, default='')
     new_password = serializers.CharField(required=True, min_length=6)
+    otp = serializers.CharField(required=False, allow_blank=True, default='')
 
 
 class UserProfileSerializer(serializers.ModelSerializer):

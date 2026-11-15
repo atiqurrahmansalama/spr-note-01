@@ -83,7 +83,7 @@ export const AVAILABLE_APP_SHORTCUTS: AppShortcutItem[] = [
     title: 'Campus Structure',
     description: 'Multi-campus institutions, branches & depts',
     path: '/academy/campus-profile',
-    category: 'Academy Structure',
+    category: 'Academic Organization',
     color: 'accent',
     icon: BuildingOfficeIcon,
     requiredFeatureKey: 'campus_profile',
@@ -93,7 +93,7 @@ export const AVAILABLE_APP_SHORTCUTS: AppShortcutItem[] = [
     title: 'Classes & Sections',
     description: 'Academic grades, sections & mentorship groups',
     path: '/academy/classes-groups',
-    category: 'Academy Structure',
+    category: 'Academic Organization',
     color: 'purple',
     icon: ClassIcon,
     requiredFeatureKey: 'student_classes',
@@ -103,7 +103,7 @@ export const AVAILABLE_APP_SHORTCUTS: AppShortcutItem[] = [
     title: 'Routine & Curriculum',
     description: 'Period timetables & syllabus progression',
     path: '/academy/periods',
-    category: 'Academy Structure',
+    category: 'Academic Organization',
     color: 'sky',
     icon: TimerIcon,
     requiredFeatureKey: 'class_period_slots',
@@ -274,7 +274,7 @@ export default function QuickActionsWidget({
   if (!resolvedActions || resolvedActions.length === 0) return null;
 
   return (
-    <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-3.5 select-none min-w-0 ${className}`}>
+    <div className={`@container p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-3.5 select-none min-w-0 ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between pb-1 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
@@ -286,7 +286,7 @@ export default function QuickActionsWidget({
       </div>
 
       {/* Grid: Naturally top-aligned, leftover space stays at bottom */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-1 @[400px]:grid-cols-2 @[720px]:grid-cols-4 gap-2.5">
         {resolvedActions.map((act) => {
           const Icon = act.icon;
           const style = ACTION_COLOR_STYLES[act.color || 'accent'] || ACTION_COLOR_STYLES.accent;

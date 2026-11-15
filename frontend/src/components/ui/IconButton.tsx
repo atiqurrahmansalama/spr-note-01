@@ -186,8 +186,10 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         ${
           active
             ? variant === 'ghost' || variant === 'sub' || variant === 'surface' || variant === 'outline'
-              ? 'theme-bg-sub theme-text-primary'
-              : 'theme-bg-accent theme-accent-text ring-1 ring-[var(--accent-main)]/40 shadow-xs'
+              ? 'theme-bg-sub theme-text-primary border-0 ring-0'
+              : variant === 'accent-soft'
+              ? 'theme-bg-accent-soft theme-accent border-0 ring-0 shadow-xs'
+              : 'theme-bg-accent theme-accent-text border-0 ring-0 shadow-xs'
             : ''
         }
         ${

@@ -15,7 +15,7 @@ export const navigation = {
   residentialAttendance: 'আবাসিক উপস্থিতি',
   adhocHeadcount: 'এডহক হেডকাউন্ট',
   attendanceSettings: 'উপস্থিতি সেটিংস',
-  academy: 'প্রাতিষ্ঠানিক কাঠামো',
+  academy: 'অ্যাকাডেমিক অর্গানাইজেশন',
   campusProfile: 'ক্যাম্পাস স্ট্রাকচার',
   classesGroups: 'ক্লাস ও সেকশন',
   departments: 'বিভাগসমূহ',

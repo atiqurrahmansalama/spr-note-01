@@ -547,6 +547,75 @@ class PasswordResetConfirmView(APIView):
             return Response({'error': 'Invalid or expired password reset link.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class SendPasswordResetOtpView(APIView):
+    """
+    Dispatches a 6-digit OTP code to the authenticated user's email for password reset / change verification.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        if not user.email:
+            return Response(
+                {'error': 'No email address is associated with your account. Please link an email address first.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        otp = f"{secrets.randbelow(900000) + 100000:06d}"
+        cache_key = f"password_change_otp_{user.id}"
+        cache.set(cache_key, {'email': user.email, 'otp': otp}, timeout=900)
+
+        inst_name = getattr(user, 'institution', None) and user.institution.name or 'SPR Note Suite'
+        context = {
+            'user_name': user.name or f"{getattr(user, 'first_name', '')} {getattr(user, 'last_name', '')}".strip() or user.username or user.email,
+            'verification_code': otp,
+            'institution_name': inst_name,
+        }
+        send_smtp_email(
+            'emails/email_verification.html',
+            context,
+            f'Password Change Verification Code - {inst_name}',
+            [user.email]
+        )
+
+        parts = user.email.split('@')
+        masked = f"{parts[0][:2]}***@{parts[1]}" if len(parts) == 2 and len(parts[0]) > 2 else user.email
+
+        return Response({
+            'message': f'A 6-digit verification code has been dispatched to {masked}.',
+            'masked_email': masked,
+            'expires_in_seconds': 900
+        }, status=status.HTTP_200_OK)
+
+
+class VerifyPasswordResetOtpView(APIView):
+    """
+    Verifies the 6-digit OTP code before displaying new password inputs.
+    Marks OTP as verified in cache so subsequent ChangePasswordView call succeeds.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        otp = (request.data.get('otp') or '').strip()
+        if not otp:
+            return Response({'error': 'Please enter the 6-digit verification code.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        cache_key = f"password_change_otp_{user.id}"
+        cached = cache.get(cache_key)
+
+        if not cached or cached.get("otp") != otp:
+            return Response({'error': 'Invalid or expired verification code. Please request a new code.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        cached['is_verified'] = True
+        cache.set(cache_key, cached, timeout=900)
+
+        return Response({
+            'message': 'Verification code verified successfully!',
+            'verified': True
+        }, status=status.HTTP_200_OK)
+
+
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ChangePasswordSerializer
@@ -566,8 +635,16 @@ class ChangePasswordView(APIView):
 
         old_password = serializer.validated_data.get("old_password") or request.data.get("old_password") or request.data.get("current_password")
         new_password = serializer.validated_data.get("new_password") or request.data.get("new_password")
+        otp = (serializer.validated_data.get("otp") or request.data.get("otp") or "").strip()
+        is_otp_flow = bool(otp)
 
-        if has_usable_pwd:
+        if is_otp_flow:
+            cache_key = f"password_change_otp_{user.id}"
+            cached = cache.get(cache_key)
+            if not cached or (cached.get("otp") != otp and not cached.get("is_verified")):
+                return Response({"otp": ["Invalid or expired verification code. Please request a new code."]}, status=status.HTTP_400_BAD_REQUEST)
+            cache.delete(cache_key)
+        elif has_usable_pwd:
             if not old_password:
                 return Response({"old_password": ["Current password is required."]}, status=status.HTTP_400_BAD_REQUEST)
             if not user.check_password(old_password):

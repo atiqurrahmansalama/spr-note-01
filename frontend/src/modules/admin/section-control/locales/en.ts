@@ -28,6 +28,16 @@ export const en = {
     totalFeatures: 'Total Features:',
   },
 
+  stats: {
+    title: 'Feature Controls Overview',
+    total: 'Total Features',
+    enabled: 'Enabled & Active',
+    disabled: 'Disabled / Inactive',
+    activeRate: 'Active Deployment Rate',
+    liveSynced: 'Scope Synchronized & Live',
+    unsavedChanges: '{{count}} unsaved changes in scope',
+  },
+
   actions: {
     saveChanges: 'Save Changes',
     saving: 'Saving...',

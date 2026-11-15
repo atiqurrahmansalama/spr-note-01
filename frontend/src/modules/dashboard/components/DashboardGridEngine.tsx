@@ -11,7 +11,6 @@ import {
   ArrowUpIcon, 
   ArrowDownIcon,
   Squares2X2Icon,
-  PlusIcon,
   ShieldCheckIcon
 } from '../../../components/ui/Icons';
 
@@ -288,11 +287,11 @@ export default function DashboardGridEngine({
   const getColSpanClass = (span: WidgetColSpan = 1) => {
     switch (span) {
       case 4:
-        return 'col-span-1 sm:col-span-2 lg:col-span-4';
+        return 'col-span-1 @[640px]:col-span-2 @[1024px]:col-span-4';
       case 3:
-        return 'col-span-1 sm:col-span-2 lg:col-span-3';
+        return 'col-span-1 @[640px]:col-span-2 @[1024px]:col-span-3';
       case 2:
-        return 'col-span-1 sm:col-span-2 lg:col-span-2';
+        return 'col-span-1 @[640px]:col-span-2 @[1024px]:col-span-2';
       case 1:
       default:
         return 'col-span-1';
@@ -300,7 +299,7 @@ export default function DashboardGridEngine({
   };
 
   return (
-    <div className="space-y-6 w-full min-w-0">
+    <div className={`space-y-6 w-full min-w-0 ${isEditMode ? 'pb-28 sm:pb-32' : ''}`}>
       {displayItems.length === 0 ? (
         <div className="p-8 sm:p-12 rounded-3xl theme-bg-surface shadow-xs border-0 text-center flex flex-col items-center justify-center space-y-4 max-w-xl mx-auto my-8 animate-fade-in">
           <div className="w-16 h-16 rounded-2xl theme-bg-accent-soft text-[var(--accent-main)] flex items-center justify-center">
@@ -340,10 +339,10 @@ export default function DashboardGridEngine({
           )}
         </div>
       ) : (
-        /* Dynamic 4-Column Responsive Grid with dense auto-flow packing & full-height row stretching */
+        /* Dynamic 4-Column Responsive Grid with container queries & dense auto-flow packing */
         <div
           ref={gridRef}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 w-full min-w-0 items-stretch [grid-auto-flow:dense]"
+          className="@container grid grid-cols-1 @[640px]:grid-cols-2 @[1024px]:grid-cols-4 gap-4 @[640px]:gap-5 w-full min-w-0 items-stretch [grid-auto-flow:dense]"
         >
         {displayItems.map((layoutItem, index) => {
           const widgetDef = WIDGET_REGISTRY[layoutItem.widgetId];
@@ -481,29 +480,6 @@ export default function DashboardGridEngine({
           );
         })}
       </div>
-      )}
-
-      {/* Edit Mode Bottom Helper & Add Widget Launchpad */}
-      {isEditMode && onOpenWidgetCatalog && (
-        <div className="p-4 rounded-2xl theme-bg-surface shadow-xs border-0 flex flex-col sm:flex-row items-center justify-between gap-3 animate-fade-in text-center sm:text-left">
-          <div className="space-y-0.5">
-            <h4 className="text-sm font-bold theme-text-primary">
-              Customize Your Workspace Layout
-            </h4>
-            <p className="text-xs theme-text-secondary">
-              Drag widgets using handles, change column widths, or add more cards from the catalog.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onOpenWidgetCatalog}
-            className="px-4 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold shadow-md hover:opacity-90 transition-all cursor-pointer flex items-center gap-2 shrink-0 border-0 ring-0"
-          >
-            <PlusIcon className="w-4 h-4" />
-            <span>Add More Widgets</span>
-          </button>
-        </div>
       )}
     </div>
   );

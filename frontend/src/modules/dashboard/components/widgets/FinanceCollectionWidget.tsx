@@ -31,7 +31,7 @@ export default function FinanceCollectionWidget({
   };
 
   return (
-    <div className={`p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-4 select-none ${className}`}>
+    <div className={`@container p-5 rounded-2xl theme-bg-surface shadow-xs hover:shadow-md h-full flex flex-col justify-start space-y-4 select-none ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between pb-2">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -63,7 +63,7 @@ export default function FinanceCollectionWidget({
       </div>
 
       {/* Hero Stats */}
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-1 @[320px]:grid-cols-2 gap-2.5">
         <div className="p-3.5 rounded-xl theme-bg-sub/70 space-y-1">
           <span className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">
             Today's Inflow

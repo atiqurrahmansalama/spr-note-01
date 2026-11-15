@@ -302,17 +302,17 @@ class DashboardGovernanceAndRoleSyncTestCase(TestCase):
                 "scope_type": "ROLE",
                 "target_identifier": "ADMIN",
                 "updates": [
-                    {"section_key": "dashboard_widget_hifz_tracker", "is_enabled": False}
+                    {"section_key": "dashboard_widget_recitation_trends", "is_enabled": False}
                 ],
             },
             format="json",
         )
         self.assertEqual(role_res.status_code, status.HTTP_200_OK)
 
-        # Super Admin previewing ADMIN immediately sees dashboard_widget_hifz_tracker disabled
+        # Super Admin previewing ADMIN immediately sees dashboard_widget_recitation_trends disabled
         preview_admin = self.client.get("/api/v1/section-control/evaluate/?preview_role=ADMIN")
         self.assertEqual(preview_admin.status_code, status.HTTP_200_OK)
-        self.assertFalse(preview_admin.data["flags"]["dashboard_widget_hifz_tracker"])
+        self.assertFalse(preview_admin.data["flags"]["dashboard_widget_recitation_trends"])
         self.assertTrue(preview_admin.data["flags"]["dashboard_widget_kpi_metrics"])
 
     def test_google_staff_onboarding_upgrades_role_and_replaces_dummy_phone(self):

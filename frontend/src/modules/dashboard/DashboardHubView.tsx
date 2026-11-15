@@ -14,6 +14,8 @@ import {
 } from '../../utils/roleUtils';
 import { useRightSidebar, useDrawerRegistration } from '../../context/RightSidebarContext';
 import { PageContainer } from '../../components/layout';
+import { FloatingActionDock, CustomButton } from '../../components/ui';
+import { CheckIcon, PlusIcon } from '../../components/ui/Icons';
 import DashboardHeader from './components/DashboardHeader';
 import DashboardCustomizerPanel from './components/DashboardCustomizerPanel';
 import SuperAdminDashboardView from './views/SuperAdminDashboardView';
@@ -335,7 +337,7 @@ export default function DashboardHubView() {
       />
 
       {/* 2. Role-Driven Dynamic View Dispatcher */}
-      <div className="w-full min-w-0 transition-all duration-300">
+      <div className={`w-full min-w-0 transition-all duration-300 ${isEditMode ? 'pb-28 sm:pb-32' : ''}`}>
         <ActiveViewComponent
           role={effectiveRole}
           isEditMode={isEditMode}
@@ -346,6 +348,28 @@ export default function DashboardHubView() {
           isSuperAdmin={isSuperAdmin}
         />
       </div>
+
+      {/* 3. Reusable Floating Action Dock when Layout Customization is Active */}
+      <FloatingActionDock
+        visible={isEditMode}
+        title="Customize Workspace Layout"
+        subtitle="Drag handles to reorder, borders to resize"
+        showPulseDot
+        extraActions={
+          <CustomButton
+            size="sm"
+            variant="sub"
+            icon={PlusIcon}
+            onClick={handleOpenCustomizer}
+            className="rounded-xl px-3.5"
+          >
+            Add More Widgets
+          </CustomButton>
+        }
+        primaryLabel="Save Changes"
+        primaryIcon={CheckIcon}
+        onPrimaryClick={() => setIsEditMode(false)}
+      />
     </PageContainer>
   );
 }

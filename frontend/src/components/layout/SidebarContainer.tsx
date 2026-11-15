@@ -152,7 +152,7 @@ export default function SidebarContainer({
     },
     {
       id: "Academy",
-      name: "Academy Structure",
+      name: "Academic Organization",
       i18nKey: "academy",
       Icon: BuildingOfficeIcon,
       hasSub: true,

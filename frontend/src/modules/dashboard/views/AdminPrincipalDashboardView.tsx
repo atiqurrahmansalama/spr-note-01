@@ -80,6 +80,7 @@ export default function AdminPrincipalDashboardView({
       trend: { value: '+14 this month', isPositive: true },
       icon: GroupsIcon,
       color: 'accent',
+      requiredFeatureKey: 'student_roster',
       onClick: () => navigate('/students'),
     },
     {
@@ -90,6 +91,7 @@ export default function AdminPrincipalDashboardView({
       trend: { value: '96% staff attendance', isPositive: true },
       icon: AttendanceIcon,
       color: 'emerald',
+      requiredFeatureKey: 'monthly_attendance_matrix',
       onClick: () => navigate('/learning/daily-classroom?tab=attendance'),
     },
     {
@@ -100,6 +102,7 @@ export default function AdminPrincipalDashboardView({
       trend: { value: '83% target met', isPositive: true },
       icon: BanknotesIcon,
       color: 'purple',
+      requiredFeatureKey: 'nav_finance',
       onClick: () => navigate('/finance'),
     },
     {
@@ -110,6 +113,7 @@ export default function AdminPrincipalDashboardView({
       trend: { value: '6 interview scheduled', isPositive: true },
       icon: AdmissionIcon,
       color: 'amber',
+      requiredFeatureKey: 'student_admission',
       onClick: () => navigate('/student-management/admission?tab=applications'),
     },
   ];
@@ -176,8 +180,9 @@ export default function AdminPrincipalDashboardView({
     working_hours: {},
     academic_events: {},
     agenda_schedule: {},
-    academic_progress: {},
-    hifz_tracker: {},
+    recitation_kpis: {},
+    recitation_trends_chart: {},
+    recitation_session_breakdown: {},
     recitation_trends: {},
   };
 

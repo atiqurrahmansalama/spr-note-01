@@ -28,6 +28,16 @@ export const ur = {
     totalFeatures: 'کل فیچرز:',
   },
 
+  stats: {
+    title: 'فیچر کنٹرولز کا جائزہ',
+    total: 'کل فیچر کنٹرولرز',
+    enabled: 'فعال اور آن',
+    disabled: 'غیر فعال / بند',
+    activeRate: 'فعالیت کی شرح',
+    liveSynced: 'ہم آہنگ اور لائیو',
+    unsavedChanges: 'اس اسکوپ میں {{count}} غیر محفوظ شدہ تبدیلیاں',
+  },
+
   actions: {
     saveChanges: 'تبدیلیاں محفوظ کریں',
     saving: 'محفوظ ہو رہا ہے...',

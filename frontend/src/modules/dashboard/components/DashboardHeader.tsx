@@ -121,20 +121,34 @@ export default function DashboardHeader({
   }, [isEditMode, onToggleEditMode, onOpenCustomizerDrawer, isSuperAdmin, t]);
 
   return (
-    <div className="w-full flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-1 select-none">
+    <div className="@container w-full flex flex-col @[640px]:flex-row @[640px]:items-center @[640px]:justify-between gap-3.5 @[640px]:gap-4 pb-1 select-none">
       {/* Welcome Title and Subtitle */}
-      <div className="space-y-1 min-w-0">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight theme-text-primary truncate">
-          {t(greetingKey, defaultGreeting, { name: userName || 'Administrator' })}
-        </h1>
+      <div className="space-y-1 min-w-0 w-full @[640px]:w-auto">
+        {/* Top Line: Title on Left, 3-Dot Menu on Far Right on Small Screens */}
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-xl @[640px]:text-2xl font-bold tracking-tight theme-text-primary truncate">
+            {t(greetingKey, defaultGreeting, { name: userName || 'Administrator' })}
+          </h1>
 
-        <p className="text-xs sm:text-sm theme-text-secondary leading-relaxed max-w-2xl">
+          {/* 3-Dot Menu: Displayed here on small screens (< 640px) */}
+          <div className="@[640px]:hidden shrink-0">
+            <ActionMenu
+              icon={MoreVerticalIcon}
+              variant="ghost"
+              align="right"
+              header="Dashboard Management"
+              items={managementMenuItems}
+            />
+          </div>
+        </div>
+
+        <p className="text-xs @[640px]:text-sm theme-text-secondary leading-relaxed max-w-2xl">
           {t('welcomeSubtitle', 'Here is what is happening across your institutional workspace today.')}
         </p>
       </div>
 
-      {/* Right Controls: Date Badge, Super Admin Role Switcher & Far-Right Three-Dot Menu (Borderless & Clean) */}
-      <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+      {/* Controls: Date Badge, Role Switcher & (on >= 640px) 3-Dot Menu */}
+      <div className="flex flex-wrap items-center justify-center @[640px]:justify-end gap-2.5 shrink-0 w-full @[640px]:w-auto pt-1 @[640px]:pt-0">
         {/* Today's Date Badge (Borderless) */}
         <div className="px-3 py-1.5 rounded-xl theme-bg-surface shadow-xs flex items-center gap-2 theme-text-secondary text-xs font-medium select-none">
           <CalendarIcon className="w-3.5 h-3.5 opacity-70" />
@@ -159,7 +173,7 @@ export default function DashboardHeader({
             title={currentRoleName}
           >
             <ActiveRoleIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
-            <span className="truncate max-w-[140px] sm:max-w-[200px]">{currentRoleName}</span>
+            <span className="truncate max-w-[140px] @[640px]:max-w-[200px]">{currentRoleName}</span>
           </div>
         )}
 
@@ -176,14 +190,16 @@ export default function DashboardHeader({
           </button>
         )}
 
-        {/* Far-Right Three-Dot Menu: Project ActionMenu */}
-        <ActionMenu
-          icon={MoreVerticalIcon}
-          variant="ghost"
-          align="right"
-          header="Dashboard Management"
-          items={managementMenuItems}
-        />
+        {/* Far-Right Three-Dot Menu: Only visible here on desktop/medium screens (>= 640px) */}
+        <div className="hidden @[640px]:block">
+          <ActionMenu
+            icon={MoreVerticalIcon}
+            variant="ghost"
+            align="right"
+            header="Dashboard Management"
+            items={managementMenuItems}
+          />
+        </div>
       </div>
     </div>
   );

@@ -31,10 +31,10 @@ export const ProgressSparklineKPIs: React.FC<ProgressSparklineKPIsProps> = ({
     }));
   }, [kpis]);
 
-  const effectiveCols = cols || (metricItems.length <= 3 ? 3 : 4);
+  const effectiveCols = cols || (metricItems.length <= 3 ? metricItems.length : 4);
 
   return (
-    <div className={className}>
+    <div className={`@container w-full ${className}`}>
       <MetricsGrid items={metricItems} cols={effectiveCols} variant="kpi" />
     </div>
   );
