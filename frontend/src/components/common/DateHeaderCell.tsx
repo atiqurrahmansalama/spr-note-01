@@ -136,6 +136,9 @@ export const DateHeaderCell: React.FC<DateHeaderCellProps> = ({
       : 'theme-bg-surface hover:theme-bg-sub/40 theme-text-primary';
   }
 
+  // Standardized strip height across all cells: controlled purely by whether Hijri tier is enabled
+  const showHijriTier = Boolean(isHijriEnabled);
+
   return (
     <Component
       onClick={onClick}
@@ -147,11 +150,16 @@ export const DateHeaderCell: React.FC<DateHeaderCellProps> = ({
       } transition-colors cursor-pointer select-none align-middle ${statusClasses} ${className}`}
       {...restProps}
     >
-      <div className="flex flex-col items-center justify-between min-h-[62px] sm:min-h-[68px] py-1">
-        {/* Top Group: Gregorian & Hijri Dates */}
-        <div className="flex flex-col items-center justify-center gap-1.5 sm:gap-2">
-          {/* 1. Gregorian Day Number */}
-          <div
+      <div
+        className={`flex flex-col items-center justify-between py-1 w-full ${
+          showHijriTier
+            ? 'h-[64px] min-h-[64px] max-h-[64px] sm:h-[70px] sm:min-h-[70px] sm:max-h-[70px]'
+            : 'h-[50px] min-h-[50px] max-h-[50px] sm:h-[54px] sm:min-h-[54px] sm:max-h-[54px]'
+        }`}
+      >
+        {/* Tier 1: Gregorian Day Number (Fixed horizontal baseline slot across all cells) */}
+        <div className="h-5 sm:h-5.5 flex items-center justify-center shrink-0 w-full">
+          <span
             className={`font-bold text-xs sm:text-sm tracking-tight leading-none ${
               isSelected
                 ? 'text-white'
@@ -165,45 +173,55 @@ export const DateHeaderCell: React.FC<DateHeaderCellProps> = ({
             }`}
           >
             {resolvedDayNum}
-          </div>
+          </span>
+        </div>
 
-          {/* 2. Hijri Day Number (Clean text, no boxed background pill) */}
-          {isHijriEnabled && resolvedHijriDay && (
-            <div
-              className={`text-[10px] sm:text-[11px] font-mono font-bold leading-none select-none ${
-                isSelected
-                  ? 'text-white/90'
-                  : 'theme-accent'
-              }`}
-            >
-              {resolvedHijriDay}
+        {/* Tier 2: Middle Slot (Uniform Hijri text if enabled, plus fixed-height event dot slot) */}
+        <div className="flex flex-col items-center justify-center shrink-0 w-full">
+          {showHijriTier && (
+            <div className="h-3.5 sm:h-4 flex items-center justify-center shrink-0 w-full">
+              {resolvedHijriDay ? (
+                <span
+                  className={`text-[10px] sm:text-[11px] font-mono font-bold leading-none select-none ${
+                    isSelected ? 'text-white/90' : 'theme-accent'
+                  }`}
+                >
+                  {resolvedHijriDay}
+                </span>
+              ) : (
+                <span className="opacity-0 select-none text-[10px] sm:text-[11px] leading-none">-</span>
+              )}
             </div>
           )}
 
-          {/* 3. Event Indicator Dot */}
-          {hasEvent && (
-            <span
-              className={`w-1 h-1 rounded-full shrink-0 ${
-                isSelected
-                  ? 'bg-white'
-                  : eventColors?.dot || 'theme-bg-accent'
-              }`}
-              style={
-                !isSelected && eventColors?.hex
-                  ? { backgroundColor: eventColors.hex }
-                  : undefined
-              }
-            />
-          )}
+          {/* Fixed-dimension Dot Slot: maintains exact identical height whether event exists or not */}
+          <div className="h-2 flex items-center justify-center shrink-0 w-full">
+            {hasEvent ? (
+              <span
+                className={`w-1 h-1 rounded-full shrink-0 ${
+                  isSelected ? 'bg-white' : eventColors?.dot || 'theme-bg-accent'
+                }`}
+                style={
+                  !isSelected && eventColors?.hex
+                    ? { backgroundColor: eventColors.hex }
+                    : undefined
+                }
+              />
+            ) : (
+              <span className="w-1 h-1 rounded-full shrink-0 opacity-0 pointer-events-none" />
+            )}
+          </div>
         </div>
 
-        {/* Bottom Group: Centered 2-Letter Weekday Name */}
-        <div className={`w-full pt-1.5 mt-1 ${borderless ? 'border-0' : 'border-t theme-border'} flex items-center justify-center`}>
+        {/* Tier 3: Centered 2-Letter Weekday Name (Fixed horizontal baseline slot across all cells) */}
+        <div
+          className={`w-full h-4 sm:h-4.5 flex items-center justify-center shrink-0 ${
+            borderless ? 'border-0' : 'border-t theme-border'
+          }`}
+        >
           <span
             className={`text-[8px] sm:text-[9px] font-semibold uppercase leading-none text-center block ${
-              isSelected
-                ? 'text-white/80'
-                : 'opacity-60 theme-text-primary'
+              isSelected ? 'text-white/80' : 'opacity-60 theme-text-primary'
             }`}
           >
             {resolvedWeekday2Letter}

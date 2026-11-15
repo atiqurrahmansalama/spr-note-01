@@ -21,6 +21,14 @@ export const academyCategoriesSectionConfig = {
   icon: BuildingOfficeIcon,
 };
 
+export const branchCategoriesSectionConfig = {
+  id: "branch-categories",
+  group: "Academic Structure",
+  title: "Branch & Campus Categories",
+  description: "Configure campus classifications, branch types (Main Campus, Sub Branch, Residential Complex), and campus scopes",
+  icon: BuildingOfficeIcon,
+};
+
 /**
  * Academy Categories and Branch Categories Taxonomy Panels
  */

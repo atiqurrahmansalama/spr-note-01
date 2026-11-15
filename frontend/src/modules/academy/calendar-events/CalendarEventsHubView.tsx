@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import PageHeader from '../../../components/ui/PageHeader';
 import TabSwitcher from '../../../components/ui/TabSwitcher';
 import CustomButton from '../../../components/ui/CustomButton';
 import ErrorBoundary from '../../../components/ui/ErrorBoundary';
@@ -9,9 +8,13 @@ import {
   MasterTimeCalendar,
   TimeScheduleDrawerForm,
   TimeScheduleDetailDrawer,
+  UserTaskDrawerForm,
+  MyTasksHubView,
 } from './components';
 import { masterCalendarStore, calendarSettings } from '../../../utils/localStore';
+import { userTaskStore } from './tasks/userTaskStore';
 import { useTenant } from '../../../context/TenantContext';
+import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
 import { useRightSidebar, useDrawerRegistration } from '../../../context/RightSidebarContext';
 import { useFeatureControl } from '../../../context/FeatureControlContext';
@@ -22,16 +25,18 @@ import {
   CalendarIcon,
   TimerIcon,
   PrintIcon,
-  RefreshIcon,
   PlusIcon,
   ChecklistIcon,
+  CheckCircleIcon,
 } from '../../../components/ui/Icons';
-import type { CalendarEvent, CalendarTabItem, DeleteEventOptions } from './types';
+import type { CalendarEvent, CalendarTabItem, DeleteEventOptions, UserPersonalTask } from './types';
 
 export default function CalendarEventsHubView() {
   const { t } = useCalendarTranslation();
   const { showToast } = useToast();
   const { activeTenantId } = useTenant();
+  const { user } = useAuth() as any;
+  const userId = user?.id || user?.username || user?.email || 'me';
   const { openDrawer, closeDrawer } = useRightSidebar();
   const { isSectionEnabled } = useFeatureControl();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -39,6 +44,7 @@ export default function CalendarEventsHubView() {
   const isWorkingHoursEnabled = isSectionEnabled('calendar_tab_working_hours');
   const isEventsEnabled = isSectionEnabled('calendar_tab_events');
   const isAgendaEnabled = isSectionEnabled('calendar_tab_agenda');
+  const isMyTasksEnabled = isSectionEnabled('calendar_tab_personal_tasks', true);
 
   const visibleTabs: CalendarTabItem[] = useMemo(() => {
     const list: CalendarTabItem[] = [];
@@ -51,8 +57,11 @@ export default function CalendarEventsHubView() {
     if (isAgendaEnabled) {
       list.push({ id: 'AGENDA', label: t('agenda', 'Agenda'), icon: ChecklistIcon });
     }
+    if (isMyTasksEnabled) {
+      list.push({ id: 'MY_TASKS', label: t('myTasks', 'My Tasks'), icon: CheckCircleIcon });
+    }
     return list.length > 0 ? list : [{ id: 'WORKING_HOURS', label: t('workingHours', 'Working Hours'), icon: TimerIcon }];
-  }, [isWorkingHoursEnabled, isEventsEnabled, isAgendaEnabled, t]);
+  }, [isWorkingHoursEnabled, isEventsEnabled, isAgendaEnabled, isMyTasksEnabled, t]);
 
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const rawTab = searchParams.get('tab') || 'WORKING_HOURS';
@@ -251,6 +260,55 @@ export default function CalendarEventsHubView() {
     [activeTenantId, t]
   );
 
+  // Universal Drawer Registration for User Task Form
+  useDrawerRegistration(
+    'user-task',
+    (params: any) => {
+      const targetTask = params?.task || null;
+      const targetDate = params?.date || new Date().toISOString().split('T')[0];
+      return {
+        title: targetTask ? t('updateTask', 'Update Task') : t('createTask', 'Create Task'),
+        category: t('personalTasks', 'Personal Tasks & To-Do'),
+        size: 'md' as const,
+        content: (
+          <UserTaskDrawerForm
+            key={`task-form-${targetTask?.id || 'new'}-${targetDate}`}
+            task={targetTask}
+            initialDate={targetDate}
+            onSave={(savedTask) => {
+              userTaskStore.saveTask(activeTenantId, userId, savedTask);
+              showToast(
+                targetTask
+                  ? t('taskUpdated', 'Task updated successfully!')
+                  : t('taskCreated', 'Task created successfully!'),
+                'success'
+              );
+              closeDrawer();
+            }}
+            onDelete={(taskId) => {
+              userTaskStore.deleteTask(activeTenantId, userId, taskId);
+              showToast(t('taskDeleted', 'Task removed successfully.'), 'info');
+              closeDrawer();
+            }}
+            onCancel={closeDrawer}
+          />
+        ),
+      };
+    },
+    [activeTenantId, userId, closeDrawer, showToast, t]
+  );
+
+  // Open Right Sidebar for adding new personal task
+  const handleOpenUserTaskDrawer = useCallback(
+    (task?: UserPersonalTask | null, date?: string) => {
+      openDrawer('user-task', {
+        task,
+        date: date || new Date().toISOString().split('T')[0],
+      });
+    },
+    [openDrawer]
+  );
+
   // Open Right Sidebar for adding new entry from top TabSwitcher
   const handleOpenAddDrawer = () => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -280,56 +338,18 @@ export default function CalendarEventsHubView() {
     showToast(t('exportSuccess', 'Master schedule exported successfully.'), 'success');
   };
 
-  // Reset Defaults
-  const handleResetDefaults = () => {
-    if (window.confirm(t('confirmReset', 'Reset calendar & events to standard institutional defaults? Custom changes will be restored.'))) {
-      localStorage.removeItem(`spr_master_calendar_${activeTenantId || 'default'}`);
-      loadEvents();
-      showToast(t('resetSuccess', 'Calendar reset to standard institutional defaults.'), 'info');
-    }
-  };
-
   const actionMenuItems = [
-    {
-      label: t('weeklyHolidays', 'Weekly Holidays & Weekends'),
-      icon: CalendarIcon,
-      onClick: () => openDrawer('weekly-holidays'),
-    },
-    {
-      label: t('manageTaxonomies', 'Schedule Taxonomies'),
-      icon: ChecklistIcon,
-      onClick: () => openDrawer('calendar-taxonomy'),
-    },
     {
       label: t('exportCsv', 'Export Schedule (CSV)'),
       icon: PrintIcon,
       onClick: handleExportCSV,
-    },
-    {
-      label: t('printCalendar', 'Print Calendar'),
-      icon: PrintIcon,
-      onClick: () => window.print(),
-    },
-    {
-      label: t('resetDefaults', 'Reset to Standard Defaults'),
-      icon: RefreshIcon,
-      onClick: handleResetDefaults,
     },
   ];
 
   return (
     <ErrorBoundary>
       <PageContainer>
-        {/* ─── 1. Header Overview with Reusable PageHeader ──────────── */}
-        <div className="print:hidden">
-          <PageHeader
-            icon={CalendarIcon}
-            title={t('calendarAndEvents', 'Calendar & Events')}
-            subtitle={t('calendarSubtitle', 'Master institutional console for managing operational working hours, faculty shifts, public holidays, and academic event schedules.')}
-          />
-        </div>
-
-        {/* ─── 2. Top Tab Switcher with Add Button on Far Right ─── */}
+        {/* ─── Top Tab Switcher with Add Button on Far Right ─── */}
         <div className="print:hidden">
           <TabSwitcher
             tabs={visibleTabs}
@@ -341,28 +361,34 @@ export default function CalendarEventsHubView() {
                 variant="primary"
                 size="sm"
                 icon={PlusIcon}
-                onClick={handleOpenAddDrawer}
-                title={t('addSchedule', 'Add Schedule or Event')}
+                onClick={activeTab === 'MY_TASKS' ? () => handleOpenUserTaskDrawer() : handleOpenAddDrawer}
+                title={activeTab === 'MY_TASKS' ? t('newTask', 'New Task') : t('addSchedule', 'Add Schedule or Event')}
               >
-                <span className="hidden sm:inline">{t('addSchedule', 'Add')}</span>
+                <span className="hidden sm:inline">
+                  {activeTab === 'MY_TASKS' ? t('newTask', 'New Task') : t('addSchedule', 'Add')}
+                </span>
               </CustomButton>
             }
           />
         </div>
 
-        {/* ─── 3. Reusable Master Calendar Engine ────────────────────── */}
+        {/* ─── 3. Reusable Master Calendar Engine or Dedicated My Tasks View ─── */}
         <div className="min-h-[640px] w-full min-w-0 pb-16 sm:pb-24">
-          <MasterTimeCalendar
-            events={events}
-            onSaveEvent={handleSaveEvent}
-            onDeleteEvent={handleDeleteEvent}
-            selectedCategory={activeTab === 'AGENDA' ? 'ALL' : activeTab}
-            viewMode={activeTab === 'AGENDA' ? 'list' : 'month'}
-            actionMenuItems={actionMenuItems}
-            onDateSelect={setSelectedTimelineDate}
-            onDisplayModeChange={setCalendarDisplayMode}
-            isHijriEnabled={isHijriEnabled}
-          />
+          {activeTab === 'MY_TASKS' ? (
+            <MyTasksHubView onOpenTaskDrawer={handleOpenUserTaskDrawer} />
+          ) : (
+            <MasterTimeCalendar
+              events={events}
+              onSaveEvent={handleSaveEvent}
+              onDeleteEvent={handleDeleteEvent}
+              selectedCategory={activeTab === 'AGENDA' ? 'ALL' : activeTab}
+              viewMode={activeTab === 'AGENDA' ? 'list' : 'month'}
+              actionMenuItems={actionMenuItems}
+              onDateSelect={setSelectedTimelineDate}
+              onDisplayModeChange={setCalendarDisplayMode}
+              isHijriEnabled={isHijriEnabled}
+            />
+          )}
         </div>
       </PageContainer>
     </ErrorBoundary>

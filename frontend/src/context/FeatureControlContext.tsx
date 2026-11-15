@@ -61,6 +61,7 @@ export const HARD_DEFAULTS: Record<string, boolean> = {
   calendar_tab_working_hours: true,
   calendar_tab_events: true,
   calendar_tab_agenda: true,
+  calendar_tab_personal_tasks: true,
   residential_quarters: true,
   residential_tab_buildings: true,
   residential_tab_rooms: true,

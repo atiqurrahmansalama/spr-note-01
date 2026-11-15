@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import ActionMenu from "../../../../components/ui/ActionMenu";
 import CustomInput from "../../../../components/ui/CustomInput";
 import CustomButton from "../../../../components/ui/CustomButton";
@@ -9,6 +9,7 @@ import {
   ChevronRightIcon,
   GridIcon,
   TimelineIcon,
+  CheckCircleIcon,
 } from "../../../../components/ui/Icons";
 import DateHeaderCell from "../../../../components/common/DateHeaderCell";
 import { useRightSidebar } from "../../../../context/RightSidebarContext";
@@ -17,6 +18,7 @@ import { useTenant } from "../../../../context/TenantContext";
 import { getHijriDateString, getHijriDetails } from "../../../../utils/hijriUtils";
 import type { CalendarEvent, CalendarCategory, CalendarDisplayMode, DeleteEventOptions } from "../types";
 import { EVENT_COLOR_MAP, resolveCanonicalEventColor, type EventColorStyle } from "../constants/eventColors";
+import { useUserTasks } from "../tasks/useUserTasks";
 
 export { EVENT_COLOR_MAP, type EventColorStyle };
 
@@ -237,6 +239,8 @@ export default function MasterTimeCalendar({
 }: MasterTimeCalendarProps) {
   const { openDrawer } = useRightSidebar();
   const { activeTenantId } = useTenant();
+  const { tasks: userTasks, getTasksForDate, toggleTaskStatus } = useUserTasks();
+  const [showPersonalTasks, setShowPersonalTasks] = useState<boolean>(true);
 
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
   const [selectedDay, setSelectedDay] = useState<number>(() => new Date().getDate());
@@ -318,6 +322,49 @@ export default function MasterTimeCalendar({
     return true;
   }, [viewYear, viewMonth, displayMode, selectedDay]);
 
+  // Track whether today's date element in timeline strip has scrolled out of the visible horizontal viewport
+  const [isTodayScrolledOutOfView, setIsTodayScrolledOutOfView] = useState(false);
+
+  const checkTodayVisibility = useCallback(() => {
+    if (!dayStripRef.current || displayMode !== "timeline") {
+      setIsTodayScrolledOutOfView(false);
+      return;
+    }
+    const container = dayStripRef.current;
+    const now = new Date();
+    if (viewYear !== now.getFullYear() || viewMonth !== now.getMonth()) {
+      setIsTodayScrolledOutOfView(true);
+      return;
+    }
+
+    const todayEl = container.querySelector('[data-today="true"]') as HTMLElement | null;
+    if (!todayEl) {
+      setIsTodayScrolledOutOfView(true);
+      return;
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const todayRect = todayEl.getBoundingClientRect();
+
+    // Today is out of view if it is scrolled past either left or right edges of the visible strip
+    const isOut = todayRect.right <= containerRect.left + 8 || todayRect.left >= containerRect.right - 8;
+    setIsTodayScrolledOutOfView(isOut);
+  }, [displayMode, viewYear, viewMonth]);
+
+  // Determine if Today button should be displayed
+  const shouldShowTodayButton = useMemo(() => {
+    if (viewMode !== "month") return false;
+    const now = new Date();
+    const isCurrentMonthYear = viewYear === now.getFullYear() && viewMonth === now.getMonth();
+
+    if (displayMode === "grid") {
+      return !isCurrentMonthYear;
+    }
+
+    // In timeline view: show if not in current month/year, or not today selected, or today pill scrolled off-screen
+    return !isCurrentMonthYear || selectedDay !== now.getDate() || isTodayScrolledOutOfView;
+  }, [viewMode, displayMode, viewYear, viewMonth, selectedDay, isTodayScrolledOutOfView]);
+
   const hijriMonthHeader = useMemo(() => {
     if (!isHijriEnabled) return "";
     try {
@@ -334,7 +381,6 @@ export default function MasterTimeCalendar({
       return "";
     }
   }, [viewYear, viewMonth, isHijriEnabled]);
-
 
   useEffect(() => {
     if (onDisplayModeChange) {
@@ -361,7 +407,8 @@ export default function MasterTimeCalendar({
           activeEl.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
         }
       }
-    }, 50);
+      checkTodayVisibility();
+    }, 60);
   };
 
   // Open Right Sidebar for viewing event / working hours details
@@ -482,6 +529,12 @@ export default function MasterTimeCalendar({
         const col = idx + 1; // 1-based (1 = Sun, 7 = Sat)
         const dateStr = cell.dateStr;
         const weekday = cell.weekday;
+
+        // Multi-day spanning events on the current page must strictly constrain to the current month's dates
+        // Leading or trailing padding days belonging to adjacent months are not spanned across
+        if (!cell.isCurrentMonth) {
+          return;
+        }
 
         // Skip exceptions
         if (Array.isArray(evt.exceptions) && evt.exceptions.includes(dateStr)) {
@@ -793,11 +846,30 @@ export default function MasterTimeCalendar({
   };
 
   useEffect(() => {
-    const cleanupDay = setupHorizontalScroll(dayStripRef.current);
+    const el = dayStripRef.current;
+    const cleanupDay = setupHorizontalScroll(el);
+
+    const handleScroll = () => {
+      checkTodayVisibility();
+    };
+
+    if (el) {
+      el.addEventListener("scroll", handleScroll, { passive: true });
+      window.addEventListener("resize", handleScroll, { passive: true });
+    }
+
+    checkTodayVisibility();
+    const timer = setTimeout(checkTodayVisibility, 100);
+
     return () => {
       cleanupDay();
+      if (el) {
+        el.removeEventListener("scroll", handleScroll);
+      }
+      window.removeEventListener("resize", handleScroll);
+      clearTimeout(timer);
     };
-  }, [displayMode, viewMonth, viewYear]);
+  }, [displayMode, viewMonth, viewYear, selectedDay, checkTodayVisibility]);
 
   useEffect(() => {
     if (dayStripRef.current && displayMode === "timeline") {
@@ -805,8 +877,9 @@ export default function MasterTimeCalendar({
       if (activeEl) {
         activeEl.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
       }
+      setTimeout(checkTodayVisibility, 120);
     }
-  }, [selectedDay, viewMonth, viewYear, displayMode]);
+  }, [selectedDay, viewMonth, viewYear, displayMode, checkTodayVisibility]);
 
   const navControlVariant = embeddedSurface ? "card" : "app";
 
@@ -858,21 +931,6 @@ export default function MasterTimeCalendar({
                 </span>
               )}
             </div>
-
-            {/* Today Button: Automatically hidden when calendar is currently viewing today */}
-            {!isViewingToday && (
-              <CustomButton
-                type="button"
-                variant={navControlVariant}
-                size="sm"
-                icon={CalendarIcon}
-                onClick={handleJumpToday}
-                title="Jump to Today"
-                className="shrink-0"
-              >
-                <span>Today</span>
-              </CustomButton>
-            )}
           </div>
         ) : (
           <div className="flex items-center gap-2.5 shrink-0">
@@ -889,20 +947,52 @@ export default function MasterTimeCalendar({
         {(!hideViewModeToggle || !hideSearch || (actionMenuItems && actionMenuItems.length > 0)) && (
           <div className="flex items-center gap-2 justify-start @[720px]:justify-end flex-1 @[720px]:flex-none min-w-0">
             
-            {/* Single View Mode Toggle Button */}
-            {viewMode === "month" && !hideViewModeToggle && (
-              <CustomButton
-                type="button"
-                variant={navControlVariant}
-                size="sm"
-                icon={displayMode === "grid" ? TimelineIcon : GridIcon}
-                onClick={() => handleSetDisplayMode(displayMode === "grid" ? "timeline" : "grid")}
-                title={displayMode === "grid" ? "Switch to Timeline View" : "Switch to Grid View"}
-                className="shrink-0 select-none"
-              >
-                <span className="hidden @[440px]:inline">{displayMode === "grid" ? "Timeline" : "Grid"}</span>
-              </CustomButton>
-            )}
+            {/* View Mode Toggle (Grid/Timeline) & Today Button Group */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Today Button: Placed before the Grid/Timeline view button */}
+              {shouldShowTodayButton && (
+                <CustomButton
+                  type="button"
+                  variant={navControlVariant}
+                  size="sm"
+                  icon={CalendarIcon}
+                  onClick={handleJumpToday}
+                  title="Jump to Today"
+                  className="shrink-0 select-none transition-all duration-150"
+                >
+                  <span>Today</span>
+                </CustomButton>
+              )}
+
+              {viewMode === "month" && !hideViewModeToggle && (
+                <CustomButton
+                  type="button"
+                  variant={navControlVariant}
+                  size="sm"
+                  icon={displayMode === "grid" ? TimelineIcon : GridIcon}
+                  onClick={() => handleSetDisplayMode(displayMode === "grid" ? "timeline" : "grid")}
+                  title={displayMode === "grid" ? "Switch to Timeline View" : "Switch to Grid View"}
+                  className="shrink-0 select-none"
+                >
+                  <span className="hidden @[440px]:inline">{displayMode === "grid" ? "Timeline" : "Grid"}</span>
+                </CustomButton>
+              )}
+
+              {/* Personal Tasks Overlay Toggle */}
+              {viewMode === "month" && (
+                <CustomButton
+                  type="button"
+                  variant={showPersonalTasks ? "primary" : navControlVariant}
+                  size="sm"
+                  icon={CheckCircleIcon}
+                  onClick={() => setShowPersonalTasks((prev) => !prev)}
+                  title={showPersonalTasks ? "Personal Tasks Active. Click to hide." : "Personal Tasks Hidden. Click to show."}
+                  className="shrink-0 select-none"
+                >
+                  <span className="hidden @[560px]:inline">Tasks</span>
+                </CustomButton>
+              )}
+            </div>
 
             {/* Reusable Search Box with CustomInput */}
             {!hideSearch && (
@@ -970,6 +1060,7 @@ export default function MasterTimeCalendar({
                     >
                       {weekDays.map((cell) => {
                         const dayEvents = getEventsForDate(cell.dateStr, cell.weekday);
+                        const cellTasks = showPersonalTasks ? getTasksForDate(cell.dateStr) : [];
                         const isToday = cell.dateStr === todayStr;
                         const topEvent = dayEvents.length > 0 ? dayEvents[0] : null;
                         const topStyle = topEvent ? getEventColors(topEvent, activeTenantId) : null;
@@ -996,7 +1087,11 @@ export default function MasterTimeCalendar({
                                 ? "theme-bg-tile hover:theme-bg-elevated/80"
                                 : "theme-bg-tile-muted opacity-50 hover:opacity-80"
                             }`}
-                            title={dayEvents.length > 0 ? `${dayEvents.length} item(s) on ${cell.dateStr}. Click to view details.` : cell.dateStr}
+                            title={
+                              dayEvents.length > 0 || cellTasks.length > 0
+                                ? `${dayEvents.length} event(s), ${cellTasks.length} task(s) on ${cell.dateStr}. Click to view details.`
+                                : cell.dateStr
+                            }
                           >
                             {/* Top: Day Number (Top Left) & Hijri Day Number (Top Right) */}
                             <div className="flex items-center justify-between relative w-full mb-0.5 shrink-0 pointer-events-auto">
@@ -1018,33 +1113,45 @@ export default function MasterTimeCalendar({
                                   {getHijriDateString(cell.dateStr).split(" ")[0]}
                                 </span>
                               )}
-
-                              {!readOnly && (
-                                <span
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenAddDrawer(cell.dateStr);
-                                  }}
-                                  className="hidden @2xl:inline-block absolute right-0 top-0 opacity-0 group-hover:opacity-100 text-[10px] theme-accent font-bold px-1 rounded transition hover:theme-bg-surface cursor-pointer"
-                                  title="Add schedule"
-                                >
-                                  +
-                                </span>
-                              )}
                             </div>
 
-                            {/* Small Screen: Strictly ONE single dot indicator (একটি ডট থাকবে, এর বেশি না) */}
-                            {dayEvents.length > 0 && topStyle && (
-                              <div className="flex @md:hidden items-center justify-center mt-auto pb-0.5 shrink-0">
-                                <span
-                                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${topStyle.dot} shadow-2xs`}
-                                  title={`${dayEvents.length} item(s)`}
-                                />
+                            {/* Small Screen: Dot indicators (events and/or personal tasks) */}
+                            {(dayEvents.length > 0 || cellTasks.length > 0) && (
+                              <div className="flex @md:hidden items-center justify-center gap-1 mt-auto pb-0.5 shrink-0">
+                                {dayEvents.length > 0 && topStyle && (
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${topStyle.dot} shadow-2xs`}
+                                    title={`${dayEvents.length} schedule item(s)`}
+                                  />
+                                )}
+                                {cellTasks.length > 0 && (
+                                  <span
+                                    className="w-1.5 h-1.5 rounded-full shrink-0 bg-indigo-500 shadow-2xs"
+                                    title={`${cellTasks.length} personal task(s)`}
+                                  />
+                                )}
                               </div>
                             )}
 
-                            {/* Desktop/Tablet vertical spacer so cell holds proper height */}
-                            <div className="hidden @md:block flex-1 min-h-[44px] pointer-events-none" />
+                            {/* Desktop/Tablet personal tasks compact pill */}
+                            {cellTasks.length > 0 && (
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openDrawer('user-task', { date: cell.dateStr });
+                                }}
+                                className="hidden @md:flex items-center gap-1 px-1.5 py-0.5 mt-auto rounded-md text-[9px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 transition cursor-pointer select-none pointer-events-auto shrink-0 z-20"
+                                title={`${cellTasks.length} personal task(s). Click to view / add.`}
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                                <span className="truncate">{cellTasks.length} {cellTasks.length === 1 ? 'Task' : 'Tasks'}</span>
+                              </div>
+                            )}
+
+                            {/* Desktop/Tablet vertical spacer so cell holds proper height when no tasks */}
+                            {cellTasks.length === 0 && (
+                              <div className="hidden @md:block flex-1 min-h-[44px] pointer-events-none" />
+                            )}
                           </div>
                         );
                       })}
@@ -1262,6 +1369,81 @@ export default function MasterTimeCalendar({
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Daily Personal Tasks & Checklist for Selected Date */}
+              {showPersonalTasks && (
+                <div className="pt-3 border-t theme-border space-y-2.5 mt-2">
+                  <div className="flex items-center justify-between gap-2 px-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0 shadow-xs" />
+                      <span className="text-xs font-bold theme-text-primary">
+                        Personal Tasks ({getTasksForDate(selectedDateStr).length})
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openDrawer('user-task', { date: selectedDateStr })}
+                      className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline transition cursor-pointer"
+                    >
+                      + Add Task
+                    </button>
+                  </div>
+
+                  {getTasksForDate(selectedDateStr).length === 0 ? (
+                    <div className="p-3.5 text-center border-0 rounded-2xl theme-bg-tile text-[11px] theme-text-secondary shadow-2xs">
+                      No personal tasks scheduled for this day.
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {getTasksForDate(selectedDateStr).map((task) => (
+                        <div
+                          key={task.id}
+                          className="p-2 sm:p-2.5 rounded-xl border-0 theme-bg-tile hover:theme-bg-elevated/75 transition-all flex items-center justify-between gap-2 shadow-2xs group"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={task.status === 'DONE'}
+                              onChange={() => toggleTaskStatus(task.id)}
+                              className="w-4 h-4 rounded border-0 accent-indigo-600 cursor-pointer shrink-0"
+                            />
+                            <span
+                              onClick={() => openDrawer('user-task', { task, date: selectedDateStr })}
+                              className={`text-xs truncate cursor-pointer select-none ${
+                                task.status === 'DONE'
+                                  ? 'line-through opacity-50 theme-text-secondary'
+                                  : 'font-medium theme-text-primary group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+                              }`}
+                            >
+                              {task.title}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {task.priority && task.priority !== 'MEDIUM' && (
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shadow-2xs ${
+                                task.priority === 'URGENT'
+                                  ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                                  : task.priority === 'HIGH'
+                                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                                  : 'bg-slate-500/15 text-slate-600 dark:text-slate-400'
+                              }`}>
+                                {task.priority}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => openDrawer('user-task', { task, date: selectedDateStr })}
+                              className="text-[10px] font-semibold opacity-0 group-hover:opacity-100 theme-text-secondary hover:theme-text-primary transition cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

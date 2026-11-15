@@ -1,8 +1,13 @@
 export const bn = {
   // Greetings & Header
+  greetingAssalamuAlaikum: 'আসসালামু আলাইকুম',
+  greetingFajr: 'শুভ ভোর, {name}',
   greetingMorning: 'শুভ সকাল, {name}',
-  greetingAfternoon: 'শুভ অপরাহ্ন, {name}',
+  greetingNoon: 'শুভ দুপুর, {name}',
+  greetingAfternoon: 'শুভ বিকেল, {name}',
   greetingEvening: 'শুভ সন্ধ্যা, {name}',
+  greetingNight: 'শুভ রাত্রি, {name}',
+  greetingMidnight: 'শুভ গভীর রাত, {name}',
   welcomeSubtitle: 'আজ আপনার শিক্ষাপ্রতিষ্ঠানের সামগ্রিক কার্যক্রমের রিয়েল-টাইম ওভারভিউ।',
   activeSession: 'সক্রিয় শিক্ষাবর্ষ',
   viewingAs: 'ড্যাশবোর্ড ভিউ:',

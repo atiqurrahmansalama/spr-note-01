@@ -1,8 +1,13 @@
 export const ur = {
   // Greetings & Header
+  greetingAssalamuAlaikum: 'السلام علیکم',
+  greetingFajr: 'صبح صادق بخیر، {name}',
   greetingMorning: 'صبح بخیر، {name}',
-  greetingAfternoon: 'دوپہر بخیر، {name}',
+  greetingNoon: 'دوپہر بخیر، {name}',
+  greetingAfternoon: 'سه پہر بخیر، {name}',
   greetingEvening: 'شام بخیر، {name}',
+  greetingNight: 'شب بخیر، {name}',
+  greetingMidnight: 'پر سکون رات، {name}',
   welcomeSubtitle: 'آج آپ کے ادارہ جاتی ورک اسپیس کا مکمل اور براہ راست جائزہ۔',
   activeSession: 'فعال تعلیمی سال',
   viewingAs: 'ڈیش بورڈ منظر:',

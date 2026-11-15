@@ -60,16 +60,33 @@ export default function DashboardHeader({
   // Dynamic roles from /role-management
   const { roles = [] } = useRoleManagement();
 
-  // Determine time-based greeting
+  // Determine comprehensive time-based greeting:
+  // Fajr/Dawn (04:00 - 05:59), Morning (06:00 - 11:59), Midday/Noon (12:00 - 13:59),
+  // Afternoon (14:00 - 16:59), Evening (17:00 - 19:59), Night (20:00 - 22:59), Midnight (23:00 - 03:59)
   const hour = new Date().getHours();
   let greetingKey = 'greetingMorning';
   let defaultGreeting = 'Good morning, {name}';
-  if (hour >= 12 && hour < 17) {
+  if (hour >= 4 && hour < 6) {
+    greetingKey = 'greetingFajr';
+    defaultGreeting = 'Blessed early morning, {name}';
+  } else if (hour >= 6 && hour < 12) {
+    greetingKey = 'greetingMorning';
+    defaultGreeting = 'Good morning, {name}';
+  } else if (hour >= 12 && hour < 14) {
+    greetingKey = 'greetingNoon';
+    defaultGreeting = 'Good midday, {name}';
+  } else if (hour >= 14 && hour < 17) {
     greetingKey = 'greetingAfternoon';
     defaultGreeting = 'Good afternoon, {name}';
-  } else if (hour >= 17) {
+  } else if (hour >= 17 && hour < 20) {
     greetingKey = 'greetingEvening';
     defaultGreeting = 'Good evening, {name}';
+  } else if (hour >= 20 && hour < 23) {
+    greetingKey = 'greetingNight';
+    defaultGreeting = 'Good night, {name}';
+  } else {
+    greetingKey = 'greetingMidnight';
+    defaultGreeting = 'Peaceful late night, {name}';
   }
 
   // Active role details derived dynamically from role-management
@@ -124,11 +141,11 @@ export default function DashboardHeader({
     <div className="@container w-full flex flex-col @[640px]:flex-row @[640px]:items-center @[640px]:justify-between gap-3.5 @[640px]:gap-4 pb-1 select-none">
       {/* Welcome Title and Subtitle */}
       <div className="space-y-1 min-w-0 w-full @[640px]:w-auto">
-        {/* Top Line: Title on Left, 3-Dot Menu on Far Right on Small Screens */}
+        {/* Line 1: Assalamu Alaikum & 3-Dot Menu on small screens */}
         <div className="flex items-center justify-between gap-2">
-          <h1 className="text-xl @[640px]:text-2xl font-bold tracking-tight theme-text-primary truncate">
-            {t(greetingKey, defaultGreeting, { name: userName || 'Administrator' })}
-          </h1>
+          <p className="text-sm @[640px]:text-base font-bold tracking-wide theme-accent select-none">
+            {t('greetingAssalamuAlaikum', 'Assalamu Alaikum')}
+          </p>
 
           {/* 3-Dot Menu: Displayed here on small screens (< 640px) */}
           <div className="@[640px]:hidden shrink-0">
@@ -141,6 +158,11 @@ export default function DashboardHeader({
             />
           </div>
         </div>
+
+        {/* Line 2: Comprehensive Time-Based Greeting */}
+        <h1 className="text-xl @[640px]:text-2xl font-bold tracking-tight theme-text-primary truncate">
+          {t(greetingKey, defaultGreeting, { name: userName || 'Administrator' })}
+        </h1>
 
         <p className="text-xs @[640px]:text-sm theme-text-secondary leading-relaxed max-w-2xl">
           {t('welcomeSubtitle', 'Here is what is happening across your institutional workspace today.')}

@@ -20,6 +20,7 @@ import {
   AcademicCapIcon,
   BuildingOfficeIcon,
   SectionIcon,
+  ChevronDownIcon,
 } from "@/components/ui/Icons";
 import {
   computeNiceYAxis,
@@ -157,6 +158,49 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [copiedSuccess, setCopiedSuccess] = useState<boolean>(false);
+  const [isFooterExpanded, setIsFooterExpanded] = useState<boolean>(false);
+  const [hasFooterOverflow, setHasFooterOverflow] = useState<boolean>(false);
+  const footerGridRef = useRef<HTMLDivElement>(null);
+
+  // Check if any single-line truncated text is actually clipped / hidden in the DOM
+  useEffect(() => {
+    const container = footerGridRef.current;
+    if (!container) return;
+
+    const checkOverflow = () => {
+      // If expanded, don't re-measure clipped state since elements are multi-line
+      if (isFooterExpanded) return;
+      const truncates = container.querySelectorAll(".truncate");
+      let overflowing = false;
+      truncates.forEach((el) => {
+        if (el.scrollWidth > el.clientWidth) {
+          overflowing = true;
+        }
+      });
+      setHasFooterOverflow(overflowing);
+    };
+
+    // Run measurement on mount / state change
+    checkOverflow();
+
+    const observer = new ResizeObserver(() => {
+      checkOverflow();
+    });
+    observer.observe(container);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [
+    isFooterExpanded,
+    footerStudents,
+    footerSessions,
+    footerDepartments,
+    footerClasses,
+    footerSections,
+    footerTeachers,
+    trendPoints,
+  ]);
 
   // Auto-switch to line chart if dense dataset (> 14 days)
   const isDenseDataset = trendPoints.length > 14;
@@ -221,33 +265,57 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
         const rect = chartCanvasRef.current.getBoundingClientRect();
         const w = rect.width || chartCanvasRef.current.clientWidth;
         if (w > 0) setContainerWidth(Math.round(w));
+      } else if (chartContainerRef.current) {
+        const rect = chartContainerRef.current.getBoundingClientRect();
+        const w = rect.width ? Math.max(240, Math.round(rect.width - 76)) : 0;
+        if (w > 0) setContainerWidth(w);
       }
     };
     updateSize();
 
-    // Re-verify after layout stabilization / tab switch
+    // Re-verify after layout stabilization / tab switch / drawer resize transitions
     const rafId = requestAnimationFrame(updateSize);
-    const timerId = setTimeout(updateSize, 120);
+    const timer1 = setTimeout(updateSize, 80);
+    const timer2 = setTimeout(updateSize, 250);
 
     let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== "undefined" && chartCanvasRef.current) {
+    if (typeof ResizeObserver !== "undefined") {
       ro = new ResizeObserver((entries) => {
         for (const entry of entries) {
           const w = entry.contentRect.width;
-          if (w > 0) setContainerWidth(Math.round(w));
+          if (w > 0) {
+            if (chartCanvasRef.current && (entry.target === chartCanvasRef.current)) {
+              setContainerWidth(Math.round(w));
+            } else if (entry.target === chartContainerRef.current) {
+              const canvasEl = chartCanvasRef.current;
+              if (canvasEl) {
+                const cRect = canvasEl.getBoundingClientRect();
+                const cw = cRect.width || canvasEl.clientWidth;
+                if (cw > 0) setContainerWidth(Math.round(cw));
+              } else {
+                setContainerWidth(Math.max(240, Math.round(w - 76)));
+              }
+            }
+          }
         }
       });
-      ro.observe(chartCanvasRef.current);
+      if (chartCanvasRef.current) {
+        ro.observe(chartCanvasRef.current);
+      }
+      if (chartContainerRef.current) {
+        ro.observe(chartContainerRef.current);
+      }
     }
 
     window.addEventListener("resize", updateSize);
     return () => {
       cancelAnimationFrame(rafId);
-      clearTimeout(timerId);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
       window.removeEventListener("resize", updateSize);
       if (ro) ro.disconnect();
     };
-  }, []);
+  }, [trendPoints.length, viewMode]);
 
   const chartHeight = 220;
   const topPadding = 18;
@@ -874,8 +942,8 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
           </div>
         </div>
 
-        {/* Row 2 on mobile: All Pages Errors Bars Line on ONE single line */}
-        <div className="flex items-center gap-1.5 @[680px]:gap-2 shrink-0 flex-nowrap overflow-x-auto no-scrollbar justify-start @[680px]:justify-end w-full @[680px]:w-auto">
+        {/* Row 2 on mobile: All Pages Errors Bars Line centered on small screens */}
+        <div className="flex items-center gap-1.5 @[680px]:gap-2 shrink-0 flex-nowrap overflow-x-auto no-scrollbar justify-center @[680px]:justify-end w-full @[680px]:w-auto">
           <SegmentedSwitch
             options={metricOptions}
             value={currentMetric}
@@ -1124,6 +1192,7 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
                   <svg
                     className="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-hidden"
                     viewBox={`0 0 ${containerWidth} ${chartHeight}`}
+                    preserveAspectRatio="none"
                     style={{ width: "100%", height: "100%" }}
                   >
                     {(currentMetric === "combined" || currentMetric === "pages") && chartCoordinates.pages.length > 1 && (
@@ -1165,6 +1234,7 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
                     <svg
                       className="w-full h-full overflow-hidden"
                       viewBox={`0 0 ${containerWidth} ${chartHeight}`}
+                      preserveAspectRatio="none"
                       style={{ width: "100%", height: "100%" }}
                     >
                       <defs>
@@ -1410,104 +1480,171 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
         </div>
       )}
 
-      {/* 5. Dedicated Chart Card Footer: Metadata Overview (2 Columns) */}
+      {/* 5. Dedicated Chart Card Footer: Metadata Overview (Single-line Default with Full View Toggle) */}
       {trendPoints.length > 0 && (
-        <div className="pt-3 border-t theme-border grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-xs theme-text-secondary select-none">
-          {/* Students */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
-              <StudentIcon className="w-3.5 h-3.5 theme-accent" />
-              <span>Students:</span>
-            </div>
-            {footerStudents.length === 0 ? (
-              <span className="text-xs theme-text-secondary opacity-70">
-                {propStudentCount ? `${propStudentCount} Students` : "No student details"}
-              </span>
-            ) : footerStudents.length <= 3 ? (
-              <span className="text-xs font-medium theme-text-secondary truncate" title={footerStudents.join(", ")}>
-                {footerStudents.join(", ")}
-              </span>
+        <div className="pt-3 border-t theme-border select-none">
+          <div ref={footerGridRef} className="grid grid-cols-1 @[520px]:grid-cols-2 gap-x-6 gap-y-2 text-xs theme-text-secondary">
+            {/* Students */}
+            {isFooterExpanded ? (
+              <div className="min-w-0 text-xs leading-relaxed">
+                <span className="inline-flex items-center gap-1 font-bold theme-text-primary mr-1.5 select-none align-baseline shrink-0">
+                  <StudentIcon className="w-3.5 h-3.5 theme-accent inline-block shrink-0 -translate-y-0.5" />
+                  <span>Students:</span>
+                </span>
+                <span className="font-medium theme-text-secondary break-words align-baseline">
+                  {footerStudents.length === 0
+                    ? (propStudentCount ? `${propStudentCount} Students` : "No student details")
+                    : footerStudents.join(", ")}
+                </span>
+              </div>
             ) : (
-              <span className="text-xs font-medium theme-text-secondary">
-                {footerStudents.length} Total Students
-              </span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
+                  <StudentIcon className="w-3.5 h-3.5 theme-accent" />
+                  <span>Students:</span>
+                </div>
+                <span className="text-xs font-medium theme-text-secondary truncate min-w-0" title={footerStudents.join(", ")}>
+                  {footerStudents.length === 0
+                    ? (propStudentCount ? `${propStudentCount} Students` : "No student details")
+                    : (footerStudents.length <= 3 ? footerStudents.join(", ") : `${footerStudents.length} Total Students`)}
+                </span>
+              </div>
+            )}
+
+            {/* Sessions */}
+            {isFooterExpanded ? (
+              <div className="min-w-0 text-xs leading-relaxed">
+                <span className="inline-flex items-center gap-1 font-bold theme-text-primary mr-1.5 select-none align-baseline shrink-0">
+                  <SessionsIcon className="w-3.5 h-3.5 theme-accent inline-block shrink-0 -translate-y-0.5" />
+                  <span>Sessions:</span>
+                </span>
+                <span className="font-medium theme-text-secondary break-words align-baseline">
+                  {footerSessions.length === 0 ? "No session details" : footerSessions.join(", ")}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
+                  <SessionsIcon className="w-3.5 h-3.5 theme-accent" />
+                  <span>Sessions:</span>
+                </div>
+                <span className="text-xs font-medium theme-text-secondary truncate min-w-0" title={footerSessions.join(", ")}>
+                  {footerSessions.length === 0
+                    ? "No session details"
+                    : (footerSessions.length <= 3 ? footerSessions.join(", ") : `${footerSessions.length} Total Sessions`)}
+                </span>
+              </div>
+            )}
+
+            {/* Department */}
+            {isFooterExpanded ? (
+              <div className="min-w-0 text-xs leading-relaxed">
+                <span className="inline-flex items-center gap-1 font-bold theme-text-primary mr-1.5 select-none align-baseline shrink-0">
+                  <BuildingOfficeIcon className="w-3.5 h-3.5 theme-accent inline-block shrink-0 -translate-y-0.5" />
+                  <span>Department:</span>
+                </span>
+                <span className="font-medium theme-text-secondary break-words align-baseline">
+                  {footerDepartments.length > 0 ? footerDepartments.join(", ") : "General"}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
+                  <BuildingOfficeIcon className="w-3.5 h-3.5 theme-accent" />
+                  <span>Department:</span>
+                </div>
+                <span className="text-xs font-medium theme-text-secondary truncate min-w-0" title={footerDepartments.join(", ") || "General"}>
+                  {footerDepartments.length > 0 ? footerDepartments.join(", ") : "General"}
+                </span>
+              </div>
+            )}
+
+            {/* Class */}
+            {isFooterExpanded ? (
+              <div className="min-w-0 text-xs leading-relaxed">
+                <span className="inline-flex items-center gap-1 font-bold theme-text-primary mr-1.5 select-none align-baseline shrink-0">
+                  <AcademicCapIcon className="w-3.5 h-3.5 theme-accent inline-block shrink-0 -translate-y-0.5" />
+                  <span>Class:</span>
+                </span>
+                <span className="font-medium theme-text-secondary break-words align-baseline">
+                  {footerClasses.length > 0 ? footerClasses.join(", ") : "All Classes"}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
+                  <AcademicCapIcon className="w-3.5 h-3.5 theme-accent" />
+                  <span>Class:</span>
+                </div>
+                <span className="text-xs font-medium theme-text-secondary truncate min-w-0" title={footerClasses.join(", ") || "All Classes"}>
+                  {footerClasses.length > 0 ? footerClasses.join(", ") : "All Classes"}
+                </span>
+              </div>
+            )}
+
+            {/* Section */}
+            {isFooterExpanded ? (
+              <div className="min-w-0 text-xs leading-relaxed">
+                <span className="inline-flex items-center gap-1 font-bold theme-text-primary mr-1.5 select-none align-baseline shrink-0">
+                  <SectionIcon className="w-3.5 h-3.5 theme-accent inline-block shrink-0 -translate-y-0.5" />
+                  <span>Section:</span>
+                </span>
+                <span className="font-medium theme-text-secondary break-words align-baseline">
+                  {footerSections.length > 0 ? footerSections.join(", ") : "All Sections"}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
+                  <SectionIcon className="w-3.5 h-3.5 theme-accent" />
+                  <span>Section:</span>
+                </div>
+                <span className="text-xs font-medium theme-text-secondary truncate min-w-0" title={footerSections.join(", ") || "All Sections"}>
+                  {footerSections.length > 0 ? footerSections.join(", ") : "All Sections"}
+                </span>
+              </div>
+            )}
+
+            {/* Teacher */}
+            {isFooterExpanded ? (
+              <div className="min-w-0 text-xs leading-relaxed">
+                <span className="inline-flex items-center gap-1 font-bold theme-text-primary mr-1.5 select-none align-baseline shrink-0">
+                  <TeacherIcon className="w-3.5 h-3.5 theme-accent inline-block shrink-0 -translate-y-0.5" />
+                  <span>Teacher:</span>
+                </span>
+                <span className="font-medium theme-text-secondary break-words align-baseline">
+                  {footerTeachers.length > 0 ? footerTeachers.join(", ") : "Staff Teacher"}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
+                  <TeacherIcon className="w-3.5 h-3.5 theme-accent" />
+                  <span>Teacher:</span>
+                </div>
+                <span className="text-xs font-medium theme-text-secondary truncate min-w-0" title={footerTeachers.join(", ") || "Staff Teacher"}>
+                  {footerTeachers.length > 0 ? footerTeachers.join(", ") : "Staff Teacher"}
+                </span>
+              </div>
             )}
           </div>
 
-          {/* Sessions */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
-              <SessionsIcon className="w-3.5 h-3.5 theme-accent" />
-              <span>Sessions:</span>
+          {/* Toggle More / Less button placed cleanly at the bottom right - only rendered when text overflows or is expanded */}
+          {(hasFooterOverflow || isFooterExpanded) && (
+            <div className="flex items-center justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setIsFooterExpanded((prev) => !prev)}
+                className="px-2.5 py-1 rounded-xl theme-bg-tile hover:theme-bg-elevated theme-accent text-[11px] font-semibold transition-all duration-150 flex items-center gap-1 cursor-pointer select-none border-0 shadow-2xs"
+                title={isFooterExpanded ? "Collapse to single line view" : "Expand to view full details"}
+              >
+                <span>{isFooterExpanded ? "Show Less" : "More"}</span>
+                <ChevronDownIcon
+                  className={`w-3 h-3 transition-transform duration-200 ${isFooterExpanded ? "rotate-180" : ""}`}
+                />
+              </button>
             </div>
-            {footerSessions.length === 0 ? (
-              <span className="text-xs theme-text-secondary opacity-70">No session details</span>
-            ) : footerSessions.length <= 3 ? (
-              <span className="text-xs font-medium theme-text-secondary truncate" title={footerSessions.join(", ")}>
-                {footerSessions.join(", ")}
-              </span>
-            ) : (
-              <span className="text-xs font-medium theme-text-secondary">
-                {footerSessions.length} Total Sessions
-              </span>
-            )}
-          </div>
-
-          {/* Department */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
-              <BuildingOfficeIcon className="w-3.5 h-3.5 theme-accent" />
-              <span>Department:</span>
-            </div>
-            <span
-              className="text-xs font-medium theme-text-secondary truncate max-w-[160px] sm:max-w-none"
-              title={footerDepartments.join(", ") || "General"}
-            >
-              {footerDepartments.length > 0 ? footerDepartments.join(", ") : "General"}
-            </span>
-          </div>
-
-          {/* Class */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
-              <AcademicCapIcon className="w-3.5 h-3.5 theme-accent" />
-              <span>Class:</span>
-            </div>
-            <span
-              className="text-xs font-medium theme-text-secondary truncate max-w-[160px] sm:max-w-none"
-              title={footerClasses.join(", ") || "All Classes"}
-            >
-              {footerClasses.length > 0 ? footerClasses.join(", ") : "All Classes"}
-            </span>
-          </div>
-
-          {/* Section */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
-              <SectionIcon className="w-3.5 h-3.5 theme-accent" />
-              <span>Section:</span>
-            </div>
-            <span
-              className="text-xs font-medium theme-text-secondary truncate max-w-[160px] sm:max-w-none"
-              title={footerSections.join(", ") || "All Sections"}
-            >
-              {footerSections.length > 0 ? footerSections.join(", ") : "All Sections"}
-            </span>
-          </div>
-
-          {/* Teacher */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
-              <TeacherIcon className="w-3.5 h-3.5 theme-accent" />
-              <span>Teacher:</span>
-            </div>
-            <span
-              className="text-xs font-medium theme-text-secondary truncate max-w-[160px] sm:max-w-none"
-              title={footerTeachers.join(", ") || "Staff Teacher"}
-            >
-              {footerTeachers.length > 0 ? footerTeachers.join(", ") : "Staff Teacher"}
-            </span>
-          </div>
+          )}
         </div>
       )}
     </div>

@@ -7,9 +7,38 @@
 
 import React from 'react';
 
-export type CalendarCategory = 'WORKING_HOURS' | 'ACADEMIC_EVENT' | 'AGENDA' | 'ALL';
+export type CalendarCategory = 'WORKING_HOURS' | 'ACADEMIC_EVENT' | 'AGENDA' | 'MY_TASKS' | 'ALL';
 
 export type CalendarDisplayMode = 'grid' | 'timeline' | 'list';
+
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'DEFERRED';
+
+export interface TaskSubItem {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+export interface UserPersonalTask {
+  id: string;
+  tenantId: string;
+  userId: string;
+  title: string;
+  description?: string;
+  dueDate: string; // YYYY-MM-DD
+  dueTime?: string; // HH:mm
+  priority: TaskPriority;
+  status: TaskStatus;
+  category?: string;
+  color?: string;
+  subtasks?: TaskSubItem[];
+  isPinned?: boolean;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  [key: string]: any;
+}
 
 export interface CalendarEvent {
   id: string;

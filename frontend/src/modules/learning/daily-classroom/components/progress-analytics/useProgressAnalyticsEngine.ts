@@ -79,8 +79,16 @@ export function useProgressAnalyticsEngine(
   _legacyHorizon?: TimeHorizon
 ): ProgressAnalyticsEngineResult {
   return useMemo(() => {
+    // 0. Filter reports by date range if explicitly requested
+    const targetReports = (startDate && endDate)
+      ? reports.filter((r) => {
+          const d = getReportDate(r);
+          return d && d >= startDate && d <= endDate;
+        })
+      : reports;
+
     // 1. Overall Aggregations
-    const totalReports = reports.length;
+    const totalReports = targetReports.length;
     let totalPages = 0;
     let totalMistakes = 0;
     let totalStucks = 0;
@@ -91,7 +99,7 @@ export function useProgressAnalyticsEngine(
     const sectionSet = new Set<string>();
     const teacherSet = new Set<string>();
 
-    reports.forEach((r) => {
+    targetReports.forEach((r) => {
       const p = getReportPages(r);
       const m = getReportMistakes(r);
       const s = getReportStucks(r);
@@ -222,11 +230,13 @@ export function useProgressAnalyticsEngine(
     }
 
     // Ingest reports into buckets
-    reports.forEach((r) => {
+    targetReports.forEach((r) => {
       const dateStr = getReportDate(r);
       if (!dateStr) return;
 
-      if (!bucketMap.has(dateStr)) {
+      if (dateSlots.length > 0) {
+        if (!bucketMap.has(dateStr)) return;
+      } else if (!bucketMap.has(dateStr)) {
         bucketMap.set(dateStr, createEmptyBucket(dateStr));
       }
 

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import CustomSelect from "../../../../components/ui/CustomSelect";
 import CustomInput from "../../../../components/ui/CustomInput";
 import CustomButton from "../../../../components/ui/CustomButton";
@@ -23,8 +24,9 @@ import {
 } from "../../../../utils/localStore";
 import { useTenant } from "../../../../context/TenantContext";
 import { useToast } from "../../../../context/ToastContext";
+import { useRightSidebar } from "../../../../context/RightSidebarContext";
 import { fetchWithAuth } from "../../../../utils/authService";
-import { DrawerContainer } from "../../../../components/layout";
+import { DrawerContainer, DrawerSection, DrawerFooter } from "../../../../components/layout";
 import { EVENT_COLORS, EVENT_COLOR_CATEGORIES, resolveCanonicalEventColor } from "../constants/eventColors";
 import { useCalendarTranslation } from "../locales";
 
@@ -374,11 +376,17 @@ export function UntilWhenPicker({
   );
 }
 
+const COLOR_GROUPS = [
+  'Emerald & Nature',
+  'Ocean & Sky',
+  'Purple & Royal',
+  'Rose & Coral',
+  'Amber & Earth',
+] as const;
+
 export function EventColorPickerDropdown({ value, onChange }) {
   const { t } = useCalendarTranslation();
   const [isOpen, setIsOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState("All");
-  const [searchQuery, setSearchQuery] = useState("");
   const containerRef = useRef(null);
 
   const canonicalId = resolveCanonicalEventColor(value, EVENT_COLORS[0].id);
@@ -386,26 +394,9 @@ export function EventColorPickerDropdown({ value, onChange }) {
     return EVENT_COLORS.find((c) => c.id === canonicalId) || EVENT_COLORS[0];
   }, [canonicalId]);
 
-  const filteredColors = useMemo(() => {
-    let list = EVENT_COLORS;
-    if (activeCategory !== "All") {
-      list = list.filter((c) => c.category === activeCategory);
-    }
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      list = list.filter(
-        (c) =>
-          c.label.toLowerCase().includes(q) ||
-          c.hex.toLowerCase().includes(q) ||
-          c.id.toLowerCase().includes(q)
-      );
-    }
-    return list;
-  }, [activeCategory, searchQuery]);
-
   useEffect(() => {
-    const handleOutsideClick = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -415,15 +406,26 @@ export function EventColorPickerDropdown({ value, onChange }) {
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [isOpen]);
 
+  // Auto-scroll into view when opened so palette is never clipped or hidden at drawer bottom
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const timer = setTimeout(() => {
+        containerRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+          inline: "nearest",
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
   return (
     <div ref={containerRef} className="relative w-full">
       <div className="flex items-center justify-between mb-2">
         <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary">
           {t("eventColor", "Event Color")}
         </label>
-        <span className="text-[10px] font-mono theme-text-secondary font-semibold">
-          {selectedColor.hex}
-        </span>
       </div>
 
       {/* Selected Event Color Trigger Card */}
@@ -444,9 +446,6 @@ export function EventColorPickerDropdown({ value, onChange }) {
           <span className="text-xs font-semibold theme-text-primary truncate">
             {selectedColor.label}
           </span>
-          <span className="text-[10px] font-mono theme-text-secondary">
-            {selectedColor.hex}
-          </span>
           {selectedColor.category && (
             <span className="hidden @[440px]:inline-block text-[9px] px-2 py-0.5 rounded-full theme-bg-app border-0 theme-text-secondary truncate">
               {selectedColor.category}
@@ -463,87 +462,53 @@ export function EventColorPickerDropdown({ value, onChange }) {
 
       {/* Borderless Curated Enterprise Palette Dropdown */}
       {isOpen && (
-        <div className="mt-2 p-3 rounded-3xl theme-bg-surface border-0 ring-0 shadow-lg animate-fade-in space-y-3 z-30">
-          
-          {/* Top Quick Search Bar */}
-          <div className="w-full">
-            <CustomInput
-              type="search"
-              size="sm"
-              variant="app"
-              placeholder={t("searchColors", "Search color or HEX...")}
-              value={searchQuery}
-              onChange={(val) => setSearchQuery(val)}
-              clearable={true}
-            />
-          </div>
-
-          {/* Color Family Category Pills */}
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5 -mx-1 px-1">
-            {EVENT_COLOR_CATEGORIES.map((cat) => {
-              const isActive = activeCategory === cat;
+        <div className="mt-2 p-3.5 rounded-3xl theme-bg-surface border-0 ring-0 shadow-lg animate-fade-in space-y-3.5 z-30">
+          {/* Grouped by Color Family with Clean Small Section Headers */}
+          <div className="space-y-3.5 max-h-72 overflow-y-auto scrollbar-none pr-0.5">
+            {COLOR_GROUPS.map((cat) => {
+              const colorsInCat = EVENT_COLORS.filter((c) => c.category === cat);
               return (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setActiveCategory(cat)}
-                  className={`px-2.5 py-1 rounded-xl text-[10px] font-bold whitespace-nowrap transition cursor-pointer border-0 ring-0 shrink-0 select-none ${
-                    isActive
-                      ? "theme-bg-accent text-white shadow-xs"
-                      : "theme-bg-app hover:theme-bg-elevated/60 theme-text-secondary hover:theme-text-primary"
-                  }`}
-                >
-                  {cat === "All" ? t("allColors", "All") : cat}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Color Swatch Grid */}
-          <div className="grid grid-cols-1 @[420px]:grid-cols-2 @[560px]:grid-cols-3 gap-1.5 max-h-64 overflow-y-auto scrollbar-none pr-0.5">
-            {filteredColors.map((col) => {
-              const isSelected = selectedColor.id === col.id;
-              return (
-                <button
-                  key={col.id}
-                  type="button"
-                  onClick={() => {
-                    onChange(col.id);
-                    setIsOpen(false);
-                  }}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-2xl border-0 ring-0 text-left transition cursor-pointer ${
-                    isSelected
-                      ? "bg-[var(--accent-main)]/15 dark:bg-[var(--accent-main)]/25 theme-accent font-bold"
-                      : "theme-bg-app hover:theme-bg-elevated/60 theme-text-primary"
-                  }`}
-                >
-                  <span
-                    className="w-4 h-4 rounded-full shrink-0 shadow-xs border-0"
-                    style={{ backgroundColor: col.hex }}
-                  />
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <span className="text-[11px] font-medium truncate leading-tight">
-                      {col.label}
-                    </span>
-                    <span className="text-[9px] font-mono theme-text-secondary leading-tight opacity-75">
-                      {col.hex}
-                    </span>
+                <div key={cat} className="space-y-1.5">
+                  <div className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary px-1">
+                    {cat}
                   </div>
-                  {isSelected && (
-                    <span className="w-4 h-4 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center shadow-xs shrink-0">
-                      <CheckIcon className="w-2.5 h-2.5" />
-                    </span>
-                  )}
-                </button>
+                  <div className="grid grid-cols-2 @[560px]:grid-cols-3 gap-1.5">
+                    {colorsInCat.map((col) => {
+                      const isSelected = selectedColor.id === col.id;
+                      return (
+                        <button
+                          key={col.id}
+                          type="button"
+                          onClick={() => {
+                            onChange(col.id);
+                            setIsOpen(false);
+                          }}
+                          className={`flex items-center gap-2 px-2.5 py-2 rounded-2xl border-0 ring-0 text-left transition cursor-pointer select-none min-w-0 ${
+                            isSelected
+                              ? "bg-[var(--accent-main)]/15 dark:bg-[var(--accent-main)]/25 theme-accent font-bold"
+                              : "theme-bg-app hover:theme-bg-elevated/60 theme-text-primary"
+                          }`}
+                        >
+                          <span
+                            className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full shrink-0 shadow-xs border-0"
+                            style={{ backgroundColor: col.hex }}
+                          />
+                          <span className="text-[11px] font-medium truncate leading-tight flex-1 min-w-0">
+                            {col.label}
+                          </span>
+                          {isSelected && (
+                            <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full theme-bg-accent theme-accent-text flex items-center justify-center shadow-xs shrink-0">
+                              <CheckIcon className="w-2.5 h-2.5" />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               );
             })}
           </div>
-
-          {filteredColors.length === 0 && (
-            <div className="py-6 text-center text-xs theme-text-secondary">
-              No matching colors found.
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -628,6 +593,8 @@ export default function TimeScheduleDrawerForm({
   const { activeTenantId } = useTenant();
   const { showToast } = useToast() as any;
   const { t } = useCalendarTranslation();
+  const navigate = useNavigate();
+  const { closeDrawer } = useRightSidebar();
   const [validationErrors, setValidationErrors] = useState<{ title?: string; startDate?: string }>({});
   const [eventTypes, setEventTypes] = useState(() => calendarEventTypesStore.getEventTypes(activeTenantId));
   const [eventKinds, setEventKinds] = useState(() => calendarEventKindsStore.getKinds(activeTenantId));
@@ -1109,18 +1076,27 @@ export default function TimeScheduleDrawerForm({
     }
   };
 
+  const isWorkingHours = formData.category === "WORKING_HOURS";
+  const scheduleOrEventLabel = isWorkingHours
+    ? t("workingSchedule", "Working Schedule / Shift")
+    : t("academicEvent", "Academic Event");
+  const settingsPath = isWorkingHours
+    ? "/institution-settings/working-schedules"
+    : "/institution-settings/event-types";
+  const settingsActionLabel = isWorkingHours ? t("manageShifts", "Manage Shifts") : t("manageTypes", "Manage Types");
+  const settingsActionTitle = isWorkingHours
+    ? t("manageWorkingSchedules", "Manage Working Hours & Shifts in Institution Settings")
+    : t("manageEventTypes", "Manage Schedule & Event Types in Institution Settings");
+
   return (
     <DrawerContainer padding="none" spacing="normal">
       <form id={formId} onSubmit={handleSubmit} className="space-y-6 pt-2 pb-6 @container">
         {/* ─── 1. Schedule Information Section ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-1">
-            <UsersIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
-            <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
-              {t("scheduleInformation", "Schedule Information")}
-            </h4>
-          </div>
-
+        <DrawerSection
+          title={t("scheduleInformation", "Schedule Information")}
+          icon={UsersIcon}
+          variant="streamlined"
+        >
           {/* Category & Schedule/Event Dropdown */}
           <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3">
             <div>
@@ -1151,7 +1127,7 @@ export default function TimeScheduleDrawerForm({
 
             <div>
               <CustomSelect
-                label={t("scheduleOrEvent", "Schedule / Event")}
+                label={scheduleOrEventLabel}
                 value={formData.title}
                 onChange={(val) => {
                   const matched = eventTitleOptions.find((o) => o.value === val);
@@ -1170,9 +1146,20 @@ export default function TimeScheduleDrawerForm({
                   }
                 }}
                 options={eventTitleOptions}
-                placeholder={t("scheduleOrEvent", "Select Schedule / Event...")}
-                searchable={true}
-                showDescription={true}
+                placeholder={
+                  isWorkingHours
+                    ? t("selectWorkingSchedule", "Select Working Schedule...")
+                    : t("selectAcademicEvent", "Select Academic Event...")
+                }
+                searchable={false}
+                showDescription={false}
+                showBadge={true}
+                onActionClick={() => {
+                  if (closeDrawer) closeDrawer();
+                  navigate(settingsPath);
+                }}
+                actionLabel={settingsActionLabel}
+                actionTitle={settingsActionTitle}
                 error={validationErrors.title}
               />
             </div>
@@ -1199,7 +1186,8 @@ export default function TimeScheduleDrawerForm({
                 onChange={(val) => setFormData({ ...formData, impacts: val })}
                 options={impactOptions}
                 placeholder={t("impacts", "Select Impacted Modules...")}
-                showDescription={true}
+                showBadge={false}
+                showDescription={false}
               />
             </div>
           </div>
@@ -1212,7 +1200,8 @@ export default function TimeScheduleDrawerForm({
               onChange={(val) => setFormData({ ...formData, priorityRank: Number(val) })}
               options={priorityRankOptions}
               placeholder={t("priority", "Select Priority Rank...")}
-              showDescription={true}
+              showBadge={false}
+              showDescription={false}
               direction="auto"
             />
           </div>
@@ -1229,34 +1218,32 @@ export default function TimeScheduleDrawerForm({
               placeholder={t("descriptionPlaceholder", "Add schedule details, agenda, instructions or remarks...")}
             />
           </div>
-        </div>
+        </DrawerSection>
 
         {/* ─── 2. Timing & Recurrence Section ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-1 pt-2">
-            <ClockIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
-            <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
-              {t("dateAndTiming", "Date & Timing")}
-            </h4>
+        <DrawerSection
+          title={t("dateAndTiming", "Date & Timing")}
+          icon={ClockIcon}
+          variant="streamlined"
+        >
+          {/* Start Date */}
+          <div>
+            <ReusableCalendar
+              label={t("dateLabel", "Date")}
+              selectedDate={formData.startDate}
+              onSelectDate={(newDate) => {
+                setValidationErrors((prev) => ({ ...prev, startDate: undefined }));
+                setFormData({ ...formData, startDate: newDate });
+              }}
+            />
+            {validationErrors.startDate && (
+              <p className="text-[11px] font-medium theme-danger mt-1">{validationErrors.startDate}</p>
+            )}
           </div>
 
-          {/* Date & Until when? Section */}
-          <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3">
-            <div>
-              <ReusableCalendar
-                label={t("dateLabel", "Date")}
-                selectedDate={formData.startDate}
-                onSelectDate={(newDate) => {
-                  setValidationErrors((prev) => ({ ...prev, startDate: undefined }));
-                  setFormData({ ...formData, startDate: newDate });
-                }}
-              />
-              {validationErrors.startDate && (
-                <p className="text-[11px] font-medium theme-danger mt-1">{validationErrors.startDate}</p>
-              )}
-            </div>
-
-            <div>
+          {/* Until when? & All day Row (Strictly 2 columns on all screen sizes) */}
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3 items-end">
+            <div className="min-w-0">
               <UntilWhenPicker
                 until={formData.until}
                 untilDate={formData.untilDate || formData.endDate}
@@ -1265,31 +1252,39 @@ export default function TimeScheduleDrawerForm({
                 onChangeUntilDate={(val) => setFormData((prev) => ({ ...prev, untilDate: val, endDate: val }))}
               />
             </div>
+
+            <div className="min-w-0 flex flex-col justify-end">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider theme-text-secondary truncate">
+                  {t("allDay", "All day")}
+                </label>
+              </div>
+              <div className="h-[46px] min-h-[46px] flex items-center justify-between px-3 sm:px-3.5 py-2.5 rounded-2xl border-0 theme-bg-surface shadow-xs">
+                <span className="text-xs font-semibold theme-text-primary select-none truncate">
+                  {formData.isFullDay ? t("yes", "Yes") : t("no", "No")}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={Boolean(formData.isFullDay)}
+                  onClick={() => setFormData((prev) => ({ ...prev, isFullDay: !prev.isFullDay }))}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center px-0.5 cursor-pointer rounded-full border-0 transition-colors duration-200 ease-in-out focus:outline-none ${
+                    formData.isFullDay ? "theme-bg-accent" : "bg-black/15 dark:bg-white/15"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      formData.isFullDay ? "translate-x-5 rtl:-translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* All Day Toggle Switch (Project soft surface + theme tokens, zero borders) */}
-          <div className="flex items-center justify-between px-4 py-3 rounded-2xl border-0 theme-bg-surface shadow-xs">
-            <span className="text-xs font-bold theme-text-primary">{t("allDay", "All day")}</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={Boolean(formData.isFullDay)}
-              onClick={() => setFormData((prev) => ({ ...prev, isFullDay: !prev.isFullDay }))}
-              className={`relative inline-flex h-6 w-11 shrink-0 items-center px-0.5 cursor-pointer rounded-full border-0 transition-colors duration-200 ease-in-out focus:outline-none ${
-                formData.isFullDay ? "theme-bg-accent" : "bg-black/15 dark:bg-white/15"
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                  formData.isFullDay ? "translate-x-5 rtl:-translate-x-5" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
-
-          {/* From & To Time Pickers (Visible when NOT All Day) */}
+          {/* From & To Time Pickers (Visible when NOT All Day, strictly 2 columns on all screen sizes) */}
           {!formData.isFullDay && (
-            <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3 animate-fade-in">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3 animate-fade-in">
               <InlineTimePicker
                 label={t("fromTime", "From")}
                 value={formData.startTime}
@@ -1365,60 +1360,43 @@ export default function TimeScheduleDrawerForm({
               </div>
             </div>
           )}
-        </div>
+        </DrawerSection>
 
         {/* ─── 3. Visual Styling Section ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-1 pt-2">
-            <ShapesIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
-            <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
-              {t("visualAppearance", "Visual Appearance")}
-            </h4>
-          </div>
-
+        <DrawerSection
+          title={t("visualAppearance", "Visual Appearance")}
+          icon={ShapesIcon}
+          variant="streamlined"
+        >
           <EventColorPickerDropdown
             value={formData.color}
             onChange={(val) => setFormData({ ...formData, color: resolveCanonicalEventColor(val) })}
           />
-        </div>
 
-        {/* Apply Changes To Dropdown */}
-        {isRecurringOrMultiDay && (
-          <div className="pt-2 animate-fade-in">
-            <CustomSelect
-              label={t("applyChangesTo", "Apply Changes To")}
-              value={editScope}
-              onChange={(val) => setEditScope(val)}
-              options={editScopeOptions}
-              placeholder={t("applyChangesTo", "Select update scope...")}
-              showDescription={true}
-              direction="auto"
-            />
-          </div>
-        )}
-
-        {/* Bottom Action Buttons */}
-        <div className="pt-4 border-0 flex items-center justify-end gap-2.5">
-          {onCancel && (
-            <CustomButton
-              type="button"
-              variant="surface"
-              size="md"
-              onClick={onCancel}
-            >
-              {t("cancel", "Cancel")}
-            </CustomButton>
+          {/* Apply Changes To Dropdown */}
+          {isRecurringOrMultiDay && (
+            <div className="pt-2 animate-fade-in">
+              <CustomSelect
+                label={t("applyChangesTo", "Apply Changes To")}
+                value={editScope}
+                onChange={(val) => setEditScope(val)}
+                options={editScopeOptions}
+                placeholder={t("applyChangesTo", "Select update scope...")}
+                showDescription={true}
+                direction="auto"
+              />
+            </div>
           )}
-          <CustomButton
-            type="submit"
-            variant="primary"
-            size="md"
-            icon={SaveIcon}
-            className="flex-1"
-          >
-            {t("save", "Save Schedule")}
-          </CustomButton>
-        </div>
+        </DrawerSection>
+
+        {/* Reusable Drawer Footer */}
+        <DrawerFooter
+          onCancel={onCancel}
+          cancelLabel={t("cancel", "Cancel")}
+          saveLabel={t("save", "Save Schedule")}
+          saveIcon={SaveIcon}
+          onSubmit={handleSubmit}
+        />
       </form>
     </DrawerContainer>
   );

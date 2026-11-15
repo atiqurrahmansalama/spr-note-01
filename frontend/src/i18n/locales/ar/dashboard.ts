@@ -1,8 +1,13 @@
 export const dashboard = {
   // Header & Greetings
+  greetingAssalamuAlaikum: 'السلام عليكم',
+  greetingFajr: 'صباح الفجر والبركة، {name}',
   greetingMorning: 'صباح الخير، {name}',
-  greetingAfternoon: 'مساء الخير، {name}',
-  greetingEvening: 'مساء النور، {name}',
+  greetingNoon: 'طاب منتصف النهار، {name}',
+  greetingAfternoon: 'طاب مساؤكم، {name}',
+  greetingEvening: 'مساء الخير، {name}',
+  greetingNight: 'طابت ليلتكم، {name}',
+  greetingMidnight: 'ليلة هادئة، {name}',
   welcomeSubtitle: 'إليك ملخص شامل للأنشطة وسير العمل المؤسسي لليوم.',
   activeSession: 'العام الدراسي الحالي',
   viewingAs: 'عرض لوحة التحكم:',

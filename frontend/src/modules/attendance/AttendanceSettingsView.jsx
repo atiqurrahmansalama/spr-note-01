@@ -27,19 +27,25 @@ import CustomInput from "../../components/ui/CustomInput";
 import CustomCheckbox from "../../components/ui/CustomCheckbox";
 import CustomTimePicker from "../../components/ui/CustomTimePicker";
 
+export const attendanceTimingSectionConfig = {
+  id: "timing-rules",
+  group: "Attendance Policies",
+  title: "Attendance Timing Policies",
+  description: "Configure start/late thresholds, edit lockout windows, auto-absent triggers, and admin overrides",
+  icon: ClockIcon,
+};
+
+export const attendanceEventRestrictionsSectionConfig = {
+  id: "event-restrictions",
+  group: "Attendance Policies",
+  title: "Class Attendance Off Events",
+  description: "Configure which calendar event types and specific events disable class attendance and mark recess",
+  icon: CalendarIcon,
+};
+
 const SECTIONS = [
-  {
-    id: "timing-rules",
-    title: "Attendance Timing Policies",
-    description: "Configure start/late thresholds, edit lockout windows, auto-absent triggers, and admin overrides",
-    icon: ClockIcon,
-  },
-  {
-    id: "event-restrictions",
-    title: "Class Attendance Off Events",
-    description: "Configure which calendar event types and specific events disable class attendance and mark recess",
-    icon: CalendarIcon,
-  },
+  attendanceTimingSectionConfig,
+  attendanceEventRestrictionsSectionConfig,
 ];
 
 export default function AttendanceSettingsView({

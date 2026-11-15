@@ -216,6 +216,8 @@ export const masterCalendarStore = {
 
     const newEvent = {
       ...eventData,
+      institution_id: tenantId || 'default',
+      tenant_id: tenantId || 'default',
       priorityRank: rankVal,
       id: eventData.id || `evt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       createdAt: new Date().toISOString(),

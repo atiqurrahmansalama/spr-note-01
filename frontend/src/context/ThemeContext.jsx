@@ -52,6 +52,7 @@ export function ThemeProvider({ children }) {
     document.documentElement.setAttribute("data-mode-preference", modeId);
     document.body.setAttribute("data-mode-preference", modeId);
     document.documentElement.style.colorScheme = effectiveMode;
+    document.documentElement.classList.toggle("dark", effectiveMode === "dark");
 
     // Sync color-scheme meta tag for native browser controls & scrollbars
     let colorSchemeMeta = document.querySelector('meta[name="color-scheme"]');

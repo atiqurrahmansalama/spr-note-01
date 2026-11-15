@@ -1,8 +1,13 @@
 export const dashboard = {
   // Header & Greetings
+  greetingAssalamuAlaikum: 'السلام علیکم',
+  greetingFajr: 'صبح صادق بخیر، {name}',
   greetingMorning: 'صبح بخیر، {name}',
-  greetingAfternoon: 'دوپہر بخیر، {name}',
+  greetingNoon: 'دوپہر بخیر، {name}',
+  greetingAfternoon: 'سه پہر بخیر، {name}',
   greetingEvening: 'شام بخیر، {name}',
+  greetingNight: 'شب بخیر، {name}',
+  greetingMidnight: 'پر سکون رات، {name}',
   welcomeSubtitle: 'آج آپ کے ادارے کی مجموعی سرگرمیوں اور تازہ ترین معلومات کا خلاصہ نیچے درج ہے۔',
   activeSession: 'موجودہ تعلیمی سال',
   viewingAs: 'ڈیش بورڈ منظر:',

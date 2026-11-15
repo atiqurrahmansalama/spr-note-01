@@ -1,8 +1,13 @@
 export const ar = {
   // Greetings & Header
+  greetingAssalamuAlaikum: 'السلام عليكم',
+  greetingFajr: 'صباح الفجر والبركة، {name}',
   greetingMorning: 'صباح الخير، {name}',
-  greetingAfternoon: 'مساء الخير، {name}',
-  greetingEvening: 'مساء النور، {name}',
+  greetingNoon: 'طاب منتصف النهار، {name}',
+  greetingAfternoon: 'طاب مساؤكم، {name}',
+  greetingEvening: 'مساء الخير، {name}',
+  greetingNight: 'طابت ليلتكم، {name}',
+  greetingMidnight: 'ليلة هادئة، {name}',
   welcomeSubtitle: 'إليك نظرة عامة في الوقت الفعلي على مساحة العمل المؤسسية الخاصة بك اليوم.',
   activeSession: 'العام الدراسي النشط',
   viewingAs: 'عرض لوحة التحكم:',

@@ -1,8 +1,13 @@
 export const dashboard = {
   // Header & Greetings
+  greetingAssalamuAlaikum: 'Assalamu Alaikum',
+  greetingFajr: 'Blessed early morning, {name}',
   greetingMorning: 'Good morning, {name}',
+  greetingNoon: 'Good midday, {name}',
   greetingAfternoon: 'Good afternoon, {name}',
   greetingEvening: 'Good evening, {name}',
+  greetingNight: 'Good night, {name}',
+  greetingMidnight: 'Peaceful late night, {name}',
   welcomeSubtitle: 'Here is what is happening across your institutional workspace today.',
   activeSession: 'Active Session',
   viewingAs: 'Dashboard View:',

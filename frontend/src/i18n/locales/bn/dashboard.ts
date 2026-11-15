@@ -1,8 +1,13 @@
 export const dashboard = {
   // Header & Greetings
+  greetingAssalamuAlaikum: 'আসসালামু আলাইকুম',
+  greetingFajr: 'শুভ ভোর, {name}',
   greetingMorning: 'শুভ সকাল, {name}',
-  greetingAfternoon: 'শুভ অপরাহ্ন, {name}',
+  greetingNoon: 'শুভ দুপুর, {name}',
+  greetingAfternoon: 'শুভ বিকেল, {name}',
   greetingEvening: 'শুভ সন্ধ্যা, {name}',
+  greetingNight: 'শুভ রাত্রি, {name}',
+  greetingMidnight: 'শুভ গভীর রাত, {name}',
   welcomeSubtitle: 'আজ আপনার প্রতিষ্ঠানের সার্বিক কার্যক্রম ও হালনাগাদ তথ্যসমূহ নিচে তুলে ধরা হলো।',
   activeSession: 'চলতি শিক্ষাবর্ষ',
   viewingAs: 'ড্যাশবোর্ড ভিউ:',

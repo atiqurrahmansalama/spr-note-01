@@ -60,10 +60,16 @@ export const DeveloperToolsContentRenderer: React.FC<DeveloperToolsContentRender
 }) => {
   return (
     <div className="w-full">
-      {/* Section 1: Academy & Branch Categories */}
+      {/* Section 1: Academy Categories */}
       {currentRenderSection === "categories" && (
-        <div className="space-y-8 animate-fade-in">
+        <div className="w-full animate-fade-in">
           <AcademyCategoriesPanel />
+        </div>
+      )}
+
+      {/* Section 1.5: Branch & Campus Categories */}
+      {currentRenderSection === "branch-categories" && (
+        <div className="w-full animate-fade-in">
           <BranchCategoriesPanel activeTenantId={activeTenantId} />
         </div>
       )}

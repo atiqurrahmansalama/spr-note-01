@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import SettingsSplitLayout from "../../../components/common/SettingsSplitLayout";
 import { SparklesIcon } from "../../../components/ui/Icons";
 import { HealthDiagnosticsResponse } from "./types";
@@ -126,47 +126,42 @@ export const DeveloperToolsHubView: React.FC = () => {
     }));
   }, [docTypes]);
 
-  // URL Tab / Section Sync
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // URL Tab / Section Sync: Normalize path parameter and query string
   const { sectionId: pathSectionId } = useParams<{ sectionId?: string }>();
   const queryTab = searchParams.get("tab") || searchParams.get("section");
-  const initialSection = pathSectionId || queryTab || null;
+  const resolvedSection = pathSectionId || queryTab || null;
 
-  const [activeSection, setActiveSection] = useState<string | null>(initialSection);
+  const [activeSection, setActiveSection] = useState<string | null>(resolvedSection);
 
   useEffect(() => {
-    const currentTab = pathSectionId || queryTab || null;
-    if (currentTab !== activeSection) {
-      setActiveSection(currentTab);
-    }
-  }, [pathSectionId, queryTab]);
+    setActiveSection(resolvedSection);
+  }, [resolvedSection]);
+
+  const basePath = useMemo(() => {
+    const p = location.pathname;
+    if (p.startsWith("/institution-settings")) return "/institution-settings";
+    if (p.startsWith("/developer-tools")) return "/developer-tools";
+    if (p.startsWith("/admin-tools")) return "/admin-tools";
+    if (p.startsWith("/sp-management")) return "/sp-management";
+    return "/institution-settings";
+  }, [location.pathname]);
 
   const currentRenderSection = activeSection || visibleSections[0]?.id || "categories";
 
-  const handleSectionChange = (sectionId: string | null) => {
-    setActiveSection(sectionId);
-    if (!sectionId) {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.delete("tab");
-          next.delete("section");
-          return next;
-        },
-        { replace: true }
-      );
-      return;
-    }
-
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.set("tab", sectionId);
-        next.delete("section");
-        return next;
-      },
-      { replace: true }
-    );
-  };
+  const handleSectionChange = useCallback(
+    (sectionId: string | null) => {
+      setActiveSection(sectionId);
+      if (!sectionId) {
+        navigate(basePath, { replace: true });
+        return;
+      }
+      navigate(`${basePath}/${sectionId}`, { replace: true });
+    },
+    [basePath, navigate]
+  );
 
   const handleBackToMenu = () => {
     handleSectionChange(null);
