@@ -44,7 +44,7 @@ export default function CalendarEventsHubView() {
   const isWorkingHoursEnabled = isSectionEnabled('calendar_tab_working_hours');
   const isEventsEnabled = isSectionEnabled('calendar_tab_events');
   const isAgendaEnabled = isSectionEnabled('calendar_tab_agenda');
-  const isMyTasksEnabled = isSectionEnabled('calendar_tab_personal_tasks', true);
+  const isMyTasksEnabled = isSectionEnabled('calendar_tab_personal_tasks');
 
   const visibleTabs: CalendarTabItem[] = useMemo(() => {
     const list: CalendarTabItem[] = [];
@@ -206,8 +206,8 @@ export default function CalendarEventsHubView() {
       return {
         title: mode === 'add'
           ? (isWorkingHours ? t('addWorkingHours', 'Add Working Hours') : t('addAcademicEvent', 'Add Academic Event'))
-          : t('editSchedule', 'Edit Schedule / Event'),
-        category: t('scheduleDetails', 'Schedule & Calendar'),
+          : (isWorkingHours ? t('editWorkingHours', 'Edit Working Hours') : t('editAcademicEvent', 'Edit Academic Event')),
+        category: isWorkingHours ? t('workingHours', 'Working Hours') : t('academicEvents', 'Academic Events'),
         size: 'md' as const,
         content: (
           <TimeScheduleDrawerForm
@@ -317,7 +317,7 @@ export default function CalendarEventsHubView() {
     openDrawer('schedule', {
       mode: 'add',
       date: targetDate,
-      category: activeTab === 'AGENDA' ? 'WORKING_HOURS' : activeTab,
+      category: activeTab === 'WORKING_HOURS' ? 'WORKING_HOURS' : 'ACADEMIC_EVENT',
     });
   };
 
@@ -356,24 +356,39 @@ export default function CalendarEventsHubView() {
             activeTab={activeTab}
             onChange={setActiveTab}
             rightContent={
-              <CustomButton
-                type="button"
-                variant="primary"
-                size="sm"
-                icon={PlusIcon}
-                onClick={activeTab === 'MY_TASKS' ? () => handleOpenUserTaskDrawer() : handleOpenAddDrawer}
-                title={activeTab === 'MY_TASKS' ? t('newTask', 'New Task') : t('addSchedule', 'Add Schedule or Event')}
-              >
-                <span className="hidden sm:inline">
-                  {activeTab === 'MY_TASKS' ? t('newTask', 'New Task') : t('addSchedule', 'Add')}
-                </span>
-              </CustomButton>
+              activeTab === 'WORKING_HOURS' ? (
+                <CustomButton
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  icon={PlusIcon}
+                  onClick={handleOpenAddDrawer}
+                  title={t('addSchedule', 'Add Schedule')}
+                >
+                  <span className="hidden sm:inline">
+                    {t('addSchedule', 'Add Schedule')}
+                  </span>
+                </CustomButton>
+              ) : activeTab === 'ACADEMIC_EVENT' ? (
+                <CustomButton
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  icon={PlusIcon}
+                  onClick={handleOpenAddDrawer}
+                  title={t('addEvent', 'Add Event')}
+                >
+                  <span className="hidden sm:inline">
+                    {t('addEvent', 'Add Event')}
+                  </span>
+                </CustomButton>
+              ) : null
             }
           />
         </div>
 
         {/* ─── 3. Reusable Master Calendar Engine or Dedicated My Tasks View ─── */}
-        <div className="min-h-[640px] w-full min-w-0 pb-16 sm:pb-24">
+        <div className={`w-full min-w-0 ${activeTab === 'MY_TASKS' ? 'flex-1 flex flex-col min-h-[calc(100vh-220px)]' : 'min-h-[640px] pb-16 sm:pb-24'}`}>
           {activeTab === 'MY_TASKS' ? (
             <MyTasksHubView onOpenTaskDrawer={handleOpenUserTaskDrawer} />
           ) : (

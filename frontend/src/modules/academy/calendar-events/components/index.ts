@@ -5,6 +5,7 @@ export { default as TimeScheduleDetailDrawer } from './TimeScheduleDetailDrawer'
 export { default as DayAgendaDrawer } from './DayAgendaDrawer';
 export { default as UserTaskDrawerForm } from './UserTaskDrawerForm';
 export { default as MyTasksHubView } from './MyTasksHubView';
+export { default as TaskQuickInputDock } from './TaskQuickInputDock';
 
 // Reusable enterprise presentation components
 export { default as WorkingShiftRow } from './WorkingShiftRow';

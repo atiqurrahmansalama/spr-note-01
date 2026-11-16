@@ -343,12 +343,26 @@ export default function MasterTimeCalendar({
       return;
     }
 
+    // 1. Try DOM offset calculation (robust against display/animation/tab transition states)
+    if (container.clientWidth > 0 && todayEl.offsetWidth > 0) {
+      const scrollLeft = container.scrollLeft;
+      const clientWidth = container.clientWidth;
+      const elLeft = todayEl.offsetLeft;
+      const elWidth = todayEl.offsetWidth;
+
+      // Element is scrolled out if its right edge is before the visible viewport or its left edge is past the visible viewport
+      const isOutScroll = (elLeft + elWidth <= scrollLeft + 8) || (elLeft >= scrollLeft + clientWidth - 8);
+      setIsTodayScrolledOutOfView(isOutScroll);
+      return;
+    }
+
+    // 2. Fallback to bounding client rect if clientWidth is ready
     const containerRect = container.getBoundingClientRect();
     const todayRect = todayEl.getBoundingClientRect();
-
-    // Today is out of view if it is scrolled past either left or right edges of the visible strip
-    const isOut = todayRect.right <= containerRect.left + 8 || todayRect.left >= containerRect.right - 8;
-    setIsTodayScrolledOutOfView(isOut);
+    if (containerRect.width > 0 && todayRect.width > 0) {
+      const isOut = todayRect.right <= containerRect.left + 8 || todayRect.left >= containerRect.right - 8;
+      setIsTodayScrolledOutOfView(isOut);
+    }
   }, [displayMode, viewYear, viewMonth]);
 
   // Determine if Today button should be displayed
@@ -853,13 +867,70 @@ export default function MasterTimeCalendar({
       checkTodayVisibility();
     };
 
+    let resizeObserver: ResizeObserver | null = null;
+    let intersectionObserver: IntersectionObserver | null = null;
+
     if (el) {
       el.addEventListener("scroll", handleScroll, { passive: true });
       window.addEventListener("resize", handleScroll, { passive: true });
+
+      // Observe container size changes (tab switch, sidebar toggle, layout settle)
+      if (typeof ResizeObserver !== "undefined") {
+        resizeObserver = new ResizeObserver(() => {
+          checkTodayVisibility();
+        });
+        resizeObserver.observe(el);
+      }
     }
 
+    // IntersectionObserver to observe today's date element inside the scrollable strip
+    const attachIntersectionObserver = () => {
+      if (!el || displayMode !== "timeline") return;
+      const todayEl = el.querySelector('[data-today="true"]') as HTMLElement | null;
+      if (!todayEl) {
+        const now = new Date();
+        if (viewYear === now.getFullYear() && viewMonth === now.getMonth()) {
+          // Today element might be mounting
+          return;
+        }
+        setIsTodayScrolledOutOfView(true);
+        return;
+      }
+
+      if (typeof IntersectionObserver !== "undefined") {
+        if (intersectionObserver) intersectionObserver.disconnect();
+        intersectionObserver = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              const isVisible = entry.isIntersecting && entry.intersectionRatio > 0.15;
+              setIsTodayScrolledOutOfView(!isVisible);
+            }
+          },
+          {
+            root: el,
+            threshold: [0, 0.15, 0.5, 1.0],
+          }
+        );
+        intersectionObserver.observe(todayEl);
+      }
+    };
+
     checkTodayVisibility();
-    const timer = setTimeout(checkTodayVisibility, 100);
+    attachIntersectionObserver();
+
+    // Multi-stage timers to ensure measurements settle across transitions and font loads
+    const t1 = setTimeout(() => {
+      checkTodayVisibility();
+      attachIntersectionObserver();
+    }, 60);
+    const t2 = setTimeout(() => {
+      checkTodayVisibility();
+      attachIntersectionObserver();
+    }, 200);
+    const t3 = setTimeout(() => {
+      checkTodayVisibility();
+      attachIntersectionObserver();
+    }, 500);
 
     return () => {
       cleanupDay();
@@ -867,7 +938,11 @@ export default function MasterTimeCalendar({
         el.removeEventListener("scroll", handleScroll);
       }
       window.removeEventListener("resize", handleScroll);
-      clearTimeout(timer);
+      if (resizeObserver) resizeObserver.disconnect();
+      if (intersectionObserver) intersectionObserver.disconnect();
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
     };
   }, [displayMode, viewMonth, viewYear, selectedDay, checkTodayVisibility]);
 
@@ -877,7 +952,15 @@ export default function MasterTimeCalendar({
       if (activeEl) {
         activeEl.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
       }
-      setTimeout(checkTodayVisibility, 120);
+      // Re-check visibility as smooth scroll progresses and completes
+      const t1 = setTimeout(checkTodayVisibility, 80);
+      const t2 = setTimeout(checkTodayVisibility, 250);
+      const t3 = setTimeout(checkTodayVisibility, 500);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
     }
   }, [selectedDay, viewMonth, viewYear, displayMode, checkTodayVisibility]);
 
@@ -1046,7 +1129,7 @@ export default function MasterTimeCalendar({
             <div className="flex flex-col w-full gap-1 sm:gap-1.5">
               {weeks.map((weekDays, weekIdx) => {
                 const { items: weekEvents, maxTracks } = getWeekEvents(weekDays);
-                const weekRowMinHeight = Math.max(88, 36 + maxTracks * 26);
+                const weekRowMinHeight = Math.max(0, 36 + maxTracks * 26);
 
                 return (
                   <div
@@ -1080,7 +1163,7 @@ export default function MasterTimeCalendar({
                                 handleOpenAddDrawer(cell.dateStr);
                               }
                             }}
-                            className={`border-0 aspect-square @md:aspect-auto min-h-0 @md:min-h-[var(--week-min-h,88px)] w-full p-1 @sm:p-1.5 @xl:p-2 flex flex-col justify-between transition-colors cursor-pointer group select-none rounded-xl sm:rounded-2xl ${
+                            className={`border-0 aspect-square min-h-[var(--week-min-h,0px)] w-full p-1 @sm:p-1.5 @xl:p-2 flex flex-col justify-between transition-colors cursor-pointer group select-none rounded-xl sm:rounded-2xl ${
                               isToday
                                 ? "bg-[var(--accent-main)]/12 dark:bg-[var(--accent-main)]/18 hover:bg-[var(--accent-main)]/22"
                                 : cell.isCurrentMonth
@@ -1093,21 +1176,39 @@ export default function MasterTimeCalendar({
                                 : cell.dateStr
                             }
                           >
-                            {/* Top: Day Number (Top Left) & Hijri Day Number (Top Right) */}
+                            {/* Top: Day Number + Personal Tasks Badge (Top Left) & Hijri Day Number (Top Right) */}
                             <div className="flex items-center justify-between relative w-full mb-0.5 shrink-0 pointer-events-auto">
-                              <span
-                                className={`text-[10px] @sm:text-[11px] @xl:text-xs font-bold inline-flex items-center justify-center w-5 h-5 @sm:w-5.5 @sm:h-5.5 @xl:w-6 @xl:h-6 rounded-full transition ${
-                                  isToday
-                                    ? "theme-bg-accent text-white shadow-xs"
-                                    : "theme-text-primary group-hover:theme-accent font-mono"
-                                }`}
-                              >
-                                {cell.dayNum}
-                              </span>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span
+                                  className={`text-[10px] @sm:text-[11px] @xl:text-xs font-bold inline-flex items-center justify-center w-5 h-5 @sm:w-5.5 @sm:h-5.5 @xl:w-6 @xl:h-6 rounded-full transition ${
+                                    isToday
+                                      ? "theme-bg-accent text-white shadow-xs"
+                                      : "theme-text-primary group-hover:theme-accent font-mono"
+                                  }`}
+                                >
+                                  {cell.dayNum}
+                                </span>
+
+                                {/* Desktop/Tablet personal tasks compact badge in cell header - 100% collision-free from spanning event bars */}
+                                {cellTasks.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openDrawer('user-task', { date: cell.dateStr });
+                                    }}
+                                    className="hidden @md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 transition cursor-pointer select-none border-0 ring-0 shrink-0 z-20"
+                                    title={`${cellTasks.length} personal task(s). Click to view / add.`}
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                                    <span className="truncate">{cellTasks.length} {cellTasks.length === 1 ? 'Task' : 'Tasks'}</span>
+                                  </button>
+                                )}
+                              </div>
 
                               {isHijriEnabled && (
                                 <span
-                                  className="text-[9px] @sm:text-[10px] font-mono theme-accent font-semibold leading-none select-none opacity-85"
+                                  className="text-[9px] @sm:text-[10px] font-mono theme-accent font-semibold leading-none select-none opacity-85 shrink-0"
                                   title={`Hijri: ${getHijriDateString(cell.dateStr)}`}
                                 >
                                   {getHijriDateString(cell.dateStr).split(" ")[0]}
@@ -1133,25 +1234,8 @@ export default function MasterTimeCalendar({
                               </div>
                             )}
 
-                            {/* Desktop/Tablet personal tasks compact pill */}
-                            {cellTasks.length > 0 && (
-                              <div
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openDrawer('user-task', { date: cell.dateStr });
-                                }}
-                                className="hidden @md:flex items-center gap-1 px-1.5 py-0.5 mt-auto rounded-md text-[9px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 transition cursor-pointer select-none pointer-events-auto shrink-0 z-20"
-                                title={`${cellTasks.length} personal task(s). Click to view / add.`}
-                              >
-                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
-                                <span className="truncate">{cellTasks.length} {cellTasks.length === 1 ? 'Task' : 'Tasks'}</span>
-                              </div>
-                            )}
-
-                            {/* Desktop/Tablet vertical spacer so cell holds proper height when no tasks */}
-                            {cellTasks.length === 0 && (
-                              <div className="hidden @md:block flex-1 min-h-[44px] pointer-events-none" />
-                            )}
+                            {/* Desktop/Tablet vertical spacer so cell holds proper height for event bars without collision */}
+                            <div className="hidden @md:block flex-1 min-h-[44px] pointer-events-none" />
                           </div>
                         );
                       })}
@@ -1405,14 +1489,14 @@ export default function MasterTimeCalendar({
                           <div className="flex items-center gap-2.5 min-w-0 flex-1">
                             <input
                               type="checkbox"
-                              checked={task.status === 'DONE'}
+                              checked={task.status === 'COMPLETED'}
                               onChange={() => toggleTaskStatus(task.id)}
                               className="w-4 h-4 rounded border-0 accent-indigo-600 cursor-pointer shrink-0"
                             />
                             <span
                               onClick={() => openDrawer('user-task', { task, date: selectedDateStr })}
                               className={`text-xs truncate cursor-pointer select-none ${
-                                task.status === 'DONE'
+                                task.status === 'COMPLETED'
                                   ? 'line-through opacity-50 theme-text-secondary'
                                   : 'font-medium theme-text-primary group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
                               }`}

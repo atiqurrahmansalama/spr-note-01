@@ -407,6 +407,9 @@ export default function StudentSelector({
         size={size}
         showAllOptionsOnFocus={showAllOptionsOnFocus}
         disabled={disabled}
+        autoComplete="off"
+        name="student_autocomplete_query"
+        data-lpignore="true"
       />
     </div>
   );

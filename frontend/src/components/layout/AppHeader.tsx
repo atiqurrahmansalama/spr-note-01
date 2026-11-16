@@ -155,8 +155,9 @@ export default function AppHeader({
               align="center"
               showChevron={false}
               size="md"
+              variant="ghost"
               menuClassName="w-80 sm:w-96 rounded-3xl p-2.5 shadow-2xl border theme-border"
-              buttonClassName="group/inst flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-2xl hover:theme-bg-elevated/70 active:scale-[0.98] transition cursor-pointer max-w-full border-0 outline-hidden focus:outline-hidden"
+              buttonClassName="group/inst flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-2xl hover:theme-bg-elevated/40 active:scale-[0.98] transition cursor-pointer max-w-full border-0 shadow-none bg-transparent outline-hidden focus:outline-hidden ring-0"
               header={
                 <ActionMenuHeader
                   title="Switch Academy"

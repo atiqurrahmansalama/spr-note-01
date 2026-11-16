@@ -39,6 +39,7 @@ export interface TeacherSelectProps {
   disabled?: boolean;
   searchable?: boolean;
   showBadge?: boolean;
+  hideDesignation?: boolean;
   size?: 'sm' | 'md' | 'lg';
   compactMode?: boolean;
   error?: string;
@@ -69,6 +70,7 @@ export default function TeacherSelect({
   disabled = false,
   searchable = false,
   showBadge = false,
+  hideDesignation = false,
   size = 'md',
   compactMode = false,
   error,
@@ -140,27 +142,29 @@ export default function TeacherSelect({
     }
 
     filteredTeachers.forEach((t) => {
-      const nameStr =
+      const rawBaseName =
         t.name_en ||
         t.user_name ||
         t.name ||
         t.full_name ||
         t.employee_id ||
-        (t.user_phone ? `Teacher (${t.user_phone})` : `Teacher #${t.id}`);
+        t.user_phone ||
+        `Teacher #${t.id}`;
+      const nameStr = String(rawBaseName).replace(/\(.*?\)/g, "").trim();
       const designationStr = t.designation || (t.staff_type === 'TEACHING' ? 'Teacher' : '');
       const itemValue = valueKey === 'user' ? String(t.user || t.id) : String(t.id || t.user);
 
       list.push({
         value: itemValue,
-        label: designationStr ? `${nameStr} (${designationStr})` : nameStr,
-        typeLabel: showBadge ? (designationStr || 'Staff') : undefined,
-        badge: showBadge ? (designationStr || 'Staff') : undefined,
+        label: hideDesignation ? nameStr : designationStr ? `${nameStr} (${designationStr})` : nameStr,
+        typeLabel: (!hideDesignation && showBadge) ? (designationStr || 'Staff') : undefined,
+        badge: (!hideDesignation && showBadge) ? (designationStr || 'Staff') : undefined,
         raw: t,
       });
     });
 
     return list;
-  }, [filteredTeachers, allowAll, allLabel, allValue, showBadge, valueKey]);
+  }, [filteredTeachers, allowAll, allLabel, allValue, showBadge, hideDesignation, valueKey]);
 
   const handleChange = (selectedVal: string | number) => {
     const foundObj = filteredTeachers.find((t) => {

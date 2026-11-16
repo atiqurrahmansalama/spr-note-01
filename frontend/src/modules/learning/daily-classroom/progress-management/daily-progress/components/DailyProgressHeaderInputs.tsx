@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import AutocompleteDropdown, { type AutocompleteOption } from "@/components/ui/AutocompleteDropdown";
+import CustomSelect from "@/components/ui/CustomSelect";
 import { curriculumStore, learningStore } from "@/stores";
 import { getDailyLessons } from "@/api/learning";
 import { useTenant } from "@/context/TenantContext";
@@ -38,6 +39,7 @@ export function SessionInputSection({
 }: SessionInputSectionProps) {
   const { isFeatureEnabled } = useFeatureControl();
   const canAddSession = isFeatureEnabled('progress_action_add_session');
+  const canTypeCustomSession = isFeatureEnabled('progress_session_custom_name');
 
   const effectiveActionLabel = canAddSession
     ? (actionLabel !== undefined ? actionLabel : "+ Add Session")
@@ -62,6 +64,28 @@ export function SessionInputSection({
     }
   };
 
+  // If custom session typing is disabled in Feature & Module Control, force strict dropdown selection
+  if (!canTypeCustomSession) {
+    return (
+      <div className="w-full">
+        <CustomSelect
+          label="SESSION"
+          placeholder="Select Session..."
+          value={selectedSession}
+          onChange={(val) => onSessionChange && onSessionChange(String(val || ""))}
+          options={sessionOptions.map((opt) => ({
+            value: String(opt.value),
+            label: String(opt.label),
+          }))}
+          actionLabel={effectiveActionLabel}
+          actionTo={effectiveActionTo}
+          actionTitle="Add or manage sessions"
+          size="md"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="w-full">
       <AutocompleteDropdown
@@ -76,6 +100,8 @@ export function SessionInputSection({
         actionTitle="Add or manage sessions"
         size="md"
         showAllOptionsOnFocus={true}
+        autoComplete="off"
+        data-lpignore="true"
       />
     </div>
   );

@@ -97,6 +97,8 @@ export default function AutocompleteDropdown({
   error = null,
   id = '',
   inputId = '',
+  name = '',
+  ...rest
 }: AutocompleteDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const initialSearchTerm = typeof value === 'string' ? value : value?.label || value?.name || '';
@@ -384,8 +386,16 @@ export default function AutocompleteDropdown({
 
           <input
             id={id || inputId || undefined}
+            name={name || (id ? `${id}-search` : "spr-autocomplete-search")}
             ref={refToUse}
             type="text"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            data-lpignore="true"
+            data-form-type="other"
+            aria-autocomplete="list"
             readOnly={readOnly}
             disabled={disabled}
             value={safeSearchTerm}

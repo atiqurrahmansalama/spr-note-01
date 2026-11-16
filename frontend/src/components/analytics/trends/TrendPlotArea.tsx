@@ -39,8 +39,8 @@ export const TrendPlotArea: React.FC<TrendPlotAreaProps> = ({
   const chartCanvasRef = useRef<HTMLDivElement>(null);
 
   const chartHeight = 220;
-  const topPadding = 18;
-  const bottomPadding = 6;
+  const topPadding = 12;
+  const bottomPadding = 4;
   const plotHeight = chartHeight - topPadding - bottomPadding;
   const baselineY = chartHeight - bottomPadding;
 
@@ -226,7 +226,7 @@ export const TrendPlotArea: React.FC<TrendPlotAreaProps> = ({
   }, [dataPoints.length, containerWidth]);
 
   return (
-    <div className="relative pt-6 pb-1 select-none">
+    <div className="relative pt-1.5 pb-0.5 select-none">
       <div className="flex items-start gap-1 sm:gap-2 w-full min-w-0">
         {/* Left Fixed Y-Axis Scale with proper bottom spacer matching timeline height */}
         <div className="flex flex-col shrink-0 select-none">
@@ -244,7 +244,7 @@ export const TrendPlotArea: React.FC<TrendPlotAreaProps> = ({
               </span>
             ))}
           </div>
-          <div className="w-7 sm:w-9 min-h-[52px]" />
+          <div className="w-7 sm:w-9 min-h-[34px]" />
         </div>
 
         {/* Right Main Chart & Timeline */}
@@ -509,7 +509,7 @@ export const TrendPlotArea: React.FC<TrendPlotAreaProps> = ({
           )}
 
           {/* Bottom X-Axis Timeline Dates (Absolute positioned, aligned with bars) */}
-          <div className="relative w-full h-8 pt-1.5 select-none min-w-0 overflow-visible">
+          <div className="relative w-full h-8 pt-1 select-none min-w-0 overflow-visible">
             {Array.from(visibleDateIndices).map((idx) => {
               const point = dataPoints[idx];
               if (!point) return null;

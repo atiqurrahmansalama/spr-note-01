@@ -218,14 +218,14 @@ export default function DailyProgressView({
         t.name ||
         t.full_name ||
         t.employee_id ||
-        (t.user_phone ? `Teacher (${t.user_phone})` : "")
-      ).trim();
+        t.user_phone ||
+        "Teacher"
+      ).replace(/\(.*?\)/g, "").trim();
       if (!baseName) return;
-      const designation = String(t.designation || "").trim();
       seenIds.add(val);
       opts.push({
         value: val,
-        label: designation ? `${baseName} (${designation})` : baseName,
+        label: baseName,
         rawName: baseName,
         raw: t,
       });

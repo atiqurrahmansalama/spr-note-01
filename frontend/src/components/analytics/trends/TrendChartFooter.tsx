@@ -33,25 +33,25 @@ export const TrendFooterFieldItem: React.FC<TrendFooterFieldItemProps> = ({
 
   if (isExpanded) {
     return (
-      <div className="min-w-0 text-xs leading-relaxed">
-        <span className="inline-flex items-center gap-1 font-bold theme-text-primary mr-1.5 select-none align-baseline shrink-0">
-          <Icon className="w-3.5 h-3.5 theme-accent inline-block shrink-0 -translate-y-0.5" />
+      <div className="flex items-baseline gap-1.5 min-w-0 text-xs leading-normal">
+        <div className="inline-flex items-center gap-1 font-bold theme-text-primary shrink-0 select-none">
+          <Icon className="w-3.5 h-3.5 theme-accent shrink-0" />
           <span>{label}:</span>
-        </span>
-        <span className="font-medium theme-text-secondary break-words align-baseline">
+        </div>
+        <div className="font-medium theme-text-secondary break-words flex-1 min-w-0">
           {fullText}
-        </span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-1.5 min-w-0">
-      <div className="flex items-center gap-1.5 font-bold theme-text-primary shrink-0">
-        <Icon className="w-3.5 h-3.5 theme-accent" />
+    <div className="flex items-baseline gap-1.5 min-w-0 text-xs leading-normal">
+      <div className="inline-flex items-center gap-1 font-bold theme-text-primary shrink-0 select-none">
+        <Icon className="w-3.5 h-3.5 theme-accent shrink-0" />
         <span>{label}:</span>
       </div>
-      <span className="text-xs font-medium theme-text-secondary truncate min-w-0" title={fullText}>
+      <span className="font-medium theme-text-secondary truncate min-w-0 flex-1" title={fullText}>
         {truncatedSummary}
       </span>
     </div>

@@ -444,6 +444,7 @@ export default function DailyClassroomFilterControls({
               placeholder={teacherPlaceholder}
               allowAll={allowAllTeachers}
               allLabel="All Teachers"
+              hideDesignation={true}
               size="md"
             />
           )

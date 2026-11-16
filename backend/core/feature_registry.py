@@ -513,6 +513,16 @@ FEATURE_REGISTRY = [
         "default_enabled": True,
         "sort_order": 40,
     },
+    {
+        "key": "calendar_tab_personal_tasks",
+        "label": "My Tasks",
+        "category": "INSTITUTIONS",
+        "description": "Personal to-do hub, task checklists, kanban board, and quick-capture dock",
+        "is_parent": False,
+        "parent_key": "academy_calendar_events",
+        "default_enabled": True,
+        "sort_order": 41,
+    },
     # --- 6. Residential & Quarters ---
     {
         "key": "residential_quarters",
@@ -690,6 +700,16 @@ FEATURE_REGISTRY = [
         "parent_key": "progress_tab_daily_progress",
         "default_enabled": True,
         "sort_order": 574,
+    },
+    {
+        "key": "progress_session_custom_name",
+        "label": "Custom Session Freeform Typing",
+        "category": "ACADEMIC",
+        "description": "Allow freeform typing of custom session names. When disabled, users must select from predefined sessions dropdown only.",
+        "is_parent": False,
+        "parent_key": "progress_tab_daily_progress",
+        "default_enabled": True,
+        "sort_order": 575,
     },
     {
         "key": "progress_tab_reports",

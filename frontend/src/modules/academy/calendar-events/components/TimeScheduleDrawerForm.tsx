@@ -1020,14 +1020,6 @@ export default function TimeScheduleDrawerForm({
     });
   };
 
-  const localizedCategoryOptions = useMemo(
-    () => [
-      { value: "WORKING_HOURS", label: t("workingScheduleOption", CATEGORY_OPTIONS[0].label) },
-      { value: "ACADEMIC_EVENT", label: t("academicEventOption", CATEGORY_OPTIONS[1].label) },
-    ],
-    [t]
-  );
-
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
@@ -1093,76 +1085,48 @@ export default function TimeScheduleDrawerForm({
       <form id={formId} onSubmit={handleSubmit} className="space-y-6 pt-2 pb-6 @container">
         {/* ─── 1. Schedule Information Section ─── */}
         <DrawerSection
-          title={t("scheduleInformation", "Schedule Information")}
+          title={isWorkingHours ? t("workingScheduleInformation", "Working Schedule Information") : t("eventInformation", "Event Information")}
           icon={UsersIcon}
           variant="streamlined"
         >
-          {/* Category & Schedule/Event Dropdown */}
-          <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3">
-            <div>
-              <CustomSelect
-                label={t("entryPurpose", "Entry Purpose")}
-                value={formData.category}
-                onChange={(val) => {
-                  const isWH = val === "WORKING_HOURS";
-                  const defaultTitle = isWH
-                    ? (workingSchedules?.[0]?.name || "Morning Working Session")
-                    : (eventTypes?.[0]?.name || "Mid-Term Examination");
-                  const newColor = isWH
-                    ? resolveCanonicalEventColor(workingSchedules?.[0]?.color, "blueberry")
-                    : resolveEventFormColor({ title: defaultTitle }, "ACADEMIC_EVENT", eventKinds, eventTypes);
-                  setValidationErrors((prev) => ({ ...prev, title: undefined }));
+          {/* Schedule/Event Dropdown */}
+          <div>
+            <CustomSelect
+              label={scheduleOrEventLabel}
+              value={formData.title}
+              onChange={(val) => {
+                const matched = eventTitleOptions.find((o) => o.value === val);
+                setValidationErrors((prev) => ({ ...prev, title: undefined }));
+                if (matched) {
                   setFormData((prev) => ({
                     ...prev,
-                    category: val,
-                    title: defaultTitle,
-                    color: newColor,
-                    repeats: isWH,
+                    title: matched.value,
+                    type: matched.type,
+                    category: matched.category,
+                    color: matched.color ? resolveCanonicalEventColor(matched.color, prev.color) : prev.color,
+                    repeats: matched.repeats !== undefined ? matched.repeats : prev.repeats,
                   }));
-                }}
-                options={localizedCategoryOptions}
-                placeholder={t("entryPurpose", "Select Category")}
-              />
-            </div>
-
-            <div>
-              <CustomSelect
-                label={scheduleOrEventLabel}
-                value={formData.title}
-                onChange={(val) => {
-                  const matched = eventTitleOptions.find((o) => o.value === val);
-                  setValidationErrors((prev) => ({ ...prev, title: undefined }));
-                  if (matched) {
-                    setFormData((prev) => ({
-                      ...prev,
-                      title: matched.value,
-                      type: matched.type,
-                      category: matched.category,
-                      color: matched.color ? resolveCanonicalEventColor(matched.color, prev.color) : prev.color,
-                      repeats: matched.repeats !== undefined ? matched.repeats : prev.repeats,
-                    }));
-                  } else {
-                    setFormData((prev) => ({ ...prev, title: val }));
-                  }
-                }}
-                options={eventTitleOptions}
-                placeholder={
-                  isWorkingHours
-                    ? t("selectWorkingSchedule", "Select Working Schedule...")
-                    : t("selectAcademicEvent", "Select Academic Event...")
+                } else {
+                  setFormData((prev) => ({ ...prev, title: val }));
                 }
-                searchable={false}
-                showDescription={false}
-                showBadge={true}
-                onActionClick={() => {
-                  if (closeDrawer) closeDrawer();
-                  navigate(settingsPath);
-                }}
-                actionLabel={settingsActionLabel}
-                actionTitle={settingsActionTitle}
-                error={validationErrors.title}
-              />
-            </div>
+              }}
+              options={eventTitleOptions}
+              placeholder={
+                isWorkingHours
+                  ? t("selectWorkingSchedule", "Select Working Schedule...")
+                  : t("selectAcademicEvent", "Select Academic Event...")
+              }
+              searchable={false}
+              showDescription={false}
+              showBadge={true}
+              onActionClick={() => {
+                if (closeDrawer) closeDrawer();
+                navigate(settingsPath);
+              }}
+              actionLabel={settingsActionLabel}
+              actionTitle={settingsActionTitle}
+              error={validationErrors.title}
+            />
           </div>
 
           {/* Target Audience & System Impact Multi-Select */}

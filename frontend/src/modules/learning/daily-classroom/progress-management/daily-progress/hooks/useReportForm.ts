@@ -322,7 +322,8 @@ export function useReportForm() {
   });
   const [sessionList, setSessionList] = useState<any[]>(() => {
     try {
-      return sessionStore.getAll() || [];
+      const tenantId = localStorage.getItem("spr_active_tenant_id") || "default";
+      return sessionStore.getAll(tenantId) || [];
     } catch {
       return [];
     }
@@ -1136,8 +1137,9 @@ export function useReportForm() {
   };
 
   const fetchData = async () => {
+    const tenantId = localStorage.getItem("spr_active_tenant_id") || "default";
     const cachedStudents = studentStore.getAll();
-    const cachedSessions = sessionStore.getAll();
+    const cachedSessions = sessionStore.getAll(tenantId);
 
     if (cachedStudents.length > 0) setStudentDatabase(cachedStudents);
     if (cachedSessions.length > 0) setSessionList(cachedSessions);
@@ -1180,7 +1182,8 @@ export function useReportForm() {
           id: typeof s === "object" ? (s.id || s.name) : String(s),
           name: typeof s === "object" ? (s.name || s.session_name || s.label || String(s)) : String(s),
         }));
-        const merged = mergeSessions(apiSessions, sessionStore.getAll());
+        const merged = mergeSessions(apiSessions, sessionStore.getAll(tenantId));
+        sessionStore.saveAll(merged, tenantId);
         setSessionList(merged);
       }
 
@@ -1210,7 +1213,13 @@ export function useReportForm() {
     }
     initLoad();
 
-    const handleTenantChanged = () => isMounted && fetchData();
+    const handleTenantChanged = () => {
+      if (isMounted) {
+        const tid = localStorage.getItem("spr_active_tenant_id") || "default";
+        setSessionList(sessionStore.getAll(tid));
+        fetchData();
+      }
+    };
     const handleStudentsUpdated = () => {
       if (isMounted) {
         const cached = studentStore.getAll();

@@ -116,10 +116,10 @@ export const TrendChart: React.FC<TrendChartProps> = ({
   return (
     <div
       ref={chartContainerRef}
-      className={`@container theme-bg-surface border-0 rounded-2xl p-3.5 sm:p-5 shadow-xs space-y-4 select-none relative w-full min-w-0 overflow-hidden ${className}`}
+      className={`@container theme-bg-surface border-0 rounded-2xl p-3.5 sm:p-5 shadow-xs space-y-2.5 sm:space-y-3 select-none relative w-full min-w-0 overflow-hidden ${className}`}
     >
       {/* 1. Header Toolbar: Left Title + Right Unified Controls */}
-      <div className="flex flex-col @[680px]:flex-row @[680px]:items-center justify-between gap-2.5 border-b theme-border pb-3 w-full min-w-0">
+      <div className="flex flex-col @[680px]:flex-row @[680px]:items-center justify-between gap-2.5 border-b theme-border pb-2 sm:pb-2.5 w-full min-w-0">
         {/* Row 1 on mobile: Left Title + Right 3-Dot ActionMenu */}
         <div className="flex items-center justify-between w-full @[680px]:w-auto min-w-0">
           <div className="flex items-center gap-2 min-w-0">

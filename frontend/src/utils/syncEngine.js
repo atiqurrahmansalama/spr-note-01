@@ -865,7 +865,8 @@ export const syncSessionsAndComments = async () => {
 
   // 4b. Sync Sessions
   try {
-    const localSessions = sessionStore.getAll();
+    const tenantId = (typeof localStorage !== "undefined" ? localStorage.getItem("spr_active_tenant_id") : "") || "default";
+    const localSessions = sessionStore.getAll(tenantId);
     const localOnlySessions = localSessions.filter((s) => s._local);
 
     for (const session of localOnlySessions) {
@@ -876,13 +877,13 @@ export const syncSessionsAndComments = async () => {
         });
         if (res.ok) {
           const apiSession = await res.json();
-          const currentSessions = sessionStore.getAll();
+          const currentSessions = sessionStore.getAll(tenantId);
           const updated = currentSessions.map((s) =>
             s.name.toLowerCase() === session.name.toLowerCase()
               ? { id: apiSession.id, name: apiSession.name }
               : s
           );
-          sessionStore.saveAll(updated);
+          sessionStore.saveAll(updated, tenantId);
           console.log("[SyncEngine] Synced session preset:", session.name);
         }
       } catch (err) {

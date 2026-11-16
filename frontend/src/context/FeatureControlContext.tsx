@@ -81,6 +81,7 @@ export const HARD_DEFAULTS: Record<string, boolean> = {
   progress_mode_book: true,
   progress_action_add_student: true,
   progress_action_add_session: true,
+  progress_session_custom_name: true,
   progress_tab_reports: true,
   progress_reports_analytics: true,
   progress_reports_view_all_teachers: true,
