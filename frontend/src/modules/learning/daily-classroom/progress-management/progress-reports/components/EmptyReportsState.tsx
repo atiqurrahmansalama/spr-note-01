@@ -55,7 +55,7 @@ export const EmptyReportsState: React.FC<EmptyReportsStateProps> = ({
       )}
       descriptionClassName="text-xs theme-text-secondary max-w-sm"
       actions={actions}
-      className={className}
+      className={`!border-0 shadow-xs ${className}`}
     />
   );
 };

@@ -53,7 +53,7 @@ export function SyncErrorsAlertBanner({
   };
 
   return (
-    <div className="w-full rounded-2xl p-4 theme-bg-sub border theme-border text-xs shadow-2xs animate-fade-in space-y-3">
+    <div className="w-full rounded-2xl p-4 theme-bg-sub border-0 text-xs shadow-xs animate-fade-in space-y-3">
       {/* Banner Header & Action Buttons */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -66,7 +66,7 @@ export function SyncErrorsAlertBanner({
           <button
             type="button"
             onClick={handleCopyAllErrors}
-            className="px-3 py-1.5 rounded-xl theme-bg-elevated hover:theme-bg-surface border theme-border theme-text-primary font-bold text-xs shadow-2xs cursor-pointer transition-all flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-xl theme-bg-elevated hover:theme-bg-surface border-0 theme-text-primary font-bold text-xs shadow-2xs cursor-pointer transition-all flex items-center gap-1.5"
             title="Copy all error messages"
             aria-label="Copy all error messages"
           >
@@ -113,7 +113,7 @@ export function SyncErrorsAlertBanner({
               key={idx}
               onClick={() => handleCopyErrorItem(err)}
               title="Click to copy error message"
-              className="group flex items-center justify-between gap-3 text-xs py-2 px-3 rounded-xl theme-bg-elevated hover:theme-bg-surface border theme-border shadow-2xs transition-all cursor-pointer select-none"
+              className="group flex items-center justify-between gap-3 text-xs py-2 px-3 rounded-xl theme-bg-elevated hover:theme-bg-surface border-0 shadow-2xs transition-all cursor-pointer select-none"
             >
               <div className="flex items-start gap-2 flex-1 min-w-0">
                 <span className="font-bold theme-text-primary shrink-0">

@@ -18,7 +18,7 @@ export default function ReportsTableSkeleton({
 
   return (
     <div
-      className={`w-full overflow-hidden rounded-2xl border theme-border theme-bg-surface shadow-xs animate-pulse select-none ${className}`}
+      className={`w-full overflow-hidden rounded-2xl border-0 theme-bg-surface shadow-xs animate-pulse select-none ${className}`}
     >
       {/* Table Header Skeleton */}
       <div className="flex items-center gap-3 px-4 py-3 border-b theme-border bg-slate-400/5 text-xs font-semibold">

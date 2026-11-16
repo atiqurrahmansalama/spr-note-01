@@ -245,12 +245,12 @@ export default function StudentGroupedCardGrid({
           return (
             <div
               key={stu.student_key}
-              className={`rounded-2xl theme-bg-surface transition-all p-4 sm:p-5 flex flex-col justify-between space-y-4 shadow-xs hover:shadow-md ${
+              className={`rounded-2xl theme-bg-surface transition-all p-4 sm:p-5 flex flex-col justify-between space-y-4 shadow-xs hover:shadow-md border-0 ${
                 isStudentAllSelected
-                  ? "border border-[var(--accent-main)] ring-1 ring-[var(--accent-main)]/30 theme-bg-sub/20 shadow-sm"
+                  ? "bg-[var(--accent-main)]/10 dark:bg-[var(--accent-main)]/20 shadow-sm"
                   : isStudentPartiallySelected
-                  ? "border border-[var(--accent-main)]/50 theme-bg-sub/10"
-                  : "border theme-border hover:border-[var(--border-hover)] hover:theme-bg-sub/10"
+                  ? "bg-[var(--accent-main)]/5 theme-bg-sub/10"
+                  : "hover:theme-bg-sub/10"
               }`}
             >
               <div className="space-y-3.5">
@@ -313,7 +313,7 @@ export default function StudentGroupedCardGrid({
                 {/* 2. Rollup KPI Summary Bar (Sessions, Pages, Mistakes, Stucks with text-only error colors) */}
                 <div className="grid grid-cols-3 gap-2 text-center text-xs">
                   {/* Total Pages */}
-                  <div className="p-2 rounded-xl theme-bg-sub/20 border theme-border">
+                  <div className="p-2 rounded-xl theme-bg-sub/20 border-0">
                     <span className="text-[10px] theme-text-secondary block font-medium">Pages</span>
                     <span className="text-sm font-bold font-mono theme-accent">
                       {stu.totalPages}
@@ -321,7 +321,7 @@ export default function StudentGroupedCardGrid({
                   </div>
 
                   {/* Mistakes */}
-                  <div className="p-2 rounded-xl theme-bg-sub/20 border theme-border">
+                  <div className="p-2 rounded-xl theme-bg-sub/20 border-0">
                     <span className="text-[10px] theme-text-secondary block font-medium">Mistakes</span>
                     <span className={`text-sm font-bold font-mono ${stu.totalMistakes > 0 ? "text-rose-500" : "theme-text-secondary"}`}>
                       {stu.totalMistakes}
@@ -329,7 +329,7 @@ export default function StudentGroupedCardGrid({
                   </div>
 
                   {/* Stucks */}
-                  <div className="p-2 rounded-xl theme-bg-sub/20 border theme-border">
+                  <div className="p-2 rounded-xl theme-bg-sub/20 border-0">
                     <span className="text-[10px] theme-text-secondary block font-medium">Stucks</span>
                     <span className={`text-sm font-bold font-mono ${stu.totalStucks > 0 ? "text-amber-500" : "theme-text-secondary"}`}>
                       {stu.totalStucks}
@@ -414,10 +414,10 @@ export default function StudentGroupedCardGrid({
                         return (
                           <div
                             key={repKey || idx}
-                            className={`p-3 rounded-xl border text-left text-xs space-y-2 transition-all ${
+                            className={`p-3 rounded-xl border-0 text-left text-xs space-y-2 transition-all ${
                               isRepSelected
-                                ? "border border-[var(--accent-main)] ring-1 ring-[var(--accent-main)]/30 theme-bg-sub/30"
-                                : "theme-bg-sub/20 border theme-border hover:theme-bg-sub/40"
+                                ? "bg-[var(--accent-main)]/15 theme-bg-accent-soft/30 shadow-2xs"
+                                : "theme-bg-sub/20 hover:theme-bg-elevated/40"
                             }`}
                           >
                             {/* Session Header: Checkbox + Session Name + Date + ActionMenu */}

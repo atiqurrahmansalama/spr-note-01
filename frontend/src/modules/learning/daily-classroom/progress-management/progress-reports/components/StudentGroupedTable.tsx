@@ -195,7 +195,7 @@ export default function StudentGroupedTable({
 
       {/* Main Hierarchical Parent Table */}
       <DataTable
-        wrapperClassName="w-full min-w-0 text-left"
+        wrapperClassName="w-full min-w-0 text-left !border-0 shadow-xs"
         columns={columns}
         data={paginatedStudents}
         sortable={true}

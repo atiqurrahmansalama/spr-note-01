@@ -864,7 +864,7 @@ export default function ProgressReportsView({
 
       {/* 2b. Offline Banner */}
       {offline && (
-        <div className="w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs">
+        <div className="w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border-0 text-amber-500 dark:text-amber-400 text-xs shadow-xs">
           <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
           <span className="text-[11px] sm:text-xs">
             Offline mode active — showing cached reports from LocalStorage.

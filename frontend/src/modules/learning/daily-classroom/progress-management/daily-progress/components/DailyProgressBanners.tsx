@@ -40,7 +40,7 @@ export function EditModeBanner({ editingReport, onCancel }: EditModeBannerProps)
   const modeStr = (editingReport.mode || editingReport.progress_mode || "QURAN").toUpperCase();
 
   return (
-    <div className="w-full theme-bg-sub border theme-border rounded-xl p-2.5 sm:p-3 shadow-sm flex items-center justify-between gap-2.5 animate-fade-in select-none">
+    <div className="w-full theme-bg-sub border-0 rounded-xl p-2.5 sm:p-3 shadow-xs flex items-center justify-between gap-2.5 animate-fade-in select-none">
       <div className="flex items-center gap-2.5 min-w-0 text-left">
         <div className="p-1.5 rounded-lg theme-bg-accent-soft shrink-0 flex items-center justify-center">
           <EditIcon className="w-4 h-4 theme-accent" />
@@ -54,7 +54,7 @@ export function EditModeBanner({ editingReport, onCancel }: EditModeBannerProps)
           {dateStr && (
             <span className="theme-text-secondary"> · {dateStr}</span>
           )}
-          <span className="ml-1.5 inline-block text-[10px] px-1.5 py-0.5 rounded-md font-semibold theme-bg-elevated border theme-border uppercase tracking-wider">
+          <span className="ml-1.5 inline-block text-[10px] px-1.5 py-0.5 rounded-md font-semibold theme-bg-elevated border-0 uppercase tracking-wider">
             {modeStr === "BOOK" ? "Book" : "Quran"}
           </span>
         </div>
@@ -62,7 +62,7 @@ export function EditModeBanner({ editingReport, onCancel }: EditModeBannerProps)
       <button
         type="button"
         onClick={onCancel}
-        className="theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated text-xs px-2.5 py-1 rounded-lg font-medium transition cursor-pointer shrink-0 flex items-center gap-1 border theme-border"
+        className="theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated text-xs px-2.5 py-1 rounded-lg font-medium transition cursor-pointer shrink-0 flex items-center gap-1 border-0"
       >
         <CloseIcon className="w-3.5 h-3.5" />
         <span>Cancel</span>
@@ -120,7 +120,7 @@ export function DraftRecoveryBanner({
   };
 
   return (
-    <div className="w-full theme-bg-surface border theme-border rounded-2xl p-4 shadow-xl space-y-3 animate-fade-in select-none text-left">
+    <div className="w-full theme-bg-surface border-0 rounded-2xl p-4 shadow-xs space-y-3 animate-fade-in select-none text-left">
       <div className="flex items-center gap-2 border-b theme-border pb-2">
         <ClockIcon className="w-4 h-4 theme-accent" />
         <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary">
@@ -148,13 +148,13 @@ export function DraftRecoveryBanner({
           return (
             <div
               key={draft.id}
-              className="p-2.5 rounded-xl theme-bg-sub border theme-border hover:border-primary/40 transition-colors space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-2.5"
+              className="p-2.5 rounded-xl theme-bg-sub border-0 hover:theme-bg-elevated transition-colors space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-2.5 shadow-2xs"
             >
               <div className="flex items-start justify-between gap-2 min-w-0 sm:flex-1">
                 <div className="min-w-0 text-xs">
                   <div className="flex items-center gap-1.5 font-bold theme-text-primary truncate">
                     <span className="truncate">{infoText}</span>
-                    <span className="shrink-0 text-[10px] px-1.5 py-0.2 rounded font-semibold theme-bg-elevated border theme-border text-xs uppercase tracking-wider">
+                    <span className="shrink-0 text-[10px] px-1.5 py-0.2 rounded font-semibold theme-bg-elevated border-0 text-xs uppercase tracking-wider">
                       {modeBadge}
                     </span>
                   </div>
@@ -187,7 +187,7 @@ export function DraftRecoveryBanner({
                 <button
                   type="button"
                   onClick={() => handleOpenInNewTab(draft)}
-                  className="theme-bg-elevated hover:theme-bg-accent-soft hover:theme-accent theme-text-primary text-[11px] sm:text-[10px] px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-lg font-semibold transition border theme-border cursor-pointer active:scale-95"
+                  className="theme-bg-elevated hover:theme-bg-accent-soft hover:theme-accent theme-text-primary text-[11px] sm:text-[10px] px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-lg font-semibold transition border-0 shadow-2xs cursor-pointer active:scale-95"
                   title="Open this draft in a new tab"
                 >
                   Open in New Tab

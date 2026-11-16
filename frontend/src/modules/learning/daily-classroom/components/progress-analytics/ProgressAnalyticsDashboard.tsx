@@ -5,7 +5,8 @@ import {
 } from "./types";
 import { useProgressAnalyticsEngine } from "./useProgressAnalyticsEngine";
 import ProgressSparklineKPIs from "./ProgressSparklineKPIs";
-import { ProgressTrendsChart, ProgressSessionBreakdown } from "@/components/analytics";
+import { ProgressTrendsChart } from "./ProgressTrendsChart";
+import { ProgressSessionBreakdown } from "./ProgressSessionBreakdown";
 import { TrendingUpIcon, ChevronIcon } from "@/components/ui/Icons";
 
 export const ProgressAnalyticsDashboard: React.FC<ProgressAnalyticsDashboardProps> = ({
@@ -60,7 +61,7 @@ export const ProgressAnalyticsDashboard: React.FC<ProgressAnalyticsDashboardProp
               handleToggle();
             }
           }}
-          className="flex items-center justify-between p-3.5 rounded-2xl theme-bg-surface border theme-border shadow-2xs hover:border-[var(--border-hover)] transition cursor-pointer select-none"
+          className="flex items-center justify-between p-3.5 rounded-2xl theme-bg-surface border-0 shadow-xs hover:theme-bg-elevated/40 transition cursor-pointer select-none"
         >
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0">

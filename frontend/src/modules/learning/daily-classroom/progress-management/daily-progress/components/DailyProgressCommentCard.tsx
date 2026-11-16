@@ -25,7 +25,7 @@ export function CommentSection({
 }: CommentSectionProps) {
   return (
     <div className="space-y-4">
-      <div className="theme-bg-surface rounded-2xl p-5 shadow-lg relative z-0 space-y-3 border theme-border">
+      <div className="theme-bg-surface rounded-2xl p-5 shadow-xs relative z-0 space-y-3 border-0">
         <TemplateTextarea
           id="comment-textarea"
           label="Comments"

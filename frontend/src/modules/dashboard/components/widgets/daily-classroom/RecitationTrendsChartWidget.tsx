@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useCanonicalProgressReports } from '../../../hooks/useCanonicalProgressReports';
 import { useProgressAnalyticsEngine } from '../../../../learning/daily-classroom/components/progress-analytics/useProgressAnalyticsEngine';
-import { ProgressTrendsChart } from '../../../../../components/analytics';
+import { ProgressTrendsChart } from '../../../../learning/daily-classroom/components/progress-analytics';
 import type { MetricType } from '../../../../../components/analytics/types';
 
 export interface RecitationTrendsChartWidgetProps {

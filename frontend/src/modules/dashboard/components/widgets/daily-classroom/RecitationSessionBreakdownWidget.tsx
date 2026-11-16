@@ -1,7 +1,7 @@
 import React from 'react';
 import { useCanonicalProgressReports } from '../../../hooks/useCanonicalProgressReports';
 import { useProgressAnalyticsEngine } from '../../../../learning/daily-classroom/components/progress-analytics/useProgressAnalyticsEngine';
-import { ProgressSessionBreakdown } from '../../../../../components/analytics';
+import { ProgressSessionBreakdown } from '../../../../learning/daily-classroom/components/progress-analytics';
 
 export interface RecitationSessionBreakdownWidgetProps {
   reports?: any[];

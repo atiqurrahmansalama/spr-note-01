@@ -1,7 +1,11 @@
+import React from "react";
+import { SegmentedSwitchOption } from "@/components/ui/SegmentedSwitch";
+
 /**
  * Enterprise Analytics Types & Contracts
- * High-reusability interfaces for analytical charts, time-series metrics, KPIs,
- * and dimensional breakdowns across any application domain.
+ * Universal, domain-agnostic interfaces for analytical charts, time-series metrics,
+ * KPIs, and dimensional breakdowns across any application domain (Learning, Attendance,
+ * HR, Finance, Examinations, etc.).
  */
 
 export type TimeHorizon = "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
@@ -13,28 +17,32 @@ export type ActiveMetricType = "combined" | "primary" | "secondary" | "pages" | 
 
 /**
  * Enterprise Reusable Time-Series Trend Data Point
- * Universally models periodic data points across any domain (Learning, Attendance, HR, Finance, etc.)
+ * Universally models periodic data points across any domain.
  */
 export interface TrendDataPoint {
   key: string;
   label: string;
   dateStr: string;
+  dayName?: string;
 
-  // Universal metric values
-  value?: number; // Primary metric value (e.g., volume, pages, attendance, amount, score)
-  secondaryValue?: number; // Secondary metric value (e.g., mistakes, late arrivals, expense)
-  tertiaryValue?: number; // Tertiary metric value (e.g., stucks, absences, discount)
-  totalCount?: number; // Total count of records / transactions in this bucket
-  activeValue?: number; // Currently highlighted or normalized active comparison value
-  rate?: number; // Generic percentage or completion rate (0-100)
+  // Universal metric values map: { pages: 5, mistakes: 2, attendance: 95, amount: 1200, ... }
+  values?: Record<string, number>;
+
+  // Common universal fields
+  value?: number;
+  secondaryValue?: number;
+  tertiaryValue?: number;
+  totalCount?: number;
+  activeValue?: number;
+  rate?: number;
 
   // Generic grouping & entity dimensions
-  entitiesCount?: number; // Count of entities active (e.g., students, staff, customers)
-  entityNames?: string[]; // Names of active entities in this period
-  groupNames?: string[]; // Names of active groups / sessions / classes in this period
-  metadata?: Record<string, any>; // Arbitrary extensible metadata for domain-specific enrichment
+  entitiesCount?: number;
+  entityNames?: string[];
+  groupNames?: string[];
+  metadata?: Record<string, any>;
 
-  // Backward-compatibility aliases for recitation & progress reports
+  // Backward-compatibility aliases for legacy progress report consumers
   totalPages?: number;
   totalReports?: number;
   totalMistakes?: number;
@@ -54,6 +62,22 @@ export type ProgressTrendPoint = TrendDataPoint;
 export type RecitationTrendPoint = TrendDataPoint;
 
 /**
+ * Configuration for a single data series on a chart (bar or line)
+ */
+export interface ChartSeriesConfig {
+  key: string;
+  label: string;
+  color: string;
+  strokeColor?: string;
+  fillColor?: string;
+  indicatorClass?: string;
+  ringClass?: string;
+  circleBorderClass?: string;
+  visible?: boolean;
+  unit?: string;
+}
+
+/**
  * High-value Key Performance Indicator definition
  */
 export interface AnalyticsKPI {
@@ -61,7 +85,9 @@ export interface AnalyticsKPI {
   label: string;
   value: string | number;
   subValue?: string;
+  icon?: React.ComponentType<{ className?: string }>;
   sparkline?: number[];
+  variant?: "default" | "accent" | "rose" | "amber" | "indigo";
   trend?: {
     value: string;
     isPositive: boolean;
@@ -71,7 +97,19 @@ export interface AnalyticsKPI {
 export type ProgressKPI = AnalyticsKPI;
 
 /**
- * Generic Dimension Breakdown Item (e.g., by session, department, category)
+ * Generic Metadata Field definition for Chart Footers
+ */
+export interface TrendFooterFieldConfig {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  items: string[];
+  emptyText?: string;
+  totalSuffix?: string;
+}
+
+/**
+ * Generic Dimension Breakdown Item (e.g. by session, department, category, account)
  */
 export interface DimensionBreakdownItem {
   id?: string;
@@ -87,6 +125,8 @@ export interface DimensionBreakdownItem {
   rate?: number;
   cleanRate?: number;
   percentOfTotal: number;
+  subLabel?: string;
+  color?: string;
   metadata?: Record<string, any>;
 }
 
@@ -94,25 +134,42 @@ export type SessionBreakdownItem = DimensionBreakdownItem;
 export type SessionSlice = DimensionBreakdownItem;
 
 /**
- * Reusable Trend Chart Component Props
+ * Universal Domain-Agnostic Trend Chart Component Props
  */
 export interface TrendChartProps {
-  trendPoints: TrendDataPoint[];
+  dataPoints: TrendDataPoint[];
+  series: ChartSeriesConfig[];
+  activeMetric?: MetricType;
+  onMetricChange?: (metric: MetricType) => void;
+  metricOptions?: SegmentedSwitchOption[];
   title?: string;
   subtitle?: string;
+  emptyMessage?: string;
+  emptyIcon?: React.ComponentType<{ className?: string }>;
+  kpiItems?: AnalyticsKPI[];
+  footerFields?:
+    | TrendFooterFieldConfig[]
+    | ((
+        hoveredIndex: number | null,
+        hoveredPoint: TrendDataPoint | null
+      ) => TrendFooterFieldConfig[]);
+  hoveredIndex?: number | null;
+  onHoverIndexChange?: (index: number | null) => void;
+  viewMode?: ChartViewMode;
+  onViewModeChange?: (mode: ChartViewMode) => void;
+  exportFilename?: string;
+  exportTitle?: string;
+  className?: string;
+  customTooltipRenderer?: (point: TrendDataPoint, series: ChartSeriesConfig[]) => React.ReactNode;
+
+  // Optional legacy props kept for backward-compatibility with upstream consumers
+  trendPoints?: TrendDataPoint[];
   primaryMetricLabel?: string;
   secondaryMetricLabel?: string;
   tertiaryMetricLabel?: string;
-  activeMetric?: MetricType;
-  onMetricChange?: (metric: MetricType) => void;
   maxMetricValue?: number;
-  viewMode?: ChartViewMode;
-  onViewModeChange?: (mode: ChartViewMode) => void;
   timeHorizon?: TimeHorizon;
   onHorizonChange?: (horizon: TimeHorizon) => void;
-  className?: string;
-
-  // Domain-specific aliases for backward compatibility with progress reports
   totalPages?: number;
   totalMistakes?: number;
   totalStucks?: number;
@@ -130,11 +187,23 @@ export interface TrendChartProps {
 
 export type ProgressTrendsChartProps = TrendChartProps;
 
+/**
+ * Universal Dimension Breakdown Card Props
+ */
 export interface DimensionBreakdownProps {
+  title?: string;
+  subtitle?: string;
+  dimensionLabel?: string;
+  insightTitle?: string;
+  insightText?: string;
+  emptyText?: string;
+  items?: DimensionBreakdownItem[];
+  className?: string;
+
+  // Backward compatibility aliases
   breakdownItems?: DimensionBreakdownItem[];
   sessionBreakdown?: DimensionBreakdownItem[];
   aiInsight?: string;
-  className?: string;
 }
 
 export type ProgressSessionBreakdownProps = DimensionBreakdownProps;

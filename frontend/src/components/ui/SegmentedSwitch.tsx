@@ -1,7 +1,8 @@
 import React from 'react';
 
 export interface SegmentedSwitchOption<T extends string = string> {
-  value: T;
+  value?: T;
+  id?: T;
   label: string;
   icon?: React.ComponentType<{ className?: string }>;
   count?: number | string;
@@ -68,19 +69,20 @@ export default function SegmentedSwitch<T extends string = string>({
       } ${className}`}
     >
       {options.map((opt) => {
-        const isActive = value === opt.value;
+        const optValue = (opt.value !== undefined ? opt.value : opt.id) as T;
+        const isActive = value === optValue;
         const isDisabled = disabled || opt.disabled;
         const IconComponent = opt.icon;
 
         return (
           <button
-            key={opt.value}
+            key={String(optValue || opt.label)}
             role="tab"
             aria-selected={isActive}
             disabled={isDisabled}
             type="button"
             title={opt.title || opt.label}
-            onClick={() => !isDisabled && !isActive && onChange(opt.value)}
+            onClick={() => !isDisabled && !isActive && onChange(optValue)}
             className={`font-bold transition-colors duration-150 cursor-pointer flex items-center justify-center outline-none focus:outline-none shrink-0 group ${
               sizeClasses.button
             } ${fullWidth ? 'flex-1' : ''} ${

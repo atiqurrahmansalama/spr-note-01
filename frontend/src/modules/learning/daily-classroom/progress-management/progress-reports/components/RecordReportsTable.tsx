@@ -211,6 +211,7 @@ export default function RecordReportsTable({
         selectionCellClassName="!w-12 !min-w-[48px] !max-w-[48px] !p-0 text-center"
         headerPaddingClass="py-2.5 px-3 sm:px-4 text-xs font-bold uppercase tracking-wider"
         cellPaddingClass="py-2.5 px-3 sm:px-4 text-xs"
+        wrapperClassName="!border-0 shadow-xs"
         tableClassName="w-full min-w-full sm:min-w-[940px] text-left"
         rowClassName={(rep) => {
           const repKey = String(rep.id ?? rep.report_unique_id ?? "");

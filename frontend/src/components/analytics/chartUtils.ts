@@ -1,5 +1,5 @@
 /**
- * Mathematical and SVG Path Utilities for Recitation Progress Trends Chart
+ * Enterprise Mathematical and SVG Path Utilities for Analytics & Trend Charts
  */
 
 export const computeNiceYAxis = (maxVal: number): { max: number; ticks: number[] } => {

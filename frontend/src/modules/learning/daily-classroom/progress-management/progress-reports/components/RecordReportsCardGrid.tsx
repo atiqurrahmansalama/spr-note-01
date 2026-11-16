@@ -206,10 +206,10 @@ export default function RecordReportsCardGrid({
             <div
               key={reportKey}
               onContextMenu={(e) => onContextMenu && onContextMenu(e, report)}
-              className={`rounded-2xl theme-bg-surface transition-all p-4 sm:p-5 flex flex-col justify-between space-y-3.5 relative group shadow-xs hover:shadow-md ${
+              className={`rounded-2xl theme-bg-surface transition-all p-4 sm:p-5 flex flex-col justify-between space-y-3.5 relative group shadow-xs hover:shadow-md border-0 ${
                 isSelected
-                  ? "border border-[var(--accent-main)] ring-1 ring-[var(--accent-main)]/30 theme-bg-sub/20 shadow-sm"
-                  : "border theme-border hover:border-[var(--border-hover)] hover:theme-bg-sub/10"
+                  ? "bg-[var(--accent-main)]/10 dark:bg-[var(--accent-main)]/20 shadow-sm"
+                  : "hover:theme-bg-sub/10"
               }`}
             >
               <div className="space-y-3">
@@ -376,7 +376,7 @@ export default function RecordReportsCardGrid({
                   </div>
 
                   {/* Mistakes */}
-                  <div className="p-2 rounded-xl theme-bg-sub/20 border theme-border">
+                  <div className="p-2 rounded-xl theme-bg-sub/20 border-0">
                     <span className="text-[10px] theme-text-secondary block font-medium">Mistakes</span>
                     <span className={`text-sm font-bold font-mono ${mistakes.length > 0 ? "text-rose-500" : "theme-text-secondary"}`}>
                       {mistakes.length}
@@ -384,7 +384,7 @@ export default function RecordReportsCardGrid({
                   </div>
 
                   {/* Stucks */}
-                  <div className="p-2 rounded-xl theme-bg-sub/20 border theme-border">
+                  <div className="p-2 rounded-xl theme-bg-sub/20 border-0">
                     <span className="text-[10px] theme-text-secondary block font-medium">Stucks</span>
                     <span className={`text-sm font-bold font-mono ${stucks.length > 0 ? "text-amber-500" : "theme-text-secondary"}`}>
                       {stucks.length}
@@ -394,7 +394,7 @@ export default function RecordReportsCardGrid({
 
                 {/* 5. Comments Section (if present) */}
                 {report.comment && report.comment.trim() && (
-                  <div className="text-left text-xs p-2 rounded-xl theme-bg-sub/20 border theme-border">
+                  <div className="text-left text-xs p-2 rounded-xl theme-bg-sub/20 border-0">
                     <p
                       className={`theme-text-primary italic leading-relaxed break-words ${
                         isCommentExpanded ? "" : "line-clamp-2"

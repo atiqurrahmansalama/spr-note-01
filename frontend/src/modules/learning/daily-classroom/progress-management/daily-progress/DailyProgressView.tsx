@@ -704,7 +704,7 @@ export default function DailyProgressView({
         sectionConfig.mistakeTracker?.enabled ||
         sectionConfig.stuckTracker?.enabled ||
         progressMode === "BOOK") && (
-        <div className="theme-bg-surface rounded-2xl p-3.5 sm:p-5 shadow-xl border theme-border space-y-3.5 sm:space-y-4">
+        <div className="theme-bg-surface rounded-2xl p-3.5 sm:p-5 shadow-xs border-0 space-y-3.5 sm:space-y-4">
           {/* Top Book / Subject Name & Lesson Controls - Displayed when in Book / Subject mode */}
           {progressMode === "BOOK" && (
             <>
