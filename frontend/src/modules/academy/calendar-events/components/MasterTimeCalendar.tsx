@@ -324,6 +324,8 @@ export default function MasterTimeCalendar({
 
   // Track whether today's date element in timeline strip has scrolled out of the visible horizontal viewport
   const [isTodayScrolledOutOfView, setIsTodayScrolledOutOfView] = useState(false);
+  const isProgrammaticScrollRef = useRef(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const checkTodayVisibility = useCallback(() => {
     if (!dayStripRef.current || displayMode !== "timeline") {
@@ -332,12 +334,11 @@ export default function MasterTimeCalendar({
     }
     const container = dayStripRef.current;
     const now = new Date();
-    if (viewYear !== now.getFullYear() || viewMonth !== now.getMonth()) {
-      setIsTodayScrolledOutOfView(true);
-      return;
-    }
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-    const todayEl = container.querySelector('[data-today="true"]') as HTMLElement | null;
+    const todayEl = (container.querySelector(`[data-datestr="${todayStr}"]`) as HTMLElement | null) ||
+                    (container.querySelector(`[data-date="${todayStr}"]`) as HTMLElement | null) ||
+                    (container.querySelector('[data-today="true"]') as HTMLElement | null);
     if (!todayEl) {
       setIsTodayScrolledOutOfView(true);
       return;
@@ -363,7 +364,30 @@ export default function MasterTimeCalendar({
       const isOut = todayRect.right <= containerRect.left + 8 || todayRect.left >= containerRect.right - 8;
       setIsTodayScrolledOutOfView(isOut);
     }
-  }, [displayMode, viewYear, viewMonth]);
+  }, [displayMode]);
+
+  const scrollToTimelineDate = useCallback((date: Date, behavior: ScrollBehavior = "smooth") => {
+    if (!dayStripRef.current || displayMode !== "timeline") return;
+    isProgrammaticScrollRef.current = true;
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    const targetStr = `${y}-${m}-${d}`;
+
+    const el = dayStripRef.current;
+    const targetEl = (el.querySelector(`[data-datestr="${targetStr}"]`) as HTMLElement | null) ||
+                     (el.querySelector(`[data-date="${targetStr}"]`) as HTMLElement | null);
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior, inline: "center", block: "nearest" });
+    }
+
+    scrollTimeoutRef.current = setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+      checkTodayVisibility();
+    }, behavior === "smooth" ? 450 : 50);
+  }, [displayMode, checkTodayVisibility]);
 
   // Determine if Today button should be displayed
   const shouldShowTodayButton = useMemo(() => {
@@ -403,26 +427,34 @@ export default function MasterTimeCalendar({
   }, [displayMode, onDisplayModeChange]);
 
   const handlePrevMonth = () => {
-    setCurrentDate(new Date(viewYear, viewMonth - 1, 1));
+    const nextDate = new Date(viewYear, viewMonth - 1, 1);
+    setCurrentDate(nextDate);
+    setSelectedDay(1);
+    if (displayMode === "timeline") {
+      scrollToTimelineDate(nextDate, "smooth");
+    }
   };
+
   const handleNextMonth = () => {
-    setCurrentDate(new Date(viewYear, viewMonth + 1, 1));
+    const nextDate = new Date(viewYear, viewMonth + 1, 1);
+    setCurrentDate(nextDate);
+    setSelectedDay(1);
+    if (displayMode === "timeline") {
+      scrollToTimelineDate(nextDate, "smooth");
+    }
   };
+
   const handleJumpToday = () => {
     const now = new Date();
     setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
     setSelectedDay(now.getDate());
-    setTimeout(() => {
-      if (dayStripRef.current) {
-        const activeEl =
-          dayStripRef.current.querySelector('[data-active="true"]') ||
-          dayStripRef.current.querySelector('[data-today="true"]');
-        if (activeEl) {
-          activeEl.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-        }
-      }
-      checkTodayVisibility();
-    }, 60);
+    if (displayMode === "timeline") {
+      scrollToTimelineDate(now, "smooth");
+    } else {
+      setTimeout(() => {
+        checkTodayVisibility();
+      }, 60);
+    }
   };
 
   // Open Right Sidebar for viewing event / working hours details
@@ -751,59 +783,54 @@ export default function MasterTimeCalendar({
     return getEventsForDate(selectedDateStr, selectedWeekday);
   }, [selectedDateStr, selectedWeekday, filteredEvents]);
 
-  // Continuous Day Strip for Timeline
+  const [timelineRange, setTimelineRange] = useState<{ startYear: number; endYear: number }>(() => {
+    const curY = new Date().getFullYear();
+    return { startYear: curY - 2, endYear: curY + 2 };
+  });
+
+  // Dynamically expand timeline range when viewYear approaches boundaries
+  useEffect(() => {
+    setTimelineRange((prev) => {
+      let { startYear, endYear } = prev;
+      let changed = false;
+      if (viewYear <= startYear) {
+        startYear = viewYear - 2;
+        changed = true;
+      }
+      if (viewYear >= endYear) {
+        endYear = viewYear + 2;
+        changed = true;
+      }
+      return changed ? { startYear, endYear } : prev;
+    });
+  }, [viewYear]);
+
+  // Continuous multi-year Day Strip for Timeline
   const timelineStripDays: TimelineStripDay[] = useMemo(() => {
     const list: TimelineStripDay[] = [];
-    const prevMonthLastDate = new Date(viewYear, viewMonth, 0).getDate();
+    const { startYear, endYear } = timelineRange;
 
-    const prevDaysCount = 10;
-    for (let d = prevMonthLastDate - prevDaysCount + 1; d <= prevMonthLastDate; d++) {
-      const dObj = new Date(viewYear, viewMonth - 1, d);
-      const dStr = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      list.push({
-        dateObj: dObj,
-        dateStr: dStr,
-        dayNum: d,
-        monthIdx: dObj.getMonth(),
-        yearNum: dObj.getFullYear(),
-        weekday: dObj.getDay(),
-        isCurrentMonth: false,
-        isPrevMonth: true,
-      });
-    }
-
-    for (let d = 1; d <= daysInCurrentViewMonth; d++) {
-      const dObj = new Date(viewYear, viewMonth, d);
-      const dStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      list.push({
-        dateObj: dObj,
-        dateStr: dStr,
-        dayNum: d,
-        monthIdx: viewMonth,
-        yearNum: viewYear,
-        weekday: dObj.getDay(),
-        isCurrentMonth: true,
-      });
-    }
-
-    const nextDaysCount = 14;
-    for (let d = 1; d <= nextDaysCount; d++) {
-      const dObj = new Date(viewYear, viewMonth + 1, d);
-      const dStr = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      list.push({
-        dateObj: dObj,
-        dateStr: dStr,
-        dayNum: d,
-        monthIdx: dObj.getMonth(),
-        yearNum: dObj.getFullYear(),
-        weekday: dObj.getDay(),
-        isCurrentMonth: false,
-        isNextMonth: true,
-      });
+    for (let y = startYear; y <= endYear; y++) {
+      for (let m = 0; m < 12; m++) {
+        const daysInMonth = new Date(y, m + 1, 0).getDate();
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dObj = new Date(y, m, d);
+          const dStr = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          list.push({
+            dateObj: dObj,
+            dateStr: dStr,
+            dayNum: d,
+            monthIdx: m,
+            yearNum: y,
+            weekday: dObj.getDay(),
+            isCurrentMonth: y === viewYear && m === viewMonth,
+          });
+        }
+      }
     }
 
     return list;
-  }, [viewYear, viewMonth, daysInCurrentViewMonth]);
+  }, [timelineRange, viewYear, viewMonth]);
 
   const setupHorizontalScroll = (el: HTMLElement | null) => {
     if (!el) return () => {};
@@ -859,13 +886,50 @@ export default function MasterTimeCalendar({
     };
   };
 
+  const scrollRafIdRef = useRef<number | null>(null);
+  const hasMountedTimelineRef = useRef(false);
+
+  const handleScroll = useCallback(() => {
+    checkTodayVisibility();
+
+    if (isProgrammaticScrollRef.current || displayMode !== "timeline") return;
+
+    if (scrollRafIdRef.current) {
+      cancelAnimationFrame(scrollRafIdRef.current);
+    }
+
+    scrollRafIdRef.current = requestAnimationFrame(() => {
+      const el = dayStripRef.current;
+      if (!el || el.children.length === 0) return;
+
+      const centerScroll = el.scrollLeft + el.clientWidth / 2;
+      const firstChild = el.children[0] as HTMLElement;
+      const itemTotalWidth = firstChild.offsetWidth + 6;
+      if (itemTotalWidth <= 0) return;
+
+      const centerIdx = Math.max(
+        0,
+        Math.min(el.children.length - 1, Math.round(centerScroll / itemTotalWidth))
+      );
+      const centerEl = el.children[centerIdx] as HTMLElement;
+      if (!centerEl) return;
+
+      const y = Number(centerEl.getAttribute("data-year"));
+      const m = Number(centerEl.getAttribute("data-month"));
+      if (!isNaN(y) && !isNaN(m)) {
+        setCurrentDate((prev) => {
+          if (prev.getFullYear() === y && prev.getMonth() === m) {
+            return prev;
+          }
+          return new Date(y, m, prev.getDate());
+        });
+      }
+    });
+  }, [checkTodayVisibility, displayMode]);
+
   useEffect(() => {
     const el = dayStripRef.current;
     const cleanupDay = setupHorizontalScroll(el);
-
-    const handleScroll = () => {
-      checkTodayVisibility();
-    };
 
     let resizeObserver: ResizeObserver | null = null;
     let intersectionObserver: IntersectionObserver | null = null;
@@ -886,13 +950,9 @@ export default function MasterTimeCalendar({
     // IntersectionObserver to observe today's date element inside the scrollable strip
     const attachIntersectionObserver = () => {
       if (!el || displayMode !== "timeline") return;
-      const todayEl = el.querySelector('[data-today="true"]') as HTMLElement | null;
+      const todayEl = (el.querySelector('[data-today="true"]') as HTMLElement | null) ||
+                      (el.querySelector(`[data-datestr="${new Date().toISOString().split("T")[0]}"]`) as HTMLElement | null);
       if (!todayEl) {
-        const now = new Date();
-        if (viewYear === now.getFullYear() && viewMonth === now.getMonth()) {
-          // Today element might be mounting
-          return;
-        }
         setIsTodayScrolledOutOfView(true);
         return;
       }
@@ -943,26 +1003,37 @@ export default function MasterTimeCalendar({
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
+      if (scrollRafIdRef.current) cancelAnimationFrame(scrollRafIdRef.current);
     };
-  }, [displayMode, viewMonth, viewYear, selectedDay, checkTodayVisibility]);
+  }, [displayMode, handleScroll, checkTodayVisibility]);
+
+  // Initial timeline centering when mounting or switching to timeline view
+  useEffect(() => {
+    if (displayMode === "timeline" && dayStripRef.current) {
+      const targetDate = selectedDateObj || currentDate;
+      const behavior: ScrollBehavior = hasMountedTimelineRef.current ? "smooth" : "auto";
+      hasMountedTimelineRef.current = true;
+      const timer = setTimeout(() => {
+        scrollToTimelineDate(targetDate, behavior);
+      }, 40);
+      return () => clearTimeout(timer);
+    }
+  }, [displayMode, scrollToTimelineDate]);
 
   useEffect(() => {
-    if (dayStripRef.current && displayMode === "timeline") {
+    if (dayStripRef.current && displayMode === "timeline" && !isProgrammaticScrollRef.current) {
       const activeEl = dayStripRef.current.querySelector('[data-active="true"]');
       if (activeEl) {
         activeEl.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
       }
-      // Re-check visibility as smooth scroll progresses and completes
       const t1 = setTimeout(checkTodayVisibility, 80);
       const t2 = setTimeout(checkTodayVisibility, 250);
-      const t3 = setTimeout(checkTodayVisibility, 500);
       return () => {
         clearTimeout(t1);
         clearTimeout(t2);
-        clearTimeout(t3);
       };
     }
-  }, [selectedDay, viewMonth, viewYear, displayMode, checkTodayVisibility]);
+  }, [selectedDay, displayMode, checkTodayVisibility]);
 
   const navControlVariant = embeddedSurface ? "card" : "app";
 
@@ -1305,15 +1376,16 @@ export default function MasterTimeCalendar({
               }`}
             >
               {timelineStripDays.map((item) => {
-                const isSelected = item.isCurrentMonth && item.dayNum === safeSelectedDay;
+                const isSelected = item.dateStr === selectedDateStr;
                 const dEvents = getEventsForDate(item.dateStr, item.weekday);
                 const isToday = item.dateStr === todayStr;
                 const topEvent = dEvents.length > 0 ? dEvents[0] : null;
                 const topColor = topEvent ? getEventColors(topEvent, activeTenantId) : null;
+                const isCurrentMonth = item.yearNum === viewYear && item.monthIdx === viewMonth;
 
                 return (
                   <DateHeaderCell
-                    key={`${item.yearNum}-${item.monthIdx}-${item.dayNum}`}
+                    key={item.dateStr}
                     as="button"
                     type="button"
                     dateStr={item.dateStr}
@@ -1325,16 +1397,15 @@ export default function MasterTimeCalendar({
                     eventTitle={topEvent ? topEvent.title : ""}
                     isSelected={isSelected}
                     isToday={isToday}
-                    isCurrentMonth={item.isCurrentMonth}
+                    isCurrentMonth={isCurrentMonth}
                     keepNormalBgOnOtherMonths={true}
                     borderless={true}
+                    data-year={item.yearNum}
+                    data-month={item.monthIdx}
+                    data-datestr={item.dateStr}
                     onClick={() => {
-                      if (item.isCurrentMonth) {
-                        setSelectedDay(item.dayNum);
-                      } else {
-                        setCurrentDate(new Date(item.yearNum, item.monthIdx, item.dayNum));
-                        setSelectedDay(item.dayNum);
-                      }
+                      setSelectedDay(item.dayNum);
+                      setCurrentDate(new Date(item.yearNum, item.monthIdx, item.dayNum));
                     }}
                     className="w-[36px] min-w-[36px] max-w-[36px] @sm:w-[42px] @sm:min-w-[42px] @sm:max-w-[42px] shrink-0"
                   />
