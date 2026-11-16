@@ -15,6 +15,7 @@ from core.models import (
     RoleSectionPermission,
     GroupSectionPermission,
     AcademySectionOverride,
+    AcademyRoleSectionOverride,
     UserSectionOverride,
     FeatureFlagAuditLog,
     SystemSetting,
@@ -295,14 +296,27 @@ class ControlPanelSectionTreeView(APIView):
         if scope == 'ROLE' and target_id:
             role_overrides = {o.section.section_key: o.is_enabled for o in RoleSectionPermission.objects.filter(role__iexact=target_id).select_related('section')}
 
+        role_param = (request.query_params.get('role') or request.query_params.get('target_role') or '').strip().upper()
+        user_param = (request.query_params.get('user') or request.query_params.get('target_user') or '').strip()
+
         academy_overrides = {}
-        if scope in ['ACADEMY', 'INSTITUTION'] and target_id:
+        academy_role_overrides = {}
+        if scope in ['ACADEMY', 'INSTITUTION', 'ACADEMY_ROLE'] and target_id:
             inst_obj = resolve_institution_instance(target_id)
             if inst_obj:
                 academy_overrides = {
                     o.section.section_key: o.is_enabled
                     for o in AcademySectionOverride.objects.filter(institution=inst_obj).select_related('section')
                 }
+                if role_param and role_param != 'ALL':
+                    academy_role_overrides = {
+                        o.section.section_key: o.is_enabled
+                        for o in AcademyRoleSectionOverride.objects.filter(institution=inst_obj, role__iexact=role_param).select_related('section')
+                    }
+                    role_overrides = {
+                        o.section.section_key: o.is_enabled
+                        for o in RoleSectionPermission.objects.filter(role__iexact=role_param).select_related('section')
+                    }
             else:
                 try:
                     academy_overrides = {
@@ -311,6 +325,17 @@ class ControlPanelSectionTreeView(APIView):
                     }
                 except Exception:
                     academy_overrides = {}
+
+            if user_param:
+                user_query = Q(phone_number=user_param)
+                if str(user_param).isdigit():
+                    user_query |= Q(pk=int(user_param))
+                target_user_obj = User.objects.filter(user_query).first()
+                if target_user_obj:
+                    user_overrides = {
+                        o.section.section_key: o.is_enabled
+                        for o in UserSectionOverride.objects.filter(user=target_user_obj).select_related('section')
+                    }
 
         # 3. Resolve raw values (independent of hierarchy)
         resolved_raw = {}
@@ -322,18 +347,21 @@ class ControlPanelSectionTreeView(APIView):
             if not global_val:
                 resolved_raw[key] = False
                 origins[key] = "GLOBAL"
-            elif scope == 'USER' and key in user_overrides:
+            elif (scope == 'USER' or user_param) and key in user_overrides:
                 resolved_raw[key] = user_overrides[key]
                 origins[key] = "USER"
             elif scope == 'GROUP' and key in group_overrides:
                 resolved_raw[key] = group_overrides[key]
                 origins[key] = "GROUP"
-            elif scope == 'ROLE' and key in role_overrides:
-                resolved_raw[key] = role_overrides[key]
-                origins[key] = "ROLE"
-            elif scope in ['ACADEMY', 'INSTITUTION'] and key in academy_overrides:
+            elif key in academy_role_overrides:
+                resolved_raw[key] = academy_role_overrides[key]
+                origins[key] = "ACADEMY_ROLE"
+            elif scope in ['ACADEMY', 'INSTITUTION', 'ACADEMY_ROLE'] and key in academy_overrides:
                 resolved_raw[key] = academy_overrides[key]
                 origins[key] = "ACADEMY"
+            elif (scope == 'ROLE' or role_param) and key in role_overrides:
+                resolved_raw[key] = role_overrides[key]
+                origins[key] = "ROLE"
             else:
                 resolved_raw[key] = global_val
                 origins[key] = "GLOBAL"
@@ -547,16 +575,47 @@ class ControlPanelBatchUpdateView(APIView):
                         prev_state = not enabled if created else (not perm.is_enabled)
                         changed_count += 1
 
-                    elif scope_type in ['ACADEMY', 'INSTITUTION']:
+                    actual_scope_type = scope_type
+                    actual_target = target_identifier or "GLOBAL"
+
+                    if scope_type in ['ACADEMY', 'INSTITUTION', 'ACADEMY_ROLE']:
                         target_inst_id = target_identifier or request.data.get('target_institution_id', '') or request.data.get('selected_academy', '')
                         inst_obj = resolve_institution_instance(target_inst_id)
-                        if inst_obj:
+                        role_code = (request.data.get('role') or request.data.get('target_role') or request.data.get('role_code') or '').strip().upper()
+                        user_id = request.data.get('user') or request.data.get('target_user') or request.data.get('target_user_id') or ''
+
+                        if user_id:
+                            target_user_obj = User.objects.filter(
+                                Q(pk=user_id) | Q(phone_number=user_id)
+                            ).first()
+                            if target_user_obj:
+                                perm, created = UserSectionOverride.objects.update_or_create(
+                                    section=sec, user=target_user_obj,
+                                    defaults={'is_enabled': enabled}
+                                )
+                                prev_state = not enabled if created else (not perm.is_enabled)
+                                changed_count += 1
+                                actual_scope_type = 'USER'
+                                actual_target = str(user_id)
+                        elif role_code and role_code != 'ALL':
+                            if inst_obj:
+                                perm, created = AcademyRoleSectionOverride.objects.update_or_create(
+                                    section=sec, institution=inst_obj, role=role_code,
+                                    defaults={'is_enabled': enabled}
+                                )
+                                prev_state = not enabled if created else (not perm.is_enabled)
+                                changed_count += 1
+                                actual_scope_type = 'ACADEMY_ROLE'
+                                actual_target = f"{inst_obj.slug or inst_obj.id}:{role_code}"
+                        elif inst_obj:
                             perm, created = AcademySectionOverride.objects.update_or_create(
                                 section=sec, institution=inst_obj,
                                 defaults={'is_enabled': enabled}
                             )
                             prev_state = not enabled if created else (not perm.is_enabled)
                             changed_count += 1
+                            actual_scope_type = 'ACADEMY'
+                            actual_target = str(inst_obj.slug or inst_obj.id)
                         else:
                             logger.warning(f"Could not resolve AcademicInstitution for target '{target_inst_id}' during batch update")
 
@@ -572,11 +631,13 @@ class ControlPanelBatchUpdateView(APIView):
                             )
                             prev_state = not enabled if created else (not perm.is_enabled)
                             changed_count += 1
+                            actual_scope_type = 'USER'
+                            actual_target = str(target_user_id)
 
                     FeatureFlagAuditLog.objects.create(
                         changed_by=safe_user,
-                        scope_type=scope_type,
-                        target_identifier=target_identifier or "GLOBAL",
+                        scope_type=actual_scope_type,
+                        target_identifier=actual_target,
                         section_key=s_key,
                         previous_state=prev_state,
                         new_state=enabled

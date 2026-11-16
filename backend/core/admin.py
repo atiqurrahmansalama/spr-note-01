@@ -38,6 +38,7 @@ from core.models import (
     RoleSectionPermission,
     GroupSectionPermission,
     AcademySectionOverride,
+    AcademyRoleSectionOverride,
     UserSectionOverride,
     FeatureFlagAuditLog,
     UserPasskey,
@@ -632,6 +633,13 @@ class AcademySectionOverrideAdmin(admin.ModelAdmin):
     list_display = ('institution', 'section', 'is_enabled')
     list_filter = ('is_enabled', 'institution')
     search_fields = ('institution__name', 'institution__slug', 'section__title', 'section__section_key')
+
+
+@admin.register(AcademyRoleSectionOverride)
+class AcademyRoleSectionOverrideAdmin(admin.ModelAdmin):
+    list_display = ('institution', 'role', 'section', 'is_enabled')
+    list_filter = ('is_enabled', 'institution', 'role')
+    search_fields = ('institution__name', 'institution__slug', 'role', 'section__title', 'section__section_key')
 
 
 @admin.register(UserSectionOverride)

@@ -65,6 +65,14 @@ export function useSectionControl() {
     return searchParams.get('user') || '';
   }, [searchParams]);
 
+  const selectedAcademyRole = useMemo(() => {
+    return searchParams.get('academy_role') || '';
+  }, [searchParams]);
+
+  const selectedAcademyUser = useMemo(() => {
+    return searchParams.get('academy_user') || '';
+  }, [searchParams]);
+
   const [userSearchQuery, setUserSearchQuery] = useState<string>('');
   const [userSearchResults, setUserSearchResults] = useState<UserSearchResult[]>([]);
 
@@ -95,6 +103,15 @@ export function useSectionControl() {
       return [];
     }
   });
+
+  // Strictly filter users belonging to selected academy (Rule 11: Multi-tenant user isolation)
+  const filteredAcademyUsers = useMemo(() => {
+    if (!selectedAcademy) return [];
+    return dbUsers.filter((u) => {
+      const uInst = u.institution ?? u.institution_id;
+      return String(uInst) === String(selectedAcademy);
+    });
+  }, [dbUsers, selectedAcademy]);
 
   // URL-synchronized atomic setters
   const setActiveScope = useCallback(
@@ -165,6 +182,52 @@ export function useSectionControl() {
     },
     [setSearchParams]
   );
+
+  const setSelectedAcademyRole = useCallback(
+    (roleCode: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (roleCode && roleCode !== 'ALL') {
+            next.set('academy_role', roleCode);
+          } else {
+            next.delete('academy_role');
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const setSelectedAcademyUser = useCallback(
+    (userId: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (userId && userId !== 'ALL') {
+            next.set('academy_user', userId);
+          } else {
+            next.delete('academy_user');
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  // Auto-reset selected academy user if the user changes target academy
+  useEffect(() => {
+    if (activeScope === 'academy' && selectedAcademyUser) {
+      const exists = filteredAcademyUsers.some((u) => String(u.id) === String(selectedAcademyUser));
+      if (!exists && filteredAcademyUsers.length > 0) {
+        setSelectedAcademyUser('');
+      }
+    }
+  }, [activeScope, selectedAcademyUser, filteredAcademyUsers, setSelectedAcademyUser]);
 
   // Ensure initial URL contains explicit ?tab= param for shareable tab links
   useEffect(() => {
@@ -280,6 +343,19 @@ export function useSectionControl() {
       if (currentTargetId) {
         url += `&target_id=${encodeURIComponent(currentTargetId)}`;
       }
+      if (activeScope === 'academy') {
+        if (selectedAcademyRole && selectedAcademyRole !== 'ALL') {
+          url += `&role=${encodeURIComponent(selectedAcademyRole)}`;
+        }
+        if (selectedAcademyUser && selectedAcademyUser !== 'ALL') {
+          url += `&user=${encodeURIComponent(selectedAcademyUser)}`;
+        }
+      }
+
+      const scopedCacheKey =
+        activeScope === 'academy'
+          ? `spr_section_control_tree_academy_${selectedAcademy}_${selectedAcademyRole || 'all'}_${selectedAcademyUser || 'all'}`
+          : `spr_section_control_tree_${activeScope}_${currentTargetId || 'default'}`;
 
       const res = await fetchWithAuth(url);
       if (res.ok) {
@@ -289,17 +365,12 @@ export function useSectionControl() {
         if (resCats.length > 0) {
           try {
             localStorage.setItem('spr_section_control_tree_cache', JSON.stringify(resCats));
-            localStorage.setItem(
-              `spr_section_control_tree_${activeScope}_${currentTargetId || 'default'}`,
-              JSON.stringify(resCats)
-            );
+            localStorage.setItem(scopedCacheKey, JSON.stringify(resCats));
           } catch {}
         }
       } else {
         try {
-          const scopedCache = localStorage.getItem(
-            `spr_section_control_tree_${activeScope}_${currentTargetId || 'default'}`
-          );
+          const scopedCache = localStorage.getItem(scopedCacheKey);
           const fallbackCache = scopedCache || localStorage.getItem('spr_section_control_tree_cache');
           if (fallbackCache) {
             setCategories(JSON.parse(fallbackCache));
@@ -312,9 +383,11 @@ export function useSectionControl() {
       }
     } catch {
       try {
-        const scopedCache = localStorage.getItem(
-          `spr_section_control_tree_${activeScope}_${currentTargetId || 'default'}`
-        );
+        const scopedCacheKey =
+          activeScope === 'academy'
+            ? `spr_section_control_tree_academy_${selectedAcademy}_${selectedAcademyRole || 'all'}_${selectedAcademyUser || 'all'}`
+            : `spr_section_control_tree_${activeScope}_${currentTargetId || 'default'}`;
+        const scopedCache = localStorage.getItem(scopedCacheKey);
         const fallbackCache = scopedCache || localStorage.getItem('spr_section_control_tree_cache');
         if (fallbackCache) {
           setCategories(JSON.parse(fallbackCache));
@@ -328,7 +401,7 @@ export function useSectionControl() {
       isLoadingRulesRef.current = false;
       setLoading(false);
     }
-  }, [activeScope, currentTargetId]);
+  }, [activeScope, currentTargetId, selectedAcademy, selectedAcademyRole, selectedAcademyUser]);
 
   useEffect(() => {
     loadRules();
@@ -572,11 +645,33 @@ export function useSectionControl() {
 
     setSaving(true);
     try {
+      let effectiveScopeType = activeScope.toUpperCase();
+      let effectiveTargetId = currentTargetId;
+      let effectiveRole: string | undefined = undefined;
+      let effectiveUser: string | undefined = undefined;
+
+      if (activeScope === 'academy') {
+        if (selectedAcademyUser && selectedAcademyUser !== 'ALL') {
+          effectiveScopeType = 'USER';
+          effectiveTargetId = selectedAcademyUser;
+          effectiveUser = selectedAcademyUser;
+        } else if (selectedAcademyRole && selectedAcademyRole !== 'ALL') {
+          effectiveScopeType = 'ACADEMY_ROLE';
+          effectiveTargetId = selectedAcademy;
+          effectiveRole = selectedAcademyRole;
+        } else {
+          effectiveScopeType = 'ACADEMY';
+          effectiveTargetId = selectedAcademy;
+        }
+      }
+
       const payload: BatchUpdatePayload = {
-        scope_type: activeScope.toUpperCase(),
+        scope_type: effectiveScopeType,
         scope: activeScope,
-        target_identifier: currentTargetId,
-        target_id: currentTargetId,
+        target_identifier: effectiveTargetId,
+        target_id: effectiveTargetId,
+        role: effectiveRole,
+        user: effectiveUser,
         updates: keys.map((k) => ({
           section_key: k,
           is_enabled: modifiedFlags[k],
@@ -616,7 +711,19 @@ export function useSectionControl() {
     } finally {
       setSaving(false);
     }
-  }, [modifiedFlags, activeScope, currentTargetId, showToast, t, broadcastUpdate, refetchConfig, loadRules]);
+  }, [
+    modifiedFlags,
+    activeScope,
+    currentTargetId,
+    selectedAcademy,
+    selectedAcademyRole,
+    selectedAcademyUser,
+    showToast,
+    t,
+    broadcastUpdate,
+    refetchConfig,
+    loadRules,
+  ]);
 
   // Reset Overrides back to defaults
   const handleResetOverrides = useCallback(async () => {
@@ -746,6 +853,11 @@ export function useSectionControl() {
     setSelectedRole,
     selectedAcademy,
     setSelectedAcademy,
+    selectedAcademyRole,
+    setSelectedAcademyRole,
+    selectedAcademyUser,
+    setSelectedAcademyUser,
+    filteredAcademyUsers,
     selectedUser,
     setSelectedUser,
     userSearchQuery,

@@ -34,6 +34,11 @@ export const SectionControlView: React.FC = () => {
     setSelectedRole,
     selectedAcademy,
     setSelectedAcademy,
+    selectedAcademyRole,
+    setSelectedAcademyRole,
+    selectedAcademyUser,
+    setSelectedAcademyUser,
+    filteredAcademyUsers,
     selectedUser,
     setSelectedUser,
     dbRoles,
@@ -180,6 +185,11 @@ export const SectionControlView: React.FC = () => {
         dbAcademies={dbAcademies}
         selectedAcademy={selectedAcademy}
         onSelectAcademy={setSelectedAcademy}
+        selectedAcademyRole={selectedAcademyRole}
+        onSelectAcademyRole={setSelectedAcademyRole}
+        selectedAcademyUser={selectedAcademyUser}
+        onSelectAcademyUser={setSelectedAcademyUser}
+        filteredAcademyUsers={filteredAcademyUsers}
         dbUsers={dbUsers}
         selectedUser={selectedUser}
         onSelectUser={setSelectedUser}

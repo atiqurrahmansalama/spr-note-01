@@ -72,6 +72,32 @@ class AcademySectionOverride(models.Model):
         return f"Academy [{self.institution_id}] -> {self.section.section_key}: {self.is_enabled}"
 
 
+class AcademyRoleSectionOverride(models.Model):
+    """
+    Overrides feature flags for a specific user role strictly within a specific institution/academy.
+    e.g. Al-Hikmah Academy's TEACHER vs Oxford Academy's TEACHER.
+    """
+    institution = models.ForeignKey(
+        'core.AcademicInstitution',
+        on_delete=models.CASCADE,
+        related_name='role_section_overrides'
+    )
+    role = models.CharField(max_length=50, choices=User.USER_TYPE_CHOICES)
+    section = models.ForeignKey(
+        AppSection,
+        on_delete=models.CASCADE,
+        related_name='academy_role_overrides'
+    )
+    is_enabled = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'core_academy_role_section_override'
+        unique_together = ('institution', 'role', 'section')
+
+    def __str__(self):
+        return f"Academy [{self.institution_id}] Role [{self.role}] -> {self.section.section_key}: {self.is_enabled}"
+
+
 class UserSectionOverride(models.Model):
     user = models.ForeignKey('core.User', on_delete=models.CASCADE, related_name='section_overrides')
     section = models.ForeignKey(AppSection, on_delete=models.CASCADE, related_name='user_overrides')
@@ -90,6 +116,7 @@ class FeatureFlagAuditLog(models.Model):
         ('ROLE', 'Role Permission'),
         ('GROUP', 'Group Permission'),
         ('ACADEMY', 'Academy Override'),
+        ('ACADEMY_ROLE', 'Academy Role Override'),
         ('USER', 'User Override'),
     )
 

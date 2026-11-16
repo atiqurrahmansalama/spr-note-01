@@ -237,6 +237,7 @@ def evaluate_section_config_for_user(user=None, preview_role=None, preview_tenan
     group_overrides = {}
     role_overrides = {}
     academy_overrides = {}
+    academy_role_overrides = {}
 
     normalized_preview_role = str(preview_role or '').upper().strip() or None
     normalized_preview_tenant = str(preview_tenant_id or '').strip() or None
@@ -257,6 +258,17 @@ def evaluate_section_config_for_user(user=None, preview_role=None, preview_tenan
                 }
             except Exception as e:
                 logger.warning(f"Could not load preview AcademySectionOverride: {e}")
+            try:
+                from .models import AcademyRoleSectionOverride
+                academy_role_overrides = {
+                    o.section.section_key: o.is_enabled
+                    for o in AcademyRoleSectionOverride.objects.filter(
+                        institution_id=target_inst_id,
+                        role__iexact=normalized_preview_role
+                    ).select_related('section')
+                }
+            except Exception as e:
+                logger.warning(f"Could not load preview AcademyRoleSectionOverride: {e}")
     elif user and user.is_authenticated:
         # Tier 1: User Overrides
         user_overrides = {
@@ -304,6 +316,17 @@ def evaluate_section_config_for_user(user=None, preview_role=None, preview_tenan
             except Exception as e:
                 logger.warning(f"Could not load AcademySectionOverride: {e}")
                 academy_overrides = {}
+            if role_codes:
+                try:
+                    from .models import AcademyRoleSectionOverride
+                    q_expr = Q()
+                    for rc in role_codes:
+                        q_expr |= Q(role__iexact=rc)
+                    for o in AcademyRoleSectionOverride.objects.filter(Q(institution_id=target_inst_id) & q_expr).select_related('section'):
+                        academy_role_overrides[o.section.section_key] = o.is_enabled
+                except Exception as e:
+                    logger.warning(f"Could not load AcademyRoleSectionOverride: {e}")
+                    academy_role_overrides = {}
 
     has_active_subject = bool(normalized_preview_role or (user and user.is_authenticated))
 
@@ -321,6 +344,9 @@ def evaluate_section_config_for_user(user=None, preview_role=None, preview_tenan
         elif has_active_subject and key in group_overrides:
             resolved_raw[key] = group_overrides[key]
             origins[key] = "GROUP"
+        elif has_active_subject and key in academy_role_overrides:
+            resolved_raw[key] = academy_role_overrides[key]
+            origins[key] = "ACADEMY_ROLE"
         elif has_active_subject and key in role_overrides:
             resolved_raw[key] = role_overrides[key]
             origins[key] = "ROLE"

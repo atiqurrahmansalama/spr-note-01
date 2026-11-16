@@ -5,7 +5,7 @@
 
 export type ScopeType = 'global' | 'role' | 'academy' | 'user' | 'audit';
 
-export type InheritanceOrigin = 'GLOBAL' | 'ROLE' | 'GROUP' | 'ACADEMY' | 'USER';
+export type InheritanceOrigin = 'GLOBAL' | 'ROLE' | 'GROUP' | 'ACADEMY' | 'ACADEMY_ROLE' | 'USER';
 
 export interface SectionItem {
   id?: number | string;
@@ -62,6 +62,12 @@ export interface UserSearchResult {
   last_name?: string;
   phone_number?: string;
   email?: string;
+  institution?: number | string | null;
+  institution_id?: number | string | null;
+  institution_name?: string;
+  user_type?: string;
+  role?: any;
+  role_info?: any;
 }
 
 export interface BatchUpdateUpdateItem {
@@ -74,5 +80,7 @@ export interface BatchUpdatePayload {
   scope: ScopeType;
   target_identifier: string;
   target_id: string;
+  role?: string;
+  user?: string;
   updates: BatchUpdateUpdateItem[];
 }

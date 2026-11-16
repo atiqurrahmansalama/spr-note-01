@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import CustomButton from '../../../../components/ui/CustomButton';
 import CustomSelect from '../../../../components/ui/CustomSelect';
+import FilterBox, { FilterBoxScopeItem } from '../../../../components/ui/FilterBox';
 import IconButton from '../../../../components/ui/IconButton';
 import { RefreshIcon } from '../../../../components/ui/Icons';
 import { useHorizontalScroll } from '../../../../hooks';
@@ -16,6 +17,11 @@ export interface SectionTargetBarProps {
   dbRoles: RoleOption[];
   selectedAcademy?: string;
   onSelectAcademy?: (academyId: string) => void;
+  selectedAcademyRole?: string;
+  onSelectAcademyRole?: (roleCode: string) => void;
+  selectedAcademyUser?: string;
+  onSelectAcademyUser?: (userId: string) => void;
+  filteredAcademyUsers?: UserSearchResult[];
   dbAcademies?: AcademyOption[];
   dbUsers?: UserSearchResult[];
   selectedUser: string;
@@ -42,6 +48,11 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
   dbRoles,
   selectedAcademy,
   onSelectAcademy,
+  selectedAcademyRole = '',
+  onSelectAcademyRole,
+  selectedAcademyUser = '',
+  onSelectAcademyUser,
+  filteredAcademyUsers = [],
   dbAcademies = [],
   dbUsers = [],
   selectedUser,
@@ -83,6 +94,72 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
     }));
   }, [dbUsers]);
 
+  const academyRoleOptions = useMemo(() => {
+    return [
+      { value: 'ALL', label: t('targets.allRolesBase', 'All Roles (Academy Base)') },
+      ...dbRoles.map((r) => ({
+        value: r.code,
+        label: `${r.name || r.code} (${r.code})`,
+      })),
+    ];
+  }, [dbRoles, t]);
+
+  const academyUserOptions = useMemo(() => {
+    const list = filteredAcademyUsers.length > 0 ? filteredAcademyUsers : [];
+    return [
+      { value: 'ALL', label: t('targets.allUsersNoOverride', 'All Users (No User Override)') },
+      ...list.map((u) => {
+        const displayName = u.first_name || u.name || 'User';
+        const contact = u.email || u.phone_number || `#${u.id}`;
+        const roleTag = u.user_type || (typeof u.role === 'string' ? u.role : u.role?.name || u.role?.code);
+        return {
+          value: String(u.id),
+          label: `${displayName} (${contact})${roleTag ? ` - ${roleTag}` : ''}`,
+        };
+      }),
+    ];
+  }, [filteredAcademyUsers, t]);
+
+  const academyScopeItems: FilterBoxScopeItem[] = useMemo(() => {
+    const items: FilterBoxScopeItem[] = [];
+    const currentInst = dbAcademies.find((a) => String(a.id) === String(selectedAcademy));
+    if (currentInst) {
+      items.push({
+        label: 'Academy',
+        value: (
+          <span className="font-semibold theme-text-primary">
+            {currentInst.name}
+          </span>
+        ),
+      });
+    }
+
+    if (selectedAcademyRole && selectedAcademyRole !== 'ALL') {
+      items.push({
+        label: 'Role Scope',
+        value: (
+          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300">
+            {selectedAcademyRole}
+          </span>
+        ),
+      });
+    }
+
+    if (selectedAcademyUser && selectedAcademyUser !== 'ALL') {
+      const matchedUser = filteredAcademyUsers.find((u) => String(u.id) === String(selectedAcademyUser));
+      items.push({
+        label: 'User Override',
+        value: (
+          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300">
+            {matchedUser?.name || matchedUser?.first_name || `#${selectedAcademyUser}`}
+          </span>
+        ),
+      });
+    }
+
+    return items;
+  }, [dbAcademies, selectedAcademy, selectedAcademyRole, selectedAcademyUser, filteredAcademyUsers]);
+
   const auditScopeOptions = useMemo(
     () => [
       { value: 'ALL', label: t('audit.allScopes', 'All Scopes') },
@@ -95,7 +172,7 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
   );
 
   return (
-    <div className="p-3 sm:p-4 theme-bg-surface border theme-border rounded-2xl shadow-xs transition-all w-full">
+    <div className="p-3 sm:p-4 theme-bg-surface border-0 rounded-2xl shadow-xs transition-all w-full">
       {/* 1. Global Scope: Global Defaults Label (Left) + Search & Stats More Button (Right) */}
       {activeScope === 'global' && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
@@ -177,30 +254,87 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
         </div>
       )}
 
-      {/* 3. Target Academy Scope: Academy Dropdown (Left) + Search & Stats More Button (Right) */}
+      {/* 3. Target Academy Scope: Reusable FilterBox with Target Academy, Role Scopes, User Overrides & Search Features */}
       {activeScope === 'academy' && (
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 w-full">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-            <span className="text-xs font-bold theme-text-secondary uppercase tracking-wider shrink-0 whitespace-nowrap">
-              {t('targets.targetAcademy', 'Target Academy:')}
-            </span>
+        <FilterBox
+          showCardWrapper={false}
+          collapsible={false}
+          className="w-full !p-0"
+          primaryRow={
+            <div className="grid grid-cols-1 @[500px]:grid-cols-2 @[960px]:grid-cols-4 gap-2.5 sm:gap-3 w-full items-end">
+              {/* Slot 1: Target Academy */}
+              <div className="col-span-1">
+                <CustomSelect
+                  label={t('targets.targetAcademy', 'Target Academy')}
+                  options={academyOptions}
+                  value={selectedAcademy || ''}
+                  onChange={(val) => onSelectAcademy?.(String(val || ''))}
+                  placeholder={t('targets.academySearchPlaceholder', 'Select target academy...')}
+                  searchable={true}
+                  size="md"
+                />
+              </div>
 
-            <div className="w-full sm:w-72 md:w-80">
-              <CustomSelect
-                options={academyOptions}
-                value={selectedAcademy || ''}
-                onChange={(val) => onSelectAcademy?.(String(val))}
-                placeholder={t('targets.academySearchPlaceholder', 'Select target academy...')}
-                searchable={true}
-                size="sm"
-              />
-            </div>
-          </div>
+              {/* Slot 2: Role Scopes (Academy-scoped) */}
+              <div className="col-span-1">
+                <CustomSelect
+                  label={t('targets.roleScopes', 'Role Scopes')}
+                  options={academyRoleOptions}
+                  value={selectedAcademyRole || 'ALL'}
+                  onChange={(val) => onSelectAcademyRole?.(String(val || 'ALL'))}
+                  placeholder={t('targets.selectRoleScope', 'All Roles (Academy Base)')}
+                  searchable={true}
+                  size="md"
+                />
+              </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-            <div className="w-full sm:w-80">
-              <SectionSearchInput value={searchFilter} onChange={onSearchFilterChange} />
+              {/* Slot 3: User Overrides (Filtered strictly to picked academy) */}
+              <div className="col-span-1">
+                <CustomSelect
+                  label={t('targets.userOverrides', 'User Overrides')}
+                  options={academyUserOptions}
+                  value={selectedAcademyUser || 'ALL'}
+                  onChange={(val) => onSelectAcademyUser?.(String(val || 'ALL'))}
+                  placeholder={
+                    !selectedAcademy
+                      ? t('targets.selectAcademyFirst', 'Select academy first...')
+                      : filteredAcademyUsers.length === 0
+                      ? t('targets.noUsersInAcademy', 'No users in this academy')
+                      : t('targets.selectUserOverride', 'All Users (No User Override)')
+                  }
+                  searchable={true}
+                  size="md"
+                  disabled={!selectedAcademy || filteredAcademyUsers.length === 0}
+                />
+              </div>
+
+              {/* Slot 4: Search Features */}
+              <div className="col-span-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
+                  {t('targets.searchFeatures', 'Search Features')}
+                </label>
+                <SectionSearchInput
+                  value={searchFilter}
+                  onChange={onSearchFilterChange}
+                  placeholder={t('search.placeholder', 'Filter features & modules...')}
+                />
+              </div>
             </div>
+          }
+          scopeItems={academyScopeItems}
+          scopeLabel={t('targets.selectedScope', 'Selected Scope:')}
+          hasActiveFilters={Boolean(
+            (selectedAcademyRole && selectedAcademyRole !== 'ALL') ||
+            (selectedAcademyUser && selectedAcademyUser !== 'ALL') ||
+            searchFilter.trim()
+          )}
+          onResetFilters={() => {
+            onSelectAcademyRole?.('ALL');
+            onSelectAcademyUser?.('ALL');
+            onSearchFilterChange('');
+          }}
+          resetLabel={t('empty.clearSearch', 'Reset')}
+          footerActions={
             <SectionStatsMetaCard
               activeScope={activeScope}
               totalCount={totalSectionsCount}
@@ -210,8 +344,8 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
               activeAcademy={selectedAcademy}
               modifiedCount={modifiedCount}
             />
-          </div>
-        </div>
+          }
+        />
       )}
 
       {/* 4. Target User Scope: User Dropdown (Left) + Search & Stats More Button (Right) */}

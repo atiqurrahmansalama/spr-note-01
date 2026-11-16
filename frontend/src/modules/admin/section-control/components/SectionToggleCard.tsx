@@ -60,9 +60,16 @@ export const SectionToggleCard: React.FC<SectionToggleCardProps> = ({
         );
       case 'ACADEMY':
         return (
-          <span className="theme-bg-accent-soft theme-accent text-[9px] px-1.5 py-0.5 rounded font-mono font-bold flex items-center gap-1 shadow-2xs shrink-0 border border-current/20">
+          <span className="theme-bg-accent-soft theme-accent text-[9px] px-1.5 py-0.5 rounded font-mono font-bold flex items-center gap-1 shadow-2xs shrink-0 border-0">
             <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 shrink-0" />
             {t('badges.academyOverride', 'Academy Override')}
+          </span>
+        );
+      case 'ACADEMY_ROLE':
+        return (
+          <span className="bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[9px] px-1.5 py-0.5 rounded font-mono font-bold flex items-center gap-1 shadow-2xs shrink-0 border-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 shrink-0" />
+            {t('badges.academyRoleOverride', 'Academy Role Override')}
           </span>
         );
       case 'GLOBAL':
