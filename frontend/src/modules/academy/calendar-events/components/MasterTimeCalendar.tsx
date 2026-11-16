@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import ActionMenu from "../../../../components/ui/ActionMenu";
 import CustomInput from "../../../../components/ui/CustomInput";
 import CustomButton from "../../../../components/ui/CustomButton";
@@ -380,13 +380,21 @@ export default function MasterTimeCalendar({
     const targetEl = (el.querySelector(`[data-datestr="${targetStr}"]`) as HTMLElement | null) ||
                      (el.querySelector(`[data-date="${targetStr}"]`) as HTMLElement | null);
     if (targetEl) {
-      targetEl.scrollIntoView({ behavior, inline: "center", block: "nearest" });
+      const targetCenter = targetEl.offsetLeft - (el.clientWidth / 2) + (targetEl.offsetWidth / 2);
+      const distance = Math.abs(el.scrollLeft - targetCenter);
+
+      // Instant positioning if requested ("auto") or distance is large (>800px) so it doesn't take seconds to crawl
+      if (behavior === "auto" || distance > 800) {
+        el.scrollLeft = Math.max(0, targetCenter);
+      } else {
+        targetEl.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      }
     }
 
     scrollTimeoutRef.current = setTimeout(() => {
       isProgrammaticScrollRef.current = false;
       checkTodayVisibility();
-    }, behavior === "smooth" ? 450 : 50);
+    }, behavior === "smooth" ? 250 : 20);
   }, [displayMode, checkTodayVisibility]);
 
   // Determine if Today button should be displayed
@@ -449,7 +457,7 @@ export default function MasterTimeCalendar({
     setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
     setSelectedDay(now.getDate());
     if (displayMode === "timeline") {
-      scrollToTimelineDate(now, "smooth");
+      scrollToTimelineDate(now, "auto");
     } else {
       setTimeout(() => {
         checkTodayVisibility();
@@ -1007,16 +1015,11 @@ export default function MasterTimeCalendar({
     };
   }, [displayMode, handleScroll, checkTodayVisibility]);
 
-  // Initial timeline centering when mounting or switching to timeline view
-  useEffect(() => {
+  // Initial timeline centering when mounting or switching to timeline view: instant positioning with 0ms delay
+  useLayoutEffect(() => {
     if (displayMode === "timeline" && dayStripRef.current) {
       const targetDate = selectedDateObj || currentDate;
-      const behavior: ScrollBehavior = hasMountedTimelineRef.current ? "smooth" : "auto";
-      hasMountedTimelineRef.current = true;
-      const timer = setTimeout(() => {
-        scrollToTimelineDate(targetDate, behavior);
-      }, 40);
-      return () => clearTimeout(timer);
+      scrollToTimelineDate(targetDate, "auto");
     }
   }, [displayMode, scrollToTimelineDate]);
 
@@ -1234,7 +1237,7 @@ export default function MasterTimeCalendar({
                                 handleOpenAddDrawer(cell.dateStr);
                               }
                             }}
-                            className={`border-0 aspect-square min-h-[var(--week-min-h,0px)] w-full p-1 @sm:p-1.5 @xl:p-2 flex flex-col justify-between transition-colors cursor-pointer group select-none rounded-xl sm:rounded-2xl ${
+                            className={`border-0 aspect-square min-h-0 @[640px]:min-h-[var(--week-min-h,0px)] w-full p-1 @sm:p-1.5 @xl:p-2 flex flex-col justify-between transition-colors cursor-pointer group select-none rounded-xl sm:rounded-2xl ${
                               isToday
                                 ? "bg-[var(--accent-main)]/12 dark:bg-[var(--accent-main)]/18 hover:bg-[var(--accent-main)]/22"
                                 : cell.isCurrentMonth
@@ -1247,9 +1250,9 @@ export default function MasterTimeCalendar({
                                 : cell.dateStr
                             }
                           >
-                            {/* Top: Day Number + Personal Tasks Badge (Top Left) & Hijri Day Number (Top Right) */}
+                            {/* Top: Day Number + Personal Tasks Indicator (Top Left) & Hijri Day Number (Top Right) */}
                             <div className="flex items-center justify-between relative w-full mb-0.5 shrink-0 pointer-events-auto">
-                              <div className="flex items-center gap-1.5 min-w-0">
+                              <div className="flex items-center gap-1 @sm:gap-1.5 min-w-0">
                                 <span
                                   className={`text-[10px] @sm:text-[11px] @xl:text-xs font-bold inline-flex items-center justify-center w-5 h-5 @sm:w-5.5 @sm:h-5.5 @xl:w-6 @xl:h-6 rounded-full transition ${
                                     isToday
@@ -1260,7 +1263,7 @@ export default function MasterTimeCalendar({
                                   {cell.dayNum}
                                 </span>
 
-                                {/* Desktop/Tablet personal tasks compact badge in cell header - 100% collision-free from spanning event bars */}
+                                {/* Wide Container (>=640px): personal tasks compact pill in cell header */}
                                 {cellTasks.length > 0 && (
                                   <button
                                     type="button"
@@ -1268,7 +1271,7 @@ export default function MasterTimeCalendar({
                                       e.stopPropagation();
                                       openDrawer('user-task', { date: cell.dateStr });
                                     }}
-                                    className="hidden @md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 transition cursor-pointer select-none border-0 ring-0 shrink-0 z-20"
+                                    className="hidden @[640px]:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 transition cursor-pointer select-none border-0 ring-0 shrink-0 z-20"
                                     title={`${cellTasks.length} personal task(s). Click to view / add.`}
                                   >
                                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
@@ -1287,9 +1290,9 @@ export default function MasterTimeCalendar({
                               )}
                             </div>
 
-                            {/* Small Screen: Dot indicators (events and/or personal tasks) */}
+                            {/* Narrow Container (<640px): Dot indicator for schedule/event items AND personal tasks on the EXACT SAME LINE at bottom */}
                             {(dayEvents.length > 0 || cellTasks.length > 0) && (
-                              <div className="flex @md:hidden items-center justify-center gap-1 mt-auto pb-0.5 shrink-0">
+                              <div className="flex @[640px]:hidden items-center justify-center gap-1.5 mt-auto pb-0.5 shrink-0 pointer-events-auto">
                                 {dayEvents.length > 0 && topStyle && (
                                   <span
                                     className={`w-1.5 h-1.5 rounded-full shrink-0 ${topStyle.dot} shadow-2xs`}
@@ -1297,23 +1300,28 @@ export default function MasterTimeCalendar({
                                   />
                                 )}
                                 {cellTasks.length > 0 && (
-                                  <span
-                                    className="w-1.5 h-1.5 rounded-full shrink-0 bg-indigo-500 shadow-2xs"
-                                    title={`${cellTasks.length} personal task(s)`}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openDrawer('user-task', { date: cell.dateStr });
+                                    }}
+                                    className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0 shadow-2xs border-0 p-0 cursor-pointer hover:scale-125 transition-transform"
+                                    title={`${cellTasks.length} personal task(s). Click to view / add.`}
                                   />
                                 )}
                               </div>
                             )}
 
-                            {/* Desktop/Tablet vertical spacer so cell holds proper height for event bars without collision */}
-                            <div className="hidden @md:block flex-1 min-h-[44px] pointer-events-none" />
+                            {/* Wide Container (>=640px): Vertical spacer so cell holds proper height for event bars without collision */}
+                            <div className="hidden @[640px]:block flex-1 min-h-[36px] pointer-events-none" />
                           </div>
                         );
                       })}
                     </div>
 
-                    {/* Medium & Large Screens: Continuous Spanning Events Grid Layer across the Week */}
-                    <div className="hidden @md:grid grid-cols-7 gap-x-1 sm:gap-x-1.5 gap-y-1 absolute inset-x-0 top-[30px] @sm:top-[32px] @xl:top-[34px] bottom-1 pointer-events-none z-10 auto-rows-max">
+                    {/* Wide Container (>=640px): Continuous Spanning Events Grid Layer across the Week */}
+                    <div className="hidden @[640px]:grid grid-cols-7 gap-x-1 sm:gap-x-1.5 gap-y-1 absolute inset-x-0 top-[30px] @sm:top-[32px] @xl:top-[34px] bottom-1 pointer-events-none z-10 auto-rows-max">
                       {weekEvents.map((item) => {
                         const { event: evt, startCol, span, isStart, isEnd, row } = item;
                         const style = getEventColors(evt, activeTenantId);
