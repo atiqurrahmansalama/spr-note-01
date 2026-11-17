@@ -18,7 +18,7 @@ export default function LandingCreatorSpotlight() {
       <div className="max-w-5xl w-full mx-auto space-y-12 relative z-10">
         {/* Creator Badge Header */}
         <div className={`text-center space-y-4 max-w-2xl mx-auto ${getRevealClass(isVisible, 'delay-0')}`}>
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full theme-bg-elevated border theme-border shadow-md backdrop-blur-md hover:scale-105 transition-transform duration-300">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full theme-bg-elevated border-0 shadow-xs backdrop-blur-md hover:scale-105 transition-transform duration-300">
             <span className="w-2 h-2 rounded-full theme-bg-accent animate-ping" />
             <span className="text-[11px] sm:text-xs font-bold theme-text-primary uppercase tracking-widest">
               Lead Architect &amp; Software Engineer
@@ -35,19 +35,19 @@ export default function LandingCreatorSpotlight() {
         </div>
 
         {/* Creator Showcase Card */}
-        <div className={`theme-bg-surface border theme-border rounded-3xl p-6 sm:p-10 shadow-2xl hover:border-[var(--accent-main)]/50 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 relative group overflow-hidden ${getRevealClass(isVisible, 'delay-150')}`}>
+        <div className={`theme-bg-surface border-0 rounded-3xl p-6 sm:p-10 shadow-xs hover:shadow-md transition-all duration-300 relative group overflow-hidden ${getRevealClass(isVisible, 'delay-150')}`}>
           {/* Subtle Ambient Top Accent Light */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[var(--accent-main)] to-transparent opacity-80" />
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             {/* Left: Avatar & Identity Summary */}
-            <div className="lg:col-span-5 flex flex-col items-center text-center space-y-4 sm:space-y-5 border-b lg:border-b-0 lg:border-r theme-border pb-8 lg:pb-0 lg:pr-8">
+            <div className="lg:col-span-5 flex flex-col items-center text-center space-y-4 sm:space-y-5 pb-8 lg:pb-0 lg:pr-8">
               <div className="relative">
                 {/* Glowing Avatar Frame */}
-                <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl theme-bg-elevated border-2 theme-border flex items-center justify-center text-3xl sm:text-4xl font-black text-[var(--accent-main)] shadow-2xl relative group-hover:scale-105 group-hover:rotate-2 transition-all duration-300">
+                <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl theme-bg-elevated border-0 flex items-center justify-center text-3xl sm:text-4xl font-black text-[var(--accent-main)] shadow-xs relative group-hover:scale-105 transition-all duration-300">
                   AR
                 </div>
-                <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-2xl theme-bg-accent theme-accent-text flex items-center justify-center shadow-lg animate-bounce">
+                <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-2xl theme-bg-accent theme-accent-text flex items-center justify-center shadow-xs animate-bounce border-0">
                   <SparklesIcon className="w-4 h-4" />
                 </div>
               </div>
@@ -69,7 +69,7 @@ export default function LandingCreatorSpotlight() {
                 {['Enterprise SIS & ERP', 'Modern React & Full-Stack', 'Multi-Tenant Security', 'High-Speed EdTech'].map((tag, idx) => (
                   <span
                     key={idx}
-                    className="px-2.5 py-1 rounded-xl text-[10px] font-bold theme-bg-sub theme-text-secondary border theme-border hover:theme-text-primary hover:border-[var(--accent-main)]/40 transition-colors"
+                    className="px-2.5 py-1 rounded-xl text-[10px] font-bold theme-bg-app theme-text-secondary border-0 shadow-2xs hover:theme-text-primary hover:theme-bg-elevated/60 transition-colors"
                   >
                     {tag}
                   </span>
@@ -94,7 +94,7 @@ export default function LandingCreatorSpotlight() {
 
               {/* Engineering Highlights Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-3">
-                <div className="p-4 rounded-2xl theme-bg-sub border theme-border space-y-1 hover:-translate-y-1 hover:border-emerald-500/40 transition-all duration-300">
+                <div className="p-4 rounded-2xl theme-bg-app border-0 shadow-xs space-y-1 hover:-translate-y-0.5 hover:theme-bg-elevated/60 transition-all duration-300">
                   <div className="flex items-center gap-2 font-bold text-xs theme-text-primary">
                     <ShieldCheckIcon className="w-4 h-4 text-emerald-400" />
                     <span>Security-First Architecture</span>
@@ -104,7 +104,7 @@ export default function LandingCreatorSpotlight() {
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl theme-bg-sub border theme-border space-y-1 hover:-translate-y-1 hover:border-sky-500/40 transition-all duration-300">
+                <div className="p-4 rounded-2xl theme-bg-app border-0 shadow-xs space-y-1 hover:-translate-y-0.5 hover:theme-bg-elevated/60 transition-all duration-300">
                   <div className="flex items-center gap-2 font-bold text-xs theme-text-primary">
                     <AcademicCapIcon className="w-4 h-4 text-sky-400" />
                     <span>Dynamic Examination Engine</span>

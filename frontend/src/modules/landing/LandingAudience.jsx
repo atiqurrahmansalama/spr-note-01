@@ -84,17 +84,17 @@ export default function LandingAudience() {
           return (
             <div
               key={idx}
-              className={`theme-bg-surface border theme-border rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col justify-between hover:border-[var(--accent-main)]/40 hover:-translate-y-1.5 transition-all duration-300 group ${getRevealClass(
+              className={`theme-bg-surface border-0 rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col justify-between hover:theme-bg-elevated hover:-translate-y-1.5 transition-all duration-300 group ${getRevealClass(
                 isVisible,
                 idx % 2 === 0 ? 'delay-100' : 'delay-200'
               )}`}
             >
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-2xl theme-bg-sub border theme-border flex items-center justify-center text-[var(--accent-main)] shadow-md group-hover:scale-110 transition-transform">
+                  <div className="w-12 h-12 rounded-2xl theme-bg-app border-0 flex items-center justify-center text-[var(--accent-main)] shadow-sm group-hover:scale-105 transition-transform">
                     <Icon className="w-6 h-6" />
                   </div>
-                  <span className="text-[10px] font-bold theme-bg-sub theme-text-secondary border theme-border px-3 py-1 rounded-full">
+                  <span className="text-[10px] font-bold theme-bg-app theme-text-secondary border-0 px-3 py-1 rounded-full shadow-2xs">
                     {aud.badge}
                   </span>
                 </div>
@@ -108,7 +108,7 @@ export default function LandingAudience() {
                   </p>
                 </div>
 
-                <ul className="space-y-2.5 text-xs theme-text-primary font-medium pt-2 border-t theme-border">
+                <ul className="space-y-2.5 text-xs theme-text-primary font-medium pt-2 border-t theme-border/40">
                   {aud.points.map((pt, pIdx) => (
                     <li key={pIdx} className="flex items-center gap-2.5">
                       <CheckCircleIcon className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -118,9 +118,9 @@ export default function LandingAudience() {
                 </ul>
               </div>
 
-              <div className="mt-6 pt-4 border-t theme-border flex items-center justify-between text-[11px] font-bold text-[var(--accent-main)]">
-                <span>Optimized Experience</span>
-                <span>Learn More &rarr;</span>
+              <div className="mt-6 pt-4 border-t theme-border/40 flex items-center justify-between text-[11px] font-bold text-[var(--accent-main)]">
+                <span>Optimized Enterprise Experience</span>
+                <span>Deploy Module &rarr;</span>
               </div>
             </div>
           );

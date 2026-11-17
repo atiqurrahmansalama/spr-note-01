@@ -63,13 +63,13 @@ export default function LandingExaminations() {
             {examFeatures.map((item, idx) => (
               <div
                 key={idx}
-                className="p-5 rounded-2xl theme-bg-surface border theme-border hover:border-[var(--accent-main)]/40 hover:-translate-y-1 transition-all duration-300 shadow-md group"
+                className="p-5 rounded-2xl theme-bg-surface shadow-xs border-0 hover:theme-bg-elevated hover:-translate-y-1 transition-all duration-300 group"
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <h4 className="font-bold text-sm theme-text-primary group-hover:theme-accent transition-colors">
                     {item.title}
                   </h4>
-                  <span className="text-[10px] font-bold theme-bg-sub theme-text-secondary border theme-border px-2.5 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold theme-bg-app theme-text-secondary border-0 px-2.5 py-0.5 rounded-full shadow-2xs">
                     {item.badge}
                   </span>
                 </div>
@@ -81,70 +81,70 @@ export default function LandingExaminations() {
           </div>
 
           {/* Right: Realistic Transcript & Routine Card Mockup */}
-          <div className={`lg:col-span-6 theme-bg-surface border theme-border rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden space-y-5 ${getRevealClass(isVisible, 'delay-200')}`}>
-            <div className="flex items-center justify-between border-b theme-border pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl theme-bg-accent-soft theme-accent flex items-center justify-center font-bold text-xs">
+          <div className={`lg:col-span-6 theme-bg-surface border-0 rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden space-y-5 ${getRevealClass(isVisible, 'delay-200')}`}>
+            <div className="flex items-center justify-between pb-3 border-b theme-border/40">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl theme-bg-accent-soft theme-accent flex items-center justify-center font-bold text-xs shadow-2xs">
                   SPR
                 </div>
                 <div>
-                  <div className="text-xs font-bold theme-text-primary">Official Academic Grade Sheet</div>
-                  <div className="text-[10px] theme-text-secondary">Semester Final Evaluation • Batch 2026</div>
+                  <div className="text-xs font-bold theme-text-primary">Darus Salam Model Academy</div>
+                  <div className="text-[10px] theme-text-secondary">Official Academic Grade Sheet • Session 2025-2026</div>
                 </div>
               </div>
-              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 flex items-center gap-1">
+              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border-0 flex items-center gap-1 shadow-2xs">
                 <CheckCircleIcon className="w-3.5 h-3.5" />
-                Published
+                Verified &amp; Published
               </span>
             </div>
 
             {/* Subject Routine Scorecard */}
             <div className="space-y-2 text-xs">
-              <div className="p-2.5 rounded-xl theme-bg-sub/60 border theme-border flex items-center justify-between">
+              <div className="p-3 rounded-xl theme-bg-app border-0 shadow-2xs flex items-center justify-between">
                 <div>
-                  <div className="font-bold theme-text-primary">Applied Physics &amp; Mathematics</div>
-                  <div className="text-[10px] theme-text-secondary">Written (70) + Practical (20) + CA (10)</div>
+                  <div className="font-bold theme-text-primary">Quran Hifz &amp; Tajweed</div>
+                  <div className="text-[10px] theme-text-secondary">Daily Recitation (10) + Tajweed (20) + Exam (70)</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-extrabold text-emerald-400">94 / 100</div>
-                  <div className="text-[10px] theme-text-secondary font-bold">Grade: A+</div>
+                  <div className="font-extrabold text-emerald-400">97 / 100</div>
+                  <div className="text-[10px] theme-text-secondary font-bold">Grade: Mumtaz (A+)</div>
                 </div>
               </div>
 
-              <div className="p-2.5 rounded-xl theme-bg-sub/60 border theme-border flex items-center justify-between">
+              <div className="p-3 rounded-xl theme-bg-app border-0 shadow-2xs flex items-center justify-between">
                 <div>
-                  <div className="font-bold theme-text-primary">Arabic Language &amp; Grammar</div>
-                  <div className="text-[10px] theme-text-secondary">Written (40) + Oral / Viva (10)</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-extrabold text-emerald-400">48 / 50</div>
-                  <div className="text-[10px] theme-text-secondary font-bold">Grade: A+</div>
-                </div>
-              </div>
-
-              <div className="p-2.5 rounded-xl theme-bg-sub/60 border theme-border flex items-center justify-between">
-                <div>
-                  <div className="font-bold theme-text-primary">Computer Science &amp; IT</div>
-                  <div className="text-[10px] theme-text-secondary">Theory (50) + Lab (25) + Assignment (25)</div>
+                  <div className="font-bold theme-text-primary">Arabic Grammar &amp; Nahw</div>
+                  <div className="text-[10px] theme-text-secondary">Continuous CA (10) + Oral (15) + Written (75)</div>
                 </div>
                 <div className="text-right">
                   <div className="font-extrabold text-emerald-400">91 / 100</div>
-                  <div className="text-[10px] theme-text-secondary font-bold">Grade: A+</div>
+                  <div className="text-[10px] theme-text-secondary font-bold">Grade: Mumtaz (A+)</div>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl theme-bg-app border-0 shadow-2xs flex items-center justify-between">
+                <div>
+                  <div className="font-bold theme-text-primary">General Mathematics &amp; Analytics</div>
+                  <div className="text-[10px] theme-text-secondary">Attendance (10) + Lab (20) + Written (70)</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-extrabold text-emerald-400">94 / 100</div>
+                  <div className="text-[10px] theme-text-secondary font-bold">Grade: Mumtaz (A+)</div>
                 </div>
               </div>
             </div>
 
             {/* Overall Result & QR Verification Summary */}
-            <div className="p-4 rounded-2xl theme-bg-elevated border theme-border flex items-center justify-between text-xs">
+            <div className="p-4 rounded-2xl theme-bg-elevated border-0 shadow-2xs flex items-center justify-between text-xs">
               <div className="space-y-1">
                 <div className="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">
-                  Aggregate Cumulative GPA
+                  Aggregate Cumulative GPA • Batch Rank #1
                 </div>
                 <div className="text-lg font-black theme-text-primary">
-                  5.00 / 5.00 <span className="text-xs font-bold text-emerald-400">(First Class / Mumtaz)</span>
+                  5.00 / 5.00 <span className="text-xs font-bold text-emerald-400">(First Class with Distinction / Mumtaz)</span>
                 </div>
               </div>
-              <div className="w-12 h-12 rounded-xl theme-bg-sub border theme-border flex items-center justify-center text-[var(--accent-main)] shrink-0 shadow-inner">
+              <div className="w-12 h-12 rounded-xl theme-bg-app border-0 flex items-center justify-center text-[var(--accent-main)] shrink-0 shadow-inner">
                 <QrCodeIcon className="w-7 h-7" />
               </div>
             </div>

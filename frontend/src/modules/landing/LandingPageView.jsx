@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth as authStore } from '../../utils/localStore';
 import { useTheme } from '../../context/useTheme';
+import { LanguageSelector } from '../../i18n';
 import LandingHero from './LandingHero';
 import LandingInteractiveShowcase from './LandingInteractiveShowcase';
 import LandingExaminations from './LandingExaminations';
@@ -13,7 +14,14 @@ import LandingFeatures from './LandingFeatures';
 import LandingVerifySearch from './LandingVerifySearch';
 import LandingCreatorSpotlight from './LandingCreatorSpotlight';
 import LandingFooter from './LandingFooter';
-import { SparklesIcon } from '../../components/ui/Icons';
+import {
+  SparklesIcon,
+  SunIcon,
+  MoonIcon,
+  MenuIcon,
+  CloseIcon,
+  ShieldCheckIcon,
+} from '../../components/ui/Icons';
 
 export default function LandingPageView() {
   const navigate = useNavigate();
@@ -56,14 +64,14 @@ export default function LandingPageView() {
       />
 
       {/* Floating Modern Header */}
-      <header className="theme-bg-surface/85 border-b theme-border px-4 py-3 sticky top-0 z-40 backdrop-blur-md select-none transition-colors duration-300 shadow-sm">
-        <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
+      <header className="theme-bg-surface/90 border-0 px-4 py-3 sticky top-0 z-40 backdrop-blur-md select-none transition-colors duration-300 shadow-xs">
+        <div className="max-w-7xl mx-auto w-full flex justify-between items-center gap-3">
           {/* Logo Branding */}
           <div
-            className="flex items-center gap-2.5 cursor-pointer group"
+            className="flex items-center gap-2.5 cursor-pointer group shrink-0"
             onClick={() => navigate('/')}
           >
-            <div className="w-8 h-8 rounded-xl theme-bg-accent theme-accent-text flex items-center justify-center font-black text-xs shadow-md group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+            <div className="w-8 h-8 rounded-xl theme-bg-accent theme-accent-text flex items-center justify-center font-black text-xs shadow-md group-hover:scale-105 transition-all duration-300">
               SPR
             </div>
             <div className="flex flex-col text-left">
@@ -71,7 +79,7 @@ export default function LandingPageView() {
                 SPR Note
               </span>
               <span className="text-[9px] font-bold text-[var(--accent-main)] uppercase tracking-wider hidden sm:block">
-                Academic ERP
+                Academic ERP &amp; Campus SIS
               </span>
             </div>
           </div>
@@ -83,28 +91,28 @@ export default function LandingPageView() {
               onClick={() => handleNavClick('interactive-showcase')}
               className="hover:theme-text-primary hover:text-[var(--accent-main)] transition-colors duration-200 cursor-pointer bg-transparent border-0"
             >
-              Matrix
+              System Matrix
             </button>
             <button
               type="button"
               onClick={() => handleNavClick('examinations')}
               className="hover:theme-text-primary hover:text-[var(--accent-main)] transition-colors duration-200 cursor-pointer bg-transparent border-0"
             >
-              Examinations
+              Examinations &amp; Grading
             </button>
             <button
               type="button"
               onClick={() => handleNavClick('attendance')}
               className="hover:theme-text-primary hover:text-[var(--accent-main)] transition-colors duration-200 cursor-pointer bg-transparent border-0"
             >
-              Attendance
+              Attendance &amp; Biometrics
             </button>
             <button
               type="button"
               onClick={() => handleNavClick('campus-hostel')}
               className="hover:theme-text-primary hover:text-[var(--accent-main)] transition-colors duration-200 cursor-pointer bg-transparent border-0"
             >
-              Hostel
+              Campus &amp; Hostel
             </button>
             <button
               type="button"
@@ -115,37 +123,33 @@ export default function LandingPageView() {
             </button>
             <button
               type="button"
-              onClick={() => handleNavClick('audience')}
-              className="hover:theme-text-primary hover:text-[var(--accent-main)] transition-colors duration-200 cursor-pointer bg-transparent border-0"
-            >
-              Institutions
-            </button>
-            <button
-              type="button"
               onClick={() => handleNavClick('features')}
               className="hover:theme-text-primary hover:text-[var(--accent-main)] transition-colors duration-200 cursor-pointer bg-transparent border-0"
             >
-              Features
+              All Features
             </button>
             <button
               type="button"
               onClick={() => handleNavClick('verification')}
               className="hover:theme-text-primary hover:text-[var(--accent-main)] transition-colors duration-200 cursor-pointer bg-transparent border-0"
             >
-              Verify
+              Verify Document
             </button>
             <button
               type="button"
               onClick={() => handleNavClick('creator')}
               className="hover:theme-text-primary text-[var(--accent-main)] transition-colors duration-200 flex items-center gap-1 font-extrabold cursor-pointer bg-transparent border-0"
             >
-              <span>Creator</span>
+              <span>Lead Architect</span>
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-main)] animate-ping" />
             </button>
           </nav>
 
           {/* Navigation Actions */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            {/* Multi-Language Switcher */}
+            <LanguageSelector />
+
             {/* Dark / Light Mode Toggle Button */}
             <button
               type="button"
@@ -153,17 +157,14 @@ export default function LandingPageView() {
                 const nextMode = themeContext.modeId === 'dark' ? 'light' : 'dark';
                 themeContext.setModeId(nextMode);
               }}
-              className="p-2 rounded-xl theme-text-secondary hover:theme-text-primary hover:theme-bg-sub transition border-0 bg-transparent flex items-center justify-center cursor-pointer active:scale-95 shadow-xs"
+              className="p-2 rounded-xl theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated transition border-0 bg-transparent flex items-center justify-center cursor-pointer active:scale-95 shadow-2xs"
               title={themeContext.modeId === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              aria-label="Toggle Theme Mode"
             >
               {themeContext.modeId === 'dark' ? (
-                <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
-                </svg>
+                <SunIcon className="w-4 h-4 text-amber-400" />
               ) : (
-                <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
+                <MoonIcon className="w-4 h-4 text-indigo-500" />
               )}
             </button>
 
@@ -171,26 +172,26 @@ export default function LandingPageView() {
               <button
                 type="button"
                 onClick={() => navigate('/dashboard')}
-                className="px-4 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold hover:opacity-95 shadow-md active:scale-95 hover:shadow-lg transition-all duration-200 cursor-pointer flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold hover:opacity-95 shadow-sm active:scale-95 transition-all duration-200 cursor-pointer flex items-center gap-1.5 border-0"
               >
                 <SparklesIcon className="w-3.5 h-3.5" />
-                <span>Dashboard</span>
+                <span>Go to Dashboard</span>
               </button>
             ) : (
               <>
                 <button
                   type="button"
                   onClick={() => navigate('/login')}
-                  className="hidden sm:block px-3.5 py-2 rounded-xl theme-text-primary hover:theme-bg-sub text-xs font-bold transition cursor-pointer bg-transparent border-0"
+                  className="hidden sm:block px-3.5 py-2 rounded-xl theme-text-primary hover:theme-bg-elevated text-xs font-bold transition cursor-pointer bg-transparent border-0"
                 >
                   Sign In
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate('/register')}
-                  className="px-4 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold hover:opacity-95 shadow-md active:scale-95 hover:shadow-lg transition-all duration-200 cursor-pointer"
+                  className="px-4 py-2 rounded-xl theme-bg-accent theme-accent-text text-xs font-bold hover:opacity-95 shadow-sm active:scale-95 transition-all duration-200 cursor-pointer border-0"
                 >
-                  Get Started
+                  Launch Workspace
                 </button>
               </>
             )}
@@ -199,73 +200,75 @@ export default function LandingPageView() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="xl:hidden p-2 rounded-xl theme-bg-sub border theme-border theme-text-primary cursor-pointer active:scale-95 transition-colors"
+              className="xl:hidden p-2 rounded-xl theme-bg-elevated theme-text-primary cursor-pointer active:scale-95 transition-colors border-0 shadow-2xs"
               aria-label="Toggle Navigation Menu"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+              {mobileMenuOpen ? (
+                <CloseIcon className="w-4 h-4" />
+              ) : (
+                <MenuIcon className="w-4 h-4" />
+              )}
             </button>
           </div>
         </div>
 
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
-          <div className="xl:hidden border-t theme-border mt-3 pt-3 pb-2 space-y-2 text-left animate-fade-in">
+          <div className="xl:hidden mt-3 p-3 rounded-2xl theme-bg-elevated shadow-lg space-y-2 text-left animate-fade-in border-0">
             <div className="grid grid-cols-2 gap-2 text-xs font-bold">
               <button
                 type="button"
                 onClick={() => handleNavClick('interactive-showcase')}
-                className="p-2.5 rounded-xl theme-bg-sub/80 theme-text-primary text-left"
+                className="p-2.5 rounded-xl theme-bg-surface theme-text-primary text-left border-0 cursor-pointer"
               >
                 Platform Matrix
               </button>
               <button
                 type="button"
                 onClick={() => handleNavClick('examinations')}
-                className="p-2.5 rounded-xl theme-bg-sub/80 theme-text-primary text-left"
+                className="p-2.5 rounded-xl theme-bg-surface theme-text-primary text-left border-0 cursor-pointer"
               >
                 Examinations
               </button>
               <button
                 type="button"
                 onClick={() => handleNavClick('attendance')}
-                className="p-2.5 rounded-xl theme-bg-sub/80 theme-text-primary text-left"
+                className="p-2.5 rounded-xl theme-bg-surface theme-text-primary text-left border-0 cursor-pointer"
               >
                 Attendance
               </button>
               <button
                 type="button"
                 onClick={() => handleNavClick('campus-hostel')}
-                className="p-2.5 rounded-xl theme-bg-sub/80 theme-text-primary text-left"
+                className="p-2.5 rounded-xl theme-bg-surface theme-text-primary text-left border-0 cursor-pointer"
               >
                 Hostel Living
               </button>
               <button
                 type="button"
                 onClick={() => handleNavClick('hifz-tracker')}
-                className="p-2.5 rounded-xl theme-bg-sub/80 theme-text-primary text-left"
+                className="p-2.5 rounded-xl theme-bg-surface theme-text-primary text-left border-0 cursor-pointer"
               >
                 Hifz Track
               </button>
               <button
                 type="button"
                 onClick={() => handleNavClick('audience')}
-                className="p-2.5 rounded-xl theme-bg-sub/80 theme-text-primary text-left"
+                className="p-2.5 rounded-xl theme-bg-surface theme-text-primary text-left border-0 cursor-pointer"
               >
                 Institutions
               </button>
               <button
                 type="button"
                 onClick={() => handleNavClick('features')}
-                className="p-2.5 rounded-xl theme-bg-sub/80 theme-text-primary text-left"
+                className="p-2.5 rounded-xl theme-bg-surface theme-text-primary text-left border-0 cursor-pointer"
               >
                 All Features
               </button>
               <button
                 type="button"
                 onClick={() => handleNavClick('verification')}
-                className="p-2.5 rounded-xl theme-bg-sub/80 text-[var(--accent-main)] text-left"
+                className="p-2.5 rounded-xl theme-bg-surface text-[var(--accent-main)] text-left border-0 cursor-pointer"
               >
                 Verify Document
               </button>

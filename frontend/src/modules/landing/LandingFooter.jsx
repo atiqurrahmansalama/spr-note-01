@@ -27,11 +27,11 @@ export default function LandingFooter() {
   return (
     <footer
       ref={footerRef}
-      className="border-t theme-border select-none mt-16 theme-bg-sub/60 backdrop-blur-md overflow-hidden"
+      className="border-0 select-none mt-16 theme-bg-surface/80 shadow-xs backdrop-blur-md overflow-hidden"
     >
       {/* Bottom Call to Action Section */}
       <div className={`py-20 px-4 text-center max-w-4xl mx-auto space-y-6 ${getRevealClass(isVisible, 'delay-0')}`}>
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full theme-bg-elevated border theme-border shadow-2xs">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full theme-bg-elevated border-0 shadow-xs">
           <span className="w-2 h-2 rounded-full theme-bg-accent animate-pulse" />
           <span className="text-[11px] font-bold theme-text-primary uppercase tracking-wider">
             Enterprise Institutional Modernization
@@ -49,7 +49,7 @@ export default function LandingFooter() {
           <button
             type="button"
             onClick={handleLaunchClick}
-            className="w-full sm:w-auto px-8 py-4 rounded-2xl theme-bg-accent theme-accent-text text-xs sm:text-sm font-bold shadow-xl hover:opacity-95 active:scale-95 transition-all duration-200 cursor-pointer inline-flex items-center justify-center gap-2 group"
+            className="w-full sm:w-auto px-8 py-4 rounded-2xl theme-bg-accent theme-accent-text text-xs sm:text-sm font-bold shadow-xs hover:opacity-95 active:scale-95 transition-all duration-200 cursor-pointer inline-flex items-center justify-center gap-2 group border-0"
           >
             <SparklesIcon className="w-4 h-4 group-hover:rotate-12 transition-transform" />
             <span>{isLoggedIn ? 'Open Application Dashboard' : 'Launch SPR Note Free'}</span>
@@ -59,7 +59,7 @@ export default function LandingFooter() {
           <button
             type="button"
             onClick={() => handleScrollTo('verification')}
-            className="w-full sm:w-auto px-6 py-4 rounded-2xl theme-bg-surface border theme-border theme-text-primary text-xs sm:text-sm font-bold hover:theme-bg-sub active:scale-95 transition-all duration-200 cursor-pointer"
+            className="w-full sm:w-auto px-6 py-4 rounded-2xl theme-bg-elevated border-0 shadow-xs hover:theme-bg-app theme-text-primary text-xs sm:text-sm font-bold active:scale-95 transition-all duration-200 cursor-pointer"
           >
             Verify Transcript
           </button>
@@ -67,7 +67,7 @@ export default function LandingFooter() {
       </div>
 
       {/* Footer Nav Links & Copyright */}
-      <div className="border-t theme-border py-8 px-4">
+      <div className="py-8 px-4 border-0 theme-bg-app/40">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-xs theme-text-secondary">
           {/* Brand */}
           <div className="flex items-center gap-2.5">
@@ -75,7 +75,7 @@ export default function LandingFooter() {
               SPR
             </div>
             <span className="font-extrabold theme-text-primary text-sm tracking-wide">SPR Note</span>
-            <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 ml-2">
+            <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full border-0 shadow-2xs ml-2">
               v2.0 Enterprise
             </span>
           </div>

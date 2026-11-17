@@ -35,9 +35,9 @@ export default function LandingHifzTracker() {
         {/* 3 Pillars Grid with Micro-Animations */}
         <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 ${getRevealClass(isVisible, 'delay-100')}`}>
           {/* Sabaq Card */}
-          <div className="theme-bg-surface border theme-border rounded-3xl p-6 sm:p-8 shadow-xl hover:-translate-y-2.5 hover:shadow-2xl hover:border-sky-500/40 transition-all duration-300 flex flex-col justify-between group">
+          <div className="theme-bg-surface border-0 rounded-3xl p-6 sm:p-8 shadow-xs hover:-translate-y-2 hover:shadow-xl hover:theme-bg-elevated transition-all duration-300 flex flex-col justify-between group">
             <div className="space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center font-black text-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 shadow-inner">
+              <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border-0 text-sky-400 flex items-center justify-center font-black text-lg group-hover:scale-105 transition-all duration-300 shadow-2xs">
                 1
               </div>
               <h3 className="text-base sm:text-lg font-bold theme-text-primary group-hover:text-sky-400 transition-colors">
@@ -47,16 +47,16 @@ export default function LandingHifzTracker() {
                 Log exact Surah, Ayah ranges, and page boundaries. Mark memory fluency, tajweed quality, and daily target completions.
               </p>
             </div>
-            <div className="mt-6 pt-4 border-t theme-border flex items-center gap-2 text-xs font-semibold text-sky-400">
+            <div className="mt-6 pt-4 border-t theme-border/40 flex items-center gap-2 text-xs font-semibold text-sky-400">
               <CheckCircleIcon className="w-4 h-4" />
               <span>Real-time Page &amp; Ayah Counter</span>
             </div>
           </div>
 
           {/* Sabqi Card */}
-          <div className="theme-bg-surface border theme-border rounded-3xl p-6 sm:p-8 shadow-xl hover:-translate-y-2.5 hover:shadow-2xl hover:border-indigo-500/40 transition-all duration-300 flex flex-col justify-between group">
+          <div className="theme-bg-surface border-0 rounded-3xl p-6 sm:p-8 shadow-xs hover:-translate-y-2 hover:shadow-xl hover:theme-bg-elevated transition-all duration-300 flex flex-col justify-between group">
             <div className="space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center font-black text-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 shadow-inner">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border-0 text-indigo-400 flex items-center justify-center font-black text-lg group-hover:scale-105 transition-all duration-300 shadow-2xs">
                 2
               </div>
               <h3 className="text-base sm:text-lg font-bold theme-text-primary group-hover:text-indigo-400 transition-colors">
@@ -66,16 +66,16 @@ export default function LandingHifzTracker() {
                 Track the rolling 5 to 10 pages preceding the current lesson. Measure retention decay and prevent memory gaps before they expand.
               </p>
             </div>
-            <div className="mt-6 pt-4 border-t theme-border flex items-center gap-2 text-xs font-semibold text-indigo-400">
+            <div className="mt-6 pt-4 border-t theme-border/40 flex items-center gap-2 text-xs font-semibold text-indigo-400">
               <CheckCircleIcon className="w-4 h-4" />
               <span>Rolling 5-Page Memory Buffer</span>
             </div>
           </div>
 
           {/* Amokhta Card */}
-          <div className="theme-bg-surface border theme-border rounded-3xl p-6 sm:p-8 shadow-xl hover:-translate-y-2.5 hover:shadow-2xl hover:border-emerald-500/40 transition-all duration-300 flex flex-col justify-between group">
+          <div className="theme-bg-surface border-0 rounded-3xl p-6 sm:p-8 shadow-xs hover:-translate-y-2 hover:shadow-xl hover:theme-bg-elevated transition-all duration-300 flex flex-col justify-between group">
             <div className="space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 shadow-inner">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border-0 text-emerald-400 flex items-center justify-center font-black text-lg group-hover:scale-105 transition-all duration-300 shadow-2xs">
                 3
               </div>
               <h3 className="text-base sm:text-lg font-bold theme-text-primary group-hover:text-emerald-400 transition-colors">
@@ -85,7 +85,7 @@ export default function LandingHifzTracker() {
                 Track full Juz revisions (Quarter, Half, Full Para) per session. Automatically flags students needing reinforcement on past Juz.
               </p>
             </div>
-            <div className="mt-6 pt-4 border-t theme-border flex items-center gap-2 text-xs font-semibold text-emerald-400">
+            <div className="mt-6 pt-4 border-t theme-border/40 flex items-center gap-2 text-xs font-semibold text-emerald-400">
               <CheckCircleIcon className="w-4 h-4" />
               <span>Full 30-Juz Cycle Tracking</span>
             </div>

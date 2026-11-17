@@ -84,12 +84,12 @@ export default function LandingFeatures() {
             return (
               <div
                 key={i}
-                className={`theme-bg-surface border theme-border rounded-3xl p-6 sm:p-7 shadow-md hover:-translate-y-2 hover:shadow-2xl hover:border-[var(--accent-main)]/40 transition-all duration-300 flex flex-col justify-start text-left space-y-4 group ${getRevealClass(
+                className={`theme-bg-surface border-0 rounded-3xl p-6 sm:p-7 shadow-xs hover:-translate-y-2 hover:shadow-xl hover:theme-bg-elevated transition-all duration-300 flex flex-col justify-start text-left space-y-4 group ${getRevealClass(
                   isVisible,
                   `delay-${(i % 4) * 100}`
                 )}`}
               >
-                <div className="w-12 h-12 rounded-2xl theme-bg-sub flex items-center justify-center border theme-border shadow-inner text-[var(--accent-main)] group-hover:scale-110 transition-transform duration-300 shrink-0">
+                <div className="w-12 h-12 rounded-2xl theme-bg-app flex items-center justify-center border-0 shadow-inner text-[var(--accent-main)] group-hover:scale-105 transition-transform duration-300 shrink-0">
                   <Icon className="w-6 h-6" />
                 </div>
                 <div className="space-y-2">

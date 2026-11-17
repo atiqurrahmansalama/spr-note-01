@@ -17,6 +17,7 @@ import {
   CheckCircleIcon,
   AlertTriangleIcon,
   CloseIcon,
+  SpinnerIcon,
 } from "@/components/ui/Icons";
 import ActionMenu, { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { ConfirmModal } from "@/components/ui/Modal";
@@ -574,12 +575,12 @@ export default function ProgressReportsView({
               title="Sync offline reports to database"
             >
               {isSyncing ? (
-                <RefreshIcon className="w-3.5 h-3.5 shrink-0 animate-spin" />
+                <SpinnerIcon className="w-3.5 h-3.5 shrink-0" />
               ) : (
                 <CloudIcon className="w-3.5 h-3.5 shrink-0" />
               )}
               <span>
-                {isSyncing ? "Syncing..." : `Sync to DB (${pendingSyncCount})`}
+                {isSyncing ? "Syncing to DB..." : `Sync to DB (${pendingSyncCount})`}
               </span>
             </button>
           )}

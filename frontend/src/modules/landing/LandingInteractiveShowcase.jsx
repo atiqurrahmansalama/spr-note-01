@@ -85,7 +85,7 @@ export default function LandingInteractiveShowcase() {
         </div>
 
         {/* Tab Selector Buttons */}
-        <div className={`flex flex-wrap justify-center gap-2 sm:gap-2.5 p-1.5 rounded-2xl theme-bg-surface/80 border theme-border shadow-md backdrop-blur-md max-w-4xl mx-auto ${getRevealClass(isVisible, 'delay-100')}`}>
+        <div className={`flex flex-wrap justify-center gap-2 sm:gap-2.5 p-1.5 rounded-2xl theme-bg-surface/90 shadow-xs backdrop-blur-md max-w-4xl mx-auto border-0 ${getRevealClass(isVisible, 'delay-100')}`}>
           {SHOWCASE_TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -94,10 +94,10 @@ export default function LandingInteractiveShowcase() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-3.5 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+                className={`flex items-center gap-2 px-3.5 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer border-0 ${
                   isActive
-                    ? 'theme-bg-accent theme-accent-text shadow-md scale-102'
-                    : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-sub/60'
+                    ? 'theme-bg-accent theme-accent-text shadow-sm scale-102'
+                    : 'theme-text-secondary hover:theme-text-primary hover:theme-bg-elevated'
                 }`}
               >
                 <Icon className="w-4 h-4 shrink-0" />
@@ -108,7 +108,7 @@ export default function LandingInteractiveShowcase() {
         </div>
 
         {/* Interactive Showcase Preview Screen */}
-        <div className={`theme-bg-surface border theme-border rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden transition-all duration-300 ${getRevealClass(isVisible, 'delay-200')}`}>
+        <div className={`theme-bg-surface rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden transition-all duration-300 border-0 ${getRevealClass(isVisible, 'delay-200')}`}>
           {/* Top Accent Gradient Bar */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[var(--accent-main)] to-transparent opacity-75" />
 
@@ -116,7 +116,7 @@ export default function LandingInteractiveShowcase() {
           {activeTab === 'academic' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center animate-fade-in">
               <div className="lg:col-span-6 space-y-5 text-left">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent-main)] theme-bg-accent-soft px-3 py-1 rounded-full border border-[var(--accent-main)]/20">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent-main)] theme-bg-accent-soft px-3 py-1 rounded-full border-0 shadow-2xs">
                   Campus &amp; Structure Hierarchy
                 </span>
                 <h3 className="text-xl sm:text-3xl font-black theme-text-primary tracking-tight">
@@ -142,37 +142,37 @@ export default function LandingInteractiveShowcase() {
               </div>
 
               {/* Visual Mockup Card */}
-              <div className="lg:col-span-6 p-5 sm:p-6 rounded-2xl theme-bg-sub/60 border theme-border space-y-4 shadow-inner">
-                <div className="flex items-center justify-between border-b theme-border pb-3">
+              <div className="lg:col-span-6 p-5 sm:p-6 rounded-2xl theme-bg-app space-y-4 shadow-inner border-0">
+                <div className="flex items-center justify-between pb-3 border-b theme-border/40">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-xs font-bold theme-text-primary">Campus Routine Matrix</span>
+                    <span className="text-xs font-bold theme-text-primary">Darus Salam Main Campus &amp; Branches</span>
                   </div>
                   <span className="text-[10px] font-bold theme-accent theme-bg-accent-soft px-2 py-0.5 rounded-md">
-                    Academic Year 2026
+                    Session 2025-2026
                   </span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <div className="p-3 rounded-xl theme-bg-surface border theme-border">
-                    <div className="font-extrabold text-base theme-text-primary">12</div>
-                    <div className="text-[10px] theme-text-secondary mt-0.5">Departments</div>
+                  <div className="p-3 rounded-xl theme-bg-surface border-0 shadow-2xs">
+                    <div className="font-extrabold text-base theme-text-primary">14</div>
+                    <div className="text-[10px] theme-text-secondary mt-0.5">Campus Units</div>
                   </div>
-                  <div className="p-3 rounded-xl theme-bg-surface border theme-border">
-                    <div className="font-extrabold text-base theme-text-primary">48</div>
+                  <div className="p-3 rounded-xl theme-bg-surface border-0 shadow-2xs">
+                    <div className="font-extrabold text-base theme-text-primary">52</div>
                     <div className="text-[10px] theme-text-secondary mt-0.5">Classes &amp; Sections</div>
                   </div>
-                  <div className="p-3 rounded-xl theme-bg-surface border theme-border">
+                  <div className="p-3 rounded-xl theme-bg-surface border-0 shadow-2xs">
                     <div className="font-extrabold text-base text-emerald-400">100%</div>
-                    <div className="text-[10px] theme-text-secondary mt-0.5">Periods Scheduled</div>
+                    <div className="text-[10px] theme-text-secondary mt-0.5">Timetable Active</div>
                   </div>
                 </div>
-                <div className="p-3.5 rounded-xl theme-bg-surface border theme-border space-y-2">
+                <div className="p-3.5 rounded-xl theme-bg-surface border-0 shadow-2xs space-y-2">
                   <div className="flex justify-between text-xs font-semibold">
-                    <span className="theme-text-primary">Faculty &amp; Teacher Load Balance</span>
+                    <span className="theme-text-primary">Faculty Load Distribution (126 Teachers)</span>
                     <span className="theme-accent font-bold">Optimal</span>
                   </div>
-                  <div className="w-full h-2 rounded-full theme-bg-sub overflow-hidden">
-                    <div className="h-full rounded-full theme-bg-accent w-[92%]" />
+                  <div className="w-full h-2 rounded-full theme-bg-app overflow-hidden">
+                    <div className="h-full rounded-full theme-bg-accent w-[94%]" />
                   </div>
                 </div>
               </div>
@@ -183,7 +183,7 @@ export default function LandingInteractiveShowcase() {
           {activeTab === 'examinations' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center animate-fade-in">
               <div className="lg:col-span-6 space-y-5 text-left">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent-main)] theme-bg-accent-soft px-3 py-1 rounded-full border border-[var(--accent-main)]/20">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent-main)] theme-bg-accent-soft px-3 py-1 rounded-full border-0 shadow-2xs">
                   Assessment &amp; Transcript Engine
                 </span>
                 <h3 className="text-xl sm:text-3xl font-black theme-text-primary tracking-tight">
@@ -209,38 +209,48 @@ export default function LandingInteractiveShowcase() {
               </div>
 
               {/* Visual Mockup Card */}
-              <div className="lg:col-span-6 p-5 sm:p-6 rounded-2xl theme-bg-sub/60 border theme-border space-y-4 shadow-inner">
-                <div className="flex items-center justify-between border-b theme-border pb-3">
+              <div className="lg:col-span-6 p-5 sm:p-6 rounded-2xl theme-bg-app space-y-3.5 shadow-inner border-0">
+                <div className="flex items-center justify-between pb-3 border-b theme-border/40">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-main)]" />
-                    <span className="text-xs font-bold theme-text-primary">Final Examination Routine &amp; Scale</span>
+                    <div>
+                      <div className="text-xs font-bold theme-text-primary">Abdullah Ibn Omar (Roll: 101)</div>
+                      <div className="text-[10px] theme-text-secondary">Class 10 - Section A (Science)</div>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                    Synced with Master Calendar
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                    GPA: 4.80 (Mumtaz)
                   </span>
                 </div>
                 <div className="space-y-2">
-                  <div className="p-3 rounded-xl theme-bg-surface border theme-border flex items-center justify-between text-xs">
+                  <div className="p-2.5 rounded-xl theme-bg-surface border-0 shadow-2xs flex items-center justify-between text-xs">
                     <div>
-                      <div className="font-bold theme-text-primary">Higher Mathematics</div>
-                      <div className="text-[11px] theme-text-secondary">Written (70) + Practical (15) + Viva (15)</div>
+                      <div className="font-bold theme-text-primary">Quran Hifz &amp; Tajweed</div>
+                      <div className="text-[10px] theme-text-secondary">Continuous Assessment: 9.8/10 • Exam: 87/90</div>
                     </div>
-                    <span className="font-bold theme-accent">100 pts</span>
+                    <span className="font-bold text-emerald-400">97/100 (A+)</span>
                   </div>
-                  <div className="p-3 rounded-xl theme-bg-surface border theme-border flex items-center justify-between text-xs">
+                  <div className="p-2.5 rounded-xl theme-bg-surface border-0 shadow-2xs flex items-center justify-between text-xs">
                     <div>
-                      <div className="font-bold theme-text-primary">English Literature</div>
-                      <div className="text-[11px] theme-text-secondary">Written (40) + Listening (10)</div>
+                      <div className="font-bold theme-text-primary">Arabic Grammar &amp; Nahw</div>
+                      <div className="text-[10px] theme-text-secondary">Continuous Assessment: 9.5/10 • Exam: 81/90</div>
                     </div>
-                    <span className="font-bold theme-accent">50 pts</span>
+                    <span className="font-bold text-emerald-400">91/100 (A+)</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl theme-bg-surface border-0 shadow-2xs flex items-center justify-between text-xs">
+                    <div>
+                      <div className="font-bold theme-text-primary">General Mathematics</div>
+                      <div className="text-[10px] theme-text-secondary">Continuous Assessment: 9.2/10 • Exam: 85/90</div>
+                    </div>
+                    <span className="font-bold text-emerald-400">94/100 (A+)</span>
                   </div>
                 </div>
-                <div className="p-3 rounded-xl theme-bg-surface border theme-border flex items-center justify-between text-xs">
+                <div className="p-3 rounded-xl theme-bg-surface border-0 shadow-2xs flex items-center justify-between text-xs">
                   <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
                     <QrCodeIcon className="w-4 h-4" />
-                    Transcript Studio QR Embed Active
+                    Anti-Fraud Stamp: VERIFIED-DOC-2026-X89
                   </span>
-                  <span className="text-[11px] theme-text-secondary">Grade: A+ (GPA 5.00)</span>
+                  <span className="text-[11px] font-bold theme-accent">Rank: 1st</span>
                 </div>
               </div>
             </div>
@@ -250,7 +260,7 @@ export default function LandingInteractiveShowcase() {
           {activeTab === 'attendance' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center animate-fade-in">
               <div className="lg:col-span-6 space-y-5 text-left">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent-main)] theme-bg-accent-soft px-3 py-1 rounded-full border border-[var(--accent-main)]/20">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent-main)] theme-bg-accent-soft px-3 py-1 rounded-full border-0 shadow-2xs">
                   Real-time Attendance
                 </span>
                 <h3 className="text-xl sm:text-3xl font-black theme-text-primary tracking-tight">
@@ -276,33 +286,37 @@ export default function LandingInteractiveShowcase() {
               </div>
 
               {/* Visual Mockup Card */}
-              <div className="lg:col-span-6 p-5 sm:p-6 rounded-2xl theme-bg-sub/60 border theme-border space-y-4 shadow-inner">
-                <div className="flex items-center justify-between border-b theme-border pb-3">
-                  <span className="text-xs font-bold theme-text-primary">Today's Institutional Attendance</span>
-                  <span className="text-xs font-extrabold text-emerald-400">98.2% Present</span>
+              <div className="lg:col-span-6 p-5 sm:p-6 rounded-2xl theme-bg-app space-y-4 shadow-inner border-0">
+                <div className="flex items-center justify-between pb-3 border-b theme-border/40">
+                  <div>
+                    <span className="text-xs font-bold theme-text-primary">Muhammad Rayhan (Roll: 104)</span>
+                    <div className="text-[10px] theme-text-secondary">Class 9 - Section B • Monthly Register</div>
+                  </div>
+                  <span className="text-xs font-extrabold text-emerald-400">96.2% On-Time Ratio</span>
                 </div>
                 <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                  <div className="p-2.5 rounded-xl theme-bg-surface border theme-border">
-                    <div className="font-bold text-emerald-400 text-sm">842</div>
+                  <div className="p-2.5 rounded-xl theme-bg-surface border-0 shadow-2xs">
+                    <div className="font-bold text-emerald-400 text-sm">25 Days</div>
                     <div className="text-[10px] theme-text-secondary">Present</div>
                   </div>
-                  <div className="p-2.5 rounded-xl theme-bg-surface border theme-border">
-                    <div className="font-bold text-rose-400 text-sm">11</div>
-                    <div className="text-[10px] theme-text-secondary">Absent</div>
+                  <div className="p-2.5 rounded-xl theme-bg-surface border-0 shadow-2xs">
+                    <div className="font-bold text-rose-400 text-sm">0 Days</div>
+                    <div className="text-[10px] theme-text-secondary">Unexcused</div>
                   </div>
-                  <div className="p-2.5 rounded-xl theme-bg-surface border theme-border">
-                    <div className="font-bold text-amber-400 text-sm">4</div>
-                    <div className="text-[10px] theme-text-secondary">Leave</div>
+                  <div className="p-2.5 rounded-xl theme-bg-surface border-0 shadow-2xs">
+                    <div className="font-bold text-amber-400 text-sm">1 Day</div>
+                    <div className="text-[10px] theme-text-secondary">Sick Leave</div>
                   </div>
-                  <div className="p-2.5 rounded-xl theme-bg-surface border theme-border">
-                    <div className="font-bold text-sky-400 text-sm">38/38</div>
+                  <div className="p-2.5 rounded-xl theme-bg-surface border-0 shadow-2xs">
+                    <div className="font-bold text-sky-400 text-sm">126/126</div>
                     <div className="text-[10px] theme-text-secondary">Staff on Duty</div>
                   </div>
                 </div>
-                <div className="p-3.5 rounded-xl theme-bg-surface border theme-border flex items-center justify-between">
-                  <span className="text-xs font-semibold theme-text-primary">Biometric Device Hardware Sync</span>
-                  <span className="text-[10px] font-bold theme-bg-accent-soft theme-accent px-2 py-0.5 rounded-md border border-[var(--accent-main)]/20">
-                    Online &amp; Streaming
+                <div className="p-3.5 rounded-xl theme-bg-surface border-0 shadow-2xs flex items-center justify-between">
+                  <span className="text-xs font-semibold theme-text-primary">Biometric Device BIO-GATE-01</span>
+                  <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                    <CheckCircleIcon className="w-3.5 h-3.5" />
+                    <span>Punched: 08:42:15 AM</span>
                   </span>
                 </div>
               </div>
@@ -313,7 +327,7 @@ export default function LandingInteractiveShowcase() {
           {activeTab === 'hostel' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center animate-fade-in">
               <div className="lg:col-span-6 space-y-5 text-left">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent-main)] theme-bg-accent-soft px-3 py-1 rounded-full border border-[var(--accent-main)]/20">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent-main)] theme-bg-accent-soft px-3 py-1 rounded-full border-0 shadow-2xs">
                   Residential Life &amp; Boarding
                 </span>
                 <h3 className="text-xl sm:text-3xl font-black theme-text-primary tracking-tight">
@@ -339,30 +353,36 @@ export default function LandingInteractiveShowcase() {
               </div>
 
               {/* Visual Mockup Card */}
-              <div className="lg:col-span-6 p-5 sm:p-6 rounded-2xl theme-bg-sub/60 border theme-border space-y-4 shadow-inner">
-                <div className="flex items-center justify-between border-b theme-border pb-3">
-                  <span className="text-xs font-bold theme-text-primary">Hostel Campus - North Building</span>
+              <div className="lg:col-span-6 p-5 sm:p-6 rounded-2xl theme-bg-app space-y-4 shadow-inner border-0">
+                <div className="flex items-center justify-between pb-3 border-b theme-border/40">
+                  <div>
+                    <span className="text-xs font-bold theme-text-primary">Imam Bukhari Residential Hall</span>
+                    <div className="text-[10px] theme-text-secondary">Level 3 • Room 304 (Deluxe 4-Bed Dorm)</div>
+                  </div>
                   <span className="text-[10px] font-bold theme-accent theme-bg-accent-soft px-2 py-0.5 rounded-md">
-                    Capacity: 320 Beds
+                    Warden: M. Mahmudul Hasan
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5 text-xs">
-                  <div className="p-3 rounded-xl theme-bg-surface border theme-border space-y-1">
-                    <div className="text-[11px] theme-text-secondary">Occupied Beds</div>
-                    <div className="font-extrabold text-base theme-text-primary">308 / 320</div>
-                    <div className="w-full h-1.5 rounded-full theme-bg-sub">
-                      <div className="h-full rounded-full bg-emerald-500 w-[96%]" />
+                  <div className="p-3 rounded-xl theme-bg-surface border-0 shadow-2xs space-y-1">
+                    <div className="text-[11px] theme-text-secondary">Occupied Beds (Campus Wide)</div>
+                    <div className="font-extrabold text-base theme-text-primary">486 / 500</div>
+                    <div className="w-full h-1.5 rounded-full theme-bg-app">
+                      <div className="h-full rounded-full bg-emerald-500 w-[97%]" />
                     </div>
                   </div>
-                  <div className="p-3 rounded-xl theme-bg-surface border theme-border space-y-1">
-                    <div className="text-[11px] theme-text-secondary">Available Vacancies</div>
-                    <div className="font-extrabold text-base text-sky-400">12 Beds Free</div>
+                  <div className="p-3 rounded-xl theme-bg-surface border-0 shadow-2xs space-y-1">
+                    <div className="text-[11px] theme-text-secondary">Vacancies in Hall</div>
+                    <div className="font-extrabold text-base text-sky-400">14 Beds Free</div>
                     <div className="text-[10px] theme-text-secondary">Ready for Allocation</div>
                   </div>
                 </div>
-                <div className="p-3 rounded-xl theme-bg-surface border theme-border flex items-center justify-between text-xs">
-                  <span className="font-semibold theme-text-primary">Last Night Dormitory Headcount</span>
-                  <span className="font-bold text-emerald-400">100% Accounted</span>
+                <div className="p-3 rounded-xl theme-bg-surface border-0 shadow-2xs flex items-center justify-between text-xs">
+                  <span className="font-semibold theme-text-primary">Nightly Roll Call (10:15 PM)</span>
+                  <span className="font-bold text-emerald-400 flex items-center gap-1">
+                    <CheckCircleIcon className="w-3.5 h-3.5" />
+                    <span>100% Verified in Dorm</span>
+                  </span>
                 </div>
               </div>
             </div>
@@ -372,7 +392,7 @@ export default function LandingInteractiveShowcase() {
           {activeTab === 'admissions' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center animate-fade-in">
               <div className="lg:col-span-6 space-y-5 text-left">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent-main)] theme-bg-accent-soft px-3 py-1 rounded-full border border-[var(--accent-main)]/20">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent-main)] theme-bg-accent-soft px-3 py-1 rounded-full border-0 shadow-2xs">
                   Fast Onboarding &amp; Security
                 </span>
                 <h3 className="text-xl sm:text-3xl font-black theme-text-primary tracking-tight">
@@ -398,15 +418,15 @@ export default function LandingInteractiveShowcase() {
               </div>
 
               {/* Visual Mockup Card */}
-              <div className="lg:col-span-6 p-5 sm:p-6 rounded-2xl theme-bg-sub/60 border theme-border space-y-4 shadow-inner">
-                <div className="flex items-center justify-between border-b theme-border pb-3">
+              <div className="lg:col-span-6 p-5 sm:p-6 rounded-2xl theme-bg-app space-y-4 shadow-inner border-0">
+                <div className="flex items-center justify-between pb-3 border-b theme-border/40">
                   <span className="text-xs font-bold theme-text-primary">Role Invite Token &amp; QR Card</span>
-                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
                     Encrypted Token
                   </span>
                 </div>
-                <div className="p-4 rounded-xl theme-bg-surface border theme-border flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl theme-bg-sub border theme-border flex items-center justify-center text-[var(--accent-main)] shrink-0 shadow-inner">
+                <div className="p-4 rounded-xl theme-bg-surface border-0 shadow-2xs flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-xl theme-bg-app border-0 flex items-center justify-center text-[var(--accent-main)] shrink-0 shadow-inner">
                     <QrCodeIcon className="w-9 h-9" />
                   </div>
                   <div className="space-y-1 text-xs">
@@ -415,9 +435,9 @@ export default function LandingInteractiveShowcase() {
                     <div className="text-[10px] font-bold text-emerald-400">Scan to Claim Permissions &rarr;</div>
                   </div>
                 </div>
-                <div className="p-3 rounded-xl theme-bg-surface border theme-border flex items-center justify-between text-xs">
-                  <span className="theme-text-primary font-medium">Automatic Student ID / Roll Generator</span>
-                  <span className="font-bold theme-accent">Active (Batch 2026)</span>
+                <div className="p-3 rounded-xl theme-bg-surface border-0 shadow-2xs flex items-center justify-between text-xs">
+                  <span className="theme-text-primary font-medium">Automatic Student ID Format</span>
+                  <span className="font-bold theme-accent">STD-2026-0412</span>
                 </div>
               </div>
             </div>
@@ -427,7 +447,7 @@ export default function LandingInteractiveShowcase() {
           {activeTab === 'specialized' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center animate-fade-in">
               <div className="lg:col-span-6 space-y-5 text-left">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent-main)] theme-bg-accent-soft px-3 py-1 rounded-full border border-[var(--accent-main)]/20">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--accent-main)] theme-bg-accent-soft px-3 py-1 rounded-full border-0 shadow-2xs">
                   Specialized Islamic Track
                 </span>
                 <h3 className="text-xl sm:text-3xl font-black theme-text-primary tracking-tight">
@@ -453,33 +473,36 @@ export default function LandingInteractiveShowcase() {
               </div>
 
               {/* Visual Mockup Card */}
-              <div className="lg:col-span-6 p-5 sm:p-6 rounded-2xl theme-bg-sub/60 border theme-border space-y-4 shadow-inner">
-                <div className="flex items-center justify-between border-b theme-border pb-3">
-                  <span className="text-xs font-bold theme-text-primary">30-Juz Recitation Progress Matrix</span>
+              <div className="lg:col-span-6 p-5 sm:p-6 rounded-2xl theme-bg-app space-y-4 shadow-inner border-0">
+                <div className="flex items-center justify-between pb-3 border-b theme-border/40">
+                  <div>
+                    <span className="text-xs font-bold theme-text-primary">Zubair Ahmad (Hifz Group A)</span>
+                    <div className="text-[10px] theme-text-secondary">Ustad: Qari Abdul Latif • Morning Session</div>
+                  </div>
                   <span className="text-[10px] font-bold theme-accent theme-bg-accent-soft px-2 py-0.5 rounded-md">
-                    Juz 14 Completed
+                    Juz 14 Active
                   </span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <div className="p-3 rounded-xl theme-bg-surface border theme-border">
-                    <div className="text-[10px] text-sky-400 font-bold">Sabaq</div>
-                    <div className="font-extrabold text-sm theme-text-primary mt-1">Surah Al-Hijr</div>
-                    <div className="text-[10px] theme-text-secondary">v. 1-25 (p. 262)</div>
+                  <div className="p-3 rounded-xl theme-bg-surface border-0 shadow-2xs">
+                    <div className="text-[10px] text-sky-400 font-bold">Sabaq (New)</div>
+                    <div className="font-extrabold text-sm theme-text-primary mt-1">Al-Imran 102-110</div>
+                    <div className="text-[10px] theme-text-secondary">p. 63 (0 Mistakes)</div>
                   </div>
-                  <div className="p-3 rounded-xl theme-bg-surface border theme-border">
-                    <div className="text-[10px] text-indigo-400 font-bold">Sabqi</div>
-                    <div className="font-extrabold text-sm theme-text-primary mt-1">Last 5 Pages</div>
+                  <div className="p-3 rounded-xl theme-bg-surface border-0 shadow-2xs">
+                    <div className="text-[10px] text-indigo-400 font-bold">Sabqi (Recent)</div>
+                    <div className="font-extrabold text-sm theme-text-primary mt-1">Juz 3 (p. 55-62)</div>
                     <div className="text-[10px] text-emerald-400 font-semibold">0 Hesitations</div>
                   </div>
-                  <div className="p-3 rounded-xl theme-bg-surface border theme-border">
-                    <div className="text-[10px] text-emerald-400 font-bold">Amokhta</div>
-                    <div className="font-extrabold text-sm theme-text-primary mt-1">Juz 12 (Full)</div>
+                  <div className="p-3 rounded-xl theme-bg-surface border-0 shadow-2xs">
+                    <div className="text-[10px] text-emerald-400 font-bold">Amokhta (Revision)</div>
+                    <div className="font-extrabold text-sm theme-text-primary mt-1">Juz 1 &amp; 2 (Full)</div>
                     <div className="text-[10px] theme-text-secondary">Grade: Mumtaz</div>
                   </div>
                 </div>
-                <div className="p-3 rounded-xl theme-bg-surface border theme-border flex items-center justify-between text-xs">
-                  <span className="font-semibold theme-text-primary">Hifz Report Slip Generator</span>
-                  <span className="font-bold theme-accent">Ready to Print &rarr;</span>
+                <div className="p-3 rounded-xl theme-bg-surface border-0 shadow-2xs flex items-center justify-between text-xs">
+                  <span className="font-semibold theme-text-primary">Official Progress Slip Generator</span>
+                  <span className="font-bold theme-accent">Ready for Guardian SMS &rarr;</span>
                 </div>
               </div>
             </div>

@@ -36,9 +36,9 @@ export default function LandingCampusHostel() {
         {/* 2 Feature Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Card 1: Multi-Campus & Faculty Hierarchy */}
-          <div className={`p-6 sm:p-8 rounded-3xl theme-bg-surface border theme-border shadow-xl hover:border-[var(--accent-main)]/40 hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between group ${getRevealClass(isVisible, 'delay-100')}`}>
+          <div className={`p-6 sm:p-8 rounded-3xl theme-bg-surface shadow-xs border-0 hover:theme-bg-elevated hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between group ${getRevealClass(isVisible, 'delay-100')}`}>
             <div className="space-y-5">
-              <div className="w-12 h-12 rounded-2xl theme-bg-accent-soft theme-accent flex items-center justify-center border theme-border shadow-md group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-2xl theme-bg-accent-soft theme-accent flex items-center justify-center border-0 shadow-sm group-hover:scale-105 transition-transform">
                 <BuildingOfficeIcon className="w-6 h-6" />
               </div>
               <div className="space-y-2">
@@ -49,7 +49,7 @@ export default function LandingCampusHostel() {
                   Structure your institution across multiple geographic campuses and branches. Configure academic years, faculties, departments, and class sections with autonomous permission boundaries.
                 </p>
               </div>
-              <div className="space-y-2.5 pt-2 border-t theme-border text-xs theme-text-primary font-medium">
+              <div className="space-y-2.5 pt-2 border-t theme-border/40 text-xs theme-text-primary font-medium">
                 <div className="flex items-center gap-2">
                   <CheckCircleIcon className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>Centralized HQ Administration with Branch-level Permissions</span>
@@ -64,16 +64,16 @@ export default function LandingCampusHostel() {
                 </div>
               </div>
             </div>
-            <div className="mt-6 pt-4 border-t theme-border flex items-center justify-between text-[11px] font-bold text-[var(--accent-main)]">
+            <div className="mt-6 pt-4 border-t theme-border/40 flex items-center justify-between text-[11px] font-bold text-[var(--accent-main)]">
               <span>Campus Management Module</span>
               <span>Enterprise Scale &rarr;</span>
             </div>
           </div>
 
           {/* Card 2: Hostel & Residential Boarding */}
-          <div className={`p-6 sm:p-8 rounded-3xl theme-bg-surface border theme-border shadow-xl hover:border-emerald-500/40 hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between group ${getRevealClass(isVisible, 'delay-200')}`}>
+          <div className={`p-6 sm:p-8 rounded-3xl theme-bg-surface shadow-xs border-0 hover:theme-bg-elevated hover:-translate-y-1.5 transition-all duration-300 flex flex-col justify-between group ${getRevealClass(isVisible, 'delay-200')}`}>
             <div className="space-y-5">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20 shadow-md group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border-0 shadow-sm group-hover:scale-105 transition-transform">
                 <GridIcon className="w-6 h-6" />
               </div>
               <div className="space-y-2">
@@ -84,7 +84,7 @@ export default function LandingCampusHostel() {
                   Complete oversight of student residential accommodations. Track residential building capacities, room allocations, individual bed assignments, and nocturnal roll calls for total student safety.
                 </p>
               </div>
-              <div className="space-y-2.5 pt-2 border-t theme-border text-xs theme-text-primary font-medium">
+              <div className="space-y-2.5 pt-2 border-t theme-border/40 text-xs theme-text-primary font-medium">
                 <div className="flex items-center gap-2">
                   <CheckCircleIcon className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>Building &rarr; Floor &rarr; Room &rarr; Bed Allocation Hierarchy</span>
@@ -99,7 +99,7 @@ export default function LandingCampusHostel() {
                 </div>
               </div>
             </div>
-            <div className="mt-6 pt-4 border-t theme-border flex items-center justify-between text-[11px] font-bold text-emerald-400">
+            <div className="mt-6 pt-4 border-t theme-border/40 flex items-center justify-between text-[11px] font-bold text-emerald-400">
               <span>Residential Module</span>
               <span>100% Boarding Safety &rarr;</span>
             </div>
