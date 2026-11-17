@@ -34,6 +34,9 @@ export const ur = {
     enabled: 'فعال اور آن',
     disabled: 'غیر فعال / بند',
     activeRate: 'فعالیت کی شرح',
+    coreModules: 'بنیادی ماڈیولز',
+    subFeatures: 'ذیلی خصوصیات',
+    overallDeployment: 'مجموعی تعیناتی کی پیش رفت',
     liveSynced: 'ہم آہنگ اور لائیو',
     unsavedChanges: 'اس اسکوپ میں {{count}} غیر محفوظ شدہ تبدیلیاں',
   },
@@ -82,6 +85,7 @@ export const ur = {
 
   badges: {
     parentModule: 'پیرنٹ ماڈیول',
+    subModule: 'ذیلی ماڈیول',
     unsaved: 'غیر محفوظ شدہ',
     disabledByParent: 'پیرنٹ کے ذریعے غیر فعال',
     disabledByParentClickToEnable: 'پیرنٹ کے ذریعے غیر فعال (پیرنٹ کے ساتھ فعال کرنے کے لیے کلک کریں)',

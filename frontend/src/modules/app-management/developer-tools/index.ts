@@ -1,8 +1,6 @@
-export { default as DeveloperToolsHubView } from "./DeveloperToolsHubView";
-export * from "./DeveloperToolsHubView";
-export * from "./developerToolsSections";
-export * from "./DeveloperToolsContentRenderer";
-export { SystemEnvironmentPanel } from "./SystemEnvironmentPanel";
-export { EmailTemplatesPreviewPanel } from "./EmailTemplatesPreviewPanel";
-export * from "./types";
-export { default } from "./DeveloperToolsHubView";
+/**
+ * Backward compatibility barrel for legacy developer-tools imports.
+ * Redirects to the modern canonical path: @/modules/settings/institution-settings
+ */
+export * from "@/modules/settings/institution-settings";
+export { default } from "@/modules/settings/institution-settings";

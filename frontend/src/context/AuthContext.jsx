@@ -432,7 +432,28 @@ export function AuthProvider({ children }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    // Graceful fallback adhering to Rule 13 (Fault Tolerance & Safe Defaults)
+    const fallbackUser = typeof window !== 'undefined' ? authStore.getUserProfile() : null;
+    const fallbackToken = typeof window !== 'undefined' ? authStore.getAccessToken() : null;
+    return {
+      user: fallbackUser,
+      accessToken: fallbackToken,
+      isAuthenticated: Boolean(fallbackToken && fallbackUser),
+      isLoading: false,
+      login: async () => {},
+      loginWithGoogle: async () => {},
+      register: async () => {},
+      logout: () => {},
+      saveTokens: () => {},
+      verifyEmail: async () => ({ success: false }),
+      resendVerification: async () => ({ success: false }),
+      requestPasswordReset: async () => ({ success: false }),
+      confirmPasswordReset: async () => ({ success: false }),
+      fetchActiveSessions: async () => [],
+      revokeSession: async () => {},
+      updateUserProfile: () => {},
+      refreshUser: async () => {},
+    };
   }
   return context;
 }

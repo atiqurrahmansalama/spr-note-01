@@ -14,6 +14,7 @@ import {
 import { useSectionTranslation } from './hooks/useSectionTranslation';
 import { useSectionControl } from './hooks/useSectionControl';
 import { ScopeType } from './types';
+import { useFeatureControl } from '../../../context/FeatureControlContext';
 import {
   SectionTargetBar,
   SectionCategoryGroup,
@@ -86,35 +87,49 @@ export const SectionControlView: React.FC = () => {
     return result;
   }, [auditLogs, auditScopeFilter, auditSearchQuery]);
 
-  // Tab definitions for TabSwitcher
-  const tabs = [
-    {
-      id: 'global',
-      label: t('tabs.global', 'Global Defaults'),
-      icon: GlobeIcon,
-    },
-    {
-      id: 'role',
-      label: t('tabs.role', 'Role Scopes'),
-      icon: UsersIcon,
-    },
-    {
-      id: 'academy',
-      label: t('tabs.academy', 'Academy Overrides'),
-      icon: BuildingLibraryIcon,
-    },
-    {
-      id: 'user',
-      label: t('tabs.user', 'User Overrides'),
-      icon: StudentIcon,
-    },
-    {
-      id: 'audit',
-      label: t('tabs.audit', 'Audit Trail'),
-      icon: TimerIcon,
-      badge: auditLogs.length > 0 ? formatNumber(auditLogs.length) : undefined,
-    },
-  ];
+  const { isSectionEnabled } = useFeatureControl();
+
+  // Tab definitions for TabSwitcher (controlled via feature flags per tab)
+  const allTabs = useMemo(
+    () => [
+      {
+        id: 'global',
+        label: t('tabs.global', 'Global Defaults'),
+        icon: GlobeIcon,
+        sectionKey: 'section_control_tab_global',
+      },
+      {
+        id: 'role',
+        label: t('tabs.role', 'Role Scopes'),
+        icon: UsersIcon,
+        sectionKey: 'section_control_tab_role',
+      },
+      {
+        id: 'academy',
+        label: t('tabs.academy', 'Academy Overrides'),
+        icon: BuildingLibraryIcon,
+        sectionKey: 'section_control_tab_academy',
+      },
+      {
+        id: 'user',
+        label: t('tabs.user', 'User Overrides'),
+        icon: StudentIcon,
+        sectionKey: 'section_control_tab_user',
+      },
+      {
+        id: 'audit',
+        label: t('tabs.audit', 'Audit Trail'),
+        icon: TimerIcon,
+        badge: auditLogs.length > 0 ? formatNumber(auditLogs.length) : undefined,
+        sectionKey: 'section_control_tab_audit',
+      },
+    ],
+    [t, auditLogs.length, formatNumber]
+  );
+
+  const tabs = useMemo(() => {
+    return allTabs.filter((tab) => !tab.sectionKey || isSectionEnabled(tab.sectionKey));
+  }, [allTabs, isSectionEnabled]);
 
   // Check if any sections match active search filter
   const hasMatchingSections = useMemo(() => {
@@ -204,6 +219,8 @@ export const SectionControlView: React.FC = () => {
         disabledSectionsCount={featureStats.disabled}
         activePercentage={featureStats.percentage}
         modifiedCount={modifiedCount}
+        categories={categories}
+        modifiedFlags={modifiedFlags}
       />
 
       {/* 3. Main Content Viewport */}

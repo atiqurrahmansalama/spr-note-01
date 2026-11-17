@@ -6,6 +6,7 @@ export * from './hooks';
 export * from './utils';
 export * from './lesson-management';
 export * from './progress-management';
+export * from './settings';
 
 export type { StudentProfileOption } from './components';
 

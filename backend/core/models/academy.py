@@ -312,7 +312,12 @@ class StudentGroup(models.Model):
 
 
 class Session(models.Model):
+    CATEGORY_CHOICES = (
+        ('QURAN', 'Quran'),
+        ('BOOK', 'Book'),
+    )
     name = models.CharField(max_length=100, unique=True)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='QURAN', blank=True)
     created_by = models.ForeignKey(
         'User',
         on_delete=models.CASCADE,
@@ -323,7 +328,7 @@ class Session(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.category})"
 
 
 class AcademicCalendarEvent(models.Model):

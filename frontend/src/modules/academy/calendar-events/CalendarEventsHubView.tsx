@@ -364,8 +364,9 @@ export default function CalendarEventsHubView() {
                   icon={PlusIcon}
                   onClick={handleOpenAddDrawer}
                   title={t('addSchedule', 'Add Schedule')}
+                  className="w-full @[640px]:w-auto justify-center shrink-0"
                 >
-                  <span className="hidden sm:inline">
+                  <span>
                     {t('addSchedule', 'Add Schedule')}
                   </span>
                 </CustomButton>
@@ -377,8 +378,9 @@ export default function CalendarEventsHubView() {
                   icon={PlusIcon}
                   onClick={handleOpenAddDrawer}
                   title={t('addEvent', 'Add Event')}
+                  className="w-full @[640px]:w-auto justify-center shrink-0"
                 >
-                  <span className="hidden sm:inline">
+                  <span>
                     {t('addEvent', 'Add Event')}
                   </span>
                 </CustomButton>
@@ -388,7 +390,7 @@ export default function CalendarEventsHubView() {
         </div>
 
         {/* ─── 3. Reusable Master Calendar Engine or Dedicated My Tasks View ─── */}
-        <div className={`w-full min-w-0 ${activeTab === 'MY_TASKS' ? 'flex-1 flex flex-col min-h-[calc(100vh-220px)]' : 'min-h-[640px] pb-16 sm:pb-24'}`}>
+        <div className={`w-full min-w-0 ${activeTab === 'MY_TASKS' ? 'flex-1 flex flex-col min-h-[calc(100vh-220px)]' : 'min-h-0 pb-16 sm:pb-24'}`}>
           {activeTab === 'MY_TASKS' ? (
             <MyTasksHubView onOpenTaskDrawer={handleOpenUserTaskDrawer} />
           ) : (

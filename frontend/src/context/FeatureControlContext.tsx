@@ -114,9 +114,6 @@ export const HARD_DEFAULTS: Record<string, boolean> = {
   staff_daily_attendance: true,
   staff_onboarding: true,
 
-  // 7. Print Studio
-  nav_print_studio: true,
-
   // 8. Finance & Accounts
   nav_finance: true,
   finance_dashboard: true,
@@ -124,11 +121,6 @@ export const HARD_DEFAULTS: Record<string, boolean> = {
   finance_staff_payroll: true,
   finance_general_ledger: true,
   finance_reports: true,
-
-  // 9. Institution Settings
-  nav_institution_settings: true,
-  admin_tools: true,
-  attendance_policies_slots: true,
 
   // 10. App Management
   nav_app_management: true,
@@ -138,26 +130,36 @@ export const HARD_DEFAULTS: Record<string, boolean> = {
   app_communications: true,
   app_bug_reporting: true,
   app_section_control: true,
+  section_control_tab_global: true,
+  section_control_tab_role: true,
+  section_control_tab_academy: true,
+  section_control_tab_user: true,
+  section_control_tab_audit: true,
   app_user_management: true,
   app_role_management: true,
   app_activity_analytics: true,
   notification_management: true,
+  settings_backup: true,
 
-  // 11. Settings
+  // 11. Settings (mirrors sidebar)
   nav_settings: true,
   settings_profile: true,
-  settings_security: true,
+  admin_tools: true,
   settings_personalize: true,
   personalize_tab_appearance: true,
   personalize_tab_datetime: true,
   personalize_tab_language: true,
-  settings_backup: true,
   version_control: true,
 
-  // 11. System & Standalone
+  // 12. System & Standalone
+  nav_print_studio: true,
   nav_shortcuts: true,
   nav_app_guide: true,
   nav_about: true,
+  nav_official_website: true,
+  system_multilingual_translation: true,
+  system_notifications: true,
+  system_theme_switcher: true,
 };
 
 const getCachedConfig = (userId: string | number | null): Record<string, boolean> => {

@@ -15,6 +15,7 @@ import NotificationBellDropdown from "./NotificationBellDropdown";
 import { useTheme } from "../../context/useTheme";
 import { useTenant } from "../../context/TenantContext";
 import { useToast } from "../../context/ToastContext";
+import { useFeatureControl } from "../../context/FeatureControlContext";
 import { getBranchDisplayName } from "../../utils/localStore";
 import { UpdateBadge } from "../../modules/version-control/components/UpdateBadge";
 
@@ -57,6 +58,7 @@ export default function AppHeader({
     isMultiTenantAdmin,
   } = useTenant();
   const { showToast } = useToast();
+  const { isFeatureEnabled } = useFeatureControl();
 
   const handleSelectInstitution = (inst: any) => {
     const targetId = String(inst.id);
@@ -234,41 +236,47 @@ export default function AppHeader({
         <SaveStatusBadge />
 
         {/* 3-State Theme Toggle Button: Light -> Dark -> System */}
-        <IconButton
-          icon={
-            themeContext.modeId === "light"
-              ? SunIcon
-              : themeContext.modeId === "dark"
-              ? MoonIcon
-              : SystemModeIcon
-          }
-          size="sm"
-          variant="ghost"
-          onClick={() => {
-            if (themeContext.cycleMode) {
-              themeContext.cycleMode();
-            } else {
-              themeContext.setModeId((prev: string) =>
-                prev === "light" ? "dark" : prev === "dark" ? "system" : "light"
-              );
+        {isFeatureEnabled("system_theme_switcher") && (
+          <IconButton
+            icon={
+              themeContext.modeId === "light"
+                ? SunIcon
+                : themeContext.modeId === "dark"
+                ? MoonIcon
+                : SystemModeIcon
             }
-          }}
-          title={
-            themeContext.modeId === "light"
-              ? "Theme: Light (Click for Dark Mode)"
-              : themeContext.modeId === "dark"
-              ? "Theme: Dark (Click for System Theme)"
-              : `Theme: System (${themeContext.effectiveMode === "dark" ? "Dark" : "Light"} active - Click for Light Mode)`
-          }
-          ariaLabel="Toggle Theme Mode (Light / Dark / System)"
-          className="theme-accent"
-        />
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              if (themeContext.cycleMode) {
+                themeContext.cycleMode();
+              } else {
+                themeContext.setModeId((prev: string) =>
+                  prev === "light" ? "dark" : prev === "dark" ? "system" : "light"
+                );
+              }
+            }}
+            title={
+              themeContext.modeId === "light"
+                ? "Theme: Light (Click for Dark Mode)"
+                : themeContext.modeId === "dark"
+                ? "Theme: Dark (Click for System Theme)"
+                : `Theme: System (${themeContext.effectiveMode === "dark" ? "Dark" : "Light"} active - Click for Light Mode)`
+            }
+            ariaLabel="Toggle Theme Mode (Light / Dark / System)"
+            className="theme-accent"
+          />
+        )}
 
         {/* Multi-Language & RTL Switcher */}
-        <LanguageSelector />
+        {isFeatureEnabled("system_multilingual_translation") && (
+          <LanguageSelector />
+        )}
 
         {/* Real-time In-App Notification Bell */}
-        <NotificationBellDropdown />
+        {isFeatureEnabled("system_notifications") && (
+          <NotificationBellDropdown />
+        )}
 
         {/* User Profile Avatar Link */}
         <button 

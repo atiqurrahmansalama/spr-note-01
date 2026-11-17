@@ -30,7 +30,7 @@ export const SectionToggleCard: React.FC<SectionToggleCardProps> = ({
   isExpanded = false,
   onToggleExpand,
 }) => {
-  const { t } = useSectionTranslation();
+  const { t, formatNumber } = useSectionTranslation();
 
   const isInteractive = isChild ? parentActive : true;
   const isEffectivelyEnabled = isChild ? parentActive && isEnabled : isEnabled;
@@ -132,6 +132,15 @@ export const SectionToggleCard: React.FC<SectionToggleCardProps> = ({
           <span className="font-semibold text-xs sm:text-[13px] theme-text-primary truncate">
             {section.title}
           </span>
+
+          {hasChildren && childrenCount > 0 && (
+            <span
+              className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full theme-bg-sub theme-text-secondary shrink-0 select-none border-0 shadow-2xs"
+              title={t('badges.subModulesCount', '{{count}} sub-modules', { count: formatNumber(childrenCount) })}
+            >
+              {formatNumber(childrenCount)} {childrenCount === 1 ? t('badges.subModule', 'Sub-module') : t('badges.subModules', 'Sub-modules')}
+            </span>
+          )}
 
           {hasLocalMod && (
             <span

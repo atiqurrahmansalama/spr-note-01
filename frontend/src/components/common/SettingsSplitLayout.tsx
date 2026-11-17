@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import PageHeader from "../ui/PageHeader";
-import { ChevronRightIcon } from "../ui/Icons";
+import { ChevronRightIcon, ArrowLeftIcon } from "../ui/Icons";
 import CustomInput from "../ui/CustomInput";
 
 export interface SettingsSectionItem {
@@ -252,8 +252,23 @@ export const SettingsSplitLayout: React.FC<SettingsSplitLayoutProps> = ({
               {renderNavigationGroups(true)}
             </div>
           ) : (
-            /* State B: Full Width Detail View */
-            <div className="w-full min-w-0 animate-fade-in">
+            /* State B: Full Width Detail View (< 740px / Mobile) */
+            <div className="w-full min-w-0 animate-fade-in space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCompactDetailLocal(false);
+                  if (onBackToMenu) {
+                    onBackToMenu();
+                  } else if (onSectionChange) {
+                    onSectionChange(null);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold theme-bg-surface theme-text-primary hover:theme-bg-elevated transition shadow-2xs cursor-pointer border-0 select-none"
+              >
+                <ArrowLeftIcon className="w-3.5 h-3.5 theme-accent" />
+                <span>Back to Settings</span>
+              </button>
               {children}
             </div>
           )}

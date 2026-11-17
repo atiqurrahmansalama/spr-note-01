@@ -22,8 +22,11 @@ import {
   ClassAdmissionRequirementsPanel,
 } from "../../student-management/admission/AdmissionTaxonomyPanels";
 import GradingRulesView from "../../examinations/grading-rules/GradingRulesView";
-import SessionManager from "../../student-management/sessions/SessionManager";
-import ClassroomConfigurationView from "../../learning/daily-classroom/components/ClassroomConfigurationView";
+import {
+  SessionManager,
+  ClassroomReportFormatView,
+  ClassroomTimezoneConfigView,
+} from "../../learning/daily-classroom";
 import TrashRestorationView from "../../admin/TrashRestorationView";
 import { SystemEnvironmentPanel } from "./SystemEnvironmentPanel";
 import { EmailTemplatesPreviewPanel } from "./EmailTemplatesPreviewPanel";
@@ -194,26 +197,32 @@ export const DeveloperToolsContentRenderer: React.FC<DeveloperToolsContentRender
         </div>
       )}
 
-      {/* Section 4: Daily Session Progress Topics */}
-      {currentRenderSection === "report-sessions" && (
-        <div className="space-y-4 animate-fade-in">
-          <div className="p-4 sm:p-5 rounded-2xl border theme-border theme-bg-surface shadow-xs space-y-1">
-            <h3 className="text-sm sm:text-base font-bold theme-text-primary flex items-center gap-2">
-              <SessionsIcon className="w-4 h-4 theme-accent" />
-              <span>Daily Classroom Sessions &amp; Progress Topics</span>
-            </h3>
-            <p className="text-xs theme-text-secondary">
-              Configure classroom tracking session tags (Sabaq, Saat Sabaq, Amukta, Nazira, Revision, Quran Tracker).
-            </p>
-          </div>
+      {/* Section 4: Daily Progress Study Sessions */}
+      {(currentRenderSection === "report-sessions" ||
+        currentRenderSection === "study-sessions" ||
+        currentRenderSection === "daily-study-sessions" ||
+        currentRenderSection === "sessions") && (
+        <div className="w-full animate-fade-in">
           <SessionManager />
         </div>
       )}
 
-      {/* Section 4.5: Classroom Configuration & Defaults */}
-      {(currentRenderSection === "classroom-config" || currentRenderSection === "report-settings") && (
+      {/* Section 4.1: Daily Progress Report Settings (Merged) */}
+      {(currentRenderSection === "classroom-report-format" ||
+        currentRenderSection === "classroom-config" ||
+        currentRenderSection === "classroom-teacher-tag" ||
+        currentRenderSection === "classroom-date-format" ||
+        currentRenderSection === "report-settings") && (
         <div className="w-full animate-fade-in">
-          <ClassroomConfigurationView />
+          <ClassroomReportFormatView />
+        </div>
+      )}
+
+      {/* Section 4.2: Classroom Date Timezone */}
+      {(currentRenderSection === "classroom-date-timezone" ||
+        currentRenderSection === "classroom-timezone") && (
+        <div className="w-full animate-fade-in">
+          <ClassroomTimezoneConfigView />
         </div>
       )}
 

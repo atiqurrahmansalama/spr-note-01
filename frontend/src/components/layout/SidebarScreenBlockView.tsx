@@ -14,6 +14,7 @@ export interface SidebarScreenBlockViewProps {
   title?: React.ReactNode;
   category?: string;
   subCategory?: string;
+  breadcrumbs?: (string | React.ReactNode)[];
   onClose?: () => void;
   onBack?: () => void;
   children?: React.ReactNode;
@@ -31,6 +32,7 @@ export default function SidebarScreenBlockView({
   title, 
   category = "Navigation",
   subCategory,
+  breadcrumbs,
   onClose, 
   onBack,
   children, 
@@ -74,15 +76,28 @@ export default function SidebarScreenBlockView({
 
           {/* Module Category & View Title Breadcrumbs */}
           <div className="flex items-center gap-1.5 min-w-0 truncate">
-            {category && (
-              <span className="hidden sm:inline-block text-[10px] @sm:text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0">
-                {category} /
-              </span>
-            )}
-            {subCategory && (
-              <span className="hidden sm:inline-block text-[10px] @sm:text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0">
-                {subCategory} /
-              </span>
+            {Array.isArray(breadcrumbs) && breadcrumbs.length > 0 ? (
+              breadcrumbs.map((crumb, idx) => (
+                <span
+                  key={idx}
+                  className="hidden sm:inline-block text-[10px] @sm:text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0"
+                >
+                  {crumb} /
+                </span>
+              ))
+            ) : (
+              <>
+                {category && category.trim() !== '' && category.toLowerCase() !== String(title || '').toLowerCase() && (
+                  <span className="hidden sm:inline-block text-[10px] @sm:text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0">
+                    {category} /
+                  </span>
+                )}
+                {subCategory && (
+                  <span className="hidden sm:inline-block text-[10px] @sm:text-[11px] font-mono uppercase tracking-wider theme-text-secondary shrink-0">
+                    {subCategory} /
+                  </span>
+                )}
+              </>
             )}
             <span className="text-xs @sm:text-sm font-bold theme-text-primary truncate">
               {title}

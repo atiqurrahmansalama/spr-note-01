@@ -133,7 +133,6 @@ def sync_feature_registry_to_db():
         "EXAMINATIONS": "Examination & Results",
         "STUDENTS": "Student",
         "STAFF": "Staff Management",
-        "PRINT": "Print Studio",
         "FINANCE": "Finance & Accounts",
         "ADMIN": "App Management",
         "SETTINGS": "Settings",

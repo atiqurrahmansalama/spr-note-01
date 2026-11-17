@@ -1211,10 +1211,7 @@ export default function MasterTimeCalendar({
                     className="relative w-full border-0"
                   >
                     {/* Background 7-Day Columns Grid */}
-                    <div
-                      className="grid grid-cols-7 gap-1 sm:gap-1.5 w-full min-h-0"
-                      style={{ "--week-min-h": `${weekRowMinHeight}px` } as React.CSSProperties}
-                    >
+                    <div className="grid grid-cols-7 gap-1 sm:gap-1.5 w-full min-h-0">
                       {weekDays.map((cell) => {
                         const dayEvents = getEventsForDate(cell.dateStr, cell.weekday);
                         const cellTasks = showPersonalTasks ? getTasksForDate(cell.dateStr) : [];
@@ -1237,7 +1234,7 @@ export default function MasterTimeCalendar({
                                 handleOpenAddDrawer(cell.dateStr);
                               }
                             }}
-                            className={`border-0 aspect-square min-h-0 @[640px]:min-h-[var(--week-min-h,0px)] w-full p-1 @sm:p-1.5 @xl:p-2 flex flex-col justify-between transition-colors cursor-pointer group select-none rounded-xl sm:rounded-2xl ${
+                            className={`border-0 aspect-square w-full p-1 @sm:p-1.5 @xl:p-2 flex flex-col justify-between transition-colors cursor-pointer group select-none rounded-xl sm:rounded-2xl ${
                               isToday
                                 ? "bg-[var(--accent-main)]/12 dark:bg-[var(--accent-main)]/18 hover:bg-[var(--accent-main)]/22"
                                 : cell.isCurrentMonth
@@ -1313,8 +1310,8 @@ export default function MasterTimeCalendar({
                               </div>
                             )}
 
-                            {/* Wide Container (>=640px): Vertical spacer so cell holds proper height for event bars without collision */}
-                            <div className="hidden @[640px]:block flex-1 min-h-[36px] pointer-events-none" />
+                            {/* Wide Container (>=640px): Vertical spacer without forcing min-height over aspect-square */}
+                            <div className="hidden @[640px]:block flex-1 min-h-0 pointer-events-none" />
                           </div>
                         );
                       })}

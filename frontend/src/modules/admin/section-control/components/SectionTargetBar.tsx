@@ -1,12 +1,13 @@
 import React, { useMemo } from 'react';
 import CustomButton from '../../../../components/ui/CustomButton';
+import CustomInput from '../../../../components/ui/CustomInput';
 import CustomSelect from '../../../../components/ui/CustomSelect';
 import FilterBox, { FilterBoxScopeItem } from '../../../../components/ui/FilterBox';
 import IconButton from '../../../../components/ui/IconButton';
 import { RefreshIcon } from '../../../../components/ui/Icons';
 import { useHorizontalScroll } from '../../../../hooks';
 import { useSectionTranslation } from '../hooks/useSectionTranslation';
-import { ScopeType, RoleOption, UserSearchResult, AcademyOption } from '../types';
+import { ScopeType, RoleOption, UserSearchResult, AcademyOption, SectionCategory } from '../types';
 import SectionSearchInput from './SectionSearchInput';
 import SectionStatsMetaCard from './SectionStatsMetaCard';
 
@@ -39,6 +40,8 @@ export interface SectionTargetBarProps {
   disabledSectionsCount?: number;
   activePercentage?: number;
   modifiedCount?: number;
+  categories?: SectionCategory[];
+  modifiedFlags?: Record<string, boolean>;
 }
 
 export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
@@ -68,9 +71,35 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
   disabledSectionsCount = 0,
   activePercentage = 0,
   modifiedCount = 0,
+  categories = [],
+  modifiedFlags = {},
 }) => {
   const { t, formatNumber } = useSectionTranslation();
   const rolesScrollRef = useHorizontalScroll();
+
+  const currentAcademy = useMemo(
+    () => dbAcademies.find((a) => String(a.id) === String(selectedAcademy)),
+    [dbAcademies, selectedAcademy]
+  );
+  const activeAcademyName = currentAcademy?.name;
+
+  const currentRole = useMemo(
+    () => dbRoles.find((r) => r.code === selectedRole),
+    [dbRoles, selectedRole]
+  );
+  const activeRoleName = currentRole?.name || currentRole?.label;
+
+  const currentAcademyUser = useMemo(
+    () => filteredAcademyUsers.find((u) => String(u.id) === String(selectedAcademyUser)),
+    [filteredAcademyUsers, selectedAcademyUser]
+  );
+  const activeAcademyUserName = currentAcademyUser?.name || currentAcademyUser?.first_name;
+
+  const currentUser = useMemo(
+    () => dbUsers.find((u) => String(u.id) === String(selectedUser)),
+    [dbUsers, selectedUser]
+  );
+  const activeUserName = currentUser?.name || currentUser?.first_name;
 
   const roleList: Array<{ id: string; label: string; name?: string }> = useMemo(() => {
     return dbRoles.map((r) => ({
@@ -97,10 +126,12 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
   const academyRoleOptions = useMemo(() => {
     return [
       { value: 'ALL', label: t('targets.allRolesBase', 'All Roles (Academy Base)') },
-      ...dbRoles.map((r) => ({
-        value: r.code,
-        label: `${r.name || r.code} (${r.code})`,
-      })),
+      ...dbRoles
+        .filter((r) => r.code?.toUpperCase() !== 'SUPER_ADMIN')
+        .map((r) => ({
+          value: r.code,
+          label: `${r.name || r.code} (${r.code})`,
+        })),
     ];
   }, [dbRoles, t]);
 
@@ -108,15 +139,21 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
     const list = filteredAcademyUsers.length > 0 ? filteredAcademyUsers : [];
     return [
       { value: 'ALL', label: t('targets.allUsersNoOverride', 'All Users (No User Override)') },
-      ...list.map((u) => {
-        const displayName = u.first_name || u.name || 'User';
-        const contact = u.email || u.phone_number || `#${u.id}`;
-        const roleTag = u.user_type || (typeof u.role === 'string' ? u.role : u.role?.name || u.role?.code);
-        return {
-          value: String(u.id),
-          label: `${displayName} (${contact})${roleTag ? ` - ${roleTag}` : ''}`,
-        };
-      }),
+      ...list
+        .filter((u) => {
+          const uType = (u.user_type || '').toUpperCase();
+          const rCode = (typeof u.role === 'string' ? u.role : u.role?.code || '').toUpperCase();
+          return uType !== 'SUPER_ADMIN' && rCode !== 'SUPER_ADMIN';
+        })
+        .map((u) => {
+          const displayName = u.first_name || u.name || 'User';
+          const contact = u.email || u.phone_number || `#${u.id}`;
+          const roleTag = u.user_type || (typeof u.role === 'string' ? u.role : u.role?.name || u.role?.code);
+          return {
+            value: String(u.id),
+            label: `${displayName} (${contact})${roleTag ? ` - ${roleTag}` : ''}`,
+          };
+        }),
     ];
   }, [filteredAcademyUsers, t]);
 
@@ -195,6 +232,8 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
               enabledCount={enabledSectionsCount}
               disabledCount={disabledSectionsCount}
               percentage={activePercentage}
+              categories={categories}
+              modifiedFlags={modifiedFlags}
               modifiedCount={modifiedCount}
             />
           </div>
@@ -248,6 +287,9 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
               disabledCount={disabledSectionsCount}
               percentage={activePercentage}
               activeRole={selectedRole}
+              activeRoleName={activeRoleName}
+              categories={categories}
+              modifiedFlags={modifiedFlags}
               modifiedCount={modifiedCount}
             />
           </div>
@@ -283,7 +325,7 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
                   value={selectedAcademyRole || 'ALL'}
                   onChange={(val) => onSelectAcademyRole?.(String(val || 'ALL'))}
                   placeholder={t('targets.selectRoleScope', 'All Roles (Academy Base)')}
-                  searchable={true}
+                  searchable={false}
                   size="md"
                 />
               </div>
@@ -310,19 +352,20 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
 
               {/* Slot 4: Search Features */}
               <div className="col-span-1">
-                <label className="block text-[11px] font-bold uppercase tracking-wider theme-text-secondary mb-1">
-                  {t('targets.searchFeatures', 'Search Features')}
-                </label>
-                <SectionSearchInput
+                <CustomInput
+                  label={t('targets.searchFeatures', 'Search Features')}
+                  type="search"
+                  size="md"
                   value={searchFilter}
-                  onChange={onSearchFilterChange}
+                  onChange={(val: any) => onSearchFilterChange(typeof val === 'string' ? val : val?.target?.value || '')}
                   placeholder={t('search.placeholder', 'Filter features & modules...')}
+                  clearable={true}
                 />
               </div>
             </div>
           }
           scopeItems={academyScopeItems}
-          scopeLabel={t('targets.selectedScope', 'Selected Scope:')}
+          scopeLabel=""
           hasActiveFilters={Boolean(
             (selectedAcademyRole && selectedAcademyRole !== 'ALL') ||
             (selectedAcademyUser && selectedAcademyUser !== 'ALL') ||
@@ -342,6 +385,12 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
               disabledCount={disabledSectionsCount}
               percentage={activePercentage}
               activeAcademy={selectedAcademy}
+              activeAcademyName={activeAcademyName}
+              activeAcademyRole={selectedAcademyRole}
+              activeAcademyUser={selectedAcademyUser}
+              activeAcademyUserName={activeAcademyUserName}
+              categories={categories}
+              modifiedFlags={modifiedFlags}
               modifiedCount={modifiedCount}
             />
           }
@@ -394,6 +443,9 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
               disabledCount={disabledSectionsCount}
               percentage={activePercentage}
               activeUser={selectedUser}
+              activeUserName={activeUserName}
+              categories={categories}
+              modifiedFlags={modifiedFlags}
               modifiedCount={modifiedCount}
             />
           </div>

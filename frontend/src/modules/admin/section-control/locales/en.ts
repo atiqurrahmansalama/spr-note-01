@@ -33,7 +33,10 @@ export const en = {
     total: 'Total Features',
     enabled: 'Enabled & Active',
     disabled: 'Disabled / Inactive',
-    activeRate: 'Active Deployment Rate',
+    activeRate: 'Active Rate',
+    coreModules: 'Core Modules',
+    subFeatures: 'Sub-Features',
+    overallDeployment: 'Overall Deployment',
     liveSynced: 'Scope Synchronized & Live',
     unsavedChanges: '{{count}} unsaved changes in scope',
   },
@@ -82,6 +85,7 @@ export const en = {
 
   badges: {
     parentModule: 'Parent Module',
+    subModule: 'Sub-module',
     unsaved: 'Unsaved',
     disabledByParent: 'Disabled by Parent',
     disabledByParentClickToEnable: 'Disabled by parent (Click to enable with parent)',

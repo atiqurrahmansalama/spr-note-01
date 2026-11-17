@@ -34,6 +34,9 @@ export const bn = {
     enabled: 'চালু ও সক্রিয়',
     disabled: 'বন্ধ / নিষ্ক্রিয়',
     activeRate: 'সক্রিয়তার হার',
+    coreModules: 'কোর মডিউলসমূহ',
+    subFeatures: 'সাব-ফিচারসমূহ',
+    overallDeployment: 'সার্বিক ডিপ্লয়মেন্ট অগ্রগতি',
     liveSynced: 'সিঙ্ক্রোনাইজড ও লাইভ',
     unsavedChanges: 'এই স্কোপে {{count}} টি অসংরক্ষিত পরিবর্তন',
   },
@@ -82,6 +85,7 @@ export const bn = {
 
   badges: {
     parentModule: 'প্যারেন্ট মডিউল',
+    subModule: 'টি সাব-মডিউল',
     unsaved: 'অসংরক্ষিত',
     disabledByParent: 'প্যারেন্ট দ্বারা নিষ্ক্রিয়',
     disabledByParentClickToEnable: 'প্যারেন্ট দ্বারা নিষ্ক্রিয় (প্যারেন্টসহ চালু করতে ক্লিক করুন)',

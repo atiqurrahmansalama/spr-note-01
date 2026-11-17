@@ -104,12 +104,15 @@ export function useSectionControl() {
     }
   });
 
-  // Strictly filter users belonging to selected academy (Rule 11: Multi-tenant user isolation)
+  // Strictly filter users belonging to selected academy (Rule 11: Multi-tenant user isolation), excluding SUPER_ADMIN
   const filteredAcademyUsers = useMemo(() => {
     if (!selectedAcademy) return [];
     return dbUsers.filter((u) => {
       const uInst = u.institution ?? u.institution_id;
-      return String(uInst) === String(selectedAcademy);
+      if (String(uInst) !== String(selectedAcademy)) return false;
+      const uType = (u.user_type || '').toUpperCase();
+      const rCode = (typeof u.role === 'string' ? u.role : u.role?.code || '').toUpperCase();
+      return uType !== 'SUPER_ADMIN' && rCode !== 'SUPER_ADMIN';
     });
   }, [dbUsers, selectedAcademy]);
 
@@ -219,7 +222,7 @@ export function useSectionControl() {
     [setSearchParams]
   );
 
-  // Auto-reset selected academy user if the user changes target academy
+  // Auto-reset selected academy user if the user changes target academy or picked invalid/super_admin user
   useEffect(() => {
     if (activeScope === 'academy' && selectedAcademyUser) {
       const exists = filteredAcademyUsers.some((u) => String(u.id) === String(selectedAcademyUser));
@@ -228,6 +231,13 @@ export function useSectionControl() {
       }
     }
   }, [activeScope, selectedAcademyUser, filteredAcademyUsers, setSelectedAcademyUser]);
+
+  // Auto-reset selected academy role if SUPER_ADMIN was persisted in URL/state
+  useEffect(() => {
+    if (activeScope === 'academy' && selectedAcademyRole?.toUpperCase() === 'SUPER_ADMIN') {
+      setSelectedAcademyRole('ALL');
+    }
+  }, [activeScope, selectedAcademyRole, setSelectedAcademyRole]);
 
   // Ensure initial URL contains explicit ?tab= param for shareable tab links
   useEffect(() => {

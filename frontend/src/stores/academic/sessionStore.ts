@@ -38,23 +38,31 @@ export const sessions = {
     return list;
   },
 
-  /** Add new session under active or specified tenant. */
+  /** Add new session under active or specified tenant. Supports object or string. */
   add: (
-    sessionName: string,
+    sessionData: string | Partial<AcademicSessionItem>,
     tenantId?: string | null
   ): { updated: AcademicSessionItem[]; newSession: AcademicSessionItem | null } => {
     const key = getScopedSessionKey(tenantId);
     const list = sessions.getAll(tenantId);
+    const name = typeof sessionData === 'string' ? sessionData.trim() : (sessionData.name || '').trim();
+    const rawCat = typeof sessionData === 'object' && (sessionData.category || sessionData.type)
+      ? String(sessionData.category || sessionData.type).toUpperCase()
+      : 'QURAN';
+    const category: 'QURAN' | 'BOOK' = rawCat === 'BOOK' ? 'BOOK' : 'QURAN';
+
     const exists = list.some(
-      (s) => s.name?.toLowerCase() === sessionName?.toLowerCase()
+      (s) => s.name?.toLowerCase() === name?.toLowerCase()
     );
-    if (!exists) {
+    if (!exists && name) {
       const newSession: AcademicSessionItem = {
         id:
           typeof crypto !== 'undefined' && crypto.randomUUID
             ? crypto.randomUUID()
             : String(Date.now()),
-        name: sessionName,
+        name,
+        category,
+        type: category,
         _local: true,
       };
       const updated = [...list, newSession];
@@ -83,12 +91,20 @@ export function mergeSessions(
 
   const localOnly = localSessions
     .filter((s) => !apiNames.has(s.name?.toLowerCase()))
-    .map((s) => ({ ...s, _local: true }));
+    .map((s) => ({
+      ...s,
+      category: s.category || (s.type === 'BOOK' ? 'BOOK' : 'QURAN'),
+      type: s.type || s.category || 'QURAN',
+      _local: true,
+    }));
 
   const merged: AcademicSessionItem[] = [
     ...apiSessions.map((s) => {
       const copy = { ...s };
       delete copy._local;
+      const cat = (copy.category || copy.type || 'QURAN').toUpperCase();
+      copy.category = cat === 'BOOK' ? 'BOOK' : 'QURAN';
+      copy.type = copy.category;
       return copy;
     }),
     ...localOnly,

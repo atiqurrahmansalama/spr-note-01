@@ -54,12 +54,12 @@ const PRELOAD_REGISTRY: Record<string, () => Promise<unknown>> = {
 
   // Settings & Utilities
   "/profile-settings": () => import("../modules/profile/ProfileSettingsView"),
-  "/institution-settings": () => import("../modules/app-management/developer-tools/DeveloperToolsHubView"),
+  "/institution-settings": () => import("../modules/settings/institution-settings/InstitutionSettingsHubView"),
   "/preferences": () => import("../modules/settings/preferences"),
   "/version-control": () => import("../modules/version-control/views/ReleaseManagementView"),
   "/shortcuts": () => import("../modules/settings/components/ShortcutsGuide"),
   "/guide": () => import("../modules/settings/components/AppGuideView"),
-  "/about": () => import("../modules/settings/components/AboutAppView"),
+  "/about": () => import("../modules/about"),
 };
 
 const preloadedPaths = new Set<string>();

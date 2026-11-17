@@ -26,7 +26,7 @@ const HifzReportBuilderModule = lazy(() => import("./modules/learning/daily-clas
 const StudentReportsView = lazy(() => import("./modules/learning/daily-classroom/progress-management/progress-reports/ProgressReportsView"));
 const StudentDirectoryView = lazy(() => import("./modules/student-management/directory/StudentDirectoryView"));
 const StudentAdmissionView = lazy(() => import("./modules/student-management/admission/StudentAdmissionView"));
-const SessionManager = lazy(() => import("./modules/student-management/sessions/SessionManager"));
+const SessionManager = lazy(() => import("./modules/learning/daily-classroom/settings/SessionManager"));
 const StudentProfileHubView = lazy(() => import("./modules/student-management/directory/StudentProfileHubView"));
 
 // ─── Protected Staff Management Views (TypeScript Views) ──────────────────────
@@ -38,7 +38,6 @@ const StaffProfileDetailView = lazy(() => import("./modules/staff-management/Sta
 
 // ─── Protected Print Studio Views (TypeScript Views) ─────────────────────────
 const PrintStudioHubView = lazy(() => import("./components/print/PrintStudioHubView"));
-
 
 // ─── Protected Attendance Views (Lazy Loaded with Auto-Retry) ─────────────────
 const ClassAttendanceView = lazy(() => import("./modules/learning/class-attendance/ClassAttendanceView"));
@@ -75,18 +74,21 @@ const TrashRestorationView = lazy(() => import("./modules/admin/TrashRestoration
 const ProfileSettingsView = lazy(() => import("./modules/profile/ProfileSettingsView"));
 const PersonalizeSettingsHubView = lazy(() => import("./modules/settings/preferences"));
 const SecuritySessionsView = lazy(() => import("./modules/settings/components/SecuritySessionsView"));
-const ClassroomConfigurationView = lazy(() => import("./modules/learning/daily-classroom/components/ClassroomConfigurationView"));
-const ReportSettingsView = ClassroomConfigurationView;
+const ClassroomReportFormatView = lazy(() => import("./modules/learning/daily-classroom/settings/ClassroomReportFormatView"));
+const ClassroomTimezoneConfigView = lazy(() => import("./modules/learning/daily-classroom/settings/ClassroomTimezoneConfigView"));
+const ClassroomConfigurationView = ClassroomReportFormatView;
+const ReportSettingsView = ClassroomReportFormatView;
 const DataBackupView = lazy(() => import("./modules/settings/backup"));
 const ShortcutsGuide = lazy(() => import("./modules/settings/components/ShortcutsGuide"));
 const AppGuideView = lazy(() => import("./modules/settings/components/AppGuideView"));
-const AboutAppView = lazy(() => import("./modules/settings/components/AboutAppView"));
+const AboutAppView = lazy(() => import("./modules/about"));
 const SectionControlView = lazy(() => import("./modules/admin/section-control"));
 
 // ─── Protected Developer & App Management Views (Lazy Loaded) ───────────────
 const NotificationManagementView = lazy(() => import("./modules/app-management/notifications/NotificationManagementView"));
 const InstitutionListView = lazy(() => import("./modules/academy/campus-structure/academies/InstitutionListView"));
-const DeveloperToolsHubView = lazy(() => import("./modules/app-management/developer-tools/DeveloperToolsHubView"));
+const InstitutionSettingsHubView = lazy(() => import("./modules/settings/institution-settings/InstitutionSettingsHubView"));
+const DeveloperToolsHubView = InstitutionSettingsHubView;
 const DashboardHubView = lazy(() => import("./modules/dashboard/DashboardHubView"));
 const FinanceHubView = lazy(() => import("./modules/finance/FinanceHubView"));
 const PublicVerifyReceiptView = lazy(() => import("./modules/finance/components/public-verification/PublicVerifyReceiptView"));
@@ -96,7 +98,11 @@ const HelpdeskHubView = lazy(() => import("./modules/helpdesk/HelpdeskHubView"))
 const CommunicationsHubView = lazy(() => import("./modules/communications/CommunicationsHubView"));
 const BugReportingHubView = lazy(() => import("./modules/bug-reporting/BugReportingHubView"));
 
-function ProtectedRoute({ children }) {
+interface ProtectedRouteProps {
+  children: React.ReactElement;
+}
+
+function ProtectedRoute({ children }: ProtectedRouteProps): React.ReactElement {
   const urlParams = new URLSearchParams(window.location.search);
   const isGoogleCallback = urlParams.has("code") || urlParams.has("access_token") || urlParams.has("id_token");
 
@@ -119,7 +125,7 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
-function RootRoute() {
+function RootRoute(): React.ReactElement {
   if (authStore.isLoggedIn()) {
     const destination = getLastActiveRoute("/dashboard");
     return <Navigate to={destination} replace />;
@@ -127,7 +133,7 @@ function RootRoute() {
   return <LandingPageView />;
 }
 
-export default function App() {
+export default function App(): React.ReactElement {
   return (
     <BrowserRouter>
       <I18nProvider>
@@ -136,6 +142,8 @@ export default function App() {
             <Routes>
               {/* Standalone Public Auth & Verification Routes */}
               <Route path="/" element={<RootRoute />} />
+              <Route path="/landing" element={<LandingPageView />} />
+              <Route path="/official-website" element={<LandingPageView />} />
               <Route path="/login" element={<LoginView />} />
               <Route path="/register" element={<RegisterView />} />
               <Route path="/verify-email/:token" element={<VerifyEmailView />} />
@@ -200,6 +208,8 @@ export default function App() {
                 <Route path="/admission" element={<FeatureGuard sectionKey={["student_admission", "student_quick_admission", "student_roster"]}><StudentAdmissionView /></FeatureGuard>} />
                 <Route path="/students/:id/profile" element={<FeatureGuard sectionKey="student_roster"><StudentProfileHubView /></FeatureGuard>} />
                 <Route path="/sessions-comments" element={<FeatureGuard sectionKey="report_sessions_comments"><SessionManager /></FeatureGuard>} />
+                <Route path="/report-sessions" element={<FeatureGuard sectionKey="report_sessions_comments"><SessionManager /></FeatureGuard>} />
+                <Route path="/study-sessions" element={<FeatureGuard sectionKey="report_sessions_comments"><SessionManager /></FeatureGuard>} />
                 <Route path="/user-management" element={<FeatureGuard sectionKey="app_user_management"><UserManagementModule /></FeatureGuard>} />
                 <Route path="/role-management" element={<FeatureGuard sectionKey="app_role_management"><RoleManagementView showHeaderCard={true} /></FeatureGuard>} />
                 <Route path="/activity-analytics" element={<FeatureGuard sectionKey="app_activity_analytics"><ActivityAnalyticsView /></FeatureGuard>} />
@@ -318,10 +328,15 @@ export default function App() {
                 <Route path="/appearance" element={<PersonalizeSettingsHubView />} />
                 <Route path="/date-time" element={<PersonalizeSettingsHubView />} />
                 <Route path="/language" element={<PersonalizeSettingsHubView />} />
-                <Route path="/classroom-config" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomConfigurationView /></FeatureGuard>} />
-                <Route path="/classroom-settings" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomConfigurationView /></FeatureGuard>} />
-                <Route path="/copy-report" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomConfigurationView /></FeatureGuard>} />
-                <Route path="/report-settings" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomConfigurationView /></FeatureGuard>} />
+                <Route path="/classroom-config" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomReportFormatView /></FeatureGuard>} />
+                <Route path="/classroom-settings" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomReportFormatView /></FeatureGuard>} />
+                <Route path="/classroom-report-format" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomReportFormatView /></FeatureGuard>} />
+                <Route path="/classroom-date-timezone" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomTimezoneConfigView /></FeatureGuard>} />
+                <Route path="/classroom-timezone" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomTimezoneConfigView /></FeatureGuard>} />
+                <Route path="/classroom-teacher-tag" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomReportFormatView /></FeatureGuard>} />
+                <Route path="/classroom-date-format" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomReportFormatView /></FeatureGuard>} />
+                <Route path="/copy-report" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomReportFormatView /></FeatureGuard>} />
+                <Route path="/report-settings" element={<FeatureGuard sectionKey="report_copy_settings"><ClassroomReportFormatView /></FeatureGuard>} />
                 <Route path="/data-backup" element={<FeatureGuard sectionKey="settings_backup"><DataBackupView /></FeatureGuard>} />
                 <Route path="/shortcuts" element={<FeatureGuard sectionKey="nav_shortcuts"><ShortcutsGuide /></FeatureGuard>} />
                 <Route path="/guide" element={<FeatureGuard sectionKey="nav_app_guide"><AppGuideView /></FeatureGuard>} />

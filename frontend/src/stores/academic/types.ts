@@ -24,6 +24,8 @@ export interface StudentItem {
 export interface AcademicSessionItem {
   id: string | number;
   name: string;
+  category?: 'QURAN' | 'BOOK';
+  type?: string;
   _local?: boolean;
   [key: string]: any;
 }

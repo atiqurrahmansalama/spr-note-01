@@ -1,7 +1,7 @@
 // Polyfill crypto.randomUUID for non-secure contexts (HTTP) and older browsers
 if (typeof window !== 'undefined') {
   if (!window.crypto) {
-    window.crypto = {};
+    (window as any).crypto = {};
   }
   if (!window.crypto.randomUUID) {
     window.crypto.randomUUID = function () {
@@ -9,7 +9,7 @@ if (typeof window !== 'undefined') {
         const r = (Math.random() * 16) | 0;
         const v = c === 'x' ? r : (r & 0x3) | 0x8;
         return v.toString(16);
-      });
+      }) as `${string}-${string}-${string}-${string}-${string}`;
     };
   }
 
@@ -44,9 +44,14 @@ import { AcademicSessionProvider } from './context/AcademicSessionContext'
 import { I18nProvider } from './i18n'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+const googleClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '';
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error('Failed to find root element');
+}
+
+ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <ErrorBoundary>
       <GoogleOAuthProvider clientId={googleClientId}>

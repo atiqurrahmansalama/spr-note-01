@@ -176,18 +176,28 @@ export const admissionDocRequirementsSectionConfig: DeveloperToolsSectionItem = 
 export const classroomSessionsSectionConfig: DeveloperToolsSectionItem = {
   id: "report-sessions",
   group: "Classroom Configuration",
-  title: "Classroom Sessions",
-  description: "Manage pre-configured classroom session topics and lesson progress categories (e.g. Sabaq, Saat Sabaq, Amukta, Hifz Revision, Nazira)",
+  title: "Daily Progress Study Sessions",
+  description: "Manage pre-configured classroom study session topics and lesson progress categories categorized by Quran and Book",
   icon: SessionsIcon,
 };
 
-export const classroomConfigSectionConfig: DeveloperToolsSectionItem = {
-  id: "classroom-config",
+export const classroomReportFormatSectionConfig: DeveloperToolsSectionItem = {
+  id: "classroom-report-format",
   group: "Classroom Configuration",
-  title: "Classroom Configuration",
-  description: "Configure classroom timezone display, default report copy formats, and date standards",
-  icon: SettingsIcon,
+  title: "Daily Progress Report Settings",
+  description: "Configure standard report date representation, evaluator teacher mention handle, and footer attribution in copied reports",
+  icon: TeacherIcon,
 };
+
+export const classroomTimezoneSectionConfig: DeveloperToolsSectionItem = {
+  id: "classroom-date-timezone",
+  group: "Classroom Configuration",
+  title: "Classroom Date Timezone",
+  description: "Configure date timezone indicator badges and classroom-specific timezone offsets across daily classroom workflows",
+  icon: ClockIcon,
+};
+
+export const classroomConfigSectionConfig: DeveloperToolsSectionItem = classroomReportFormatSectionConfig;
 
 // ─── Group 7: System & Platform Environment ──────────────────────────────────
 
@@ -252,7 +262,7 @@ export const DEVELOPER_TOOLS_SECTIONS: DeveloperToolsSectionItem[] = [
   eventTypesSectionConfig,
   impactScopesSectionConfig,
 
-  // Group 4: Attendance Policies (আলাদা ডেডিকেটেড গ্রুপ)
+  // Group 4: Attendance Policies
   attendanceTimingSectionConfig,
   attendanceEventRestrictionsSectionConfig,
 
@@ -263,7 +273,8 @@ export const DEVELOPER_TOOLS_SECTIONS: DeveloperToolsSectionItem[] = [
 
   // Group 6: Classroom Configuration
   classroomSessionsSectionConfig,
-  classroomConfigSectionConfig,
+  classroomReportFormatSectionConfig,
+  classroomTimezoneSectionConfig,
 
   // Group 7: System & Platform Environment
   versionControlSectionConfig,

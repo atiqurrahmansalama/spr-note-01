@@ -34,6 +34,9 @@ export const ar = {
     enabled: 'مفعل ونشط',
     disabled: 'معطل / غير نشط',
     activeRate: 'معدل التفعيل',
+    coreModules: 'الوحدات الأساسية',
+    subFeatures: 'الميزات الفرعية',
+    overallDeployment: 'النشر الإجمالي',
     liveSynced: 'متزامن ومباشر',
     unsavedChanges: '{{count}} تغييرات غير محفوظة في هذا النطاق',
   },
@@ -82,6 +85,7 @@ export const ar = {
 
   badges: {
     parentModule: 'الوحدة الرئيسية',
+    subModule: 'وحدة فرعية',
     unsaved: 'غير محفوظ',
     disabledByParent: 'معطل بواسطة الوحدة الرئيسية',
     disabledByParentClickToEnable: 'معطل بواسطة الوحدة الرئيسية (انقر للتمكين مع الوحدة الأصل)',

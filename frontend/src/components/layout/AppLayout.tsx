@@ -326,19 +326,64 @@ export default function AppLayout() {
       return;
     }
 
-    // If inside any section or content tab of Institution Settings / Developer Tools, return to the menu first
     const path = window.location.pathname;
     const search = new URLSearchParams(window.location.search);
-    if (
-      (path.startsWith("/institution-settings") ||
-        path.startsWith("/admin-tools") ||
-        path.startsWith("/developer-tools")) &&
-      (search.get("tab") || search.get("section"))
-    ) {
-      navigate(path, { replace: true });
+
+    // 1. If inside any sub-section or content tab of Institution Settings, return to the main settings menu first
+    const isInstitutionSettingsSubPath =
+      path.startsWith("/institution-settings/") ||
+      path.startsWith("/admin-tools/") ||
+      path.startsWith("/developer-tools/") ||
+      path.startsWith("/sp-management/");
+    const isInstitutionSettingsQuery =
+      (path === "/institution-settings" ||
+        path === "/admin-tools" ||
+        path === "/developer-tools" ||
+        path === "/sp-management") &&
+      Boolean(search.get("tab") || search.get("section"));
+
+    if (isInstitutionSettingsSubPath || isInstitutionSettingsQuery) {
+      navigate("/institution-settings");
       return;
     }
 
+    // 2. If inside any sub-section or content tab of Preferences, return to the main preferences menu first
+    const isPreferencesSubPath =
+      path.startsWith("/preferences/") ||
+      path.startsWith("/personalize/");
+    const isPreferencesQuery =
+      (path === "/preferences" || path === "/personalize") &&
+      Boolean(search.get("tab") || search.get("section"));
+
+    if (isPreferencesSubPath || isPreferencesQuery) {
+      navigate("/preferences");
+      return;
+    }
+
+    // 3. If on direct standalone classroom settings routes, navigate back to Institution Settings
+    if (
+      path === "/classroom-date-timezone" ||
+      path === "/classroom-timezone" ||
+      path === "/classroom-report-format" ||
+      path === "/classroom-config" ||
+      path === "/classroom-settings" ||
+      path === "/classroom-teacher-tag" ||
+      path === "/classroom-date-format" ||
+      path === "/copy-report" ||
+      path === "/report-settings" ||
+      path === "/report-sessions" ||
+      path === "/study-sessions" ||
+      path === "/sessions-comments"
+    ) {
+      if (typeof window !== "undefined" && window.history.length > 1) {
+        navigate(-1);
+      } else {
+        navigate("/institution-settings");
+      }
+      return;
+    }
+
+    // 4. Default standard back navigation with fallback to /dashboard
     if (typeof window !== "undefined" && window.history.length > 1) {
       navigate(-1);
     } else {
@@ -392,6 +437,7 @@ export default function AppLayout() {
                 title={routeMeta.title}
                 category={routeMeta.category || "Navigation"}
                 subCategory={routeMeta.subCategory}
+                breadcrumbs={routeMeta.breadcrumbs}
                 onBack={handleBlockViewBack}
                 onClose={() => {
                   closeRightSidebar();

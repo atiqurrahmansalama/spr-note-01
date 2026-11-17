@@ -701,6 +701,8 @@ export default function CompactTaxonomyManager({
   extraFields = null,
   onManageTypes = null,
   headerExtra = null,
+  hideCountBadge = false,
+  customDrawerForm = null,
   icon: HeaderIcon = BuildingOfficeIcon,
   className = "",
 }) {
@@ -735,6 +737,8 @@ export default function CompactTaxonomyManager({
   const taxonomyDrawerKey = `taxonomy-${itemTypeName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
   // Universal Drawer Registration for Taxonomy (survives F5 refresh)
+  const DrawerFormComponent = customDrawerForm || TaxonomyDrawerForm;
+
   useDrawerRegistration(
     taxonomyDrawerKey,
     (params) => {
@@ -771,7 +775,7 @@ export default function CompactTaxonomyManager({
           category: 'Taxonomy & Settings',
           width: 480,
           content: (
-            <TaxonomyDrawerForm
+            <DrawerFormComponent
               key={`taxonomy-form-edit-${foundItem?.id || 'edit'}`}
               initialData={foundItem}
               itemTypeName={itemTypeName}
@@ -806,7 +810,7 @@ export default function CompactTaxonomyManager({
         category: 'Taxonomy & Settings',
         width: 480,
         content: (
-          <TaxonomyDrawerForm
+          <DrawerFormComponent
             key={`taxonomy-form-add-${itemTypeName}`}
             itemTypeName={itemTypeName}
             typeOptions={typeOptions}
@@ -829,7 +833,7 @@ export default function CompactTaxonomyManager({
         ),
       };
     },
-    [taxonomyDrawerKey, items, itemTypeName, typeOptions, typeLabel, hideStatus, extraFields, onManageTypes, createItem, updateItem, loadData, closeDrawer, showToast]
+    [taxonomyDrawerKey, items, itemTypeName, typeOptions, typeLabel, hideStatus, extraFields, onManageTypes, createItem, updateItem, loadData, closeDrawer, showToast, DrawerFormComponent]
   );
 
   // Open Right Sidebar for Details
@@ -1007,9 +1011,11 @@ export default function CompactTaxonomyManager({
               <h2 className="text-base sm:text-lg font-bold theme-text-primary tracking-tight">
                 {title}
               </h2>
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md theme-bg-sub border theme-border theme-text-secondary">
-                {items.length} {items.length === 1 ? itemTypeName.toLowerCase() : `${itemTypeName.toLowerCase()}s`}
-              </span>
+              {!hideCountBadge && (
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md theme-bg-sub border theme-border theme-text-secondary">
+                  {items.length} {items.length === 1 ? itemTypeName.toLowerCase() : `${itemTypeName.toLowerCase()}s`}
+                </span>
+              )}
             </div>
             {description && (
               <p className="text-xs theme-text-secondary mt-1 max-w-2xl leading-relaxed">

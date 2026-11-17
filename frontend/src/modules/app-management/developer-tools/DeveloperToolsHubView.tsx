@@ -155,10 +155,10 @@ export const DeveloperToolsHubView: React.FC = () => {
     (sectionId: string | null) => {
       setActiveSection(sectionId);
       if (!sectionId) {
-        navigate(basePath, { replace: true });
+        navigate(basePath);
         return;
       }
-      navigate(`${basePath}/${sectionId}`, { replace: true });
+      navigate(`${basePath}/${sectionId}`);
     },
     [basePath, navigate]
   );

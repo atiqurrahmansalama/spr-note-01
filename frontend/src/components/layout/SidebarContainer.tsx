@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { auth as authStore } from "../../utils/localStore";
 import { useFeatureControl } from "../../context/FeatureControlContext";
 import { useTenant } from "../../context/TenantContext";
@@ -18,6 +18,7 @@ import {
   ChevronIcon,
   CalendarIcon,
   CloudIcon,
+  ExternalLinkIcon,
   GlobeIcon,
   SectionControlIcon,
   ClassIcon,
@@ -339,7 +340,25 @@ function createMenuItems(dashboardRoleSlug: string): SidebarMenuItem[] {
           name: "Institution Settings", 
           i18nKey: "institutionSettings", 
           path: "/institution-settings", 
-          matchPaths: ["/institution-settings", "/admin-tools", "/developer-tools", "/sp-management", "/attendance/settings"], 
+          matchPaths: [
+            "/institution-settings",
+            "/admin-tools",
+            "/developer-tools",
+            "/sp-management",
+            "/attendance/settings",
+            "/report-sessions",
+            "/study-sessions",
+            "/classroom-report-format",
+            "/classroom-date-timezone",
+            "/classroom-config",
+            "/classroom-settings",
+            "/classroom-timezone",
+            "/classroom-teacher-tag",
+            "/classroom-date-format",
+            "/copy-report",
+            "/report-settings",
+            "/sessions-comments",
+          ], 
           Icon: AdjustmentsHorizontalIcon, 
           key: "admin_tools", 
           adminOnly: true 
@@ -391,6 +410,7 @@ function SidebarContainerComponent({
   }, []);
 
   const { isSectionEnabled } = useFeatureControl();
+  const isOfficialWebsiteEnabled = isSectionEnabled('nav_official_website');
 
   const { user: authUser } = useAuth();
   const currentUser = (authUser && typeof authUser === 'object' ? authUser : null) || authStore.getUser() || {};
@@ -605,31 +625,41 @@ function SidebarContainerComponent({
         </nav>
 
         {/* Sidebar Bottom Footer: Official Public Website & Version */}
-        <div className="p-3 border-t theme-border shrink-0 space-y-2">
-          <button
-            type="button"
-            onClick={() => {
-              if (isOverlay) onClose();
-              navigate("/");
-            }}
-            title={t('officialWebsite', 'Official Website')}
-            className={`w-full flex items-center ${
-              isCollapsed ? "justify-center p-2" : "justify-start px-3 py-2.5 gap-3"
-            } rounded-xl theme-bg-sub/60 hover:theme-bg-elevated border theme-border theme-text-primary transition-colors duration-150 cursor-pointer shadow-xs group`}
-          >
-            <div className="w-7 h-7 rounded-lg theme-bg-accent-soft text-[var(--accent-main)] flex items-center justify-center shrink-0">
-              <GlobeIcon className="w-4 h-4" />
-            </div>
-            {!isCollapsed && (
-              <div className="flex flex-col text-left rtl:text-right min-w-0">
-                <span className="text-[13px] font-bold theme-text-primary leading-tight truncate">{t('officialWebsite', 'Official Website')}</span>
-                <span className="text-[11px] theme-text-secondary leading-tight truncate mt-0.5">{t('publicPortalVerification', 'Public Portal & Verification')}</span>
+        <div className="p-3 border-0 shrink-0 space-y-2">
+          {isOfficialWebsiteEnabled && (
+            <Link
+              to="/landing"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => {
+                if (isOverlay) onClose();
+              }}
+              title={t('officialWebsite', 'Official Website')}
+              className={`w-full flex items-center ${
+                isCollapsed ? "justify-center p-2" : "justify-start px-3 py-2.5 gap-2.5"
+              } rounded-2xl theme-bg-surface hover:theme-bg-elevated/70 border-0 ring-0 theme-text-primary transition-all duration-150 cursor-pointer shadow-2xs group select-none no-underline`}
+            >
+              <div className="w-8 h-8 rounded-xl theme-bg-accent-soft text-[var(--accent-main)] flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105">
+                <GlobeIcon className="w-4 h-4" />
               </div>
-            )}
-          </button>
+              {!isCollapsed && (
+                <>
+                  <div className="flex flex-col text-left rtl:text-right min-w-0 flex-1">
+                    <span className="text-[13px] font-bold theme-text-primary group-hover:theme-accent transition-colors leading-tight truncate">
+                      {t('officialWebsite', 'Official Website')}
+                    </span>
+                    <span className="text-[10px] theme-text-secondary leading-tight truncate mt-0.5">
+                      {t('publicPortalVerification', 'Public Portal & Verification')}
+                    </span>
+                  </div>
+                  <ExternalLinkIcon className="w-3.5 h-3.5 theme-text-secondary/40 group-hover:theme-accent group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all shrink-0 ml-1" />
+                </>
+              )}
+            </Link>
+          )}
 
           {!isCollapsed ? (
-            <div className="flex items-center justify-between px-1.5 pt-0.5 text-[11px] theme-text-secondary">
+            <div className="flex items-center justify-between px-1.5 pt-0.5 text-[11px] theme-text-secondary select-none">
               <span className="font-medium tracking-tight">SPR Note Ecosystem</span>
               <button
                 type="button"
@@ -637,21 +667,21 @@ function SidebarContainerComponent({
                   if (isOverlay) onClose();
                   navigate('/version-control');
                 }}
-                className="font-mono font-semibold px-2 py-0.5 rounded-md theme-bg-sub/80 border theme-border hover:theme-accent hover:border-[var(--accent-main)] transition-colors duration-150 cursor-pointer select-none"
+                className="font-mono font-semibold px-2 py-0.5 rounded-lg theme-bg-sub/80 hover:theme-bg-elevated border-0 ring-0 hover:theme-accent transition-colors duration-150 cursor-pointer select-none"
                 title="View Release Notes"
               >
                 v1.4.0
               </button>
             </div>
           ) : (
-            <div className="flex justify-center">
+            <div className="flex justify-center select-none">
               <button
                 type="button"
                 onClick={() => {
                   if (isOverlay) onClose();
                   navigate('/version-control');
                 }}
-                className="font-mono text-[9px] font-semibold px-1 py-0.5 rounded theme-bg-sub border theme-border hover:theme-accent transition-colors duration-150"
+                className="font-mono text-[9px] font-semibold px-1 py-0.5 rounded-md theme-bg-sub/80 border-0 ring-0 hover:theme-accent transition-colors duration-150 cursor-pointer select-none"
                 title="v1.4.0 • Release Notes"
               >
                 v1.4

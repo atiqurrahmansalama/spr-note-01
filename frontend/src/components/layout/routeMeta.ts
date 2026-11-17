@@ -4,10 +4,13 @@
  * Maps application paths to their corresponding category and breadcrumb title.
  */
 
+import { INSTITUTION_SETTINGS_SECTIONS } from "@/modules/settings/institution-settings/institutionSettingsSections";
+
 export interface RouteMeta {
   title: string;
   category: string;
   subCategory?: string;
+  breadcrumbs?: string[];
   isDashboard?: boolean;
 }
 
@@ -43,12 +46,78 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
   "/daily-lessons": { title: "Daily Lessons", category: "Daily Classroom" },
   "/recitations": { title: "Daily Assessment", category: "Daily Classroom" },
   "/homework-tasks": { title: "Daily Homework", category: "Daily Classroom" },
-  "/classroom-config": { title: "Classroom Configuration", category: "Admin Tools" },
-  "/classroom-settings": { title: "Classroom Configuration", category: "Admin Tools" },
-  "/copy-report": { title: "Classroom Configuration", category: "Admin Tools" },
-  "/report-settings": { title: "Classroom Configuration", category: "Admin Tools" },
-  "/sessions-comments": { title: "Classroom Sessions", category: "Admin Tools" },
-  "/report-sessions": { title: "Classroom Sessions", category: "Admin Tools" },
+  "/classroom-config": {
+    title: "Daily Progress Report Settings",
+    subCategory: "Classroom Configuration",
+    category: "Settings",
+    breadcrumbs: ["Settings", "Institution Settings", "Classroom Configuration"],
+  },
+  "/classroom-settings": {
+    title: "Daily Progress Report Settings",
+    subCategory: "Classroom Configuration",
+    category: "Settings",
+    breadcrumbs: ["Settings", "Institution Settings", "Classroom Configuration"],
+  },
+  "/classroom-report-format": {
+    title: "Daily Progress Report Settings",
+    subCategory: "Classroom Configuration",
+    category: "Settings",
+    breadcrumbs: ["Settings", "Institution Settings", "Classroom Configuration"],
+  },
+  "/classroom-date-timezone": {
+    title: "Classroom Date Timezone",
+    subCategory: "Classroom Configuration",
+    category: "Settings",
+    breadcrumbs: ["Settings", "Institution Settings", "Classroom Configuration"],
+  },
+  "/classroom-timezone": {
+    title: "Classroom Date Timezone",
+    subCategory: "Classroom Configuration",
+    category: "Settings",
+    breadcrumbs: ["Settings", "Institution Settings", "Classroom Configuration"],
+  },
+  "/classroom-teacher-tag": {
+    title: "Daily Progress Report Settings",
+    subCategory: "Classroom Configuration",
+    category: "Settings",
+    breadcrumbs: ["Settings", "Institution Settings", "Classroom Configuration"],
+  },
+  "/classroom-date-format": {
+    title: "Daily Progress Report Settings",
+    subCategory: "Classroom Configuration",
+    category: "Settings",
+    breadcrumbs: ["Settings", "Institution Settings", "Classroom Configuration"],
+  },
+  "/copy-report": {
+    title: "Daily Progress Report Settings",
+    subCategory: "Classroom Configuration",
+    category: "Settings",
+    breadcrumbs: ["Settings", "Institution Settings", "Classroom Configuration"],
+  },
+  "/report-settings": {
+    title: "Daily Progress Report Settings",
+    subCategory: "Classroom Configuration",
+    category: "Settings",
+    breadcrumbs: ["Settings", "Institution Settings", "Classroom Configuration"],
+  },
+  "/sessions-comments": {
+    title: "Daily Progress Study Sessions",
+    subCategory: "Classroom Configuration",
+    category: "Settings",
+    breadcrumbs: ["Settings", "Institution Settings", "Classroom Configuration"],
+  },
+  "/report-sessions": {
+    title: "Daily Progress Study Sessions",
+    subCategory: "Classroom Configuration",
+    category: "Settings",
+    breadcrumbs: ["Settings", "Institution Settings", "Classroom Configuration"],
+  },
+  "/study-sessions": {
+    title: "Daily Progress Study Sessions",
+    subCategory: "Classroom Configuration",
+    category: "Settings",
+    breadcrumbs: ["Settings", "Institution Settings", "Classroom Configuration"],
+  },
 
   "/attendance/students/adhoc": { title: "Surprise Headcount", category: "Student Management" },
   "/attendance/students/monthly-matrix": { title: "Class Attendance", category: "Daily Classroom" },
@@ -151,7 +220,7 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
   "/transcripts": { title: "Marksheet Studio", category: "Examination & Results" },
   "/grading-rules": { title: "Grading Policies", category: "Examination & Results" },
 
-  "/about": { title: "About", category: "About" },
+  "/about": { title: "About", category: "" },
   "/approvals": { title: "Approvals & Decisions", category: "Action & Helpdesk" },
   "/helpdesk": { title: "Institutional Helpdesk & Issues", category: "Action & Helpdesk" },
   "/communications": { title: "Communications", category: "Action & Helpdesk" },
@@ -168,6 +237,79 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
 export function resolveRouteMeta(pathname: string, search: string = ""): RouteMeta {
   const currentPath = pathname.length > 1 ? pathname.replace(/\/+$/, "").toLowerCase() : pathname;
   let meta = ROUTE_TITLE_MAP[pathname] || ROUTE_TITLE_MAP[currentPath];
+
+  if (
+    currentPath === "/institution-settings" ||
+    currentPath.startsWith("/institution-settings/") ||
+    currentPath === "/admin-tools" ||
+    currentPath.startsWith("/admin-tools/") ||
+    currentPath === "/developer-tools" ||
+    currentPath.startsWith("/developer-tools/") ||
+    currentPath === "/sp-management" ||
+    currentPath.startsWith("/sp-management/")
+  ) {
+    const parts = currentPath.split("/");
+    const pathSection = parts[2];
+    const searchParams = new URLSearchParams(search);
+    const sectionId = pathSection || searchParams.get("tab") || searchParams.get("section");
+
+    if (sectionId) {
+      if (
+        sectionId === "classroom-date-timezone" ||
+        sectionId === "classroom-timezone" ||
+        sectionId === "timezone"
+      ) {
+        return {
+          title: "Classroom Date Timezone",
+          subCategory: "Classroom Configuration",
+          category: "Settings",
+          breadcrumbs: ["Settings", "Institution Settings", "Classroom Configuration"],
+        };
+      }
+      if (
+        sectionId === "classroom-report-format" ||
+        sectionId === "classroom-config" ||
+        sectionId === "classroom-settings" ||
+        sectionId === "classroom-teacher-tag" ||
+        sectionId === "classroom-date-format" ||
+        sectionId === "report-settings" ||
+        sectionId === "copy-report"
+      ) {
+        return {
+          title: "Daily Progress Report Settings",
+          subCategory: "Classroom Configuration",
+          category: "Settings",
+          breadcrumbs: ["Settings", "Institution Settings", "Classroom Configuration"],
+        };
+      }
+      if (
+        sectionId === "report-sessions" ||
+        sectionId === "study-sessions" ||
+        sectionId === "daily-study-sessions" ||
+        sectionId === "sessions" ||
+        sectionId === "sessions-comments"
+      ) {
+        return {
+          title: "Daily Progress Study Sessions",
+          subCategory: "Classroom Configuration",
+          category: "Settings",
+          breadcrumbs: ["Settings", "Institution Settings", "Classroom Configuration"],
+        };
+      }
+
+      // Dynamic match against registered sections in Institution Settings
+      const matched = INSTITUTION_SETTINGS_SECTIONS.find((s) => s.id === sectionId);
+      if (matched) {
+        return {
+          title: matched.title,
+          subCategory: matched.group || "Institution Settings",
+          category: "Settings",
+          breadcrumbs: ["Settings", "Institution Settings", matched.group || "Institution Settings"],
+        };
+      }
+    }
+    return { title: "Institution Settings", category: "Settings", breadcrumbs: ["Settings"] };
+  }
 
   if (
     currentPath === "/preferences" ||

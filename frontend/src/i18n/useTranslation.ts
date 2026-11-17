@@ -2,12 +2,23 @@ import { useCallback, useMemo } from 'react';
 import { useI18n, registerModuleLocales } from './I18nContext';
 import type { LanguageCode, TranslationNamespace, TranslationParams } from './types';
 
+const GLOBAL_NAMESPACES = new Set([
+  'common',
+  'navigation',
+  'settings',
+  'dashboard',
+  'finance',
+  'notifications',
+  'auth',
+  'errors',
+]);
+
 /**
  * Reusable Translation Hook with optional namespace scoping.
  * Example:
- *   const { t } = useTranslation('common');
- *   t('save'); // equivalent to t('common.save')
- *   t('navigation.dashboard'); // explicit namespace works seamlessly
+ *   const { t } = useTranslation('about');
+ *   t('architecture.tenantTitle'); // resolves to 'about.architecture.tenantTitle'
+ *   t('navigation.dashboard');     // global namespaces pass through cleanly
  */
 export function useTranslation(namespace?: TranslationNamespace) {
   const i18n = useI18n();
@@ -18,7 +29,17 @@ export function useTranslation(namespace?: TranslationNamespace) {
       defaultTextOrParams?: string | TranslationParams,
       params?: TranslationParams
     ): string => {
-      const fullKey = namespace && !key.includes('.') ? `${namespace}.${key}` : key;
+      let fullKey = key;
+      if (namespace) {
+        const rootKey = key.split('.')[0];
+        if (key.startsWith(`${namespace}.`)) {
+          fullKey = key;
+        } else if (GLOBAL_NAMESPACES.has(rootKey)) {
+          fullKey = key;
+        } else {
+          fullKey = `${namespace}.${key}`;
+        }
+      }
       return i18n.t(fullKey, defaultTextOrParams, params);
     },
     [i18n.t, namespace]

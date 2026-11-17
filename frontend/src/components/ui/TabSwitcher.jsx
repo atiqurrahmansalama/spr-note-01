@@ -49,88 +49,90 @@ export default function TabSwitcher({
   }, [activeTab]);
 
   return (
-    <div
-      className={
-        forceInlineRow
-          ? `flex flex-row items-center justify-between gap-2 sm:gap-4 border-b theme-border w-full min-w-0 ${className}`
-          : `flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 sm:border-b theme-border w-full min-w-0 ${className}`
-      }
-    >
-      {/* Tabs List with Wheel & Drag Scrolling */}
+    <div className={`w-full min-w-0 @container ${className}`}>
       <div
-        ref={tabsContainerRef}
         className={
           forceInlineRow
-            ? "flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 max-w-full cursor-grab active:cursor-grabbing pt-1 sm:pt-1.5"
-            : "flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 max-w-full cursor-grab active:cursor-grabbing pt-1 sm:pt-1.5 border-b sm:border-b-0 theme-border"
+            ? "flex flex-row items-center justify-between gap-2 @[640px]:gap-4 border-b theme-border w-full min-w-0"
+            : "flex flex-col @[640px]:flex-row @[640px]:items-center justify-between gap-2.5 @[640px]:gap-4 @[640px]:border-b theme-border w-full min-w-0"
         }
       >
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.id;
-          const IconComponent = tab.icon || tab.Icon;
-
-          return (
-            <button
-              key={tab.id}
-              data-active={isActive}
-              type="button"
-              onClick={() => (handleTabSelect && handleTabSelect(tab.id))}
-              className={`group h-8.5 sm:h-10 px-2.5 sm:px-4 text-xs font-semibold rounded-t-xl transition-colors duration-150 cursor-pointer whitespace-nowrap border-t-2 border-x flex items-center gap-1.5 sm:gap-2 relative -mb-[1px] outline-none focus:outline-none focus:ring-0 select-none shrink-0 ${
-                isActive
-                  ? 'theme-bg-surface theme-text-primary border-t-[var(--accent-main)] theme-border shadow-xs border-b-[var(--bg-surface)]'
-                  : 'border-t-transparent border-x-transparent theme-bg-sub/50 theme-text-secondary hover:theme-text-primary hover:theme-bg-sub border-b-theme-border'
-              }`}
-            >
-              {IconComponent && (
-                <IconComponent
-                  className={`w-3.5 h-3.5 transition-colors ${
-                    isActive ? 'theme-accent' : 'opacity-70 group-hover:opacity-100'
-                  }`}
-                />
-              )}
-              <span>{tab.label}</span>
-              {tab.badge !== undefined && tab.badge !== null && (
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
-                    isActive
-                      ? 'theme-bg-accent theme-accent-text'
-                      : 'theme-bg-sub theme-text-secondary border theme-border'
-                  }`}
-                >
-                  {tab.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Right-aligned Slot (Built-in inlineAction button or custom rightContent) */}
-      {(inlineAction || rightContent) && (
+        {/* Tabs List with Wheel & Drag Scrolling */}
         <div
+          ref={tabsContainerRef}
           className={
             forceInlineRow
-              ? "flex items-center justify-end gap-1.5 sm:gap-2 shrink-0 pb-1.5 sm:pb-1 w-auto"
-              : "flex items-center justify-end gap-2 shrink-0 pb-1.5 sm:pb-0 w-full sm:w-auto overflow-x-auto scrollbar-none"
+              ? "flex items-center gap-1.5 @[640px]:gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 max-w-full cursor-grab active:cursor-grabbing pt-1 @[640px]:pt-1.5"
+              : "flex items-center gap-1.5 @[640px]:gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 max-w-full cursor-grab active:cursor-grabbing pt-1 @[640px]:pt-1.5 border-b @[640px]:border-b-0 theme-border"
           }
         >
-          {inlineAction && (
-            <CustomButton
-              type="button"
-              variant={inlineAction.variant || 'primary'}
-              size="sm"
-              icon={inlineAction.icon}
-              onClick={inlineAction.onClick}
-              disabled={inlineAction.disabled}
-              title={inlineAction.title || inlineAction.label}
-              className="whitespace-nowrap shrink-0"
-            >
-              {inlineAction.label}
-            </CustomButton>
-          )}
-          {rightContent}
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            const IconComponent = tab.icon || tab.Icon;
+
+            return (
+              <button
+                key={tab.id}
+                data-active={isActive}
+                type="button"
+                onClick={() => (handleTabSelect && handleTabSelect(tab.id))}
+                className={`group h-8.5 @[640px]:h-10 px-2.5 @[640px]:px-4 text-xs font-semibold rounded-t-xl transition-colors duration-150 cursor-pointer whitespace-nowrap border-t-2 border-x flex items-center gap-1.5 @[640px]:gap-2 relative -mb-[1px] outline-none focus:outline-none focus:ring-0 select-none shrink-0 ${
+                  isActive
+                    ? 'theme-bg-surface theme-text-primary border-t-[var(--accent-main)] theme-border shadow-xs border-b-[var(--bg-surface)]'
+                    : 'border-t-transparent border-x-transparent theme-bg-sub/50 theme-text-secondary hover:theme-text-primary hover:theme-bg-sub border-b-theme-border'
+                }`}
+              >
+                {IconComponent && (
+                  <IconComponent
+                    className={`w-3.5 h-3.5 transition-colors ${
+                      isActive ? 'theme-accent' : 'opacity-70 group-hover:opacity-100'
+                    }`}
+                  />
+                )}
+                <span>{tab.label}</span>
+                {tab.badge !== undefined && tab.badge !== null && (
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                      isActive
+                        ? 'theme-bg-accent theme-accent-text'
+                        : 'theme-bg-sub theme-text-secondary border theme-border'
+                    }`}
+                  >
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
-      )}
+
+        {/* Right-aligned Slot (Built-in inlineAction button or custom rightContent) */}
+        {(inlineAction || rightContent) && (
+          <div
+            className={
+              forceInlineRow
+                ? "flex items-center justify-end gap-1.5 @[640px]:gap-2 shrink-0 pb-1.5 @[640px]:pb-1 w-auto"
+                : "flex items-center justify-stretch @[640px]:justify-end gap-2 shrink-0 pb-1.5 @[640px]:pb-0 w-full @[640px]:w-auto"
+            }
+          >
+            {inlineAction && (
+              <CustomButton
+                type="button"
+                variant={inlineAction.variant || 'primary'}
+                size="sm"
+                icon={inlineAction.icon}
+                onClick={inlineAction.onClick}
+                disabled={inlineAction.disabled}
+                title={inlineAction.title || inlineAction.label}
+                className="whitespace-nowrap shrink-0"
+              >
+                {inlineAction.label}
+              </CustomButton>
+            )}
+            {rightContent}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

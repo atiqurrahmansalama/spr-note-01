@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { verifyReport } from "../../api/reports";
 import QrCodeBadge from "../../components/common/QrCodeBadge";
 
-export default function PublicVerifyReportView({ reportIdParam }) {
+export default function PublicVerifyReportView({ reportIdParam = "" } = {}) {
   const getInitialTargetId = () => {
     if (reportIdParam) return reportIdParam;
     if (typeof window !== "undefined") {

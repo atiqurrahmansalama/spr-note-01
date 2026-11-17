@@ -45,7 +45,7 @@ export function SessionInputSection({
     ? (actionLabel !== undefined ? actionLabel : "+ Add Session")
     : null;
   const effectiveActionTo = canAddSession
-    ? (actionTo !== undefined ? actionTo : "/admin-tools?tab=report-sessions")
+    ? (actionTo !== undefined ? actionTo : "/institution-settings/report-sessions")
     : null;
 
   const sessionOptions: AutocompleteOption[] = useMemo(() => {

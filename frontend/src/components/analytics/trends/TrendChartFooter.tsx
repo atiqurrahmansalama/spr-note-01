@@ -33,25 +33,21 @@ export const TrendFooterFieldItem: React.FC<TrendFooterFieldItemProps> = ({
 
   if (isExpanded) {
     return (
-      <div className="flex items-baseline gap-1.5 min-w-0 text-xs leading-normal">
-        <div className="inline-flex items-center gap-1 font-bold theme-text-primary shrink-0 select-none">
-          <Icon className="w-3.5 h-3.5 theme-accent shrink-0" />
-          <span>{label}:</span>
-        </div>
-        <div className="font-medium theme-text-secondary break-words flex-1 min-w-0">
-          {fullText}
+      <div className="flex items-start gap-1.5 min-w-0 text-xs leading-5 select-none font-medium">
+        <Icon className="w-3.5 h-3.5 theme-accent shrink-0 mt-[2.5px]" />
+        <div className="min-w-0 flex-1 break-words select-text theme-text-secondary">
+          <span className="font-bold theme-text-primary mr-1.5">{label}:</span>
+          <span>{fullText}</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex items-baseline gap-1.5 min-w-0 text-xs leading-normal">
-      <div className="inline-flex items-center gap-1 font-bold theme-text-primary shrink-0 select-none">
-        <Icon className="w-3.5 h-3.5 theme-accent shrink-0" />
-        <span>{label}:</span>
-      </div>
-      <span className="font-medium theme-text-secondary truncate min-w-0 flex-1" title={fullText}>
+    <div className="flex items-center gap-1.5 min-w-0 text-xs leading-5">
+      <Icon className="w-3.5 h-3.5 theme-accent shrink-0" />
+      <span className="font-bold theme-text-primary shrink-0 select-none">{label}:</span>
+      <span className="font-medium theme-text-secondary truncate min-w-0 flex-1 leading-5" title={fullText}>
         {truncatedSummary}
       </span>
     </div>
@@ -112,7 +108,7 @@ export const TrendChartFooter: React.FC<TrendChartFooterProps> = ({
   if (!fields || fields.length === 0) return null;
 
   return (
-    <div className={`pt-3 border-t theme-border select-none ${className}`}>
+    <div className={`pt-2.5 border-0 select-none ${className}`}>
       <div
         ref={footerGridRef}
         className="grid grid-cols-1 @[520px]:grid-cols-2 gap-x-6 gap-y-2 text-xs theme-text-secondary"
