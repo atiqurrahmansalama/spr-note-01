@@ -8,6 +8,7 @@ import {
 } from '../widgetRegistry';
 import { AVAILABLE_APP_SHORTCUTS } from './widgets';
 import CustomCheckbox from '../../../components/ui/CustomCheckbox';
+import SegmentedSwitch from '../../../components/ui/SegmentedSwitch';
 import { useFeatureControl } from '../../../context/FeatureControlContext';
 import {
   ChevronIcon,
@@ -19,6 +20,7 @@ import {
   GridIcon,
   TimelineIcon,
   ClockIcon,
+  CheckCircleIcon,
 } from '../../../components/ui/Icons';
 
 export const CONFIGURABLE_WIDGET_IDS = new Set([
@@ -342,40 +344,40 @@ export default function DashboardWidgetCardItem({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onUpdateSettings?.({ displayMode: 'grid' });
-                  }}
+              {/* Grid & Timeline Single-line Segmented Switch */}
+              <div className="pt-0.5">
+                <SegmentedSwitch
+                  options={[
+                    { value: 'grid', label: 'Grid (Month)', icon: GridIcon },
+                    { value: 'timeline', label: 'Timeline (Hours)', icon: TimelineIcon },
+                  ]}
+                  value={settings.displayMode || 'grid'}
+                  onChange={(val) => onUpdateSettings?.({ displayMode: val })}
+                  fullWidth={true}
+                  size="sm"
                   disabled={disabled}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                    (settings.displayMode || 'grid') === 'grid'
-                      ? 'theme-bg-accent theme-accent-text border-transparent shadow-xs'
-                      : 'theme-bg-sub theme-text-secondary border theme-border hover:theme-text-primary'
-                  }`}
-                >
-                  <GridIcon className="w-3.5 h-3.5" />
-                  <span>Grid (Month)</span>
-                </button>
+                />
+              </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onUpdateSettings?.({ displayMode: 'timeline' });
+              {/* Personal Tasks Visibility Control */}
+              <div className="pt-2 border-t theme-border flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-bold theme-text-primary flex items-center gap-1.5">
+                    <CheckCircleIcon className="w-3.5 h-3.5 theme-accent" />
+                    <span>Personal Tasks</span>
+                  </div>
+                  <p className="text-[10px] theme-text-secondary mt-0.5">
+                    Show personal checklist in calendar
+                  </p>
+                </div>
+                <CustomCheckbox
+                  checked={settings.showTasks !== false}
+                  onChange={(taskChecked: boolean) => {
+                    onUpdateSettings?.({ showTasks: taskChecked });
                   }}
                   disabled={disabled}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                    (settings.displayMode || 'grid') === 'timeline'
-                      ? 'theme-bg-accent theme-accent-text border-transparent shadow-xs'
-                      : 'theme-bg-sub theme-text-secondary border theme-border hover:theme-text-primary'
-                  }`}
-                >
-                  <TimelineIcon className="w-3.5 h-3.5" />
-                  <span>Timeline (Hours)</span>
-                </button>
+                  size="sm"
+                />
               </div>
             </div>
           )}
@@ -393,40 +395,40 @@ export default function DashboardWidgetCardItem({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onUpdateSettings?.({ displayMode: 'grid' });
-                  }}
+              {/* Grid & Timeline Single-line Segmented Switch */}
+              <div className="pt-0.5">
+                <SegmentedSwitch
+                  options={[
+                    { value: 'grid', label: 'Grid (Month)', icon: GridIcon },
+                    { value: 'timeline', label: 'Timeline (Hours)', icon: TimelineIcon },
+                  ]}
+                  value={settings.displayMode || 'grid'}
+                  onChange={(val) => onUpdateSettings?.({ displayMode: val })}
+                  fullWidth={true}
+                  size="sm"
                   disabled={disabled}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                    (settings.displayMode || 'grid') === 'grid'
-                      ? 'theme-bg-accent theme-accent-text border-transparent shadow-xs'
-                      : 'theme-bg-sub theme-text-secondary border theme-border hover:theme-text-primary'
-                  }`}
-                >
-                  <GridIcon className="w-3.5 h-3.5" />
-                  <span>Grid (Month)</span>
-                </button>
+                />
+              </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onUpdateSettings?.({ displayMode: 'timeline' });
+              {/* Personal Tasks Visibility Control */}
+              <div className="pt-2 border-t theme-border flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-bold theme-text-primary flex items-center gap-1.5">
+                    <CheckCircleIcon className="w-3.5 h-3.5 theme-accent" />
+                    <span>Personal Tasks</span>
+                  </div>
+                  <p className="text-[10px] theme-text-secondary mt-0.5">
+                    Show personal checklist in calendar
+                  </p>
+                </div>
+                <CustomCheckbox
+                  checked={settings.showTasks !== false}
+                  onChange={(taskChecked: boolean) => {
+                    onUpdateSettings?.({ showTasks: taskChecked });
                   }}
                   disabled={disabled}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                    (settings.displayMode || 'grid') === 'timeline'
-                      ? 'theme-bg-accent theme-accent-text border-transparent shadow-xs'
-                      : 'theme-bg-sub theme-text-secondary border theme-border hover:theme-text-primary'
-                  }`}
-                >
-                  <TimelineIcon className="w-3.5 h-3.5" />
-                  <span>Timeline (Hours)</span>
-                </button>
+                  size="sm"
+                />
               </div>
             </div>
           )}

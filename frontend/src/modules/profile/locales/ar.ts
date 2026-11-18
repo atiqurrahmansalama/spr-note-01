@@ -32,6 +32,9 @@ export default {
   accountSwitcherSubtitle: "إدارة الحسابات المحفوظة والتنقل بين الجلسات النشطة",
   badgeSavedAccounts: "{{count}} حساب محفوظ",
   badgeSavedAccounts_plural: "{{count}} حسابات محفوظة",
+  confirmRemoveAccountTitle: "إزالة الحساب المحفوظ؟",
+  confirmRemoveAccountDesc: "هل أنت متأكد من رغبتك في إزالة هذا الحساب من الحسابات المحفوظة على هذا الجهاز؟",
+  removeSavedAccountConfirm: "إزالة الحساب",
 
   qrSyncTitle: "مسح رمز QR لتسجيل الدخول في جهاز آخر",
   qrSyncSubtitle: "تسجيل الدخول الفوري دون الحاجة لكتابة كلمة المرور",

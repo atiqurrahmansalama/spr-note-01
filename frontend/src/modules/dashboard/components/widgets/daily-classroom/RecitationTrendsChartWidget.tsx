@@ -1,8 +1,12 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCanonicalProgressReports } from '../../../hooks/useCanonicalProgressReports';
+import { useRecent7DaysRange } from '../../../hooks/useRecent7DaysRange';
 import { useProgressAnalyticsEngine } from '../../../../learning/daily-classroom/components/progress-analytics/useProgressAnalyticsEngine';
 import { ProgressTrendsChart } from '../../../../learning/daily-classroom/components/progress-analytics';
+import { DocumentTextIcon } from '../../../../../components/ui/Icons';
 import type { MetricType } from '../../../../../components/analytics/types';
+import type { ActionMenuItem } from '../../../../../components/ui/ActionMenu';
 
 export interface RecitationTrendsChartWidgetProps {
   reports?: any[];
@@ -21,49 +25,29 @@ export default function RecitationTrendsChartWidget({
   defaultMetric = 'combined',
   className = '',
 }: RecitationTrendsChartWidgetProps) {
+  const navigate = useNavigate();
   const [activeMetric, setActiveMetric] = useState<MetricType>(defaultMetric);
   const { reports: canonicalReports } = useCanonicalProgressReports();
   const effectiveReports = propReports && propReports.length > 0 ? propReports : canonicalReports;
 
-  // Default to the last 7 days for the dashboard
-  const { startDate, endDate } = useMemo(() => {
-    let anchorEnd = new Date();
-
-    if (effectiveReports && effectiveReports.length > 0) {
-      let maxDateStr = '';
-      for (const r of effectiveReports) {
-        const d = r.isoDateOnly || r.report_date || r.date || '';
-        if (d && String(d).substring(0, 10) > maxDateStr) {
-          maxDateStr = String(d).substring(0, 10);
-        }
-      }
-      if (maxDateStr) {
-        const [y, m, d] = maxDateStr.split('-').map(Number);
-        const maxDate = new Date(y, m - 1, d);
-        const diffDays = Math.round((anchorEnd.getTime() - maxDate.getTime()) / (1000 * 60 * 60 * 24));
-        if (diffDays > 7) {
-          anchorEnd = maxDate;
-        }
-      }
-    }
-
-    const anchorStart = new Date(anchorEnd);
-    anchorStart.setDate(anchorEnd.getDate() - 6); // 7 days inclusive
-
-    const formatISO = (dt: Date) => {
-      const y = dt.getFullYear();
-      const m = String(dt.getMonth() + 1).padStart(2, '0');
-      const day = String(dt.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
-    };
-
-    return {
-      startDate: formatISO(anchorStart),
-      endDate: formatISO(anchorEnd),
-    };
-  }, [effectiveReports]);
-
+  // Shared 7-day chronological window
+  const { startDate, endDate } = useRecent7DaysRange(effectiveReports);
   const analytics = useProgressAnalyticsEngine(effectiveReports, activeMetric, startDate, endDate);
+
+  const extraMenuItems: ActionMenuItem[] = useMemo(
+    () => [
+      {
+        id: 'view-progress-reports',
+        label: 'View Detailed Reports',
+        icon: DocumentTextIcon,
+        onClick: () => navigate('/studies/progress-reports/records'),
+      },
+      {
+        divider: true,
+      },
+    ],
+    [navigate]
+  );
 
   return (
     <div className={`@container w-full h-full flex flex-col justify-start select-none ${className}`}>
@@ -80,6 +64,8 @@ export default function RecitationTrendsChartWidget({
         accuracyRate={analytics.accuracyRate}
         maxMetricValue={analytics.maxMetricValue}
         totalReports={analytics.totalReports}
+        extraMenuItems={extraMenuItems}
+        className="h-full flex-1"
       />
     </div>
   );

@@ -1,6 +1,9 @@
 import { useState, useRef } from "react";
 import { saveDrawerWidthToStorage } from "../../../context/RightSidebarContext";
 
+// Universal standard minimum width for main page (Mobile screen threshold)
+const MOBILE_PAGE_MIN_WIDTH = 360;
+
 export interface UseDrawerResizingProps {
   drawerWidth: number;
   setDrawerWidth: (width: number) => void;
@@ -56,7 +59,9 @@ export function useDrawerResizing({
       const clientX = 'touches' in moveEvent ? moveEvent.touches[0].clientX : moveEvent.clientX;
       const newWidth = window.innerWidth - clientX;
       const minW = 240;
-      const maxW = Math.min(720, Math.floor(window.innerWidth * 0.75));
+      const leftSidebarEl = document.querySelector('aside');
+      const leftSidebarWidth = leftSidebarEl ? leftSidebarEl.getBoundingClientRect().width : 0;
+      const maxW = Math.max(minW, window.innerWidth - leftSidebarWidth - MOBILE_PAGE_MIN_WIDTH);
       const clampedWidth = Math.max(minW, Math.min(maxW, newWidth));
       setRightPanelWidth(clampedWidth);
       try {
@@ -98,7 +103,10 @@ export function useDrawerResizing({
       if (typeof clientX !== "number" || isNaN(clientX)) return;
       const newWidth = window.innerWidth - clientX;
       const minW = 360;
-      const maxW = Math.min(1080, Math.floor(window.innerWidth * 0.85));
+      // Rule 1: The main page to the left of the right sidebar must never shrink below mobile width (360px)
+      const leftSidebarEl = document.querySelector('aside');
+      const leftSidebarWidth = leftSidebarEl ? leftSidebarEl.getBoundingClientRect().width : 0;
+      const maxW = Math.max(minW, window.innerWidth - leftSidebarWidth - MOBILE_PAGE_MIN_WIDTH);
       const clampedWidth = Math.max(minW, Math.min(maxW, newWidth));
       latestWidth = clampedWidth;
 
@@ -131,7 +139,11 @@ export function useDrawerResizing({
   };
 
   const handleDrawerResizerDoubleClick = () => {
-    const nextWidth = drawerWidth > 700 ? 580 : 760;
+    const leftSidebarEl = document.querySelector('aside');
+    const leftSidebarWidth = leftSidebarEl ? leftSidebarEl.getBoundingClientRect().width : 0;
+    const maxAllowedWidth = Math.max(360, window.innerWidth - leftSidebarWidth - MOBILE_PAGE_MIN_WIDTH);
+    const targetWidth = drawerWidth > 700 ? 580 : 760;
+    const nextWidth = Math.min(targetWidth, maxAllowedWidth);
     setDrawerWidth(nextWidth);
     if (drawerContainerRef.current) {
       drawerContainerRef.current.style.width = `${nextWidth}px`;

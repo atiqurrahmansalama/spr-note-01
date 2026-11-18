@@ -118,7 +118,13 @@ export function useResizablePanel({
         if (typeof clientX !== 'number' || isNaN(clientX)) return;
 
         const calculatedWidth = side === 'right' ? window.innerWidth - clientX : clientX;
-        const maxAllowed = Math.min(maxWidth, Math.floor(window.innerWidth * maxRatio));
+        // The main page to the left of the right sidebar must never shrink below mobile width (360px)
+        const leftSidebarEl = document.querySelector('aside');
+        const leftSidebarWidth = leftSidebarEl ? leftSidebarEl.getBoundingClientRect().width : 0;
+        const maxMobileAllowed = side === 'right'
+          ? Math.max(minWidth, window.innerWidth - leftSidebarWidth - 360)
+          : Math.min(maxWidth, Math.floor(window.innerWidth * maxRatio));
+        const maxAllowed = Math.min(maxWidth, maxMobileAllowed);
         const clamped = Math.max(minWidth, Math.min(maxAllowed, calculatedWidth));
         setWidthState(clamped);
       };

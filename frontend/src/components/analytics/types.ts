@@ -1,5 +1,6 @@
 import React from "react";
 import { SegmentedSwitchOption } from "@/components/ui/SegmentedSwitch";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 
 /**
  * Enterprise Analytics Types & Contracts
@@ -161,6 +162,7 @@ export interface TrendChartProps {
   exportTitle?: string;
   className?: string;
   customTooltipRenderer?: (point: TrendDataPoint, series: ChartSeriesConfig[]) => React.ReactNode;
+  extraMenuItems?: ActionMenuItem[];
 
   // Optional legacy props kept for backward-compatibility with upstream consumers
   trendPoints?: TrendDataPoint[];

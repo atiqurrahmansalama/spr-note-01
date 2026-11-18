@@ -156,6 +156,7 @@ export function RightSidebarProvider({ children }) {
           'id',
           'date',
           'eventId',
+          'category',
           'targetId',
           'classId',
           'type',
@@ -242,7 +243,7 @@ export function RightSidebarProvider({ children }) {
     if (syncUrl) {
       pushUrlParams((params) => {
         // Clear previous drawer-specific params
-        const drawerParamKeys = ['id', 'mode', 'tokenId', 'studentId', 'bookId', 'bookName', 'subjectName', 'lessonTitle', 'startUnit', 'endUnit', 'slotId'];
+        const drawerParamKeys = ['id', 'mode', 'tokenId', 'studentId', 'bookId', 'bookName', 'subjectName', 'lessonTitle', 'startUnit', 'endUnit', 'slotId', 'category', 'eventId', 'date'];
         drawerParamKeys.forEach((k) => params.delete(k));
 
         params.set('drawer', drawerKey);

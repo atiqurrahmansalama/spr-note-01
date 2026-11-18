@@ -11,6 +11,7 @@ import type { CalendarDisplayMode } from '../../../../academy/calendar-events/ty
 export interface WorkingHoursWidgetProps {
   displayMode?: CalendarDisplayMode;
   initialDisplayMode?: CalendarDisplayMode;
+  showTasks?: boolean;
   title?: string;
   className?: string;
   [key: string]: any;
@@ -19,6 +20,7 @@ export interface WorkingHoursWidgetProps {
 export default function WorkingHoursWidget({
   displayMode: propDisplayMode,
   initialDisplayMode = 'grid',
+  showTasks: propShowTasks,
   title = 'Working Hours & Shifts',
   className = '',
 }: WorkingHoursWidgetProps) {
@@ -32,6 +34,9 @@ export default function WorkingHoursWidget({
     handleDeleteEvent,
     openDrawer,
   } = useDashboardCalendarSync('WORKING_HOURS');
+
+  // Tasks visibility is strictly governed by Workspace Customizer setting
+  const effectiveShowTasks = propShowTasks !== undefined ? propShowTasks : true;
 
   const handleAddShift = () => {
     openDrawer('schedule', {
@@ -47,50 +52,51 @@ export default function WorkingHoursWidget({
 
   return (
     <div
-      className={`p-3.5 @sm:p-5 rounded-3xl theme-bg-surface shadow-xs h-full flex flex-col justify-start space-y-2.5 @sm:space-y-3 select-none min-w-0 border-0 @container ${className}`}
+      className={`p-3.5 @sm:p-5 rounded-3xl theme-bg-surface shadow-xs h-auto @[640px]:h-full flex flex-col justify-start space-y-2.5 @sm:space-y-3 select-none min-w-0 border-0 @container ${className}`}
     >
       {/* Top Header Row: Clean and minimal without All, Events, Shifts, Search, Grid, Timeline switches */}
       <div className="flex items-center justify-between gap-2 pb-1 shrink-0">
         <div className="flex items-center gap-2 @sm:gap-2.5 min-w-0">
-          <div className="w-7 h-7 @sm:w-8 @sm:h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+          <div className="w-7 h-7 @sm:w-8 @sm:h-8 rounded-xl theme-bg-accent-soft theme-accent flex items-center justify-center shrink-0">
             <ClockIcon className="w-3.5 h-3.5 @sm:w-4 @sm:h-4" />
           </div>
           <div className="min-w-0">
             <h3 className="text-xs @sm:text-sm font-bold theme-text-primary leading-tight truncate">
               {title}
             </h3>
-            <p className="hidden @[380px]:block text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5 truncate">
+            {/* Subtitle hidden from mid screen down (< 820px) */}
+            <p className="hidden @[820px]:block text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5 truncate">
               Operational work shifts, active roster coverage & weekly schedules
             </p>
           </div>
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/* Add Shift Button */}
-          <button
-            type="button"
-            onClick={handleAddShift}
-            className="px-2 py-1 @sm:px-2.5 @sm:py-1.5 rounded-xl text-[11px] @sm:text-xs font-semibold theme-bg-accent theme-accent-text hover:brightness-105 transition-all flex items-center gap-1 cursor-pointer border-0 shadow-2xs"
-          >
-            <PlusIcon className="w-3.5 h-3.5" />
-            <span className="hidden @[320px]:inline">Add Shift</span>
-          </button>
-
-          {/* View Hub Shortcut */}
+        <div className="flex items-center gap-1.5 @sm:gap-2 shrink-0">
+          {/* Main Page Navigation: Pure text button placed BEFORE Add button (No hard white) */}
           <button
             type="button"
             onClick={handleNavigateToHub}
-            className="text-[11px] @sm:text-xs font-semibold theme-accent-text hover:underline cursor-pointer flex items-center gap-0.5 border-0"
+            className="px-1.5 py-1 text-[11px] @sm:text-xs font-semibold theme-text-secondary hover:theme-text-primary hover:underline transition-colors cursor-pointer border-0 bg-transparent select-none shrink-0"
           >
-            <span>Hub</span>
-            <span className="text-[10px]">→</span>
+            Full View
+          </button>
+
+          {/* Add Shift Button (Short 'Add' on small screens) */}
+          <button
+            type="button"
+            onClick={handleAddShift}
+            className="px-2 py-1 @sm:px-2.5 @sm:py-1.5 rounded-xl text-[11px] @sm:text-xs font-semibold theme-bg-accent theme-accent-text hover:brightness-105 transition-all flex items-center gap-1 cursor-pointer border-0 shadow-2xs shrink-0"
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+            <span className="inline @[480px]:hidden">Add</span>
+            <span className="hidden @[480px]:inline">Add Shift</span>
           </button>
         </div>
       </div>
 
-      {/* Main Calendar Engine: Directly rendered without top/bottom cards or internal search/view switches */}
-      <div className="min-h-[460px] flex-1 flex flex-col justify-start">
+      {/* Main Calendar Engine: Responsive height without empty bottom void on small screens */}
+      <div className="min-h-0 @[640px]:min-h-[420px] flex-1 flex flex-col justify-start">
         <MasterTimeCalendar
           events={events}
           selectedCategory="WORKING_HOURS"
@@ -99,6 +105,7 @@ export default function WorkingHoursWidget({
           hideSearch={true}
           hideViewModeToggle={true}
           embeddedSurface={true}
+          showPersonalTasks={effectiveShowTasks}
           onSaveEvent={handleSaveEvent}
           onDeleteEvent={handleDeleteEvent}
         />

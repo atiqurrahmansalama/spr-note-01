@@ -32,6 +32,9 @@ export default {
   accountSwitcherSubtitle: "সংরক্ষিত একাধিক অ্যাকাউন্ট পরিবর্তন ও ম্যানেজ করুন",
   badgeSavedAccounts: "{{count}}টি সংরক্ষিত",
   badgeSavedAccounts_plural: "{{count}}টি সংরক্ষিত",
+  confirmRemoveAccountTitle: "সংরক্ষিত অ্যাকাউন্ট মুছে ফেলবেন?",
+  confirmRemoveAccountDesc: "আপনি কি নিশ্চিত যে আপনি এই ডিভাইস থেকে সংরক্ষিত এই অ্যাকাউন্টটি মুছে ফেলতে চান?",
+  removeSavedAccountConfirm: "অ্যাকাউন্ট মুছে ফেলুন",
 
   qrSyncTitle: "কিউআর স্ক্যান করে অন্য ডিভাইসে লগইন",
   qrSyncSubtitle: "পাসওয়ার্ড টাইপ না করেই যেকোনো কম্পিউটার বা ফোনে তাৎক্ষণিক লগইন করুন",

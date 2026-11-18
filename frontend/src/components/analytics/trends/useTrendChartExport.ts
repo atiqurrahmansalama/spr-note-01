@@ -24,6 +24,7 @@ export interface UseTrendChartExportOptions {
   exportTitle?: string;
   onSuccess?: (message: string) => void;
   computeCoordinatesForWidth?: (width: number) => Record<string, Array<{ x: number; y: number }>>;
+  footerFields?: any[];
   // Backward compatibility options
   trendPoints?: TrendDataPoint[];
   currentMetric?: MetricType;
@@ -47,6 +48,7 @@ export function useTrendChartExport({
   exportTitle = "Analytics Trends",
   onSuccess,
   computeCoordinatesForWidth,
+  footerFields: propFooterFields,
   trendPoints: legacyTrendPoints,
   currentMetric: legacyMetric,
 }: UseTrendChartExportOptions) {
@@ -64,192 +66,82 @@ export function useTrendChartExport({
     return series.filter((s) => s.visible !== false);
   }, [series]);
 
-  // Medium canvas capture for export - captures a balanced medium card layout (820px)
+  // Canvas capture for export - directly captures the chart container with resolved colors and styles
   const captureDesktopCanvas = useCallback(async (): Promise<HTMLCanvasElement | null> => {
     if (!chartContainerRef.current) return null;
 
     const sourceNode = chartContainerRef.current;
-    const clone = sourceNode.cloneNode(true) as HTMLElement;
-
-    // 1. Clean up active tooltips or hover indicators in clone
-    clone.querySelectorAll("[role='tooltip'], .shadow-xl").forEach((el) => el.remove());
-
-    // 2. Hide the 3-dots action menu / export dropdown button in exported image
-    const actionMenu = clone.querySelector("[aria-label='Export Options']");
-    if (actionMenu) {
-      (actionMenu as HTMLElement).style.display = "none";
+    const computedStyle = window.getComputedStyle(sourceNode);
+    let resolvedBg = computedStyle.backgroundColor;
+    if (!resolvedBg || resolvedBg === "transparent" || resolvedBg === "rgba(0, 0, 0, 0)") {
+      resolvedBg = document.documentElement.classList.contains("dark") ? "#0f172a" : "#ffffff";
     }
-
-    // 3. Medium export dimensions (820px container width for golden presentation ratio)
-    const exportWidth = 820;
-    const exportPadding = 20;
-    const yAxisWidth = 36;
-    const gap = 8;
-    const exportCanvasWidth = exportWidth - exportPadding * 2 - yAxisWidth - gap; // ~736px
-
-    clone.style.position = "fixed";
-    clone.style.left = "-9999px";
-    clone.style.top = "0";
-    clone.style.width = `${exportWidth}px`;
-    clone.style.minWidth = `${exportWidth}px`;
-    clone.style.maxWidth = `${exportWidth}px`;
-    clone.style.height = "auto";
-    clone.style.zIndex = "-9999";
-    clone.style.opacity = "1";
-    clone.style.pointerEvents = "none";
-    clone.style.transform = "none";
-    clone.style.padding = `${exportPadding}px`;
-    clone.style.borderRadius = "16px";
-    clone.style.backgroundColor = "var(--bg-surface)";
-
-    // 4. Force desktop typography & layout
-    clone.querySelectorAll(".truncate").forEach((el) => {
-      (el as HTMLElement).style.overflow = "visible";
-      (el as HTMLElement).style.whiteSpace = "normal";
-    });
-
-    // 5. Update SVG paths for exportCanvasWidth if coordinate calculator is provided
-    if (computeCoordinatesForWidth) {
-      const exportCoords = computeCoordinatesForWidth(exportCanvasWidth);
-      const svgs = clone.querySelectorAll("svg");
-      svgs.forEach((svg) => {
-        if (svg.getAttribute("viewBox")?.includes("220")) {
-          svg.setAttribute("viewBox", `0 0 ${exportCanvasWidth} ${chartHeight}`);
-
-          const paths = svg.querySelectorAll("path");
-          paths.forEach((p) => {
-            const seriesKey = p.getAttribute("data-series-key");
-            const stroke = p.getAttribute("stroke");
-            const fill = p.getAttribute("fill");
-
-            if (seriesKey && exportCoords[seriesKey]) {
-              const coords = exportCoords[seriesKey];
-              if (stroke) {
-                p.setAttribute(
-                  "d",
-                  generateSmoothPath(extendCoordsToEdges(coords, exportCanvasWidth), topPadding, baselineY)
-                );
-              } else if (fill) {
-                p.setAttribute("d", generateAreaPath(coords, baselineY, topPadding, exportCanvasWidth));
-              }
-            } else if (stroke === "var(--accent-main)" && exportCoords.pages) {
-              p.setAttribute(
-                "d",
-                generateSmoothPath(extendCoordsToEdges(exportCoords.pages, exportCanvasWidth), topPadding, baselineY)
-              );
-            } else if (stroke === "var(--color-danger)" && exportCoords.mistakes) {
-              p.setAttribute(
-                "d",
-                generateSmoothPath(extendCoordsToEdges(exportCoords.mistakes, exportCanvasWidth), topPadding, baselineY)
-              );
-            } else if ((stroke?.includes("#f59e0b") || stroke?.includes("warning")) && exportCoords.stucks) {
-              p.setAttribute(
-                "d",
-                generateSmoothPath(extendCoordsToEdges(exportCoords.stucks, exportCanvasWidth), topPadding, baselineY)
-              );
-            } else if (fill?.includes("trendPagesGrad") && exportCoords.pages) {
-              p.setAttribute("d", generateAreaPath(exportCoords.pages, baselineY, topPadding, exportCanvasWidth));
-            } else if (fill?.includes("trendMistakesGrad") && exportCoords.mistakes) {
-              p.setAttribute("d", generateAreaPath(exportCoords.mistakes, baselineY, topPadding, exportCanvasWidth));
-            } else if (fill?.includes("trendStucksGrad") && exportCoords.stucks) {
-              p.setAttribute("d", generateAreaPath(exportCoords.stucks, baselineY, topPadding, exportCanvasWidth));
-            }
-          });
-        }
-      });
-    }
-
-    // 6. Update bar widths in the clone to export proportions
-    const n = Math.max(dataPoints.length, 1);
-    const exportColWidth = exportCanvasWidth / n;
-    const activeSeriesCount = Math.max(visibleSeries.length, 1);
-    const targetBarWidth = Math.max(
-      2,
-      Math.min(32, Math.floor((exportColWidth * 0.7) / activeSeriesCount))
-    );
-
-    const barCols = clone.querySelectorAll("[data-trend-bar='true']");
-    barCols.forEach((bar) => {
-      (bar as HTMLElement).style.width = `${targetBarWidth}px`;
-    });
-
-    // 7. Reveal all X-axis timeline dates in the export
-    const timelineLabels = clone.querySelectorAll("[data-timeline-label='true']");
-    timelineLabels.forEach((label) => {
-      (label as HTMLElement).style.opacity = "1";
-      (label as HTMLElement).style.visibility = "visible";
-    });
-
-    document.body.appendChild(clone);
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
 
     try {
-      const canvas = await html2canvas(clone, {
+      const canvas = await html2canvas(sourceNode, {
         scale: 2,
         useCORS: true,
-        backgroundColor: null,
+        allowTaint: true,
         logging: false,
-        width: exportWidth,
-        windowWidth: exportWidth,
+        backgroundColor: resolvedBg,
+        ignoreElements: (el) => {
+          if (
+            el.getAttribute("aria-label") === "Export Options" ||
+            el.getAttribute("role") === "menu" ||
+            el.getAttribute("role") === "tooltip" ||
+            el.hasAttribute("data-export-hide")
+          ) {
+            return true;
+          }
+          return false;
+        },
       });
       return canvas;
     } catch (err) {
       console.error("[useTrendChartExport] Canvas capture failed:", err);
       return null;
-    } finally {
-      if (clone.parentNode) {
-        clone.parentNode.removeChild(clone);
-      }
     }
-  }, [
-    chartContainerRef,
-    computeCoordinatesForWidth,
-    dataPoints.length,
-    visibleSeries,
-    baselineY,
-  ]);
+  }, [chartContainerRef]);
 
   // Unified, robust clipboard copy helper
   const copyChartCanvasToClipboard = useCallback(async (): Promise<boolean> => {
     try {
       const canvas = await captureDesktopCanvas();
-      if (!canvas) return false;
+      if (!canvas) {
+        onSuccess?.("Failed to generate chart image.");
+        return false;
+      }
 
-      if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
-        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-        if (blob) {
-          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-          setCopiedSuccess(true);
-          setTimeout(() => setCopiedSuccess(false), 2500);
-          onSuccess?.("Copied to Clipboard!");
-          return true;
+      let copied = false;
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard && typeof navigator.clipboard.write === "function") {
+        try {
+          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+          if (blob) {
+            await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+            copied = true;
+          }
+        } catch (clipErr) {
+          console.warn("[useTrendChartExport] navigator.clipboard.write failed:", clipErr);
         }
       }
 
-      const dataUrl = canvas.toDataURL("image/png");
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      setCopiedSuccess(true);
-      setTimeout(() => setCopiedSuccess(false), 2500);
-      onSuccess?.("Copied to Clipboard!");
+      if (copied) {
+        setCopiedSuccess(true);
+        setTimeout(() => setCopiedSuccess(false), 2500);
+        onSuccess?.("Chart image copied to clipboard!");
+        return true;
+      }
+
+      // If clipboard write is not permitted by browser, fallback to automatic download
+      const a = document.createElement("a");
+      a.download = `${exportFilename}_${new Date().toISOString().split("T")[0]}.png`;
+      a.href = canvas.toDataURL("image/png");
+      a.click();
+      onSuccess?.("Downloaded chart image (clipboard access restricted).");
       return true;
     } catch (err) {
-      console.warn("[useTrendChartExport] Clipboard copy failed:", err);
-      try {
-        const canvas = await captureDesktopCanvas();
-        if (canvas) {
-          const a = document.createElement("a");
-          a.download = `${exportFilename}_preview_${new Date().toISOString().split("T")[0]}.png`;
-          a.href = canvas.toDataURL("image/png");
-          a.click();
-          setCopiedSuccess(true);
-          setTimeout(() => setCopiedSuccess(false), 2500);
-          onSuccess?.("Chart image downloaded successfully!");
-          return true;
-        }
-      } catch {}
+      console.error("[useTrendChartExport] Copy to clipboard failed:", err);
+      onSuccess?.("Unable to copy chart image.");
       return false;
     }
   }, [captureDesktopCanvas, exportFilename, onSuccess]);
@@ -257,80 +149,179 @@ export function useTrendChartExport({
   const handleExportPNG = useCallback(async () => {
     try {
       const canvas = await captureDesktopCanvas();
-      if (!canvas) return;
+      if (!canvas) {
+        onSuccess?.("Failed to generate chart image.");
+        return;
+      }
       const a = document.createElement("a");
       a.download = `${exportFilename}_${new Date().toISOString().split("T")[0]}.png`;
       a.href = canvas.toDataURL("image/png");
       a.click();
-      await copyChartCanvasToClipboard();
+      onSuccess?.("Chart downloaded as PNG!");
     } catch (err) {
       console.error("Export PNG failed:", err);
+      onSuccess?.("Failed to export chart as PNG.");
     }
-  }, [captureDesktopCanvas, copyChartCanvasToClipboard, exportFilename]);
+  }, [captureDesktopCanvas, exportFilename, onSuccess]);
 
   const handleExportCSV = useCallback(async () => {
     try {
+      // 1. Determine which metadata dimensions exist in the data points
+      const hasStudents = dataPoints.some((p) => p.studentNames && p.studentNames.length > 0);
+      const hasSessions = dataPoints.some((p) => p.sessionNames && p.sessionNames.length > 0);
+      const hasDepartments = dataPoints.some((p) => p.departmentNames && p.departmentNames.length > 0);
+      const hasClasses = dataPoints.some((p) => p.classNames && p.classNames.length > 0);
+      const hasSections = dataPoints.some((p) => p.sectionNames && p.sectionNames.length > 0);
+      const hasTeachers = dataPoints.some((p) => p.teacherNames && p.teacherNames.length > 0);
+
+      // Metadata headers to include
+      const metaHeaders: string[] = [];
+      if (hasStudents) metaHeaders.push('"Students"');
+      if (hasSessions) metaHeaders.push('"Sessions"');
+      if (hasDepartments) metaHeaders.push('"Department"');
+      if (hasClasses) metaHeaders.push('"Class"');
+      if (hasSections) metaHeaders.push('"Section"');
+      if (hasTeachers) metaHeaders.push('"Teacher"');
+
       const headers = [
         "Date",
         ...visibleSeries.map((s) => `"${s.label}"`),
-        "Entities Active",
+        ...metaHeaders,
       ];
 
+      const escapeCsv = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+
       const rows = dataPoints.map((p) => {
-        const dateCell = `"${p.dateStr || p.label}"`;
+        const dateCell = escapeCsv(p.dateStr || p.label);
         const seriesCells = visibleSeries.map((s) => {
           const val =
             p.values?.[s.key] !== undefined
               ? p.values[s.key]
               : (p as Record<string, any>)[s.key];
-          return val !== undefined ? val : 0;
+          return val !== undefined && val !== null ? Number(val).toFixed(1).replace(/\.0$/, '') : "0";
         });
-        const entityCell = p.entitiesCount ?? p.studentCount ?? "";
-        return [dateCell, ...seriesCells, entityCell];
+
+        const metaCells: string[] = [];
+        if (hasStudents) metaCells.push(escapeCsv((p.studentNames || []).join('; ')));
+        if (hasSessions) metaCells.push(escapeCsv((p.sessionNames || []).join('; ')));
+        if (hasDepartments) metaCells.push(escapeCsv((p.departmentNames || []).join('; ')));
+        if (hasClasses) metaCells.push(escapeCsv((p.classNames || []).join('; ')));
+        if (hasSections) metaCells.push(escapeCsv((p.sectionNames || []).join('; ')));
+        if (hasTeachers) metaCells.push(escapeCsv((p.teacherNames || []).join('; ')));
+
+        return [dateCell, ...seriesCells, ...metaCells];
       });
 
-      const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
+      // 2. Append Summary Footer Totals Block
+      const allStudents = new Set<string>();
+      const allSessions = new Set<string>();
+      const allDepartments = new Set<string>();
+      const allClasses = new Set<string>();
+      const allSections = new Set<string>();
+      const allTeachers = new Set<string>();
+
+      dataPoints.forEach((p) => {
+        (p.studentNames || []).forEach((n) => n && allStudents.add(n));
+        (p.sessionNames || []).forEach((n) => n && allSessions.add(n));
+        (p.departmentNames || []).forEach((n) => n && allDepartments.add(n));
+        (p.classNames || []).forEach((n) => n && allClasses.add(n));
+        (p.sectionNames || []).forEach((n) => n && allSections.add(n));
+        (p.teacherNames || []).forEach((n) => n && allTeachers.add(n));
+      });
+
+      if (propFooterFields && Array.isArray(propFooterFields)) {
+        propFooterFields.forEach((f: any) => {
+          if (f.id === 'students' && Array.isArray(f.items)) f.items.forEach((item: string) => allStudents.add(item));
+          if (f.id === 'sessions' && Array.isArray(f.items)) f.items.forEach((item: string) => allSessions.add(item));
+          if (f.id === 'departments' && Array.isArray(f.items)) f.items.forEach((item: string) => allDepartments.add(item));
+          if (f.id === 'classes' && Array.isArray(f.items)) f.items.forEach((item: string) => allClasses.add(item));
+          if (f.id === 'sections' && Array.isArray(f.items)) f.items.forEach((item: string) => allSections.add(item));
+          if (f.id === 'teachers' && Array.isArray(f.items)) f.items.forEach((item: string) => allTeachers.add(item));
+        });
+      }
+
+      const summaryRows = [
+        [""],
+        ['"--- OVERALL FOOTER METADATA SUMMARY ---"'],
+        ['"Field / Dimension"', '"Total Count / Enrolled Entities"'],
+        ['"Students"', escapeCsv(`${allStudents.size} Total (${Array.from(allStudents).join('; ')})`)],
+        ['"Sessions"', escapeCsv(`${allSessions.size} Active (${Array.from(allSessions).join('; ')})`)],
+        ['"Departments"', escapeCsv(Array.from(allDepartments).join('; ') || 'General')],
+        ['"Classes"', escapeCsv(Array.from(allClasses).join('; ') || 'All Classes')],
+        ['"Sections"', escapeCsv(Array.from(allSections).join('; ') || 'All Sections')],
+        ['"Teachers"', escapeCsv(Array.from(allTeachers).join('; ') || 'Staff Teachers')],
+      ];
+
+      const csvLines = [
+        headers.join(','),
+        ...rows.map((r) => r.join(',')),
+        ...summaryRows.map((r) => r.join(',')),
+      ];
+
+      const csvContent = "\uFEFF" + csvLines.join("\r\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${exportFilename}_data_${new Date().toISOString().split("T")[0]}.csv`;
+      link.download = `${exportFilename}_full_${new Date().toISOString().split("T")[0]}.csv`;
       link.click();
       URL.revokeObjectURL(url);
-
-      await copyChartCanvasToClipboard();
+      onSuccess?.("Chart and footer data exported as CSV!");
     } catch (err) {
       console.error("Export CSV failed:", err);
+      onSuccess?.("Failed to export CSV.");
     }
-  }, [dataPoints, visibleSeries, copyChartCanvasToClipboard, exportFilename]);
+  }, [dataPoints, visibleSeries, exportFilename, propFooterFields, onSuccess]);
 
   const handleShareChart = useCallback(async () => {
     try {
       const canvas = await captureDesktopCanvas();
-      if (typeof navigator !== "undefined" && navigator.share && canvas) {
-        const fileName = `${exportFilename}_${new Date().toISOString().split("T")[0]}.png`;
+      const fileName = `${exportFilename}_${new Date().toISOString().split("T")[0]}.png`;
+
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
         const shareData: ShareData = {
           title: exportTitle,
           text: `${exportTitle} - Summary & Analytics`,
+          url: window.location.href,
         };
 
-        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-        if (blob && navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: "image/png" })] })) {
-          const file = new File([blob], fileName, { type: "image/png" });
-          shareData.files = [file];
+        if (canvas) {
+          try {
+            const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+            if (blob && navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: "image/png" })] })) {
+              const file = new File([blob], fileName, { type: "image/png" });
+              shareData.files = [file];
+            }
+          } catch (fileShareErr) {
+            console.warn("File share not supported, falling back to url share:", fileShareErr);
+          }
         }
 
-        await navigator.share(shareData);
-        return;
+        try {
+          await navigator.share(shareData);
+          onSuccess?.("Chart shared successfully!");
+          return;
+        } catch (shareErr: any) {
+          if (shareErr.name === "AbortError") {
+            // User cancelled share dialog
+            return;
+          }
+          console.warn("Navigator share failed, falling back to copy link:", shareErr);
+        }
       }
-      await copyChartCanvasToClipboard();
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        console.warn("Share failed, falling back to copy:", err);
+
+      // Fallback: Copy link to clipboard
+      if (typeof navigator !== "undefined" && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(window.location.href);
+        onSuccess?.("Chart link copied to clipboard!");
+      } else {
         await copyChartCanvasToClipboard();
       }
+    } catch (err) {
+      console.warn("Share failed, falling back to copy:", err);
+      await copyChartCanvasToClipboard();
     }
-  }, [captureDesktopCanvas, copyChartCanvasToClipboard, exportFilename, exportTitle]);
+  }, [captureDesktopCanvas, copyChartCanvasToClipboard, exportFilename, exportTitle, onSuccess]);
 
   const exportMenuItems: ActionMenuItem[] = useMemo(
     () => [

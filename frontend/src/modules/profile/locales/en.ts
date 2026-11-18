@@ -32,6 +32,9 @@ export default {
   accountSwitcherSubtitle: "Manage saved accounts and active session switches",
   badgeSavedAccounts: "{{count}} Account Saved",
   badgeSavedAccounts_plural: "{{count}} Accounts Saved",
+  confirmRemoveAccountTitle: "Remove Saved Account?",
+  confirmRemoveAccountDesc: "Are you sure you want to remove this account from your saved accounts on this device?",
+  removeSavedAccountConfirm: "Remove Account",
 
   qrSyncTitle: "Scan QR to Login Elsewhere",
   qrSyncSubtitle: "Instantly authorize login on another workstation or mobile device",

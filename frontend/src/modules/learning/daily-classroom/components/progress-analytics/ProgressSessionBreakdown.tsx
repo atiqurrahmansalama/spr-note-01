@@ -25,9 +25,22 @@ export const ProgressSessionBreakdown: React.FC<ProgressSessionBreakdownProps> =
     1
   );
 
+  const totalVolume = sessionBreakdown.reduce(
+    (acc, s) => acc + (s.totalPages ?? s.primaryValue ?? s.totalCount ?? 0),
+    0
+  );
+
+  const topSession = sessionBreakdown.reduce(
+    (prev, current) =>
+      (current.totalPages ?? current.primaryValue ?? 0) > (prev?.totalPages ?? prev?.primaryValue ?? 0)
+        ? current
+        : prev,
+    sessionBreakdown[0]
+  );
+
   return (
     <div
-      className={`theme-bg-surface border-0 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4 flex flex-col justify-between select-none ${className}`}
+      className={`theme-bg-surface border-0 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4 flex flex-col justify-between select-none h-full flex-1 ${className}`}
     >
       <div className="space-y-3.5 flex-1 flex flex-col min-h-0">
         {/* 1. Header */}
@@ -82,7 +95,7 @@ export const ProgressSessionBreakdown: React.FC<ProgressSessionBreakdownProps> =
           </div>
 
           {sessionBreakdown.length === 0 ? (
-            <div className="text-xs text-center py-4 theme-text-secondary opacity-60 border-0 rounded-xl theme-bg-sub/30">
+            <div className="text-xs text-center py-4 theme-text-secondary opacity-60 border-0 rounded-xl theme-bg-sub/30 flex-1 flex items-center justify-center">
               No session data in active filter
             </div>
           ) : (
@@ -119,6 +132,24 @@ export const ProgressSessionBreakdown: React.FC<ProgressSessionBreakdownProps> =
             </div>
           )}
         </div>
+
+        {/* 4. Bottom Session Summary Strip (Anchors widget height cleanly) */}
+        {sessionBreakdown.length > 0 && (
+          <div className="pt-3 border-t theme-border flex items-center justify-between text-xs shrink-0 mt-auto">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] theme-text-secondary">Top Session:</span>
+              <span className="font-semibold theme-text-primary px-2 py-0.5 rounded-lg theme-bg-sub text-[11px]">
+                {topSession?.sessionName || topSession?.label || 'N/A'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 font-mono">
+              <span className="text-[11px] theme-text-secondary">Total:</span>
+              <span className="font-bold theme-accent text-[11px]">
+                {Number(totalVolume).toFixed(1)}p
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

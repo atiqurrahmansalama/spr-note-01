@@ -81,11 +81,19 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
     }
   };
 
-  const handleRemove = (e: React.MouseEvent, account: any) => {
+  const [accountToRemove, setAccountToRemove] = useState<any | null>(null);
+
+  const handleRequestRemove = (e: React.MouseEvent, account: any) => {
     e.stopPropagation();
-    const targetId = account.user?.phone_number || account.user?.email || account.user?.id;
+    setAccountToRemove(account);
+  };
+
+  const handleConfirmRemove = () => {
+    if (!accountToRemove) return;
+    const targetId = accountToRemove.user?.phone_number || accountToRemove.user?.email || accountToRemove.user?.id;
     const updated = multiAccount.removeAccount(targetId);
     setAccounts(updated);
+    setAccountToRemove(null);
     showToast(t('accountRemoved', 'Account removed from saved list.'), 'info');
   };
 
@@ -243,7 +251,7 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
                     ) : (
                       <button
                         type="button"
-                        onClick={(e) => handleRemove(e, acc)}
+                        onClick={(e) => handleRequestRemove(e, acc)}
                         className="p-1.5 rounded-lg theme-text-secondary hover:theme-danger hover:theme-bg-danger-soft transition-colors cursor-pointer"
                         title={t('removeSavedAccount', 'Remove Account')}
                       >
@@ -272,10 +280,6 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
         {/* Section 2: Connected Social & Single Sign-On (SSO) */}
         <DrawerSection
           title={t('socialAccountsSection', 'Connected Social & Single Sign-On (SSO)')}
-          subtitle={t(
-            'socialAccountsDesc',
-            'Manage third-party identities and single sign-on providers linked to this account.'
-          )}
           icon={ShieldCheckIcon}
         >
           <div className="space-y-3">
@@ -341,29 +345,6 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
                 )}
               </div>
             </div>
-
-            {/* Institutional SSO / SAML Provider Card */}
-            <div className="p-3.5 sm:p-4 rounded-xl border theme-border theme-bg-sub/30 shadow-2xs flex items-start gap-3 transition-colors">
-              <div className="w-10 h-10 rounded-xl border theme-border theme-bg-surface flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
-                <ShieldCheckIcon className="w-5 h-5 theme-accent" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold theme-text-primary leading-snug break-words">
-                    {t('institutionalSsoTitle', 'Institutional Identity Provider (SAML / OIDC)')}
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold theme-bg-accent-soft theme-accent border border-[var(--accent-main)]/20 shrink-0 whitespace-nowrap shadow-2xs">
-                    {t('badgeReady', 'Enterprise Ready')}
-                  </span>
-                </div>
-                <p className="text-xs theme-text-secondary mt-0.5 leading-relaxed break-words">
-                  {t(
-                    'institutionalSsoDesc',
-                    'Campus domain SSO is enabled for enterprise single sign-on.'
-                  )}
-                </p>
-              </div>
-            </div>
           </div>
         </DrawerSection>
       </div>
@@ -405,6 +386,38 @@ export const AccountSwitcherDrawer: React.FC<AccountSwitcherDrawerProps> = ({ on
           />
         </div>
       </ConfirmModal>
+
+      {/* Confirm Remove Saved Account Modal */}
+      <ConfirmModal
+        isOpen={Boolean(accountToRemove)}
+        onClose={() => setAccountToRemove(null)}
+        onConfirm={handleConfirmRemove}
+        title={t('confirmRemoveAccountTitle', 'Remove Saved Account?')}
+        message={
+          accountToRemove ? (
+            <span>
+              {t(
+                'confirmRemoveAccountDesc',
+                'Are you sure you want to remove this account from your saved accounts on this device?'
+              )}
+              <strong className="block mt-2 theme-text-primary">
+                {accountToRemove.user?.name ||
+                  (accountToRemove.user?.first_name
+                    ? `${accountToRemove.user.first_name} ${accountToRemove.user.last_name || ''}`.trim()
+                    : null) ||
+                  accountToRemove.user?.email ||
+                  accountToRemove.user?.phone_number ||
+                  accountToRemove.user?.username ||
+                  'Saved Account'}
+              </strong>
+            </span>
+          ) : undefined
+        }
+        confirmText={t('removeSavedAccountConfirm', 'Remove Account')}
+        cancelText={t('cancel', 'Cancel')}
+        confirmVariant="danger"
+        confirmIcon={TrashIcon}
+      />
     </DrawerContainer>
   );
 };

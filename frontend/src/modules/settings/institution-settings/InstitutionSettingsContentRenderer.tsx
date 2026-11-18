@@ -11,7 +11,6 @@ import {
   StaffRecruitmentRulesPanel,
 } from "@/modules/staff-management/StaffTaxonomyPanels";
 import {
-  WorkingSchedulesPanel,
   EventTypesPanel,
   ImpactScopesPanel,
 } from "@/modules/academy/calendar-events/CalendarSchedulesTaxonomyPanels";
@@ -116,13 +115,6 @@ export const InstitutionSettingsContentRenderer: React.FC<InstitutionSettingsCon
       {currentRenderSection === "grading-policies" && (
         <div className="w-full animate-fade-in">
           <GradingRulesView />
-        </div>
-      )}
-
-      {/* Section 2: Working Hours & Shifts */}
-      {currentRenderSection === "working-schedules" && (
-        <div className="w-full animate-fade-in">
-          <WorkingSchedulesPanel activeTenantId={activeTenantId} />
         </div>
       )}
 

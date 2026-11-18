@@ -115,6 +115,17 @@ export const TrendPlotArea: React.FC<TrendPlotAreaProps> = ({
       }
       const n = dataPoints.length;
       const colWidth = targetWidth / n;
+      const interDateGap = Math.max(6, Math.min(28, Math.round(colWidth * 0.36)));
+      const clusterWidth = Math.max(colWidth - interDateGap, 4);
+
+      const sCount = Math.max(visibleSeries.length, 1);
+      const gapPx = clusterWidth > 36 ? 4 : clusterWidth > 20 ? 2 : 1;
+      const computedBarWidth = Math.max(
+        2,
+        Math.min(32, Math.floor((clusterWidth - gapPx * (sCount - 1)) / sCount))
+      );
+      const totalClusterWidth = sCount * computedBarWidth + gapPx * (sCount - 1);
+
       const coordsMap: Record<string, Array<{ x: number; y: number }>> = {};
 
       visibleSeries.forEach((s) => {
@@ -122,8 +133,15 @@ export const TrendPlotArea: React.FC<TrendPlotAreaProps> = ({
       });
 
       dataPoints.forEach((p, i) => {
-        const x = i * colWidth + colWidth / 2;
-        visibleSeries.forEach((s) => {
+        const colCenter = i * colWidth + colWidth / 2;
+        const clusterStartX = colCenter - totalClusterWidth / 2;
+
+        visibleSeries.forEach((s, sIdx) => {
+          // If in bar mode with multiple series, align coordinates precisely to that specific bar's center
+          const x = viewMode === "bars" && sCount > 1
+            ? clusterStartX + sIdx * (computedBarWidth + gapPx) + computedBarWidth / 2
+            : colCenter;
+
           const raw =
             p.values?.[s.key] !== undefined
               ? p.values[s.key]
@@ -139,7 +157,7 @@ export const TrendPlotArea: React.FC<TrendPlotAreaProps> = ({
 
       return coordsMap;
     },
-    [dataPoints, visibleSeries, niceMax, plotHeight, topPadding, baselineY]
+    [dataPoints, visibleSeries, niceMax, plotHeight, topPadding, baselineY, viewMode]
   );
 
   useEffect(() => {
@@ -336,14 +354,14 @@ export const TrendPlotArea: React.FC<TrendPlotAreaProps> = ({
                     <path
                       key={`bar-overlay-${s.key}`}
                       d={generateSmoothPath(
-                        extendCoordsToEdges(coords, containerWidth),
+                        coords,
                         topPadding,
                         baselineY
                       )}
                       fill="none"
                       stroke={s.strokeColor || s.color || "var(--accent-main)"}
                       strokeWidth="1.6"
-                      strokeDasharray="3 3"
+                      strokeDasharray="2 1.5"
                       opacity="0.8"
                     />
                   );
@@ -435,7 +453,7 @@ export const TrendPlotArea: React.FC<TrendPlotAreaProps> = ({
                             y2={baselineY}
                             stroke="var(--text-secondary)"
                             strokeWidth="1"
-                            strokeDasharray="2 3"
+                            strokeDasharray="2 1.5"
                             opacity="0.6"
                           />
                         );

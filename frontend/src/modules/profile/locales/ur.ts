@@ -32,6 +32,9 @@ export default {
   accountSwitcherSubtitle: "محفوظ کردہ اکاؤنٹس کا نظم کریں اور فعال سیشنز تبدیل کریں",
   badgeSavedAccounts: "{{count}} اکاؤنٹ محفوظ",
   badgeSavedAccounts_plural: "{{count}} اکاؤنٹس محفوظ",
+  confirmRemoveAccountTitle: "محفوظ شدہ اکاؤنٹ ہٹائیں؟",
+  confirmRemoveAccountDesc: "کیا آپ واقعی اس ڈیوائس سے اس اکاؤنٹ کو محفوظ کردہ اکاؤنٹس سے ہٹانا چاہتے ہیں؟",
+  removeSavedAccountConfirm: "اکاؤنٹ ہٹائیں",
 
   qrSyncTitle: "کسی دوسرے ڈیوائس پر لاگ ان کے لیے QR اسکین کریں",
   qrSyncSubtitle: "پاس ورڈ ٹائپ کیے بغیر فوری لاگ ان کریں",

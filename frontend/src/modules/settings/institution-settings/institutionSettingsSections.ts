@@ -257,7 +257,6 @@ export const INSTITUTION_SETTINGS_SECTIONS: InstitutionSettingsSectionItem[] = [
   staffRecruitmentRulesSectionConfig,
 
   // Group 3: Calendar & Schedules
-  workingSchedulesSectionConfig,
   weeklyHolidaysSectionConfig,
   eventTypesSectionConfig,
   impactScopesSectionConfig,

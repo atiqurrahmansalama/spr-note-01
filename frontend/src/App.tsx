@@ -1,5 +1,5 @@
 import React, { Suspense } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import AppLayout from "./components/layout/AppLayout";
 import RouteLoadingFallback from "./components/ui/RouteLoadingFallback";
 import { auth as authStore } from "./utils/localStore";
@@ -103,6 +103,7 @@ interface ProtectedRouteProps {
 }
 
 function ProtectedRoute({ children }: ProtectedRouteProps): React.ReactElement {
+  const location = useLocation();
   const urlParams = new URLSearchParams(window.location.search);
   const isGoogleCallback = urlParams.has("code") || urlParams.has("access_token") || urlParams.has("id_token");
 
@@ -120,7 +121,12 @@ function ProtectedRoute({ children }: ProtectedRouteProps): React.ReactElement {
         </div>
       );
     }
-    return <Navigate to="/login" replace />;
+    const currentPath = location.pathname + location.search;
+    const returnParam =
+      currentPath && currentPath !== "/" && currentPath !== "/login"
+        ? `?returnTo=${encodeURIComponent(currentPath)}`
+        : "";
+    return <Navigate to={`/login${returnParam}`} replace />;
   }
   return children;
 }

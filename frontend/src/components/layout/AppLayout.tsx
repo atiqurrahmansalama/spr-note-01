@@ -501,7 +501,7 @@ export default function AppLayout() {
               className="h-full shrink-0 z-30 shadow-2xl relative border-l theme-border flex theme-bg-app min-w-0"
               style={{
                 width: isDrawerResizing ? undefined : `${drawerWidth || 580}px`,
-                maxWidth: 'min(1080px, 85vw)',
+                maxWidth: 'min(1280px, calc(100vw - 360px))',
                 minWidth: '360px',
                 transition: isDrawerResizing ? "none" : "width 0.15s ease-out"
               }}

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import CustomSelect from "../../../../components/ui/CustomSelect";
 import CustomInput from "../../../../components/ui/CustomInput";
 import CustomButton from "../../../../components/ui/CustomButton";
+import TemplateTextarea from "../../../../components/ui/TemplateTextarea";
 import {
   SaveIcon,
   ChevronIcon,
@@ -1072,13 +1073,6 @@ export default function TimeScheduleDrawerForm({
   const scheduleOrEventLabel = isWorkingHours
     ? t("workingSchedule", "Working Schedule / Shift")
     : t("academicEvent", "Academic Event");
-  const settingsPath = isWorkingHours
-    ? "/institution-settings/working-schedules"
-    : "/institution-settings/event-types";
-  const settingsActionLabel = isWorkingHours ? t("manageShifts", "Manage Shifts") : t("manageTypes", "Manage Types");
-  const settingsActionTitle = isWorkingHours
-    ? t("manageWorkingSchedules", "Manage Working Hours & Shifts in Institution Settings")
-    : t("manageEventTypes", "Manage Schedule & Event Types in Institution Settings");
 
   return (
     <DrawerContainer padding="none" spacing="normal">
@@ -1089,44 +1083,65 @@ export default function TimeScheduleDrawerForm({
           icon={UsersIcon}
           variant="streamlined"
         >
-          {/* Schedule/Event Dropdown */}
+          {/* Schedule/Event Field: TemplateTextarea for Working Hours, CustomSelect for Academic Events */}
           <div>
-            <CustomSelect
-              label={scheduleOrEventLabel}
-              value={formData.title}
-              onChange={(val) => {
-                const matched = eventTitleOptions.find((o) => o.value === val);
-                setValidationErrors((prev) => ({ ...prev, title: undefined }));
-                if (matched) {
-                  setFormData((prev) => ({
-                    ...prev,
-                    title: matched.value,
-                    type: matched.type,
-                    category: matched.category,
-                    color: matched.color ? resolveCanonicalEventColor(matched.color, prev.color) : prev.color,
-                    repeats: matched.repeats !== undefined ? matched.repeats : prev.repeats,
-                  }));
-                } else {
+            {isWorkingHours ? (
+              <TemplateTextarea
+                label={t("workingSchedule", "Working Schedule / Shift")}
+                value={formData.title}
+                onChange={(val: string) => {
+                  setValidationErrors((prev) => ({ ...prev, title: undefined }));
                   setFormData((prev) => ({ ...prev, title: val }));
-                }
-              }}
-              options={eventTitleOptions}
-              placeholder={
-                isWorkingHours
-                  ? t("selectWorkingSchedule", "Select Working Schedule...")
-                  : t("selectAcademicEvent", "Select Academic Event...")
-              }
-              searchable={false}
-              showDescription={false}
-              showBadge={true}
-              onActionClick={() => {
-                if (closeDrawer) closeDrawer();
-                navigate(settingsPath);
-              }}
-              actionLabel={settingsActionLabel}
-              actionTitle={settingsActionTitle}
-              error={validationErrors.title}
-            />
+                }}
+                placeholder={t("enterWorkingSchedule", "Enter working schedule / shift title or select template...")}
+                rows={2}
+                category="WORKING_HOURS"
+                namespace="working_schedules"
+                initialTemplates={[
+                  "Morning Working Session",
+                  "Afternoon Working Session",
+                  "Evening Support Session",
+                  "Night Study & Dormitory Supervision",
+                  "Full-Day Administrative Shift",
+                  "Weekend Operations & Caretaking",
+                ]}
+                required={true}
+                error={validationErrors.title}
+              />
+            ) : (
+              <CustomSelect
+                label={scheduleOrEventLabel}
+                value={formData.title}
+                onChange={(val) => {
+                  const matched = eventTitleOptions.find((o) => o.value === val);
+                  setValidationErrors((prev) => ({ ...prev, title: undefined }));
+                  if (matched) {
+                    setFormData((prev) => ({
+                      ...prev,
+                      title: matched.value,
+                      type: matched.type,
+                      category: matched.category,
+                      color: matched.color ? resolveCanonicalEventColor(matched.color, prev.color) : prev.color,
+                      repeats: matched.repeats !== undefined ? matched.repeats : prev.repeats,
+                    }));
+                  } else {
+                    setFormData((prev) => ({ ...prev, title: val }));
+                  }
+                }}
+                options={eventTitleOptions}
+                placeholder={t("selectAcademicEvent", "Select Academic Event...")}
+                searchable={false}
+                showDescription={false}
+                showBadge={true}
+                onActionClick={() => {
+                  if (closeDrawer) closeDrawer();
+                  navigate("/institution-settings/event-types");
+                }}
+                actionLabel={t("manageTypes", "Manage Types")}
+                actionTitle={t("manageEventTypes", "Manage Schedule & Event Types in Institution Settings")}
+                error={validationErrors.title}
+              />
+            )}
           </div>
 
           {/* Target Audience & System Impact Multi-Select */}

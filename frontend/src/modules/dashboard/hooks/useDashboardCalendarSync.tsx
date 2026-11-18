@@ -47,13 +47,31 @@ export function useDashboardCalendarSync(defaultCategory: 'WORKING_HOURS' | 'ACA
   useDrawerRegistration(
     'schedule',
     (params?: any) => {
-      const mode = params?.mode || 'detail';
-      const eventId = params?.eventId;
-      const targetDate = params?.date || new Date().toISOString().split('T')[0];
-      const targetCategory = params?.category || (defaultCategory === 'ALL' || defaultCategory === 'AGENDA' ? 'ACADEMIC_EVENT' : defaultCategory);
+      const getParam = (key: string) => {
+        if (!params) return null;
+        if (typeof params.get === 'function') return params.get(key);
+        return params[key] !== undefined ? params[key] : null;
+      };
 
-      const foundEvent = events.find((e) => e.id === eventId) || null;
-      const isWorkingHours = (foundEvent?.category || targetCategory) === 'WORKING_HOURS';
+      const eventId = getParam('eventId') || getParam('id');
+      const mode = getParam('mode') || (eventId ? 'detail' : 'add');
+      const targetDate = getParam('date') || new Date().toISOString().split('T')[0];
+      const explicitCategory = getParam('category');
+      const targetCategory = (explicitCategory && explicitCategory !== 'ALL' && explicitCategory !== 'AGENDA')
+        ? explicitCategory
+        : (defaultCategory === 'ALL' || defaultCategory === 'AGENDA' ? 'ACADEMIC_EVENT' : defaultCategory);
+
+      // Search in events state or directly from masterCalendarStore (Only in detail/edit modes)
+      let foundEvent = (mode !== 'add' && eventId) ? events.find((e) => String(e.id) === String(eventId)) : null;
+      if (!foundEvent && mode !== 'add' && eventId) {
+        try {
+          const stored = masterCalendarStore.getEvents(activeTenantId);
+          foundEvent = stored?.find((e: any) => String(e.id) === String(eventId)) || null;
+        } catch {}
+      }
+      const isWorkingHours = mode === 'add'
+        ? targetCategory === 'WORKING_HOURS'
+        : (foundEvent?.category || targetCategory) === 'WORKING_HOURS';
 
       if (mode === 'detail' && foundEvent) {
         return {
@@ -91,8 +109,8 @@ export function useDashboardCalendarSync(defaultCategory: 'WORKING_HOURS' | 'ACA
         size: 'md' as const,
         content: (
           <TimeScheduleDrawerForm
-            key={`dashboard-schedule-form-${mode}-${eventId || 'new'}-${targetDate}-${targetCategory}`}
-            event={foundEvent}
+            key={`dashboard-schedule-form-${mode}-${mode === 'add' ? 'new' : (eventId || 'new')}-${targetDate}-${targetCategory}`}
+            event={mode === 'add' ? null : foundEvent}
             initialDate={targetDate}
             defaultCategory={targetCategory}
             onSave={(savedData: any) => {

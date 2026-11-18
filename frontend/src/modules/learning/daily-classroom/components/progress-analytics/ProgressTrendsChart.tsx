@@ -43,6 +43,7 @@ export interface ProgressTrendsChartProps {
   timeHorizon?: any;
   onHorizonChange?: (horizon: any) => void;
   accuracyRate?: number;
+  extraMenuItems?: any[];
 }
 
 /**
@@ -69,6 +70,7 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
   viewMode,
   onViewModeChange,
   className = "",
+  extraMenuItems = [],
 }) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
@@ -322,6 +324,7 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
       footerFields={footerFields as any}
       exportFilename="recitation_trends"
       exportTitle="Recitation Trends"
+      extraMenuItems={extraMenuItems}
       className={className}
     />
   );

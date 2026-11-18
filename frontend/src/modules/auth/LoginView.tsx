@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
@@ -33,6 +33,27 @@ export default function LoginView(): React.JSX.Element {
   const rememberId = useId();
   const identifierInputRef = useRef<HTMLInputElement>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
+  const returnToRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const r = params.get("returnTo");
+    if (r && r.startsWith("/") && !r.startsWith("/login")) {
+      returnToRef.current = r;
+    }
+  }, []);
+
+  const resolvePostLoginTarget = useCallback(() => {
+    if (returnToRef.current) {
+      return returnToRef.current;
+    }
+    const searchParams = new URLSearchParams(window.location.search);
+    const returnTo = searchParams.get("returnTo");
+    if (returnTo && returnTo.startsWith("/") && !returnTo.startsWith("/login")) {
+      return returnTo;
+    }
+    return getLastActiveRoute("/dashboard");
+  }, []);
 
   const [usernameOrEmail, setUsernameOrEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -56,6 +77,7 @@ export default function LoginView(): React.JSX.Element {
     const claimQrTicket = async () => {
       setLoading(true);
       setAuthErrorBanner(null);
+      const targetRoute = resolvePostLoginTarget();
       // Clean query parameter immediately from URL so subsequent refreshes don't re-trigger
       window.history.replaceState({}, document.title, window.location.pathname);
 
@@ -67,7 +89,7 @@ export default function LoginView(): React.JSX.Element {
         if (data.status === "authorized" && data.access) {
           saveTokens(data);
           showToast(t("qrSuccess", "Signed in via QR code successfully!"), "success");
-          navigate(getLastActiveRoute("/dashboard"), { replace: true });
+          navigate(targetRoute, { replace: true });
         } else {
           const errMsg = data.message || t("qrFailed", "QR session expired or invalid.");
           setAuthErrorBanner(errMsg);
@@ -139,7 +161,7 @@ export default function LoginView(): React.JSX.Element {
 
     if (result.success) {
       showToast(t("loginSuccess", "Signed in successfully!"), "success");
-      navigate(getLastActiveRoute("/dashboard"), { replace: true });
+      navigate(resolvePostLoginTarget(), { replace: true });
     } else {
       const errMsg = result.error || t("authFailed", "Authentication failed.");
       setAuthErrorBanner(errMsg);
@@ -206,7 +228,7 @@ export default function LoginView(): React.JSX.Element {
           onSuccess={() => {
             setAuthErrorBanner(null);
             showToast(t("googleSuccess", "Signed in with Google successfully!"), "success");
-            navigate(getLastActiveRoute("/dashboard"), { replace: true });
+            navigate(resolvePostLoginTarget(), { replace: true });
           }}
           onError={(errMsg) => {
             setAuthErrorBanner(errMsg);

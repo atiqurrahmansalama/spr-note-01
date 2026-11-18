@@ -46,6 +46,7 @@ export const TrendChart: React.FC<TrendChartProps> = ({
   className = "",
   customTooltipRenderer,
   trendPoints: legacyTrendPoints,
+  extraMenuItems = [],
 }) => {
   const { showToast } = useToast() as any;
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -109,9 +110,17 @@ export const TrendChart: React.FC<TrendChartProps> = ({
     activeMetric,
     exportFilename,
     exportTitle,
+    footerFields: resolvedFooterFields,
     onSuccess: (msg) => showToast?.(msg, "success"),
     computeCoordinatesForWidth: coordCalculator,
   });
+
+  const combinedMenuItems = useMemo(() => {
+    if (!extraMenuItems || extraMenuItems.length === 0) {
+      return exportMenuItems;
+    }
+    return [...extraMenuItems, ...exportMenuItems];
+  }, [extraMenuItems, exportMenuItems]);
 
   return (
     <div
@@ -146,13 +155,13 @@ export const TrendChart: React.FC<TrendChartProps> = ({
           {/* Mobile 3-dot button */}
           <div className="@[680px]:hidden shrink-0">
             <ActionMenu
-              items={exportMenuItems}
+              items={combinedMenuItems}
               size="sm"
               variant="ghost"
               align="right"
               showChevron={false}
-              title={`Export ${title}`}
-              ariaLabel="Export Options"
+              title={`Options for ${title}`}
+              ariaLabel="Chart Options"
             />
           </div>
         </div>
@@ -180,13 +189,13 @@ export const TrendChart: React.FC<TrendChartProps> = ({
           {/* Desktop 3-dot button */}
           <div className="hidden @[680px]:block shrink-0">
             <ActionMenu
-              items={exportMenuItems}
+              items={combinedMenuItems}
               size="sm"
               variant="ghost"
               align="right"
               showChevron={false}
-              title={`Export ${title}`}
-              ariaLabel="Export Options"
+              title={`Options for ${title}`}
+              ariaLabel="Chart Options"
             />
           </div>
         </div>
