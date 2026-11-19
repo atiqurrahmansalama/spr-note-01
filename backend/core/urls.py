@@ -290,6 +290,16 @@ urlpatterns = [
     path('api/health/', root_health_check, name='api_health'),
     path('api/v1/health/', root_health_check, name='api_v1_health'),
 
+    # Domain-Driven Modular Endpoints (Rule 16: Progressive Modular Backend Architecture)
+    path('api/v1/iam/', include('modules.iam.urls')),
+    path('api/v1/academic/', include('modules.academic_structure.urls')),
+    path('api/v1/students/', include('modules.student_management.urls')),
+    path('api/v1/staff/', include('modules.staff_management.urls')),
+    path('api/v1/classroom/', include('modules.daily_classroom.urls')),
+    path('api/v1/finance/', include('modules.finance.urls')),
+    path('api/v1/helpdesk/', include('modules.helpdesk.urls')),
+    path('api/v1/system-control/', include('modules.system_control.urls')),
+
     # OpenAPI 3.0 Documentation Endpoints
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),

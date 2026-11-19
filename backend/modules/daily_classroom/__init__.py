@@ -1,0 +1,50 @@
+"""
+Daily Classroom & Progress Reporting Module
+Encapsulates Daily Progress Reports, Sabaq / Memorization Tracking,
+Student Attendance, Biometrics, Period Slots, Learning Plans, and Homework.
+"""
+from .views import (
+    StudentDailyReportViewSet,
+    VerifyReportView,
+    AttendanceSlotViewSet,
+    StudentAttendanceViewSet,
+    TeacherMatrixViewSet,
+    DynamicPeriodSlotViewSet,
+    TeacherRoutineScheduleViewSet,
+    GateLogViewSet,
+    AdHocHeadcountViewSet,
+    BiometricDeviceViewSet,
+    BiometricGatewayViewSet,
+    AttendancePolicyViewSet,
+    AcademicGoalViewSet,
+    DailyLessonPlanViewSet,
+    LessonEvaluationViewSet,
+    HomeworkAssignmentViewSet,
+    HomeworkSubmissionViewSet,
+    AcademicReportViewSet,
+    CalendarEventViewSet,
+    InstitutionalTaskViewSet,
+)
+
+__all__ = [
+    'StudentDailyReportViewSet',
+    'VerifyReportView',
+    'AttendanceSlotViewSet',
+    'StudentAttendanceViewSet',
+    'TeacherMatrixViewSet',
+    'DynamicPeriodSlotViewSet',
+    'TeacherRoutineScheduleViewSet',
+    'GateLogViewSet',
+    'AdHocHeadcountViewSet',
+    'BiometricDeviceViewSet',
+    'BiometricGatewayViewSet',
+    'AttendancePolicyViewSet',
+    'AcademicGoalViewSet',
+    'DailyLessonPlanViewSet',
+    'LessonEvaluationViewSet',
+    'HomeworkAssignmentViewSet',
+    'HomeworkSubmissionViewSet',
+    'AcademicReportViewSet',
+    'CalendarEventViewSet',
+    'InstitutionalTaskViewSet',
+]
