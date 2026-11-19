@@ -1,11 +1,18 @@
 {
-  "name": "spr-note-workspace",
+  "name": "spr-note-ecosystem",
   "private": true,
   "version": "1.0.0",
+  "packageManager": "pnpm@12.21.0",
   "scripts": {
     "dev": "node run-dev.js",
+    "dev:turbo": "turbo dev",
+    "build": "turbo build",
+    "typecheck": "turbo typecheck",
+    "lint": "turbo lint",
     "backend": "cd backend && python manage.py runserver",
-    "frontend": "npm --prefix frontend run dev"
+    "frontend": "pnpm --filter spr-note-web run dev"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.13"
   }
 }
-

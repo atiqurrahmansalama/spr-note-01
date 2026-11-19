@@ -1,0 +1,238 @@
+import React from 'react';
+import { getHijriDateString } from '../../utils/hijriUtils';
+
+const WEEKDAY_2LETTER = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+export interface DateHeaderCellProps {
+  as?: React.ElementType;
+  dayData?: any;
+  dateStr?: string;
+  dayNum?: number | string;
+  weekday?: number | string;
+  isHijriEnabled?: boolean;
+  hijriDay?: number | string;
+  hasEvent?: boolean;
+  eventColors?: any;
+  eventTitle?: string;
+  isHoliday?: boolean;
+  holidayTitle?: string;
+  isSelected?: boolean;
+  isToday?: boolean;
+  isCurrentMonth?: boolean;
+  keepNormalBgOnOtherMonths?: boolean;
+  showEventBackground?: boolean;
+  borderless?: boolean;
+  onClick?: (e?: React.MouseEvent) => void;
+  title?: string;
+  className?: string;
+  children?: React.ReactNode;
+  [key: string]: any;
+}
+
+/**
+ * Universal Date Header Cell Component
+ * Centralized standard date header cell used across:
+ * 1. Student Class Attendance (AttendanceMatrixTable)
+ * 2. Student Residential Attendance (AttendanceMatrixTable)
+ * 3. Teacher Class Attendance (AttendanceMatrixTable)
+ * 4. Staff Daily Attendance (AttendanceMatrixTable)
+ * 5. Event Calendar Timeline View (MasterTimeCalendar)
+ *
+ * Provides the unified 3-tier layout:
+ * - Gregorian Day Number
+ * - Hijri Day Number (clean text without background pill)
+ * - Event Indicator Dot
+ * - Centered 2-letter Weekday with Divider
+ */
+const DateHeaderCellComponent: React.FC<DateHeaderCellProps> = ({
+  as: Component = 'th',
+  dayData,
+  dateStr: propDateStr,
+  dayNum: propDayNum,
+  weekday: propWeekday,
+  isHijriEnabled = false,
+  hijriDay: propHijriDay,
+  hasEvent: propHasEvent,
+  eventColors: propEventColors,
+  eventTitle: propEventTitle,
+  isHoliday: propIsHoliday,
+  holidayTitle: propHolidayTitle,
+  isSelected = false,
+  isToday: propIsToday,
+  isCurrentMonth = true,
+  keepNormalBgOnOtherMonths = false,
+  showEventBackground = false,
+  borderless = false,
+  onClick,
+  title,
+  className = '',
+  children,
+  ...restProps
+}) => {
+  const dateStr = propDateStr || dayData?.date || '';
+  const dayNum = propDayNum !== undefined && propDayNum !== null ? propDayNum : dayData?.day;
+  const weekday = propWeekday !== undefined && propWeekday !== null ? propWeekday : dayData?.weekday;
+  const isHoliday = propIsHoliday !== undefined ? propIsHoliday : Boolean(dayData?.is_holiday);
+  const holidayTitle = propHolidayTitle || dayData?.holiday_title || '';
+  const hasEvent = propHasEvent !== undefined ? propHasEvent : Boolean(dayData?.has_event);
+  const eventColors = propEventColors || dayData?.event_colors || null;
+  const eventTitle = propEventTitle || dayData?.event_title || '';
+  const isToday = propIsToday !== undefined ? propIsToday : Boolean(dayData?.is_today);
+  const hijriDay = propHijriDay || dayData?.hijri_day || null;
+
+  // Resolve numeric day
+  const resolvedDayNum = dayNum !== undefined && dayNum !== null
+    ? dayNum
+    : (dateStr ? parseInt(String(dateStr).split('-')[2], 10) : '');
+
+  // Resolve Hijri Day number
+  const resolvedHijriDay = isHijriEnabled
+    ? (hijriDay || (dateStr ? getHijriDateString(dateStr).split(' ')[0] : null))
+    : null;
+
+  // Resolve 2-letter weekday
+  let resolvedWeekday2Letter = '';
+  if (typeof weekday === 'number') {
+    resolvedWeekday2Letter = WEEKDAY_2LETTER[weekday % 7] || '';
+  } else if (typeof weekday === 'string' && weekday.length > 0) {
+    resolvedWeekday2Letter = weekday.slice(0, 2).toUpperCase();
+  } else if (dateStr) {
+    const dObj = new Date(dateStr);
+    if (!isNaN(dObj.getDay())) {
+      resolvedWeekday2Letter = WEEKDAY_2LETTER[dObj.getDay()];
+    }
+  }
+
+  // Construct comprehensive title tooltip if not provided
+  const tooltipText = title || (
+    isHoliday
+      ? `Holiday / Class Off: ${holidayTitle || eventTitle || 'Class Attendance Closed'} [${dateStr || resolvedDayNum}]`
+      : eventTitle
+      ? `${eventTitle} [${dateStr || resolvedDayNum}]`
+      : `${resolvedWeekday2Letter} - ${dateStr || resolvedDayNum}${resolvedHijriDay ? ` (Hijri: ${resolvedHijriDay})` : ''}`
+  );
+
+  // Dynamic status-based background & text styling
+  let statusClasses = '';
+  if (isSelected) {
+    statusClasses = 'theme-bg-accent text-white font-bold shadow-xs';
+  } else if (isToday) {
+    statusClasses = 'theme-bg-accent-soft theme-accent font-bold hover:brightness-95';
+  } else if (hasEvent && eventColors && showEventBackground) {
+    statusClasses = `${eventColors.bg} ${eventColors.text} font-bold hover:brightness-95`;
+  } else if (isHoliday) {
+    statusClasses = borderless
+      ? 'theme-bg-elevated/60 hover:theme-bg-elevated theme-text-secondary'
+      : 'theme-bg-sub/80 hover:theme-bg-sub theme-text-secondary';
+  } else if (!isCurrentMonth) {
+    statusClasses = borderless
+      ? 'theme-bg-tile-muted hover:theme-bg-elevated/60 opacity-55 hover:opacity-85 theme-text-secondary'
+      : keepNormalBgOnOtherMonths
+      ? 'theme-bg-surface hover:theme-bg-sub/40 opacity-40 hover:opacity-75 theme-text-secondary'
+      : 'theme-bg-sub/30 opacity-40 hover:opacity-75 theme-text-secondary';
+  } else {
+    statusClasses = borderless
+      ? 'theme-bg-tile hover:theme-bg-elevated/70 theme-text-primary'
+      : 'theme-bg-surface hover:theme-bg-sub/40 theme-text-primary';
+  }
+
+  // Standardized strip height across all cells: controlled purely by whether Hijri tier is enabled
+  const showHijriTier = Boolean(isHijriEnabled);
+
+  return (
+    <Component
+      onClick={onClick}
+      title={tooltipText}
+      data-active={isSelected}
+      data-today={isToday}
+      className={`py-1.5 px-0.5 sm:px-1 font-mono ${
+        borderless ? 'border-0 rounded-2xl' : 'border-r border-b theme-border'
+      } transition-colors cursor-pointer select-none align-middle ${statusClasses} ${className}`}
+      {...restProps}
+    >
+      <div
+        className={`flex flex-col items-center justify-between py-1 w-full ${
+          showHijriTier
+            ? 'h-[64px] min-h-[64px] max-h-[64px] sm:h-[70px] sm:min-h-[70px] sm:max-h-[70px]'
+            : 'h-[50px] min-h-[50px] max-h-[50px] sm:h-[54px] sm:min-h-[54px] sm:max-h-[54px]'
+        }`}
+      >
+        {/* Tier 1: Gregorian Day Number (Fixed horizontal baseline slot across all cells) */}
+        <div className="h-5 sm:h-5.5 flex items-center justify-center shrink-0 w-full">
+          <span
+            className={`font-bold text-xs sm:text-sm tracking-tight leading-none ${
+              isSelected
+                ? 'text-white'
+                : isToday
+                ? 'theme-accent'
+                : hasEvent && eventColors && showEventBackground
+                ? eventColors.text
+                : !isCurrentMonth
+                ? 'theme-text-secondary'
+                : 'theme-text-primary'
+            }`}
+          >
+            {resolvedDayNum}
+          </span>
+        </div>
+
+        {/* Tier 2: Middle Slot (Uniform Hijri text if enabled, plus fixed-height event dot slot) */}
+        <div className="flex flex-col items-center justify-center shrink-0 w-full">
+          {showHijriTier && (
+            <div className="h-3.5 sm:h-4 flex items-center justify-center shrink-0 w-full">
+              {resolvedHijriDay ? (
+                <span
+                  className={`text-[10px] sm:text-[11px] font-mono font-bold leading-none select-none ${
+                    isSelected ? 'text-white/90' : 'theme-accent'
+                  }`}
+                >
+                  {resolvedHijriDay}
+                </span>
+              ) : (
+                <span className="opacity-0 select-none text-[10px] sm:text-[11px] leading-none">-</span>
+              )}
+            </div>
+          )}
+
+          {/* Fixed-dimension Dot Slot: maintains exact identical height whether event exists or not */}
+          <div className="h-2 flex items-center justify-center shrink-0 w-full">
+            {hasEvent ? (
+              <span
+                className={`w-1 h-1 rounded-full shrink-0 ${
+                  isSelected ? 'bg-white' : eventColors?.dot || 'theme-bg-accent'
+                }`}
+                style={
+                  !isSelected && eventColors?.hex
+                    ? { backgroundColor: eventColors.hex }
+                    : undefined
+                }
+              />
+            ) : (
+              <span className="w-1 h-1 rounded-full shrink-0 opacity-0 pointer-events-none" />
+            )}
+          </div>
+        </div>
+
+        {/* Tier 3: Centered 2-Letter Weekday Name (Fixed horizontal baseline slot across all cells) */}
+        <div
+          className={`w-full h-4 sm:h-4.5 flex items-center justify-center shrink-0 ${
+            borderless ? 'border-0' : 'border-t theme-border'
+          }`}
+        >
+          <span
+            className={`text-[8px] sm:text-[9px] font-semibold uppercase leading-none text-center block ${
+              isSelected ? 'text-white/80' : 'opacity-60 theme-text-primary'
+            }`}
+          >
+            {resolvedWeekday2Letter}
+          </span>
+        </div>
+
+        {children}
+      </div>
+    </Component>
+  );
+};
+
+export const DateHeaderCell = React.memo(DateHeaderCellComponent);
+export default DateHeaderCell;

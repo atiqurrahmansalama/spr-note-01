@@ -1,0 +1,139 @@
+import React, { useEffect } from 'react';
+import { useHorizontalScroll } from './hooks';
+import CustomButton from './CustomButton';
+
+/**
+ * Reusable Theme-Aware Tab Switcher Component
+ * Matches the enterprise design of Section Control tabs with full CSS variable theme support.
+ * Supports horizontal mouse wheel and drag-to-scroll across all devices and screen sizes.
+ *
+ * @param {Array<{id: string, label: string, icon?: React.ComponentType, Icon?: React.ComponentType, badge?: string|number}>} tabs
+ * @param {string} activeTab
+ * @param {Function} onChange
+ * @param {React.ReactNode} rightContent
+ * @param {{label: string, icon?: React.ComponentType, onClick: Function, title?: string, variant?: string, disabled?: boolean}|null} inlineAction - Optional built-in compact action button rendered inline on the same row across all screen widths.
+ * @param {string} className
+ * @param {boolean} keepRightContentInline - When true, keeps rightContent on the exact same row as tabs on mobile/small screens.
+ */
+/** @type {any} */
+export default function TabSwitcher({
+  tabs = [],
+  activeTab = '',
+  onChange = null,
+  onTabChange = null,
+  rightContent = null,
+  inlineAction = null,
+  className = '',
+  keepRightContentInline = false,
+}) {
+  const tabsContainerRef = useHorizontalScroll();
+  const handleTabSelect = onChange || onTabChange;
+  const forceInlineRow = Boolean(keepRightContentInline || inlineAction);
+
+  // Auto-scroll active tab into view horizontally within container only
+  useEffect(() => {
+    const container = tabsContainerRef.current;
+    if (container) {
+      const activeEl = container.querySelector('[data-active="true"]');
+      if (activeEl) {
+        const containerRect = container.getBoundingClientRect();
+        const elRect = activeEl.getBoundingClientRect();
+        // Only scroll if active element is partially or completely outside the container horizontally
+        if (elRect.left < containerRect.left || elRect.right > containerRect.right) {
+          const scrollLeft =
+            activeEl.offsetLeft - container.clientWidth / 2 + activeEl.clientWidth / 2;
+          container.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
+        }
+      }
+    }
+  }, [activeTab]);
+
+  return (
+    <div className={`w-full min-w-0 @container ${className}`}>
+      <div
+        className={
+          forceInlineRow
+            ? "flex flex-row items-center justify-between gap-2 @[640px]:gap-4 border-b theme-border w-full min-w-0"
+            : "flex flex-col @[640px]:flex-row @[640px]:items-center justify-between gap-2.5 @[640px]:gap-4 @[640px]:border-b theme-border w-full min-w-0"
+        }
+      >
+        {/* Tabs List with Wheel & Drag Scrolling */}
+        <div
+          ref={tabsContainerRef}
+          className={
+            forceInlineRow
+              ? "flex items-center gap-1.5 @[640px]:gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 max-w-full cursor-grab active:cursor-grabbing pt-1 @[640px]:pt-1.5"
+              : "flex items-center gap-1.5 @[640px]:gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 max-w-full cursor-grab active:cursor-grabbing pt-1 @[640px]:pt-1.5 border-b @[640px]:border-b-0 theme-border"
+          }
+        >
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            const IconComponent = tab.icon || tab.Icon;
+
+            return (
+              <button
+                key={tab.id}
+                data-active={isActive}
+                type="button"
+                onClick={() => (handleTabSelect && handleTabSelect(tab.id))}
+                className={`group h-8.5 @[640px]:h-10 px-2.5 @[640px]:px-4 text-xs font-semibold rounded-t-xl transition-colors duration-150 cursor-pointer whitespace-nowrap border-t-2 border-x flex items-center gap-1.5 @[640px]:gap-2 relative -mb-[1px] outline-none focus:outline-none focus:ring-0 select-none shrink-0 ${
+                  isActive
+                    ? 'theme-bg-surface theme-text-primary border-t-[var(--accent-main)] theme-border shadow-xs border-b-[var(--bg-surface)]'
+                    : 'border-t-transparent border-x-transparent theme-bg-sub/50 theme-text-secondary hover:theme-text-primary hover:theme-bg-sub border-b-theme-border'
+                }`}
+              >
+                {IconComponent && (
+                  <IconComponent
+                    className={`w-3.5 h-3.5 transition-colors ${
+                      isActive ? 'theme-accent' : 'opacity-70 group-hover:opacity-100'
+                    }`}
+                  />
+                )}
+                <span>{tab.label}</span>
+                {tab.badge !== undefined && tab.badge !== null && (
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                      isActive
+                        ? 'theme-bg-accent theme-accent-text'
+                        : 'theme-bg-sub theme-text-secondary border theme-border'
+                    }`}
+                  >
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right-aligned Slot (Built-in inlineAction button or custom rightContent) */}
+        {(inlineAction || rightContent) && (
+          <div
+            className={
+              forceInlineRow
+                ? "flex items-center justify-end gap-1.5 @[640px]:gap-2 shrink-0 pb-1.5 @[640px]:pb-1 w-auto"
+                : "flex items-center justify-stretch @[640px]:justify-end gap-2 shrink-0 pb-1.5 @[640px]:pb-0 w-full @[640px]:w-auto"
+            }
+          >
+            {inlineAction && (
+              <CustomButton
+                type="button"
+                variant={inlineAction.variant || 'primary'}
+                size="sm"
+                icon={inlineAction.icon}
+                onClick={inlineAction.onClick}
+                disabled={inlineAction.disabled}
+                title={inlineAction.title || inlineAction.label}
+                className="whitespace-nowrap shrink-0"
+              >
+                {inlineAction.label}
+              </CustomButton>
+            )}
+            {rightContent}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+

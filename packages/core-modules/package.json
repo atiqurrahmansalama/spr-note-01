@@ -1,0 +1,40 @@
+{
+  "name": "@repo/core-modules",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./iam": {
+      "types": "./src/iam/index.ts",
+      "default": "./src/iam/index.ts"
+    },
+    "./notifications": {
+      "types": "./src/notifications/index.ts",
+      "default": "./src/notifications/index.ts"
+    },
+    "./calendar": {
+      "types": "./src/calendar/index.ts",
+      "default": "./src/calendar/index.ts"
+    },
+    "./system-control": {
+      "types": "./src/system-control/index.ts",
+      "default": "./src/system-control/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@repo/utils": "workspace:*"
+  },
+  "devDependencies": {
+    "@repo/tsconfig": "workspace:*",
+    "typescript": "^5.9.3"
+  }
+}

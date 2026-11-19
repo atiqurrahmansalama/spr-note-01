@@ -35,14 +35,19 @@ backend/logs/
 backend/backups/
 
 # ==========================================
-# 4. Frontend Exclusions (Node & React/Vite)
+# 4. Frontend & Monorepo Exclusions (Node & Turborepo)
 # ==========================================
 node_modules/
-frontend/node_modules/
-frontend/dist/
+.turbo/
 dist/
-frontend/dist-ssr/
-frontend/coverage/
+coverage/
+apps/*/node_modules/
+apps/*/dist/
+apps/*/.turbo/
+packages/*/node_modules/
+packages/*/dist/
+packages/*/.turbo/
+frontend/
 
 # ==========================================
 # 5. Extra Unused Folders

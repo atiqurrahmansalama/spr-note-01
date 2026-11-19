@@ -83,32 +83,30 @@ jobs:
           cd backend
           python manage.py test core --noinput
 
-  frontend-ci:
-    name: Frontend Typecheck & Production Build
+  monorepo-ci:
+    name: Monorepo Typecheck & Production Build (Turborepo & pnpm)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code Repository
         uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.21.0
+
       - name: Setup Node.js Runtime
         uses: actions/setup-node@v4
         with:
           node-version: "20.x"
-          cache: "npm"
-          cache-dependency-path: "frontend/package-lock.json"
+          cache: "pnpm"
 
-      - name: Install Frontend Dependencies
-        run: |
-          cd frontend
-          npm ci
+      - name: Install Monorepo Dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: TypeScript Static Typecheck
-        run: |
-          cd frontend
-          npx tsc --noEmit
+      - name: Universal TypeScript Static Typecheck
+        run: pnpm run typecheck
 
-      - name: Production Vite Build
-        run: |
-          cd frontend
-          npm run build
+      - name: Multi-Project Production Build (Turborepo)
+        run: pnpm run build

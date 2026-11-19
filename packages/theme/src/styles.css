@@ -1,0 +1,135 @@
+/**
+ * @repo/theme — Enterprise Semantic Design Tokens
+ * ================================================
+ * Pure CSS variables and utility classes for dark/light themes.
+ */
+
+:root {
+  --bg-app: #121315;
+  --bg-surface: #1c1d1f;
+  --bg-surface-sub: #18191b;
+  --bg-elevated: #26282c;
+  --bg-tile: #262a32;
+  --bg-tile-muted: #1e2127;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.15);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --accent-main: #6366f1;
+  --accent-soft: color-mix(in srgb, var(--accent-main) 18%, transparent);
+  --accent-text: #ffffff;
+  --danger-main: #f43f5e;
+  --danger-soft: color-mix(in srgb, var(--color-danger, #f43f5e) 18%, transparent);
+  --danger-hover: color-mix(in srgb, var(--color-danger, #f43f5e) 25%, transparent);
+  --danger-text: #fb7185;
+
+  /* Global Semantic Status Tokens (Dark Default) */
+  --color-success: #10b981;
+  --color-success-soft: rgba(16, 185, 129, 0.12);
+  --color-success-border: rgba(16, 185, 129, 0.25);
+  --color-success-text: #34d399;
+
+  --color-warning: #f59e0b;
+  --color-warning-soft: rgba(245, 158, 11, 0.12);
+  --color-warning-border: rgba(245, 158, 11, 0.25);
+  --color-warning-text: #fbbf24;
+
+  --color-danger: #f43f5e;
+  --color-danger-soft: rgba(244, 63, 94, 0.12);
+  --color-danger-border: rgba(244, 63, 94, 0.25);
+  --color-danger-text: #fb7185;
+
+  --color-info: #0ea5e9;
+  --color-info-soft: rgba(14, 165, 233, 0.12);
+  --color-info-border: rgba(14, 165, 233, 0.25);
+  --color-info-text: #38bdf8;
+
+  --color-purple: #a855f7;
+  --color-purple-soft: rgba(168, 85, 247, 0.12);
+  --color-purple-border: rgba(168, 85, 247, 0.25);
+  --color-purple-text: #c084fc;
+
+  --color-neutral: #64748b;
+  --color-neutral-soft: rgba(100, 116, 139, 0.12);
+  --color-neutral-border: rgba(100, 116, 139, 0.25);
+  --color-neutral-text: #94a3b8;
+
+  /* Global Semantic Elevation & Soft Surface Shadow Tokens (Dark Default) */
+  --shadow-subtle: 0 1px 3px 0 rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 2px 8px 0 rgba(0, 0, 0, 0.35), 0 1px 3px 0 rgba(0, 0, 0, 0.25);
+  --shadow-popover: 0 0 18px 0 rgba(0, 0, 0, 0.45), 0 16px 32px -4px rgba(0, 0, 0, 0.60);
+  --shadow-modal: 0 0 28px 0 rgba(0, 0, 0, 0.55), 0 24px 48px -8px rgba(0, 0, 0, 0.70);
+  --shadow-floating: 0 0 16px 0 rgba(0, 0, 0, 0.40), 0 14px 30px -4px rgba(0, 0, 0, 0.55);
+}
+
+html[data-mode="light"] {
+  --bg-app: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-sub: #f1f5f9;
+  --bg-elevated: #e2e8f0;
+  --bg-tile: #f1f5f9;
+  --bg-tile-muted: #e2e8f0;
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(0, 0, 0, 0.15);
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --accent-main: #6366f1;
+  --accent-soft: color-mix(in srgb, var(--accent-main) 12%, transparent);
+  --accent-text: #ffffff;
+
+  --color-success: #059669;
+  --color-success-soft: rgba(5, 150, 105, 0.10);
+  --color-success-border: rgba(5, 150, 105, 0.20);
+  --color-success-text: #047857;
+
+  --color-warning: #d97706;
+  --color-warning-soft: rgba(217, 119, 6, 0.10);
+  --color-warning-border: rgba(217, 119, 6, 0.20);
+  --color-warning-text: #b45309;
+
+  --color-danger: #e11d48;
+  --color-danger-soft: rgba(225, 29, 72, 0.10);
+  --color-danger-border: rgba(225, 29, 72, 0.20);
+  --color-danger-text: #be123c;
+
+  --color-info: #0284c7;
+  --color-info-soft: rgba(2, 132, 199, 0.10);
+  --color-info-border: rgba(2, 132, 199, 0.20);
+  --color-info-text: #0369a1;
+
+  --shadow-subtle: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 2px 8px 0 rgba(0, 0, 0, 0.04), 0 1px 3px 0 rgba(0, 0, 0, 0.03);
+}
+
+/* Common Theme Utility Classes */
+.theme-bg-app {
+  background-color: var(--bg-app);
+}
+
+.theme-bg-surface {
+  background-color: var(--bg-surface);
+}
+
+.theme-bg-elevated {
+  background-color: var(--bg-elevated);
+}
+
+.theme-text-primary {
+  color: var(--text-primary);
+}
+
+.theme-text-secondary {
+  color: var(--text-secondary);
+}
+
+.theme-accent {
+  color: var(--accent-main);
+}
+
+.theme-accent-text {
+  color: var(--accent-text);
+}
+
+.theme-bg-accent {
+  background-color: var(--accent-main);
+}

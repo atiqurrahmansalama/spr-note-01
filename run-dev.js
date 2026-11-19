@@ -8,9 +8,15 @@ const fs = require('fs');
 
 const rootDir = __dirname;
 const backendDir = path.join(rootDir, 'backend');
-const frontendDir = path.join(rootDir, 'frontend');
+const frontendDir = path.join(rootDir, 'apps', 'spr-note-web');
 const isWin = process.platform === 'win32';
-const npmCmd = isWin ? 'npm.cmd' : 'npm';
+let npmCmd = isWin ? 'pnpm.cmd' : 'pnpm';
+try {
+  const { execSync } = require('child_process');
+  execSync(isWin ? 'where pnpm' : 'which pnpm', { stdio: 'ignore' });
+} catch {
+  npmCmd = isWin ? 'npm.cmd' : 'npm';
+}
 
 // Detect Python executable (prefer project venv if present)
 const venvPythonWin = path.join(rootDir, 'venv', 'Scripts', 'python.exe');
