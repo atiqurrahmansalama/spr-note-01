@@ -23,6 +23,7 @@ interface CalendarControlBarProps {
   isHijriEnabled?: boolean;
   shouldShowTodayButton: boolean;
   showPersonalTasks: boolean;
+  showPersonalTasksToggle?: boolean;
   searchQuery: string;
   filteredEventsCount: number;
   embeddedSurface?: boolean;
@@ -50,6 +51,7 @@ export const CalendarControlBar: React.FC<CalendarControlBarProps> = ({
   isHijriEnabled,
   shouldShowTodayButton,
   showPersonalTasks,
+  showPersonalTasksToggle = true,
   searchQuery,
   filteredEventsCount,
   embeddedSurface = false,
@@ -156,7 +158,7 @@ export const CalendarControlBar: React.FC<CalendarControlBarProps> = ({
             )}
 
             {/* Personal Tasks Overlay Toggle */}
-            {viewMode === 'month' && (
+            {viewMode === 'month' && showPersonalTasksToggle && (
               <CustomButton
                 type="button"
                 variant={showPersonalTasks ? 'primary' : navControlVariant}

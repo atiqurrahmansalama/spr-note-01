@@ -35,6 +35,7 @@ export const ur = {
 
   // Table Columns
   colFacultyStaff: 'استاد / ملازم',
+  colDesignation: 'عہدہ',
   colRankDesignation: 'مرتبہ اور عہدہ',
   colDepartmentRole: 'شعبہ اور حیثیت',
   colAssignments: 'تفویض شدہ فرائض',

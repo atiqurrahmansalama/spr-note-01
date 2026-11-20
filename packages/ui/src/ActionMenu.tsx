@@ -403,7 +403,7 @@ export default function ActionMenu({
               transform: !coords.isCustomCoord && align === 'center' ? 'translateX(-50%)' : undefined,
               zIndex: 99999,
             }}
-            className={`min-w-[190px] max-w-[min(92vw,420px)] max-h-[380px] overflow-y-auto scrollbar-none no-scrollbar rounded-3xl theme-bg-surface border theme-border shadow-2xl p-1.5 space-y-0.5 animate-scale-in text-left focus:outline-none backdrop-blur-md select-none print:hidden print-studio-no-print ${menuClassName}`}
+            className={`min-w-[190px] max-w-[min(92vw,420px)] max-h-[380px] overflow-y-auto scrollbar-none no-scrollbar rounded-2xl theme-bg-surface border theme-border shadow-2xl p-1.5 space-y-0.5 animate-scale-in text-left focus:outline-none backdrop-blur-md select-none print:hidden print-studio-no-print ${menuClassName}`}
           >
             {/* Header: title/subtitle or header label */}
             {(title || subtitle) ? (

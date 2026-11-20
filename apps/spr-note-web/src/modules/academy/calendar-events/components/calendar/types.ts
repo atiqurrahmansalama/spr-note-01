@@ -55,4 +55,6 @@ export interface MasterTimeCalendarProps {
   embeddedSurface?: boolean;
   showPersonalTasks?: boolean;
   onTogglePersonalTasks?: () => void;
+  canAddWorkingHours?: boolean;
+  canAddEvents?: boolean;
 }

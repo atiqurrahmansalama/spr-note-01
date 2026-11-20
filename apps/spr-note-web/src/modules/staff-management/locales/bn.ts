@@ -35,6 +35,7 @@ export const bn = {
 
   // Table Columns
   colFacultyStaff: 'অনুষদ ও স্টাফ',
+  colDesignation: 'পদবী',
   colRankDesignation: 'পদক্রম ও পদবী',
   colDepartmentRole: 'বিভাগ ও ধরন',
   colAssignments: 'নির্ধারিত দায়িত্ব',

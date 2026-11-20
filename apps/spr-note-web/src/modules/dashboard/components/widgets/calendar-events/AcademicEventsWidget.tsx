@@ -5,6 +5,7 @@ import {
   PlusIcon,
 } from '../../../../../components/ui/Icons';
 import useDashboardCalendarSync from '../../../hooks/useDashboardCalendarSync';
+import { useFeatureControl } from '../../../../../context/FeatureControlContext';
 import type { CalendarDisplayMode } from '../../../../academy/calendar-events/types';
 
 // Code-split heavy MasterTimeCalendar asynchronously to avoid blocking the dashboard main thread
@@ -47,8 +48,13 @@ export default function AcademicEventsWidget({
   className = '',
 }: AcademicEventsWidgetProps) {
   const navigate = useNavigate();
+  const { isSectionEnabled } = useFeatureControl();
   // View mode is strictly governed by Workspace Customizer settings
   const effectiveDisplayMode: CalendarDisplayMode = propDisplayMode || initialDisplayMode || 'grid';
+
+  const canAddEvents = isSectionEnabled('calendar_add_events');
+  const canViewEvents = isSectionEnabled('calendar_view_events');
+  const isMyTasksEnabled = isSectionEnabled('calendar_tab_personal_tasks') && isSectionEnabled('calendar_view_personal_tasks');
 
   const {
     events,
@@ -57,8 +63,8 @@ export default function AcademicEventsWidget({
     openDrawer,
   } = useDashboardCalendarSync('ACADEMIC_EVENT');
 
-  // Tasks visibility is strictly governed by Workspace Customizer setting
-  const effectiveShowTasks = propShowTasks !== undefined ? propShowTasks : true;
+  // Tasks visibility is strictly governed by Workspace Customizer setting and My Tasks feature switches
+  const effectiveShowTasks = isMyTasksEnabled && (propShowTasks !== undefined ? propShowTasks : true);
 
   const handleAddEvent = () => {
     openDrawer('schedule', {
@@ -96,24 +102,28 @@ export default function AcademicEventsWidget({
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 @sm:gap-2 shrink-0">
           {/* Main Page Navigation: Pure text button placed BEFORE Add button (No hard white) */}
-          <button
-            type="button"
-            onClick={handleNavigateToHub}
-            className="px-1.5 py-1 text-[11px] @sm:text-xs font-semibold theme-text-secondary hover:theme-text-primary hover:underline transition-colors cursor-pointer border-0 bg-transparent select-none shrink-0"
-          >
-            Full View
-          </button>
+          {canViewEvents && (
+            <button
+              type="button"
+              onClick={handleNavigateToHub}
+              className="px-1.5 py-1 text-[11px] @sm:text-xs font-semibold theme-text-secondary hover:theme-text-primary hover:underline transition-colors cursor-pointer border-0 bg-transparent select-none shrink-0"
+            >
+              Full View
+            </button>
+          )}
 
           {/* Add Event Button (Short 'Add' on small screens) */}
-          <button
-            type="button"
-            onClick={handleAddEvent}
-            className="px-2 py-1 @sm:px-2.5 @sm:py-1.5 rounded-xl text-[11px] @sm:text-xs font-semibold theme-bg-accent theme-accent-text hover:brightness-105 transition-all flex items-center gap-1 cursor-pointer border-0 shadow-2xs shrink-0"
-          >
-            <PlusIcon className="w-3.5 h-3.5" />
-            <span className="inline @[480px]:hidden">Add</span>
-            <span className="hidden @[480px]:inline">New Event</span>
-          </button>
+          {canAddEvents && (
+            <button
+              type="button"
+              onClick={handleAddEvent}
+              className="px-2 py-1 @sm:px-2.5 @sm:py-1.5 rounded-xl text-[11px] @sm:text-xs font-semibold theme-bg-accent theme-accent-text hover:brightness-105 transition-all flex items-center gap-1 cursor-pointer border-0 shadow-2xs shrink-0"
+            >
+              <PlusIcon className="w-3.5 h-3.5" />
+              <span className="inline @[480px]:hidden">Add</span>
+              <span className="hidden @[480px]:inline">New Event</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -129,6 +139,7 @@ export default function AcademicEventsWidget({
             hideViewModeToggle={true}
             embeddedSurface={true}
             showPersonalTasks={effectiveShowTasks}
+            canAddEvents={canAddEvents}
             onSaveEvent={handleSaveEvent}
             onDeleteEvent={handleDeleteEvent}
           />

@@ -20,6 +20,7 @@ interface CalendarMonthGridViewProps {
   onSelectDay: (dayNum: number) => void;
   onSetCurrentDate: (date: Date) => void;
   onSetDisplayMode: (mode: CalendarDisplayMode) => void;
+  canAdd?: boolean;
   onOpenAddDrawer: (dateStr: string) => void;
   onOpenEventDetail: (evt: CalendarEvent, dateStr?: string) => void;
 }
@@ -33,6 +34,7 @@ export const CalendarMonthGridView: React.FC<CalendarMonthGridViewProps> = ({
   readOnly = false,
   embeddedSurface = false,
   showPersonalTasks = true,
+  canAdd = true,
   activeTenantId,
   getEventsForDate,
   getTasksForDate,
@@ -92,8 +94,10 @@ export const CalendarMonthGridView: React.FC<CalendarMonthGridViewProps> = ({
                         }
                         if (dayEvents.length > 0) {
                           onSetDisplayMode('timeline');
-                        } else if (!readOnly) {
+                        } else if (!readOnly && canAdd) {
                           onOpenAddDrawer(cell.dateStr);
+                        } else {
+                          onSetDisplayMode('timeline');
                         }
                       }}
                       className={`border-0 w-full p-1 @sm:p-1.5 @xl:p-2 flex flex-col justify-start transition-colors cursor-pointer group select-none rounded-md relative overflow-hidden ${

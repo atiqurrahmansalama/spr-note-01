@@ -208,6 +208,13 @@ export const masterCalendarStore = {
     }
     return events;
   },
+  saveEvent: (tenantId, eventData) => {
+    if (!eventData) return null;
+    if (eventData.id) {
+      return masterCalendarStore.updateEvent(tenantId, eventData.id, eventData);
+    }
+    return masterCalendarStore.addEvent(tenantId, eventData);
+  },
   addEvent: (tenantId, eventData) => {
     const list = masterCalendarStore.getEvents(tenantId);
     const rankVal = eventData.priorityRank !== undefined && eventData.priorityRank !== null

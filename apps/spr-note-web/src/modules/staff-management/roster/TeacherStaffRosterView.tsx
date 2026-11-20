@@ -40,6 +40,9 @@ export const TeacherStaffRosterView: React.FC = () => {
     rankFilterOptions,
     departmentOptions,
     statusOptions,
+    resetAllFilters,
+    hasActiveFilters,
+    activeFilterCount,
   } = useStaffFilter({ staffList, ranksList, departments });
 
   // Modals for In-Page Class & Duty Assignments (Zero Right Sidebar Required)
@@ -48,15 +51,13 @@ export const TeacherStaffRosterView: React.FC = () => {
 
   return (
     <PageContainer>
-      {/* 1. Header with Live Metrics & Direct Onboarding Action */}
+      {/* 1. Header with Live Metrics */}
       <StaffRosterHeader
         metrics={metrics}
         matchingCount={filteredStaff.length}
-        isRefreshing={isRefreshing}
-        onRefresh={() => loadData(true)}
       />
 
-      {/* 2. Search, Filter Toolbar & Table/Grid View Switcher */}
+      {/* 2. Unified Search, Filter Toolbar & Table/Grid View Switcher */}
       <StaffRosterToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -75,6 +76,11 @@ export const TeacherStaffRosterView: React.FC = () => {
         onToggleDisplayMode={handleToggleDisplayMode}
         matchingCount={filteredStaff.length}
         totalCount={staffList.length}
+        onRefresh={() => loadData(true)}
+        isRefreshing={isRefreshing}
+        hasActiveFilters={hasActiveFilters}
+        onResetFilters={resetAllFilters}
+        activeFilterCount={activeFilterCount}
       />
 
       {/* 3. Main Roster Content (Table View vs Responsive Card Grid) */}

@@ -8,6 +8,7 @@ interface CalendarAgendaListViewProps {
   isHijriEnabled?: boolean;
   embeddedSurface?: boolean;
   activeTenantId?: string;
+  selectedCategory?: string;
   onOpenEventDetail: (evt: CalendarEvent) => void;
 }
 
@@ -16,13 +17,18 @@ export const CalendarAgendaListView: React.FC<CalendarAgendaListViewProps> = ({
   isHijriEnabled = false,
   embeddedSurface = false,
   activeTenantId,
+  selectedCategory,
   onOpenEventDetail,
 }) => {
   return (
     <div className={`${embeddedSurface ? 'p-0 pb-4' : 'p-3 @sm:p-4 pb-5 @sm:pb-6'} space-y-2.5 @sm:space-y-3`}>
       {filteredEvents.length === 0 ? (
         <div className="p-10 @sm:p-12 text-center text-xs theme-text-secondary border-0 rounded-2xl theme-bg-tile shadow-2xs">
-          No events or working hours matching the filter criteria.
+          {selectedCategory === 'WORKING_HOURS'
+            ? 'No working hours or shifts found.'
+            : selectedCategory === 'ACADEMIC_EVENT'
+            ? 'No academic events or milestones found.'
+            : 'No events or working hours matching the filter criteria.'}
         </div>
       ) : (
         filteredEvents.map((evt) => {

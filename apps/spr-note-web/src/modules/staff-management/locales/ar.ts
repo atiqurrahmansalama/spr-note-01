@@ -35,6 +35,7 @@ export const ar = {
 
   // Table Columns
   colFacultyStaff: 'الموظف والاسم',
+  colDesignation: 'المسمى الوظيفي',
   colRankDesignation: 'المرتبة والمسمى',
   colDepartmentRole: 'القسم والدور',
   colAssignments: 'الواجبات والتكليفات',

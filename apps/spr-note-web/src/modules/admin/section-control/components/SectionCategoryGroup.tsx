@@ -1,7 +1,26 @@
 import React, { useState } from 'react';
 import SectionToggleCard from './SectionToggleCard';
 import { useSectionTranslation } from '../hooks/useSectionTranslation';
+import { useFeatureControl } from '../../../../context/FeatureControlContext';
 import { SectionCategory, SectionItem } from '../types';
+
+export const WIDGET_SOURCE_PREREQUISITES: Record<string, { label: string; sectionKey: string }> = {
+  dashboard_widget_working_hours: { label: 'Working Hours', sectionKey: 'calendar_tab_working_hours' },
+  dashboard_widget_academic_events: { label: 'Academic Events', sectionKey: 'calendar_tab_events' },
+  dashboard_widget_agenda_schedule: { label: 'Agenda', sectionKey: 'calendar_tab_agenda' },
+  dashboard_widget_personal_tasks: { label: 'My Tasks', sectionKey: 'calendar_tab_personal_tasks' },
+  dashboard_widget_timetable_schedule: { label: 'Period Slots', sectionKey: 'class_period_slots' },
+  dashboard_widget_attendance_pulse: { label: 'Attendance', sectionKey: 'monthly_attendance_matrix' },
+  dashboard_widget_recitation_kpis: { label: 'Daily Classroom', sectionKey: 'progress_management' },
+  dashboard_widget_recitation_trends: { label: 'Daily Classroom', sectionKey: 'progress_management' },
+  dashboard_widget_recitation_breakdown: { label: 'Daily Classroom', sectionKey: 'progress_management' },
+  dashboard_widget_admission_pipeline: { label: 'Admissions', sectionKey: 'student_admission' },
+  dashboard_widget_finance_overview: { label: 'Finance', sectionKey: 'nav_finance' },
+  dashboard_widget_residential_occupancy: { label: 'Hostel & Residential', sectionKey: 'residential_quarters' },
+  dashboard_widget_notice_board: { label: 'Notices', sectionKey: 'notification_management' },
+  dashboard_widget_recent_activity: { label: 'Activity Analytics', sectionKey: 'app_activity_analytics' },
+  dashboard_widget_system_gateways: { label: 'Section Control', sectionKey: 'app_section_control' },
+};
 
 const WIDGET_GROUP_FALLBACKS: Record<string, string> = {
   dashboard_widget_kpi_metrics: 'Executive & KPI Analytics',
@@ -14,6 +33,7 @@ const WIDGET_GROUP_FALLBACKS: Record<string, string> = {
   dashboard_widget_working_hours: 'Calendar & Institutional Events',
   dashboard_widget_academic_events: 'Calendar & Institutional Events',
   dashboard_widget_agenda_schedule: 'Calendar & Institutional Events',
+  dashboard_widget_personal_tasks: 'Calendar & Institutional Events',
   dashboard_widget_admission_pipeline: 'Operations, Finance & Notices',
   dashboard_widget_finance_overview: 'Operations, Finance & Notices',
   dashboard_widget_residential_occupancy: 'Operations, Finance & Notices',
@@ -127,6 +147,17 @@ const SectionTreeNode: React.FC<SectionTreeNodeProps> = ({
 
   const marginClass = depth === 0 ? 'space-y-2' : 'space-y-1.5';
 
+  const { isSectionEnabled } = useFeatureControl();
+  const prereq = WIDGET_SOURCE_PREREQUISITES[section.section_key];
+  let sourceActive = true;
+  let sourceLabel: string | undefined;
+
+  if (prereq) {
+    sourceLabel = prereq.label;
+    const isPrereqMod = modifiedFlags[prereq.sectionKey] !== undefined;
+    sourceActive = isPrereqMod ? modifiedFlags[prereq.sectionKey] : isSectionEnabled(prereq.sectionKey);
+  }
+
   return (
     <div className={marginClass}>
       <SectionToggleCard
@@ -136,6 +167,8 @@ const SectionTreeNode: React.FC<SectionTreeNodeProps> = ({
         isParent={isParent}
         isChild={depth > 0}
         parentActive={parentActive}
+        sourceActive={sourceActive}
+        sourceLabel={sourceLabel}
         hasChildren={hasChildren}
         childrenCount={childrenCount}
         isExpanded={isExpanded}
@@ -194,7 +227,7 @@ const SectionTreeNode: React.FC<SectionTreeNodeProps> = ({
                 key={child.id || child.section_key}
                 section={child}
                 depth={depth + 1}
-                parentActive={parentActive && isEnabled}
+                parentActive={section.has_switch === false ? parentActive : parentActive && isEnabled}
                 modifiedFlags={modifiedFlags}
                 searchFilter={searchFilter}
                 expandedMap={expandedMap}

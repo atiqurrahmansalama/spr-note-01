@@ -5,6 +5,7 @@ import {
   PlusIcon,
 } from '../../../../../components/ui/Icons';
 import useDashboardCalendarSync from '../../../hooks/useDashboardCalendarSync';
+import { useFeatureControl } from '../../../../../context/FeatureControlContext';
 import type { CalendarDisplayMode } from '../../../../academy/calendar-events/types';
 
 // Code-split heavy MasterTimeCalendar asynchronously to avoid blocking the dashboard main thread
@@ -47,8 +48,13 @@ export default function WorkingHoursWidget({
   className = '',
 }: WorkingHoursWidgetProps) {
   const navigate = useNavigate();
+  const { isSectionEnabled } = useFeatureControl();
   // View mode is strictly governed by Workspace Customizer settings
   const effectiveDisplayMode: CalendarDisplayMode = propDisplayMode || initialDisplayMode || 'grid';
+
+  const canAddWorkingHours = isSectionEnabled('calendar_add_working_hours');
+  const canViewWorkingHours = isSectionEnabled('calendar_view_working_hours');
+  const isMyTasksEnabled = isSectionEnabled('calendar_tab_personal_tasks') && isSectionEnabled('calendar_view_personal_tasks');
 
   const {
     events,
@@ -57,8 +63,8 @@ export default function WorkingHoursWidget({
     openDrawer,
   } = useDashboardCalendarSync('WORKING_HOURS');
 
-  // Tasks visibility is strictly governed by Workspace Customizer setting
-  const effectiveShowTasks = propShowTasks !== undefined ? propShowTasks : true;
+  // Tasks visibility is strictly governed by Workspace Customizer setting and My Tasks feature switches
+  const effectiveShowTasks = isMyTasksEnabled && (propShowTasks !== undefined ? propShowTasks : true);
 
   const handleAddShift = () => {
     openDrawer('schedule', {
@@ -96,24 +102,28 @@ export default function WorkingHoursWidget({
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 @sm:gap-2 shrink-0">
           {/* Main Page Navigation: Pure text button placed BEFORE Add button (No hard white) */}
-          <button
-            type="button"
-            onClick={handleNavigateToHub}
-            className="px-1.5 py-1 text-[11px] @sm:text-xs font-semibold theme-text-secondary hover:theme-text-primary hover:underline transition-colors cursor-pointer border-0 bg-transparent select-none shrink-0"
-          >
-            Full View
-          </button>
+          {canViewWorkingHours && (
+            <button
+              type="button"
+              onClick={handleNavigateToHub}
+              className="px-1.5 py-1 text-[11px] @sm:text-xs font-semibold theme-text-secondary hover:theme-text-primary hover:underline transition-colors cursor-pointer border-0 bg-transparent select-none shrink-0"
+            >
+              Full View
+            </button>
+          )}
 
           {/* Add Shift Button (Short 'Add' on small screens) */}
-          <button
-            type="button"
-            onClick={handleAddShift}
-            className="px-2 py-1 @sm:px-2.5 @sm:py-1.5 rounded-xl text-[11px] @sm:text-xs font-semibold theme-bg-accent theme-accent-text hover:brightness-105 transition-all flex items-center gap-1 cursor-pointer border-0 shadow-2xs shrink-0"
-          >
-            <PlusIcon className="w-3.5 h-3.5" />
-            <span className="inline @[480px]:hidden">Add</span>
-            <span className="hidden @[480px]:inline">Add Shift</span>
-          </button>
+          {canAddWorkingHours && (
+            <button
+              type="button"
+              onClick={handleAddShift}
+              className="px-2 py-1 @sm:px-2.5 @sm:py-1.5 rounded-xl text-[11px] @sm:text-xs font-semibold theme-bg-accent theme-accent-text hover:brightness-105 transition-all flex items-center gap-1 cursor-pointer border-0 shadow-2xs shrink-0"
+            >
+              <PlusIcon className="w-3.5 h-3.5" />
+              <span className="inline @[480px]:hidden">Add</span>
+              <span className="hidden @[480px]:inline">Add Shift</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -129,6 +139,7 @@ export default function WorkingHoursWidget({
             hideViewModeToggle={true}
             embeddedSurface={true}
             showPersonalTasks={effectiveShowTasks}
+            canAddWorkingHours={canAddWorkingHours}
             onSaveEvent={handleSaveEvent}
             onDeleteEvent={handleDeleteEvent}
           />

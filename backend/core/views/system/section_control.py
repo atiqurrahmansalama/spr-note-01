@@ -268,9 +268,11 @@ class ControlPanelSectionTreeView(APIView):
         from core.feature_registry import FEATURE_REGISTRY
         registry_keys = {item["key"] for item in FEATURE_REGISTRY}
         widget_group_map = {item["key"]: item.get("widget_group", "") for item in FEATURE_REGISTRY}
+        has_switch_map = {item["key"]: item.get("has_switch", True) for item in FEATURE_REGISTRY}
         db_keys = set(AppSection.objects.values_list('section_key', flat=True))
         needs_dashboard_parent_upgrade = AppSection.objects.filter(section_key='nav_dashboard', is_parent=False).exists()
-        if not registry_keys.issubset(db_keys) or not AppSectionCategory.objects.exists() or needs_dashboard_parent_upgrade:
+        needs_standalone_parent_upgrade = not AppSection.objects.filter(section_key='system_standalone_modules').exists()
+        if not registry_keys.issubset(db_keys) or not AppSectionCategory.objects.exists() or needs_dashboard_parent_upgrade or needs_standalone_parent_upgrade:
             sync_feature_registry_to_db()
 
         user_obj = None
@@ -418,6 +420,7 @@ class ControlPanelSectionTreeView(APIView):
                 "title": sec.title,
                 "description": sec.description,
                 "widget_group": widget_group_map.get(sec.section_key) or "",
+                "has_switch": has_switch_map.get(sec.section_key, True),
                 "is_parent": sec.is_parent,
                 "parent_key": sec.parent_key,
                 "is_globally_enabled": sec.is_globally_enabled,

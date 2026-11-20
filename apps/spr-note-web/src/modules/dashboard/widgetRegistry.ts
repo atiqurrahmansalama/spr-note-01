@@ -21,6 +21,7 @@ const RecitationSessionBreakdownWidget = React.lazy(() => import('./components/w
 const WorkingHoursWidget = React.lazy(() => import('./components/widgets/calendar-events/WorkingHoursWidget'));
 const AcademicEventsWidget = React.lazy(() => import('./components/widgets/calendar-events/AcademicEventsWidget'));
 const AgendaScheduleWidget = React.lazy(() => import('./components/widgets/calendar-events/AgendaScheduleWidget'));
+const PersonalTasksWidget = React.lazy(() => import('./components/widgets/calendar-events/PersonalTasksWidget'));
 
 export interface KpiCardCatalogItem {
   id: string;
@@ -237,7 +238,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     minColSpan: 1,
     maxColSpan: 4,
     widgetFeatureKey: 'dashboard_widget_working_hours',
-    requiredFeatureKey: 'academy_calendar_events',
+    requiredFeatureKey: ['academy_calendar_events', 'calendar_tab_working_hours', 'calendar_view_working_hours'],
     component: WorkingHoursWidget,
   },
   academic_events: {
@@ -250,7 +251,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     minColSpan: 1,
     maxColSpan: 4,
     widgetFeatureKey: 'dashboard_widget_academic_events',
-    requiredFeatureKey: 'academy_calendar_events',
+    requiredFeatureKey: ['academy_calendar_events', 'calendar_tab_events', 'calendar_view_events'],
     component: AcademicEventsWidget,
   },
   agenda_schedule: {
@@ -263,8 +264,21 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     minColSpan: 1,
     maxColSpan: 4,
     widgetFeatureKey: 'dashboard_widget_agenda_schedule',
-    requiredFeatureKey: 'academy_calendar_events',
+    requiredFeatureKey: ['academy_calendar_events', 'calendar_tab_agenda'],
     component: AgendaScheduleWidget,
+  },
+  personal_tasks: {
+    id: 'personal_tasks',
+    title: 'My Tasks & Personal To-Do',
+    description: 'Personal task checklist, due milestones, and quick task capture with 1-click status transitions.',
+    category: 'CALENDAR',
+    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STAFF', 'STUDENT', 'GUARDIAN'],
+    defaultColSpan: 2,
+    minColSpan: 1,
+    maxColSpan: 4,
+    widgetFeatureKey: 'dashboard_widget_personal_tasks',
+    requiredFeatureKey: ['academy_calendar_events', 'calendar_tab_personal_tasks', 'calendar_view_personal_tasks'],
+    component: PersonalTasksWidget,
   },
   recent_activity: {
     id: 'recent_activity',
@@ -471,8 +485,14 @@ export function isWidgetFeaturePermitted(
   if (widgetDef.widgetFeatureKey && !isFeatureEnabled(widgetDef.widgetFeatureKey)) {
     return false;
   }
-  if (widgetDef.requiredFeatureKey && !isFeatureEnabled(widgetDef.requiredFeatureKey)) {
-    return false;
+  if (widgetDef.requiredFeatureKey) {
+    if (Array.isArray(widgetDef.requiredFeatureKey)) {
+      if (!widgetDef.requiredFeatureKey.every((key) => isFeatureEnabled(key))) {
+        return false;
+      }
+    } else if (!isFeatureEnabled(widgetDef.requiredFeatureKey)) {
+      return false;
+    }
   }
   return true;
 }

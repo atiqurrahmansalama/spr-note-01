@@ -130,6 +130,28 @@ export function useStaffFilter({ staffList, ranksList, departments }: UseStaffFi
     { value: 'TERMINATED', label: 'Terminated / Released' },
   ];
 
+  const resetAllFilters = () => {
+    setSearchQuery('');
+    setRoleFilter('ALL');
+    setRankFilter('ALL');
+    setDeptFilter('ALL');
+    setStatusFilter('ALL');
+  };
+
+  const hasActiveFilters =
+    searchQuery.trim() !== '' ||
+    roleFilter !== 'ALL' ||
+    rankFilter !== 'ALL' ||
+    deptFilter !== 'ALL' ||
+    statusFilter !== 'ALL';
+
+  const activeFilterCount =
+    (searchQuery.trim() !== '' ? 1 : 0) +
+    (roleFilter !== 'ALL' ? 1 : 0) +
+    (rankFilter !== 'ALL' ? 1 : 0) +
+    (deptFilter !== 'ALL' ? 1 : 0) +
+    (statusFilter !== 'ALL' ? 1 : 0);
+
   return {
     searchQuery,
     setSearchQuery,
@@ -147,6 +169,9 @@ export function useStaffFilter({ staffList, ranksList, departments }: UseStaffFi
     rankFilterOptions,
     departmentOptions,
     statusOptions,
+    resetAllFilters,
+    hasActiveFilters,
+    activeFilterCount,
   };
 }
 

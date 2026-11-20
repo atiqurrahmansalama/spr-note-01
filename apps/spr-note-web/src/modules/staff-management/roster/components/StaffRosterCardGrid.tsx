@@ -95,14 +95,9 @@ export const StaffRosterCardGrid: React.FC<StaffRosterCardGridProps> = ({
         const phone = s.phone_number || s.emergency_contact;
         const assignCount = s.assignments_count || 0;
         const matchedRank = ranksList.find(
-          (r) => r.name === s.designation || r.name_bn === s.designation
+          (r) => r.name === s.designation || r.name_bn === s.designation || r.code === s.designation
         );
-        const rankNum =
-          s.rank_order !== undefined && s.rank_order !== 99 && s.rank_order !== null
-            ? s.rank_order
-            : matchedRank
-            ? matchedRank.order
-            : null;
+        const designationTitle = matchedRank?.name || s.designation || 'Staff';
 
         return (
           <div
@@ -129,13 +124,8 @@ export const StaffRosterCardGrid: React.FC<StaffRosterCardGridProps> = ({
                     {staffName}
                   </h4>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    {rankNum ? (
-                      <span className="text-[10px] font-bold font-mono px-1.5 py-0.2 rounded-md theme-bg-accent-soft theme-accent border-0">
-                        Rank {rankNum}
-                      </span>
-                    ) : null}
                     <p className="text-[11px] theme-text-secondary truncate font-medium">
-                      {s.designation || 'Staff'}
+                      {designationTitle}
                     </p>
                   </div>
                 </div>
@@ -146,12 +136,13 @@ export const StaffRosterCardGrid: React.FC<StaffRosterCardGridProps> = ({
               </div>
             </div>
 
-            {/* Badges: Department & ID */}
-            <div className="flex flex-wrap items-center gap-1.5 border-0">
-              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full theme-bg-app theme-accent font-bold border-0">
+            {/* Department & ID */}
+            <div className="flex flex-wrap items-center gap-2 border-0 text-xs">
+              <span className="font-mono theme-accent font-semibold text-[11px]">
                 {s.employee_id || 'ID: —'}
               </span>
-              <span className="text-[10px] px-2.5 py-0.5 rounded-full theme-bg-accent-soft theme-accent font-medium border-0">
+              <span className="theme-text-secondary opacity-40">•</span>
+              <span className="theme-text-secondary font-medium text-[11px]">
                 {s.department_name || 'General Dept'}
               </span>
             </div>

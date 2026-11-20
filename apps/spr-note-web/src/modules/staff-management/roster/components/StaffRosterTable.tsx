@@ -122,39 +122,18 @@ export const StaffRosterTable: React.FC<StaffRosterTableProps> = ({
       },
     },
     {
-      key: 'rank_designation',
-      header: t('colRankDesignation', 'RANK & DESIGNATION'),
+      key: 'designation',
+      header: t('colDesignation', 'DESIGNATION'),
       headerClassName: 'text-left',
       align: 'left',
       render: (s: StaffMember) => {
         const matchedRank = ranksList.find(
-          (r) => r.name === s.designation || r.name_bn === s.designation
+          (r) => r.name === s.designation || r.name_bn === s.designation || r.code === s.designation
         );
-        const rankNum =
-          s.rank_order !== undefined && s.rank_order !== 99 && s.rank_order !== null
-            ? s.rank_order
-            : matchedRank
-            ? matchedRank.order
-            : null;
-        const title = s.designation || 'Staff';
-        const banglaTitle = matchedRank?.name_bn || '';
+        const title = matchedRank?.name || s.designation || 'Staff';
 
         return (
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {rankNum ? (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold theme-bg-accent-soft theme-accent font-mono shadow-xs border-0">
-                  Rank {rankNum}
-                </span>
-              ) : null}
-              <span className="text-xs font-bold theme-text-primary">{title}</span>
-            </div>
-            {banglaTitle && (
-              <span className="text-[11px] theme-text-secondary block font-medium opacity-80">
-                {banglaTitle}
-              </span>
-            )}
-          </div>
+          <span className="text-xs font-semibold theme-text-primary block">{title}</span>
         );
       },
     },
@@ -164,63 +143,21 @@ export const StaffRosterTable: React.FC<StaffRosterTableProps> = ({
       headerClassName: 'text-left',
       align: 'left',
       render: (s: StaffMember) => (
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <div className="text-xs font-semibold theme-text-primary truncate">
             {s.department_name || 'General Department'}
           </div>
-          <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border-0 ${
+          <div
+            className={`text-[11px] font-medium ${
               s.staff_type === 'TEACHING'
-                ? 'theme-bg-accent-soft theme-accent'
-                : 'theme-bg-app theme-text-secondary'
+                ? 'theme-accent'
+                : 'theme-text-secondary'
             }`}
           >
             {s.staff_type || 'Faculty'}
-          </span>
+          </div>
         </div>
       ),
-    },
-    {
-      key: 'assignments',
-      header: t('colAssignments', 'ASSIGNMENTS'),
-      headerClassName: 'text-center',
-      align: 'center',
-      render: (s: StaffMember) => {
-        const assignCount = s.assignments_count || 0;
-        const dutiesCount = s.duties_count || 0;
-
-        return (
-          <div className="flex flex-col items-center justify-center gap-1">
-            {s.staff_type === 'TEACHING' ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenClassesModal(s);
-                }}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl theme-bg-app hover:theme-bg-elevated/40 theme-text-primary text-[11px] font-medium transition-all cursor-pointer border-0 shadow-xs"
-                title="Manage Class Assignments"
-              >
-                <ClassIcon className="w-3 h-3 theme-accent" />
-                <span>{assignCount} Classes</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenDutiesModal(s);
-                }}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl theme-bg-app hover:theme-bg-elevated/40 theme-text-primary text-[11px] font-medium transition-all cursor-pointer border-0 shadow-xs"
-                title="Manage Duties"
-              >
-                <DutyIcon className="w-3 h-3 theme-accent" />
-                <span>{dutiesCount} Duties</span>
-              </button>
-            )}
-          </div>
-        );
-      },
     },
     {
       key: 'contact',
@@ -236,7 +173,7 @@ export const StaffRosterTable: React.FC<StaffRosterTableProps> = ({
                 <a
                   href={`tel:${phone}`}
                   onClick={(e) => e.stopPropagation()}
-                  className="p-1.5 rounded-xl theme-bg-app hover:theme-bg-accent-soft hover:theme-accent theme-text-secondary transition-all cursor-pointer border-0 shadow-xs"
+                  className="p-1.5 rounded-xl hover:theme-bg-accent-soft hover:theme-accent theme-text-secondary transition-all cursor-pointer border-0 shadow-xs"
                   title={`Call ${phone}`}
                 >
                   <PhoneIcon className="w-3.5 h-3.5" />
@@ -246,7 +183,7 @@ export const StaffRosterTable: React.FC<StaffRosterTableProps> = ({
                   target="_blank"
                   rel="noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="p-1.5 rounded-xl theme-bg-app hover:bg-emerald-500/10 hover:text-emerald-500 theme-text-secondary transition-all cursor-pointer border-0 shadow-xs"
+                  className="p-1.5 rounded-xl hover:bg-emerald-500/10 hover:text-emerald-500 theme-text-secondary transition-all cursor-pointer border-0 shadow-xs"
                   title="WhatsApp Chat"
                 >
                   <WhatsAppIcon className="w-3.5 h-3.5" />
@@ -265,17 +202,28 @@ export const StaffRosterTable: React.FC<StaffRosterTableProps> = ({
       headerClassName: 'text-center',
       align: 'center',
       render: (s: StaffMember) => (
-        <span
-          className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border-0 ${
-            s.employment_status === 'PERMANENT'
-              ? 'theme-bg-accent-soft theme-accent'
-              : s.employment_status === 'PROBATION'
-              ? 'bg-amber-500/15 text-amber-500'
-              : 'theme-bg-app theme-text-secondary'
-          }`}
-        >
-          {s.employment_status || 'Active'}
-        </span>
+        <div className="flex items-center justify-center gap-1.5">
+          <span
+            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+              s.employment_status === 'PERMANENT'
+                ? 'theme-bg-accent'
+                : s.employment_status === 'PROBATION'
+                ? 'bg-amber-500'
+                : 'theme-bg-subtle'
+            }`}
+          />
+          <span
+            className={`text-xs font-semibold ${
+              s.employment_status === 'PERMANENT'
+                ? 'theme-accent'
+                : s.employment_status === 'PROBATION'
+                ? 'text-amber-500'
+                : 'theme-text-secondary'
+            }`}
+          >
+            {s.employment_status || 'Active'}
+          </span>
+        </div>
       ),
     },
     {

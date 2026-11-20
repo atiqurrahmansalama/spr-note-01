@@ -43,6 +43,56 @@ const LOCALIZED_WEEKDAYS: Record<string, string[]> = {
   ur: ['اتوار', 'پیر', 'منگل', 'بدھ', 'جمعرات', 'جمعہ', 'ہفتہ'],
 };
 
+function isoToDMY(isoStr?: string): string {
+  if (!isoStr) return '';
+  const parts = String(isoStr).split('-');
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    if (y && m && d) {
+      return `${d.padStart(2, '0')}-${m.padStart(2, '0')}-${y}`;
+    }
+  }
+  return isoStr;
+}
+
+function isoToDigits(isoStr?: string): string {
+  if (!isoStr) return '';
+  const parts = String(isoStr).split('-');
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    if (y && m && d) {
+      return `${d.padStart(2, '0')}${m.padStart(2, '0')}${y}`;
+    }
+  }
+  return '';
+}
+
+function formatMaskedDate(digits: string): string {
+  if (!digits || digits.length === 0) return '';
+  const d = digits.slice(0, 8);
+  const d1 = d[0] || 'd';
+  const d2 = d[1] || 'd';
+  const m1 = d[2] || 'm';
+  const m2 = d[3] || 'm';
+  const y1 = d[4] || 'y';
+  const y2 = d[5] || 'y';
+  const y3 = d[6] || 'y';
+  const y4 = d[7] || 'y';
+  return `${d1}${d2}-${m1}${m2}-${y1}${y2}${y3}${y4}`;
+}
+
+function getMaskCursorPos(digitCount: number): number {
+  if (digitCount === 0) return 0;
+  if (digitCount === 1) return 1;
+  if (digitCount === 2) return 3;
+  if (digitCount === 3) return 4;
+  if (digitCount === 4) return 6;
+  if (digitCount === 5) return 7;
+  if (digitCount === 6) return 8;
+  if (digitCount === 7) return 9;
+  return 10;
+}
+
 export interface DisabledRangeItem {
   startDate: string;
   endDate: string;
@@ -162,6 +212,124 @@ export default function ReusableCalendar({
   const [tempStart, setTempStart] = useState<string>(startDate || selectedDate);
   const [tempEnd, setTempEnd] = useState<string>(endDate);
   const [hoverDate, setHoverDate] = useState<string>('');
+  const [rawDigits, setRawDigits] = useState<string>(() => isoToDigits(selectedDate || startDate));
+  const [typedValue, setTypedValue] = useState<string>(() => {
+    const digits = isoToDigits(selectedDate || startDate);
+    return digits.length === 8 ? isoToDMY(selectedDate || startDate) : formatMaskedDate(digits);
+  });
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const digits = isoToDigits(selectedDate || startDate);
+    setRawDigits(digits);
+    setTypedValue(digits.length === 8 ? isoToDMY(selectedDate || startDate) : formatMaskedDate(digits));
+  }, [selectedDate, startDate]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (disabled || isRange) return;
+
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      e.preventDefault();
+      if (rawDigits.length > 0) {
+        const nextDigits = rawDigits.slice(0, -1);
+        setRawDigits(nextDigits);
+        const nextDisplay = formatMaskedDate(nextDigits);
+        setTypedValue(nextDisplay);
+        if (nextDigits.length < 8) {
+          setTempStart('');
+          onSelectDate?.('');
+        }
+        setTimeout(() => {
+          const pos = getMaskCursorPos(nextDigits.length);
+          inputRef.current?.setSelectionRange(pos, pos);
+        }, 0);
+      }
+      return;
+    }
+
+    if (/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      if (rawDigits.length < 8) {
+        const nextDigits = rawDigits + e.key;
+        setRawDigits(nextDigits);
+        const nextDisplay = formatMaskedDate(nextDigits);
+        setTypedValue(nextDisplay);
+
+        setTimeout(() => {
+          const pos = getMaskCursorPos(nextDigits.length);
+          inputRef.current?.setSelectionRange(pos, pos);
+        }, 0);
+
+        if (nextDigits.length === 8) {
+          const day = parseInt(nextDigits.slice(0, 2), 10);
+          const month = parseInt(nextDigits.slice(2, 4), 10);
+          const year = parseInt(nextDigits.slice(4, 8), 10);
+
+          if (month >= 1 && month <= 12 && year >= 1900 && year <= 2150) {
+            const maxDays = new Date(year, month, 0).getDate();
+            if (day >= 1 && day <= maxDays) {
+              const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              setTempStart(iso);
+              onSelectDate?.(iso);
+              setViewYear(year);
+              setViewMonth(month - 1);
+            }
+          }
+        }
+      }
+      return;
+    }
+
+    if (['Tab', 'ArrowLeft', 'ArrowRight', 'Enter', 'Escape'].includes(e.key)) {
+      return;
+    }
+
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
+      e.preventDefault();
+    }
+  };
+
+  const handleFocus = () => {
+    if (isRange || disabled) return;
+    setTimeout(() => {
+      const pos = getMaskCursorPos(rawDigits.length);
+      inputRef.current?.setSelectionRange(pos, pos);
+    }, 0);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (disabled || isRange) return;
+    e.preventDefault();
+    const pasteText = e.clipboardData.getData('text') || '';
+    const pastedDigits = pasteText.replace(/\D/g, '').slice(0, 8);
+    if (pastedDigits.length > 0) {
+      setRawDigits(pastedDigits);
+      const nextDisplay = formatMaskedDate(pastedDigits);
+      setTypedValue(nextDisplay);
+
+      setTimeout(() => {
+        const pos = getMaskCursorPos(pastedDigits.length);
+        inputRef.current?.setSelectionRange(pos, pos);
+      }, 0);
+
+      if (pastedDigits.length === 8) {
+        const day = parseInt(pastedDigits.slice(0, 2), 10);
+        const month = parseInt(pastedDigits.slice(2, 4), 10);
+        const year = parseInt(pastedDigits.slice(4, 8), 10);
+
+        if (month >= 1 && month <= 12 && year >= 1900 && year <= 2150) {
+          const maxDays = new Date(year, month, 0).getDate();
+          if (day >= 1 && day <= maxDays) {
+            const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            setTempStart(iso);
+            onSelectDate?.(iso);
+            setViewYear(year);
+            setViewMonth(month - 1);
+          }
+        }
+      }
+    }
+  };
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
@@ -431,6 +599,8 @@ export default function ReusableCalendar({
 
     if (!isRange) {
       setTempStart(dateStr);
+      setRawDigits(isoToDigits(dateStr));
+      setTypedValue(isoToDMY(dateStr));
       if (onSelectDate) onSelectDate(dateStr);
       setIsOpen(false);
       return;
@@ -462,6 +632,8 @@ export default function ReusableCalendar({
 
     if (!isRange) {
       setTempStart(todayStr);
+      setRawDigits(isoToDigits(todayStr));
+      setTypedValue(isoToDMY(todayStr));
       if (onSelectDate) onSelectDate(todayStr);
       setIsOpen(false);
     } else {
@@ -480,6 +652,8 @@ export default function ReusableCalendar({
       onRangeSelect?.('', '');
     } else {
       setTempStart('');
+      setRawDigits('');
+      setTypedValue('');
       onSelectDate?.('');
     }
     setIsOpen(false);
@@ -881,11 +1055,9 @@ export default function ReusableCalendar({
   return (
     <div ref={containerRef} className={`relative w-full ${className}`}>
       {!isInline && (
-        <div
-          onClick={handleToggle}
-          className="w-full cursor-pointer select-none"
-        >
+        <div className="w-full">
           <CustomInput
+            ref={inputRef}
             id={id}
             name={name}
             label={label}
@@ -901,33 +1073,58 @@ export default function ReusableCalendar({
             actionTitle={actionTitle}
             manageLabel={manageLabel}
             manageTitle={manageTitle}
-            placeholder={placeholder}
-            value={getLabel() === placeholder ? '' : getLabel()}
-            readOnly={true}
+            placeholder={placeholder || (isRange ? "Select Date Range" : "dd-mm-yyyy")}
+            value={isRange ? (getLabel() === placeholder ? '' : getLabel()) : typedValue}
+            onKeyDown={!isRange ? handleKeyDown : undefined}
+            onFocus={!isRange ? handleFocus : undefined}
+            onPaste={!isRange ? handlePaste : undefined}
+            readOnly={isRange || disabled}
             disabled={disabled}
             error={error}
             helperText={helperText}
             size={size}
             variant={variant}
             icon={IconToRender}
-            className={`cursor-pointer ${inputClassName}`}
-            inputClassName="cursor-pointer select-none"
+            className={inputClassName}
+            inputClassName={isRange ? "cursor-pointer select-none" : "font-mono tracking-wider font-semibold"}
             wrapperClassName={wrapperClassName}
             endAdornment={
               <div className="flex items-center gap-1 shrink-0">
-                {clearable && (selectedDate || startDate) && !disabled && (
+                {clearable && (selectedDate || startDate || (!isRange && typedValue)) && !disabled && (
                   <IconButton
                     icon={CloseIcon}
                     size="2xs"
                     variant="ghost"
                     onClick={(e) => {
                       e.stopPropagation();
+                      setRawDigits('');
+                      setTypedValue('');
                       handleClear(e);
                     }}
                     title="Clear date"
                   />
                 )}
-                <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5 theme-text-secondary" />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggle();
+                  }}
+                  className="p-1 rounded-lg hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer border-0 bg-transparent flex items-center justify-center"
+                  title="Toggle Calendar Picker"
+                >
+                  <CalendarIcon className="w-3.5 h-3.5 theme-accent" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggle();
+                  }}
+                  className="p-0.5 rounded hover:theme-bg-elevated theme-text-secondary transition cursor-pointer border-0 bg-transparent flex items-center justify-center"
+                >
+                  <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5" />
+                </button>
               </div>
             }
           />

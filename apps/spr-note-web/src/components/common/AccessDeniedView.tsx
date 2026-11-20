@@ -9,18 +9,25 @@ export interface AccessDeniedViewProps {
   message?: string;
   sectionKey?: string | string[];
   className?: string;
+  onClose?: () => void;
+  closeLabel?: string;
+  variant?: 'page' | 'drawer' | 'card';
 }
 
 /**
  * Enterprise Access Denied & Feature Restricted View
  * Displayed when a user navigates to a route or module that is disabled in Feature Control
  * or where their role lacks permission.
+ * Reusable across full page views, modals, and slide-over drawers.
  */
 export const AccessDeniedView: React.FC<AccessDeniedViewProps> = ({
   title,
   message,
   sectionKey,
   className = '',
+  onClose,
+  closeLabel,
+  variant = 'page',
 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation('common');
@@ -34,12 +41,19 @@ export const AccessDeniedView: React.FC<AccessDeniedViewProps> = ({
     );
 
   const displayKey = Array.isArray(sectionKey) ? sectionKey.join(', ') : sectionKey;
+  const isDrawer = variant === 'drawer' || Boolean(onClose);
 
   return (
     <div
-      className={`min-h-[50vh] flex items-center justify-center p-4 sm:p-6 select-none ${className}`}
+      className={`${
+        isDrawer ? 'py-4 sm:py-6 px-2' : 'min-h-[50vh] p-4 sm:p-6'
+      } flex items-center justify-center select-none ${className}`}
     >
-      <div className="max-w-md w-full theme-bg-surface border theme-border rounded-2xl p-6 sm:p-8 shadow-xl text-center space-y-5 animate-fade-in">
+      <div
+        className={`max-w-md w-full theme-bg-surface ${
+          isDrawer ? 'border-0 shadow-xs rounded-3xl' : 'border theme-border rounded-2xl shadow-xl'
+        } p-6 sm:p-8 text-center space-y-5 animate-fade-in`}
+      >
         <div className="mx-auto w-14 h-14 rounded-2xl theme-bg-accent-soft border border-current/20 flex items-center justify-center theme-accent shadow-xs">
           <LockClosedIcon className="w-7 h-7" />
         </div>
@@ -61,25 +75,39 @@ export const AccessDeniedView: React.FC<AccessDeniedViewProps> = ({
         )}
 
         <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-          <CustomButton
-            type="button"
-            variant="ghost"
-            size="md"
-            onClick={() => navigate(-1)}
-            className="w-full sm:w-auto"
-          >
-            <span>{t('goBack', 'Go Back')}</span>
-          </CustomButton>
+          {onClose ? (
+            <CustomButton
+              type="button"
+              variant="secondary"
+              size="md"
+              onClick={onClose}
+              className="w-full sm:w-auto min-w-[120px] justify-center"
+            >
+              <span>{closeLabel || t('close', 'Close')}</span>
+            </CustomButton>
+          ) : (
+            <>
+              <CustomButton
+                type="button"
+                variant="ghost"
+                size="md"
+                onClick={() => navigate(-1)}
+                className="w-full sm:w-auto"
+              >
+                <span>{t('goBack', 'Go Back')}</span>
+              </CustomButton>
 
-          <CustomButton
-            type="button"
-            variant="primary"
-            size="md"
-            onClick={() => navigate('/dashboard')}
-            className="w-full sm:w-auto"
-          >
-            <span>{t('returnToDashboard', 'Return to Dashboard')}</span>
-          </CustomButton>
+              <CustomButton
+                type="button"
+                variant="primary"
+                size="md"
+                onClick={() => navigate('/dashboard')}
+                className="w-full sm:w-auto"
+              >
+                <span>{t('returnToDashboard', 'Return to Dashboard')}</span>
+              </CustomButton>
+            </>
+          )}
         </div>
       </div>
     </div>

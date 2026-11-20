@@ -35,6 +35,7 @@ export const en = {
 
   // Table Columns
   colFacultyStaff: 'FACULTY & STAFF',
+  colDesignation: 'DESIGNATION',
   colRankDesignation: 'RANK & DESIGNATION',
   colDepartmentRole: 'DEPARTMENT & ROLE',
   colAssignments: 'ASSIGNMENTS',

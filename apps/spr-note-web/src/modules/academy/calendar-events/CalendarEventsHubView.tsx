@@ -4,6 +4,7 @@ import TabSwitcher from '../../../components/ui/TabSwitcher';
 import CustomButton from '../../../components/ui/CustomButton';
 import ErrorBoundary from '../../../components/ui/ErrorBoundary';
 import { PageContainer } from '../../../components/layout';
+import AccessDeniedView from '../../../components/common/AccessDeniedView';
 import {
   MasterTimeCalendar,
   TimeScheduleDrawerForm,
@@ -41,10 +42,13 @@ export default function CalendarEventsHubView() {
   const { isSectionEnabled } = useFeatureControl();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const isWorkingHoursEnabled = isSectionEnabled('calendar_tab_working_hours');
-  const isEventsEnabled = isSectionEnabled('calendar_tab_events');
+  const isWorkingHoursEnabled = isSectionEnabled('calendar_tab_working_hours') && isSectionEnabled('calendar_view_working_hours');
+  const isEventsEnabled = isSectionEnabled('calendar_tab_events') && isSectionEnabled('calendar_view_events');
   const isAgendaEnabled = isSectionEnabled('calendar_tab_agenda');
-  const isMyTasksEnabled = isSectionEnabled('calendar_tab_personal_tasks');
+  const isMyTasksEnabled = isSectionEnabled('calendar_tab_personal_tasks') && isSectionEnabled('calendar_view_personal_tasks');
+  const canAddWorkingHours = isWorkingHoursEnabled && isSectionEnabled('calendar_add_working_hours');
+  const canAddEvents = isEventsEnabled && isSectionEnabled('calendar_add_events');
+  const canAddTasks = isMyTasksEnabled && isSectionEnabled('calendar_add_personal_tasks');
 
   const visibleTabs: CalendarTabItem[] = useMemo(() => {
     const list: CalendarTabItem[] = [];
@@ -60,7 +64,7 @@ export default function CalendarEventsHubView() {
     if (isMyTasksEnabled) {
       list.push({ id: 'MY_TASKS', label: t('myTasks', 'My Tasks'), icon: CheckCircleIcon });
     }
-    return list.length > 0 ? list : [{ id: 'WORKING_HOURS', label: t('workingHours', 'Working Hours'), icon: TimerIcon }];
+    return list;
   }, [isWorkingHoursEnabled, isEventsEnabled, isAgendaEnabled, isMyTasksEnabled, t]);
 
   const [events, setEvents] = useState<CalendarEvent[]>(() => {
@@ -70,8 +74,17 @@ export default function CalendarEventsHubView() {
       return [];
     }
   });
-  const rawTab = searchParams.get('tab') || 'WORKING_HOURS';
-  const activeTab = visibleTabs.some((t) => t.id === rawTab) ? rawTab : (visibleTabs[0]?.id || 'WORKING_HOURS');
+  const rawTab = searchParams.get('tab') || (visibleTabs[0]?.id || 'WORKING_HOURS');
+  const isRawTabAllowed = visibleTabs.some((t) => t.id === rawTab);
+  const activeTab = isRawTabAllowed ? rawTab : (visibleTabs[0]?.id || 'WORKING_HOURS');
+
+  // Automatic nearest-allowed route redirect: If user accesses a locked tab directly via URL (?tab=LOCKED),
+  // redirect them immediately to the nearest allowed tab (visibleTabs[0].id)
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !isRawTabAllowed) {
+      setActiveTab(visibleTabs[0].id);
+    }
+  }, [visibleTabs, isRawTabAllowed]);
   const [, setIsLoading] = useState<boolean>(true);
   const [selectedTimelineDate, setSelectedTimelineDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [calendarDisplayMode, setCalendarDisplayMode] = useState<string>(() => {
@@ -178,6 +191,34 @@ export default function CalendarEventsHubView() {
       const defaultTabCategory = activeTab === 'AGENDA' ? 'WORKING_HOURS' : activeTab;
       const targetCategory = foundEvent?.category || params.get('category') || defaultTabCategory;
       const isWorkingHours = targetCategory === 'WORKING_HOURS';
+      const canEditCategory = isWorkingHours ? canAddWorkingHours : canAddEvents;
+
+      // Zero-Trust Security Guard: Block unauthorized add/edit attempts even if deep-linked or clicked
+      if ((mode === 'add' || mode === 'edit') && !canEditCategory) {
+        return {
+          title: isWorkingHours
+            ? t('workingHoursRestricted', 'Working Hours Restricted')
+            : t('academicEventsRestricted', 'Academic Events Restricted'),
+          category: t('scheduleDetails', 'Schedule & Calendar'),
+          size: 'md' as const,
+          content: (
+            <AccessDeniedView
+              variant="drawer"
+              title={
+                isWorkingHours
+                  ? t('workingHoursLockedTitle', 'Working Hours Modification Restricted')
+                  : t('academicEventsLockedTitle', 'Academic Event Modification Restricted')
+              }
+              message={t(
+                'featureLockedDesc',
+                'You do not have permission to add or modify this schedule. Please contact your institution administrator.'
+              )}
+              sectionKey={isWorkingHours ? 'calendar_add_working_hours' : 'calendar_add_events'}
+              onClose={closeDrawer}
+            />
+          ),
+        };
+      }
 
       if (mode === 'detail' && foundEvent) {
         return {
@@ -191,18 +232,19 @@ export default function CalendarEventsHubView() {
               event={foundEvent}
               currentDate={targetDate}
               initialDate={targetDate}
-              onEdit={() => {
+              readOnly={!canEditCategory}
+              onEdit={canEditCategory ? () => {
                 openDrawer('schedule', {
                   mode: 'edit',
                   eventId: foundEvent.id,
                   category: foundEvent.category,
                   date: targetDate,
                 });
-              }}
-              onDelete={(deleteInfo: any) => {
+              } : undefined}
+              onDelete={canEditCategory ? (deleteInfo: any) => {
                 handleDeleteEvent(deleteInfo || foundEvent.id);
                 closeDrawer();
-              }}
+              } : undefined}
               onClose={closeDrawer}
             />
           ),
@@ -230,7 +272,7 @@ export default function CalendarEventsHubView() {
         ),
       };
     },
-    [events, activeTab, handleSaveEvent, handleDeleteEvent, openDrawer, closeDrawer, t]
+    [events, activeTab, canAddWorkingHours, canAddEvents, handleSaveEvent, handleDeleteEvent, openDrawer, closeDrawer, t]
   );
 
   // Universal Drawer Registration for Weekly Holidays
@@ -270,6 +312,27 @@ export default function CalendarEventsHubView() {
   useDrawerRegistration(
     'user-task',
     (params: any) => {
+      // Zero-Trust Security Guard: Block task creation/editing if tasks or add task feature is disabled
+      if (!isMyTasksEnabled || !canAddTasks) {
+        return {
+          title: t('tasksRestricted', 'Task Management Restricted'),
+          category: t('personalTasks', 'Personal Tasks & To-Do'),
+          size: 'md' as const,
+          content: (
+            <AccessDeniedView
+              variant="drawer"
+              title={t('tasksLockedTitle', 'Task Creation Restricted')}
+              message={t(
+                'tasksLockedDesc',
+                'You do not have permission to add or modify personal tasks. Please contact your institution administrator.'
+              )}
+              sectionKey={['calendar_tab_personal_tasks', 'calendar_add_personal_tasks']}
+              onClose={closeDrawer}
+            />
+          ),
+        };
+      }
+
       const targetTask = params?.task || null;
       const targetDate = params?.date || new Date().toISOString().split('T')[0];
       return {
@@ -301,7 +364,7 @@ export default function CalendarEventsHubView() {
         ),
       };
     },
-    [activeTenantId, userId, closeDrawer, showToast, t]
+    [isMyTasksEnabled, canAddTasks, activeTenantId, userId, closeDrawer, showToast, t]
   );
 
   // Open Right Sidebar for adding new personal task
@@ -352,6 +415,24 @@ export default function CalendarEventsHubView() {
     },
   ];
 
+  if (visibleTabs.length === 0) {
+    return (
+      <ErrorBoundary>
+        <PageContainer>
+          <AccessDeniedView
+            title={t('calendarDisabled', 'Calendar & Events Access Restricted')}
+            sectionKey={[
+              'calendar_tab_working_hours',
+              'calendar_tab_events',
+              'calendar_tab_agenda',
+              'calendar_tab_personal_tasks',
+            ]}
+          />
+        </PageContainer>
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <PageContainer>
@@ -362,7 +443,7 @@ export default function CalendarEventsHubView() {
             activeTab={activeTab}
             onChange={setActiveTab}
             rightContent={
-              activeTab === 'WORKING_HOURS' ? (
+              activeTab === 'WORKING_HOURS' && canAddWorkingHours ? (
                 <CustomButton
                   type="button"
                   variant="primary"
@@ -376,7 +457,7 @@ export default function CalendarEventsHubView() {
                     {t('addSchedule', 'Add Schedule')}
                   </span>
                 </CustomButton>
-              ) : activeTab === 'ACADEMIC_EVENT' ? (
+              ) : activeTab === 'ACADEMIC_EVENT' && canAddEvents ? (
                 <CustomButton
                   type="button"
                   variant="primary"
@@ -398,7 +479,7 @@ export default function CalendarEventsHubView() {
         {/* ─── 3. Reusable Master Calendar Engine or Dedicated My Tasks View ─── */}
         <div className={`w-full min-w-0 ${activeTab === 'MY_TASKS' ? 'flex-1 flex flex-col min-h-[calc(100vh-220px)]' : 'min-h-0 pb-16 sm:pb-24'}`}>
           {activeTab === 'MY_TASKS' ? (
-            <MyTasksHubView onOpenTaskDrawer={handleOpenUserTaskDrawer} />
+            <MyTasksHubView onOpenTaskDrawer={handleOpenUserTaskDrawer} canAddTasks={canAddTasks} />
           ) : (
             <MasterTimeCalendar
               events={events}
@@ -410,6 +491,8 @@ export default function CalendarEventsHubView() {
               onDateSelect={setSelectedTimelineDate}
               onDisplayModeChange={setCalendarDisplayMode}
               isHijriEnabled={isHijriEnabled}
+              canAddWorkingHours={canAddWorkingHours}
+              canAddEvents={canAddEvents}
             />
           )}
         </div>

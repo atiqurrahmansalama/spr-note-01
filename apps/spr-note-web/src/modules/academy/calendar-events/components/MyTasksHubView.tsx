@@ -30,9 +30,10 @@ import type { UserPersonalTask, TaskPriority, TaskStatus } from '../types';
 
 export interface MyTasksHubViewProps {
   onOpenTaskDrawer: (task?: UserPersonalTask | null, date?: string) => void;
+  canAddTasks?: boolean;
 }
 
-export function MyTasksHubView({ onOpenTaskDrawer }: MyTasksHubViewProps) {
+export function MyTasksHubView({ onOpenTaskDrawer, canAddTasks = true }: MyTasksHubViewProps) {
   const { t, formatDate, formatNumber } = useCalendarTranslation();
   const { tasks, metrics, saveTask, toggleTaskStatus, deleteTask } = useUserTasks();
 
@@ -373,7 +374,7 @@ export function MyTasksHubView({ onOpenTaskDrawer }: MyTasksHubViewProps) {
       )}
 
       {/* ─── 5. Pinned Bottom-Center Quick Input Dock (FloatingActionDock) ─── */}
-      <TaskQuickInputDock onOpenDrawer={onOpenTaskDrawer} />
+      {canAddTasks && <TaskQuickInputDock onOpenDrawer={onOpenTaskDrawer} />}
     </div>
   );
 }

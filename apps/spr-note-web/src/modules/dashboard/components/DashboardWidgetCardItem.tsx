@@ -66,6 +66,7 @@ export default function DashboardWidgetCardItem({
 
   const isFeaturePermitted = isWidgetFeaturePermitted(widgetDef, isFeatureEnabled);
   const isFeatureBlocked = !isFeaturePermitted;
+  const isMyTasksFeatureEnabled = isFeatureEnabled('calendar_tab_personal_tasks') && isFeatureEnabled('calendar_view_personal_tasks');
 
   // Regular non-superadmin users never see disabled features
   if (!isSuperAdmin && isFeatureBlocked) {
@@ -367,15 +368,15 @@ export default function DashboardWidgetCardItem({
                     <span>Personal Tasks</span>
                   </div>
                   <p className="text-[10px] theme-text-secondary mt-0.5">
-                    Show personal checklist in calendar
+                    {isMyTasksFeatureEnabled ? 'Show personal checklist in calendar' : 'Disabled in Feature Control'}
                   </p>
                 </div>
                 <CustomCheckbox
-                  checked={settings.showTasks !== false}
+                  checked={isMyTasksFeatureEnabled && settings.showTasks !== false}
                   onChange={(taskChecked: boolean) => {
                     onUpdateSettings?.({ showTasks: taskChecked });
                   }}
-                  disabled={disabled}
+                  disabled={disabled || !isMyTasksFeatureEnabled}
                   size="sm"
                 />
               </div>
@@ -418,15 +419,15 @@ export default function DashboardWidgetCardItem({
                     <span>Personal Tasks</span>
                   </div>
                   <p className="text-[10px] theme-text-secondary mt-0.5">
-                    Show personal checklist in calendar
+                    {isMyTasksFeatureEnabled ? 'Show personal checklist in calendar' : 'Disabled in Feature Control'}
                   </p>
                 </div>
                 <CustomCheckbox
-                  checked={settings.showTasks !== false}
+                  checked={isMyTasksFeatureEnabled && settings.showTasks !== false}
                   onChange={(taskChecked: boolean) => {
                     onUpdateSettings?.({ showTasks: taskChecked });
                   }}
-                  disabled={disabled}
+                  disabled={disabled || !isMyTasksFeatureEnabled}
                   size="sm"
                 />
               </div>

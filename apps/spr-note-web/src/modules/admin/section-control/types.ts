@@ -18,6 +18,7 @@ export interface SectionItem {
   inheritance_origin?: InheritanceOrigin;
   is_parent?: boolean;
   parent_key?: string | null;
+  has_switch?: boolean;
   children?: SectionItem[];
 }
 

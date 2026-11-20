@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import CustomSelect from "../../../../components/ui/CustomSelect";
 import CustomInput from "../../../../components/ui/CustomInput";
@@ -70,6 +71,10 @@ function formatTime12(timeStr) {
 export function InlineTimePicker({ value, onChange, label, placeholder = "Choose Time" }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
+  const popoverRef = useRef(null);
+  const selectedHourRef = useRef(null);
+  const selectedMinuteRef = useRef(null);
+  const [coords, setCoords] = useState(null);
 
   const parsed = useMemo(() => {
     if (!value) return { hour: 9, minute: 0, period: "am" };
@@ -92,9 +97,52 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
     setSelPeriod(parsed.period);
   }, [parsed]);
 
+  // Viewport-safe position calculator: never overflows left or right of window
+  const updatePosition = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const popoverWidth = 230;
+    const popoverHeight = 220;
+
+    let left = rect.left;
+    if (left + popoverWidth > window.innerWidth - 12) {
+      left = window.innerWidth - popoverWidth - 12;
+    }
+    if (left < 12) left = 12;
+
+    let top = rect.bottom + 6;
+    if (top + popoverHeight > window.innerHeight - 12) {
+      top = Math.max(12, rect.top - popoverHeight - 6);
+    }
+
+    setCoords({ top, left });
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition();
+      const handleScrollOrResize = () => updatePosition();
+      window.addEventListener("resize", handleScrollOrResize);
+      window.addEventListener("scroll", handleScrollOrResize, true);
+      setTimeout(() => {
+        selectedHourRef.current?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+        selectedMinuteRef.current?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+      }, 50);
+      return () => {
+        window.removeEventListener("resize", handleScrollOrResize);
+        window.removeEventListener("scroll", handleScrollOrResize, true);
+      };
+    }
+  }, [isOpen, updatePosition]);
+
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target) &&
+        popoverRef.current &&
+        !popoverRef.current.contains(e.target)
+      ) {
         setIsOpen(false);
       }
     };
@@ -111,7 +159,8 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
   };
 
   const hoursList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-  const minutesList = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+  // Complete 0-59 minutes list: all numbers available
+  const minutesList = Array.from({ length: 60 }, (_, i) => i);
 
   return (
     <div ref={containerRef} className="relative flex-1">
@@ -131,72 +180,112 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
         <ChevronIcon className={`w-3.5 h-3.5 theme-text-secondary transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
-      {isOpen && (
-        <div className="absolute left-0 top-full mt-1.5 z-50 p-2 rounded-2xl theme-bg-surface border-0 shadow-xl animate-fade-in flex gap-1.5 w-48">
-          {/* Hours Column */}
-          <div className="flex-1 max-h-40 overflow-y-auto scrollbar-none space-y-0.5">
-            {hoursList.map((h) => (
-              <button
-                key={h}
-                type="button"
-                onClick={() => {
-                  setSelHour(h);
-                  commitTime(h, selMinute, selPeriod);
-                }}
-                className={`w-full py-1 text-xs rounded-md font-mono transition text-center cursor-pointer border-0 ${
-                  selHour === h
-                    ? "theme-bg-accent text-white font-bold"
-                    : "hover:theme-bg-elevated theme-text-primary"
-                }`}
-              >
-                {String(h).padStart(2, "0")}
-              </button>
-            ))}
+      {isOpen && coords && typeof document !== "undefined" && createPortal(
+        <div
+          ref={popoverRef}
+          style={{
+            position: "fixed",
+            top: coords.top,
+            left: coords.left,
+            zIndex: 99999,
+            width: 230,
+          }}
+          className="p-2.5 rounded-2xl theme-bg-surface border-0 shadow-2xl animate-fade-in flex flex-col gap-1.5 select-none"
+        >
+          <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider theme-text-secondary px-1 pb-1 border-b theme-border">
+            <span className="flex-1 text-center">Hour</span>
+            <span className="flex-1 text-center">Min</span>
+            <span className="w-12 text-center">Period</span>
           </div>
+          <div className="flex gap-1.5 h-44">
+            {/* Hours Column */}
+            <div className="flex-1 overflow-y-auto scrollbar-none space-y-0.5">
+              {hoursList.map((h) => {
+                const isSel = selHour === h;
+                return (
+                  <button
+                    key={h}
+                    ref={isSel ? selectedHourRef : null}
+                    type="button"
+                    onClick={() => {
+                      setSelHour(h);
+                      commitTime(h, selMinute, selPeriod);
+                    }}
+                    className={`w-full py-1 text-xs rounded-xl font-mono transition text-center cursor-pointer border-0 ${
+                      isSel
+                        ? "theme-bg-accent theme-accent-text font-bold shadow-xs"
+                        : "hover:theme-bg-elevated theme-text-primary"
+                    }`}
+                  >
+                    {String(h).padStart(2, "0")}
+                  </button>
+                );
+              })}
+            </div>
 
-          {/* Minutes Column (5 min step) */}
-          <div className="flex-1 max-h-40 overflow-y-auto scrollbar-none px-1 space-y-0.5 border-0">
-            {minutesList.map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => {
-                  setSelMinute(m);
-                  commitTime(selHour, m, selPeriod);
-                }}
-                className={`w-full py-1 text-xs rounded-md font-mono transition text-center cursor-pointer border-0 ${
-                  selMinute === m
-                    ? "theme-bg-accent text-white font-bold"
-                    : "hover:theme-bg-elevated theme-text-primary"
-                }`}
-              >
-                {String(m).padStart(2, "0")}
-              </button>
-            ))}
-          </div>
+            {/* Minutes Column (Complete 0-59 numbers) */}
+            <div className="flex-1 overflow-y-auto scrollbar-none px-0.5 space-y-0.5 border-0">
+              {minutesList.map((m) => {
+                const isSel = selMinute === m;
+                return (
+                  <button
+                    key={m}
+                    ref={isSel ? selectedMinuteRef : null}
+                    type="button"
+                    onClick={() => {
+                      setSelMinute(m);
+                      commitTime(selHour, m, selPeriod);
+                    }}
+                    className={`w-full py-1 text-xs rounded-xl font-mono transition text-center cursor-pointer border-0 ${
+                      isSel
+                        ? "theme-bg-accent theme-accent-text font-bold shadow-xs"
+                        : "hover:theme-bg-elevated theme-text-primary"
+                    }`}
+                  >
+                    {String(m).padStart(2, "0")}
+                  </button>
+                );
+              })}
+            </div>
 
-          {/* AM/PM Column */}
-          <div className="w-11 max-h-40 overflow-y-auto scrollbar-none pl-1 space-y-1 border-0 flex flex-col justify-center">
-            {["am", "pm"].map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => {
-                  setSelPeriod(p);
-                  commitTime(selHour, selMinute, p);
-                  setIsOpen(false);
-                }}
-                className={`w-full py-1.5 text-xs rounded-md font-bold uppercase transition text-center cursor-pointer ${
-                  selPeriod === p
-                    ? "theme-bg-accent text-white"
-                    : "hover:theme-bg-elevated theme-text-primary"
-                }`}
-              >
-                {p}
-              </button>
-            ))}
+            {/* AM/PM Column */}
+            <div className="w-12 flex flex-col justify-center space-y-1">
+              {["am", "pm"].map((p) => {
+                const isSel = selPeriod === p;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => {
+                      setSelPeriod(p);
+                      commitTime(selHour, selMinute, p);
+                    }}
+                    className={`w-full py-2 text-xs rounded-xl font-bold uppercase transition text-center cursor-pointer border-0 ${
+                      isSel
+                        ? "theme-bg-accent theme-accent-text shadow-xs"
+                        : "theme-bg-tile hover:theme-bg-elevated theme-text-primary"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+          <div className="pt-1.5 border-t theme-border flex items-center justify-between text-xs">
+            <span className="font-mono text-[11px] font-bold theme-text-primary">
+              {formatTime12(value)}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="px-2.5 py-0.5 rounded-lg text-[11px] font-semibold theme-bg-elevated hover:theme-bg-elevated/80 theme-text-primary cursor-pointer border-0"
+            >
+              Done
+            </button>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -676,16 +765,17 @@ export default function TimeScheduleDrawerForm({
   // Dynamic Audience Options based on actual user roles in the institution
   const audienceOptions = useMemo(() => {
     const opts = [
-      { value: "ALL", label: "All Roles (Public & Everyone)", badge: "ALL" },
+      { value: "ALL", label: "All Roles" },
     ];
     availableRoles.forEach((r) => {
       const code = r.code || r.name;
-      const name = r.name || r.code;
+      const rawName = r.name || r.code;
       if (code && !opts.some((o) => o.value === code)) {
+        // Clean role name without any bracket data (e.g. "Student (STUDENT)" -> "Student")
+        const cleanName = String(rawName).replace(/\s*\([^)]*\)/g, "").trim() || code;
         opts.push({
           value: code,
-          label: `${name} (${code})`,
-          badge: code,
+          label: cleanName,
         });
       }
     });
@@ -1154,6 +1244,8 @@ export default function TimeScheduleDrawerForm({
                 onChange={(val) => setFormData({ ...formData, audience: val })}
                 options={audienceOptions}
                 placeholder={t("targetAudience", "Select Target Roles...")}
+                showBadge={false}
+                showDescription={false}
               />
             </div>
 

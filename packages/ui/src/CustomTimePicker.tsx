@@ -54,7 +54,7 @@ export function formatDisplayTime(timeStr?: string | null): string {
 }
 
 const HOURS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5); // 0, 5, 10, 15... 55
+const MINUTES = Array.from({ length: 60 }, (_, i) => i); // 0, 1, 2, ... 59
 
 export interface CustomTimePickerProps {
   value?: string | null;
@@ -147,9 +147,11 @@ export default function CustomTimePicker({
       shouldOpenUpward = spaceBelow < popoverHeight && spaceAbove > spaceBelow;
     }
 
-    const popoverWidth = Math.min(230, Math.max(200, rect.width));
+    const popoverWidth = Math.min(240, Math.max(210, rect.width));
     let left = rect.left;
-    if (left + popoverWidth > window.innerWidth - 12) {
+    if (left < 12) {
+      left = 12;
+    } else if (left + popoverWidth > window.innerWidth - 12) {
       left = Math.max(12, window.innerWidth - popoverWidth - 12);
     }
 
@@ -241,7 +243,7 @@ export default function CustomTimePicker({
   const handleSetNow = () => {
     const now = new Date();
     const h24 = now.getHours();
-    const m = Math.round(now.getMinutes() / 5) * 5 % 60;
+    const m = now.getMinutes();
     const time24 = `${String(h24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     const p = parse24To12(time24);
     setDraftHour(p.hour12);

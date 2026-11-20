@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRightSidebar } from '../../../../context/RightSidebarContext';
 import { useTenant } from '../../../../context/TenantContext';
+import { useFeatureControl } from '../../../../context/FeatureControlContext';
 import { calendarSettings } from '../../../../utils/localStore';
 import { useUserTasks } from '../tasks/useUserTasks';
 import { EVENT_COLOR_MAP, type EventColorStyle } from '../constants/eventColors';
@@ -40,13 +41,28 @@ export default function MasterTimeCalendar({
   embeddedSurface = false,
   showPersonalTasks: propShowPersonalTasks,
   onTogglePersonalTasks,
+  canAddWorkingHours: propCanAddWorkingHours,
+  canAddEvents: propCanAddEvents,
 }: MasterTimeCalendarProps) {
   const { openDrawer } = useRightSidebar();
   const { activeTenantId } = useTenant();
   const { tasks: userTasks, toggleTaskStatus } = useUserTasks();
+  const { isSectionEnabled } = useFeatureControl();
+
+  const isMyTasksSectionEnabled = isSectionEnabled('calendar_tab_personal_tasks') && isSectionEnabled('calendar_view_personal_tasks');
+  const featureCanAddWorkingHours = isSectionEnabled('calendar_add_working_hours');
+  const featureCanAddEvents = isSectionEnabled('calendar_add_events');
+
+  const canAddWorkingHours = propCanAddWorkingHours !== undefined ? propCanAddWorkingHours : featureCanAddWorkingHours;
+  const canAddEvents = propCanAddEvents !== undefined ? propCanAddEvents : featureCanAddEvents;
+  const canAddForActiveCategory = selectedCategory === 'WORKING_HOURS'
+    ? canAddWorkingHours
+    : selectedCategory === 'ACADEMIC_EVENT'
+    ? canAddEvents
+    : (canAddWorkingHours || canAddEvents);
 
   const [internalShowPersonalTasks, setInternalShowPersonalTasks] = useState<boolean>(true);
-  const showPersonalTasks = propShowPersonalTasks !== undefined ? propShowPersonalTasks : internalShowPersonalTasks;
+  const showPersonalTasks = isMyTasksSectionEnabled && (propShowPersonalTasks !== undefined ? propShowPersonalTasks : internalShowPersonalTasks);
   const setShowPersonalTasks = onTogglePersonalTasks || setInternalShowPersonalTasks;
 
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -195,6 +211,22 @@ export default function MasterTimeCalendar({
     });
   }, [openDrawer, selectedDateStr, selectedCategory]);
 
+  const handleOpenAddShift = useCallback((initialDate = '') => {
+    openDrawer('schedule', {
+      mode: 'add',
+      date: initialDate || selectedDateStr,
+      category: 'WORKING_HOURS',
+    });
+  }, [openDrawer, selectedDateStr]);
+
+  const handleOpenAddEvent = useCallback((initialDate = '') => {
+    openDrawer('schedule', {
+      mode: 'add',
+      date: initialDate || selectedDateStr,
+      category: 'ACADEMIC_EVENT',
+    });
+  }, [openDrawer, selectedDateStr]);
+
   const selectedDayTasks = useMemo(() => {
     return getTasksForDate(selectedDateStr);
   }, [getTasksForDate, selectedDateStr]);
@@ -211,6 +243,7 @@ export default function MasterTimeCalendar({
         isHijriEnabled={isHijriEnabled}
         shouldShowTodayButton={shouldShowTodayButton}
         showPersonalTasks={showPersonalTasks}
+        showPersonalTasksToggle={isMyTasksSectionEnabled}
         searchQuery={searchQuery}
         filteredEventsCount={filteredEvents.length}
         embeddedSurface={embeddedSurface}
@@ -244,6 +277,7 @@ export default function MasterTimeCalendar({
             readOnly={readOnly}
             embeddedSurface={embeddedSurface}
             showPersonalTasks={showPersonalTasks}
+            canAdd={canAddForActiveCategory}
             activeTenantId={activeTenantId}
             getEventsForDate={getEventsForDate}
             getTasksForDate={getTasksForDate}
@@ -272,12 +306,17 @@ export default function MasterTimeCalendar({
             readOnly={readOnly}
             showPersonalTasks={showPersonalTasks}
             activeTenantId={activeTenantId}
+            selectedCategory={selectedCategory}
+            canAddWorkingHours={canAddWorkingHours}
+            canAddEvents={canAddEvents}
             selectedDayEvents={selectedDayEvents}
             selectedDayTasks={selectedDayTasks}
             getEventsForDate={getEventsForDate}
             onSelectDay={setSelectedDay}
             onSetCurrentDate={setCurrentDate}
             onOpenAddDrawer={handleOpenAddDrawer}
+            onOpenAddShift={handleOpenAddShift}
+            onOpenAddEvent={handleOpenAddEvent}
             onOpenEventDetail={handleOpenEventDetail}
             onToggleTaskStatus={toggleTaskStatus}
             onOpenTaskDrawer={(params) => openDrawer('user-task', params)}
@@ -291,6 +330,7 @@ export default function MasterTimeCalendar({
             isHijriEnabled={isHijriEnabled}
             embeddedSurface={embeddedSurface}
             activeTenantId={activeTenantId}
+            selectedCategory={selectedCategory}
             onOpenEventDetail={handleOpenEventDetail}
           />
         )}

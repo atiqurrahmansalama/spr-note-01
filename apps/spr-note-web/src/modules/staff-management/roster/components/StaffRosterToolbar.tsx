@@ -1,11 +1,13 @@
 import React from 'react';
-import CustomInput from '@/components/ui/CustomInput';
+import { useNavigate } from 'react-router-dom';
+import DataViewToolbar from '@/components/ui/DataViewToolbar';
 import CustomSelect from '@/components/ui/CustomSelect';
 import { RoleSelect } from '@/components/selectors';
+import { PlusIcon } from '@/components/ui/Icons';
 import { useStaffTranslation } from '../../locales';
 import type { StaffDisplayMode } from '../../types';
 
-interface StaffRosterToolbarProps {
+export interface StaffRosterToolbarProps {
   searchQuery: string;
   onSearchChange: (val: string) => void;
   roleFilter: string;
@@ -23,6 +25,11 @@ interface StaffRosterToolbarProps {
   onToggleDisplayMode: (mode: StaffDisplayMode) => void;
   matchingCount: number;
   totalCount: number;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
+  hasActiveFilters?: boolean;
+  onResetFilters?: () => void;
+  activeFilterCount?: number;
 }
 
 export const StaffRosterToolbar: React.FC<StaffRosterToolbarProps> = ({
@@ -43,103 +50,103 @@ export const StaffRosterToolbar: React.FC<StaffRosterToolbarProps> = ({
   onToggleDisplayMode,
   matchingCount,
   totalCount,
+  onRefresh,
+  isRefreshing = false,
+  hasActiveFilters = false,
+  onResetFilters,
+  activeFilterCount = 0,
 }) => {
+  const navigate = useNavigate();
   const { t } = useStaffTranslation();
 
   return (
-    <div className="p-4 sm:p-5 rounded-3xl theme-bg-surface shadow-xs space-y-4 border-0">
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        {/* Search Box */}
-        <div>
-          <CustomInput
-            type="search"
-            placeholder={t('searchPlaceholder', 'Search by name, ID, phone...')}
-            value={searchQuery}
-            onChange={(val) => onSearchChange(val)}
-          />
-        </div>
+    <DataViewToolbar
+      searchLabel="Search"
+      searchQuery={searchQuery}
+      onSearchChange={onSearchChange}
+      searchPlaceholder={t('searchPlaceholder', 'Search by name, ID, phone...')}
+      searchVariant="app"
+      stackedSwitcher={true}
+      searchSpanClassName="col-span-1"
+      filterGridClassName="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 @[900px]:grid-cols-5 gap-2.5 items-end"
+      viewMode={displayMode}
+      onToggleViewMode={onToggleDisplayMode}
+      tableLabel={t('tableView', 'Table View')}
+      cardsLabel={t('cardGrid', 'Card Grid')}
+      filteredCount={matchingCount}
+      totalCount={totalCount}
+      itemLabel={t('personnel', 'personnel')}
+      hasActiveFilters={hasActiveFilters}
+      onResetFilters={onResetFilters}
+      activeFilterCount={activeFilterCount}
+      onRefresh={onRefresh}
+      loading={isRefreshing}
+      actions={
+        <button
+          type="button"
+          onClick={() => navigate('/staff/onboarding')}
+          className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl theme-bg-accent theme-accent-text hover:opacity-95 text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-98 border-0 shrink-0"
+        >
+          <PlusIcon className="w-4 h-4" />
+          <span>{t('onboardStaff', 'Onboard Staff')}</span>
+        </button>
+      }
+      customFilters={
+        <>
+          {/* 1. Role Filter */}
+          <div className="col-span-1">
+            <RoleSelect
+              value={roleFilter === 'ALL' ? '' : roleFilter}
+              onChange={(val: any) => onRoleChange(val || 'ALL')}
+              valueKey="code"
+              allowAll={true}
+              allLabel={t('allRoles', 'All Roles')}
+              placeholder={t('allRoles', 'Filter by Role')}
+              label="Role"
+              size="md"
+            />
+          </div>
 
-        {/* Role Filter */}
-        <div>
-          <RoleSelect
-            value={roleFilter === 'ALL' ? '' : roleFilter}
-            onChange={(val: any) => onRoleChange(val || 'ALL')}
-            valueKey="code"
-            allowAll={true}
-            allLabel={t('allRoles', 'All Roles')}
-            placeholder={t('allRoles', 'Filter by Role')}
-            label={null}
-          />
-        </div>
+          {/* 2. Rank / Designation Filter */}
+          <div className="col-span-1">
+            <CustomSelect
+              label="Designation"
+              options={rankFilterOptions}
+              value={rankFilter}
+              onChange={(val) => onRankChange(val)}
+              placeholder={t('allRanks', 'Filter by Rank')}
+              searchable={true}
+              size="md"
+            />
+          </div>
 
-        {/* Rank / Designation Filter */}
-        <div>
-          <CustomSelect
-            options={rankFilterOptions}
-            value={rankFilter}
-            onChange={(val) => onRankChange(val)}
-            placeholder={t('allRanks', 'Filter by Rank')}
-            searchable={true}
-          />
-        </div>
+          {/* 3. Department Filter */}
+          <div className="col-span-1">
+            <CustomSelect
+              label="Department"
+              options={departmentOptions}
+              value={deptFilter}
+              onChange={(val) => onDeptChange(val)}
+              placeholder={t('allDepartments', 'Filter by Department')}
+              size="md"
+            />
+          </div>
 
-        {/* Department Filter */}
-        <div>
-          <CustomSelect
-            options={departmentOptions}
-            value={deptFilter}
-            onChange={(val) => onDeptChange(val)}
-            placeholder={t('allDepartments', 'Filter by Department')}
-          />
-        </div>
-
-        {/* Employment Status Filter */}
-        <div>
-          <CustomSelect
-            options={statusOptions}
-            value={statusFilter}
-            onChange={(val) => onStatusChange(val)}
-            placeholder={t('allStatus', 'Filter by Status')}
-          />
-        </div>
-      </div>
-
-      {/* Bottom Toolbar & View Switcher (Zero Harsh Borders) */}
-      <div className="flex items-center justify-between gap-3 pt-2 border-0">
-        <div className="text-xs theme-text-secondary font-medium">
-          {t('showingPersonnel', 'Showing {{count}} of {{total}} personnel', {
-            count: matchingCount,
-            total: totalCount,
-          })}
-        </div>
-
-        {/* View Mode Toggle Switcher */}
-        <div className="flex items-center gap-1 p-1 rounded-2xl theme-bg-app border-0">
-          <button
-            type="button"
-            onClick={() => onToggleDisplayMode('table')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-0 ${
-              displayMode === 'table'
-                ? 'theme-bg-surface theme-accent shadow-xs'
-                : 'theme-text-secondary hover:theme-text-primary'
-            }`}
-          >
-            {t('tableView', 'Table View')}
-          </button>
-          <button
-            type="button"
-            onClick={() => onToggleDisplayMode('grid')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-0 ${
-              displayMode === 'grid'
-                ? 'theme-bg-surface theme-accent shadow-xs'
-                : 'theme-text-secondary hover:theme-text-primary'
-            }`}
-          >
-            {t('cardGrid', 'Card Grid')}
-          </button>
-        </div>
-      </div>
-    </div>
+          {/* 4. Employment Status Filter */}
+          <div className="col-span-1">
+            <CustomSelect
+              label="Status"
+              options={statusOptions}
+              value={statusFilter}
+              onChange={(val) => onStatusChange(val)}
+              placeholder={t('allStatus', 'Filter by Status')}
+              size="md"
+            />
+          </div>
+        </>
+      }
+    />
   );
 };
 
+export default StaffRosterToolbar;

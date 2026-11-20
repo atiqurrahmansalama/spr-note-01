@@ -167,7 +167,7 @@ export interface WidgetDefinition {
   minColSpan?: WidgetColSpan;
   maxColSpan?: WidgetColSpan;
   widgetFeatureKey: string;
-  requiredFeatureKey?: string;
+  requiredFeatureKey?: string | string[];
   component: React.ComponentType<any>;
 }
 

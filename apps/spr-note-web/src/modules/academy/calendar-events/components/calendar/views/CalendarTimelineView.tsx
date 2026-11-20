@@ -1,6 +1,6 @@
 import React from 'react';
 import DateHeaderCell from '../../../../../../components/common/DateHeaderCell';
-import { CalendarIcon } from '../../../../../../components/ui/Icons';
+import { CalendarIcon, ClockIcon, PlusIcon } from '../../../../../../components/ui/Icons';
 import type { CalendarEvent, UserPersonalTask } from '../../../types';
 import type { TimelineStripDay } from '../types';
 import { WEEKDAY_NAMES_FULL, MONTH_NAMES, getEventColors } from '../utils/calendarUtils';
@@ -22,12 +22,17 @@ interface CalendarTimelineViewProps {
   readOnly?: boolean;
   showPersonalTasks?: boolean;
   activeTenantId?: string;
+  selectedCategory?: string;
   selectedDayEvents: CalendarEvent[];
   selectedDayTasks: UserPersonalTask[];
   getEventsForDate: (dateStr: string, weekday: number) => CalendarEvent[];
   onSelectDay: (dayNum: number) => void;
   onSetCurrentDate: (date: Date) => void;
   onOpenAddDrawer: (dateStr: string) => void;
+  onOpenAddShift?: (dateStr: string) => void;
+  onOpenAddEvent?: (dateStr: string) => void;
+  canAddWorkingHours?: boolean;
+  canAddEvents?: boolean;
   onOpenEventDetail: (evt: CalendarEvent, dateStr?: string) => void;
   onToggleTaskStatus: (taskId: string) => void;
   onOpenTaskDrawer: (params: { task?: UserPersonalTask | null; date: string }) => void;
@@ -46,13 +51,18 @@ export const CalendarTimelineView: React.FC<CalendarTimelineViewProps> = ({
   embeddedSurface = false,
   readOnly = false,
   showPersonalTasks = true,
+  canAddWorkingHours = true,
+  canAddEvents = true,
   activeTenantId,
+  selectedCategory,
   selectedDayEvents,
   selectedDayTasks,
   getEventsForDate,
   onSelectDay,
   onSetCurrentDate,
   onOpenAddDrawer,
+  onOpenAddShift,
+  onOpenAddEvent,
   onOpenEventDetail,
   onToggleTaskStatus,
   onOpenTaskDrawer,
@@ -141,20 +151,78 @@ export const CalendarTimelineView: React.FC<CalendarTimelineViewProps> = ({
         {selectedDayEvents.length === 0 ? (
           <div className="p-6 @sm:p-10 text-center border-0 rounded-2xl theme-bg-tile shadow-2xs my-1 flex flex-col items-center justify-center gap-2">
             <div className="p-2.5 rounded-xl theme-bg-surface border-0 theme-text-secondary opacity-60 shadow-xs">
-              <CalendarIcon className="w-5 h-5" />
+              {selectedCategory === 'WORKING_HOURS' ? (
+                <ClockIcon className="w-5 h-5" />
+              ) : (
+                <CalendarIcon className="w-5 h-5" />
+              )}
             </div>
             <div>
-              <h4 className="text-xs @sm:text-sm font-bold theme-text-primary">No schedules or events for this date</h4>
-              <p className="text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5">Click below or use the top Add button to create working hours or an academic event.</p>
+              {selectedCategory === 'WORKING_HOURS' ? (
+                <>
+                  <h4 className="text-xs @sm:text-sm font-bold theme-text-primary">No working hours for this date</h4>
+                  <p className="text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5">No operational work shifts or duty hours scheduled for this day.</p>
+                </>
+              ) : selectedCategory === 'ACADEMIC_EVENT' ? (
+                <>
+                  <h4 className="text-xs @sm:text-sm font-bold theme-text-primary">No academic events for this date</h4>
+                  <p className="text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5">No examinations, institutional milestones, or academy events on this date.</p>
+                </>
+              ) : (
+                <>
+                  <h4 className="text-xs @sm:text-sm font-bold theme-text-primary">No schedules or events for this date</h4>
+                  <p className="text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5">Choose an action below to add a working schedule or an academic event.</p>
+                </>
+              )}
             </div>
+
             {!readOnly && (
-              <button
-                type="button"
-                onClick={() => onOpenAddDrawer(selectedDateStr)}
-                className="mt-1 px-3 py-1.5 rounded-xl text-xs font-bold border-0 theme-bg-surface hover:theme-bg-elevated theme-text-primary transition-all cursor-pointer shadow-xs"
-              >
-                + Add Schedule / Event
-              </button>
+              selectedCategory === 'WORKING_HOURS' ? (
+                canAddWorkingHours ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenAddShift ? onOpenAddShift(selectedDateStr) : onOpenAddDrawer(selectedDateStr)}
+                    className="mt-1 px-3.5 py-1.5 rounded-xl text-xs font-bold border-0 theme-bg-accent theme-accent-text hover:brightness-105 transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                  >
+                    <PlusIcon className="w-3.5 h-3.5" />
+                    <span>Add Working Hours</span>
+                  </button>
+                ) : null
+              ) : selectedCategory === 'ACADEMIC_EVENT' ? (
+                canAddEvents ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenAddEvent ? onOpenAddEvent(selectedDateStr) : onOpenAddDrawer(selectedDateStr)}
+                    className="mt-1 px-3.5 py-1.5 rounded-xl text-xs font-bold border-0 theme-bg-accent theme-accent-text hover:brightness-105 transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                  >
+                    <PlusIcon className="w-3.5 h-3.5" />
+                    <span>Add Academic Event</span>
+                  </button>
+                ) : null
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap justify-center mt-1">
+                  {canAddWorkingHours && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenAddShift ? onOpenAddShift(selectedDateStr) : onOpenAddDrawer(selectedDateStr)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold border-0 theme-bg-surface hover:theme-bg-elevated theme-text-primary transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                    >
+                      <ClockIcon className="w-3.5 h-3.5 theme-accent" />
+                      <span>Add Working Hours</span>
+                    </button>
+                  )}
+                  {canAddEvents && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenAddEvent ? onOpenAddEvent(selectedDateStr) : onOpenAddDrawer(selectedDateStr)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold border-0 theme-bg-surface hover:theme-bg-elevated theme-text-primary transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                    >
+                      <CalendarIcon className="w-3.5 h-3.5 theme-accent" />
+                      <span>Add Academic Event</span>
+                    </button>
+                  )}
+                </div>
+              )
             )}
           </div>
         ) : (

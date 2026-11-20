@@ -10,6 +10,7 @@ import {
   ChevronRightIcon,
 } from '../../../../../components/ui/Icons';
 import useDashboardCalendarSync from '../../../hooks/useDashboardCalendarSync';
+import { useFeatureControl } from '../../../../../context/FeatureControlContext';
 
 export interface AgendaScheduleWidgetProps {
   title?: string;
@@ -21,8 +22,13 @@ export default function AgendaScheduleWidget({
   className = '',
 }: AgendaScheduleWidgetProps) {
   const navigate = useNavigate();
+  const { isSectionEnabled } = useFeatureControl();
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+
+  const canAddEvents = isSectionEnabled('calendar_add_events');
+  const canAddWorkingHours = isSectionEnabled('calendar_add_working_hours');
+  const canAddAny = canAddEvents || canAddWorkingHours;
 
   const {
     events,
@@ -96,14 +102,16 @@ export default function AgendaScheduleWidget({
         {/* Action Controls */}
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {/* Add Item Button */}
-          <button
-            type="button"
-            onClick={handleAddItem}
-            className="px-2.5 py-1.5 rounded-xl text-xs font-semibold theme-bg-accent theme-accent-text hover:brightness-105 transition-all flex items-center gap-1 cursor-pointer border-0 shadow-2xs"
-          >
-            <PlusIcon className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Add Item</span>
-          </button>
+          {canAddAny && (
+            <button
+              type="button"
+              onClick={handleAddItem}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold theme-bg-accent theme-accent-text hover:brightness-105 transition-all flex items-center gap-1 cursor-pointer border-0 shadow-2xs"
+            >
+              <PlusIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Add Item</span>
+            </button>
+          )}
 
           {/* View Hub Shortcut */}
           <button

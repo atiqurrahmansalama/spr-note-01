@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { masterCalendarStore } from '../../../utils/localStore';
 import { useTenant } from '../../../context/TenantContext';
 import { useRightSidebar, useDrawerRegistration } from '../../../context/RightSidebarContext';
+import { useFeatureControl } from '../../../context/FeatureControlContext';
+import AccessDeniedView from '../../../components/common/AccessDeniedView';
 import {
   TimeScheduleDrawerForm,
   TimeScheduleDetailDrawer,
@@ -12,7 +14,11 @@ import type { CalendarEvent } from '../../academy/calendar-events/types';
 export function useDashboardCalendarSync(defaultCategory: 'WORKING_HOURS' | 'ACADEMIC_EVENT' | 'AGENDA' | 'ALL' = 'ALL') {
   const { activeTenantId } = useTenant();
   const { openDrawer, closeDrawer } = useRightSidebar();
+  const { isSectionEnabled } = useFeatureControl();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+
+  const canAddWorkingHours = isSectionEnabled('calendar_add_working_hours');
+  const canAddEvents = isSectionEnabled('calendar_add_events');
 
   const loadEvents = useCallback(() => {
     try {
@@ -34,7 +40,11 @@ export function useDashboardCalendarSync(defaultCategory: 'WORKING_HOURS' | 'ACA
   }, [loadEvents]);
 
   const handleSaveEvent = useCallback((savedEvent: CalendarEvent) => {
-    masterCalendarStore.saveEvent(activeTenantId, savedEvent);
+    if ((savedEvent as any)?.id) {
+      masterCalendarStore.updateEvent(activeTenantId, (savedEvent as any).id, savedEvent);
+    } else {
+      masterCalendarStore.addEvent(activeTenantId, savedEvent);
+    }
     loadEvents();
   }, [activeTenantId, loadEvents]);
 
@@ -72,6 +82,29 @@ export function useDashboardCalendarSync(defaultCategory: 'WORKING_HOURS' | 'ACA
       const isWorkingHours = mode === 'add'
         ? targetCategory === 'WORKING_HOURS'
         : (foundEvent?.category || targetCategory) === 'WORKING_HOURS';
+      const canEditCategory = isWorkingHours ? canAddWorkingHours : canAddEvents;
+
+      // Zero-Trust Security Guard: Block unauthorized add/edit attempts from dashboard widgets
+      if ((mode === 'add' || mode === 'edit') && !canEditCategory) {
+        return {
+          title: isWorkingHours ? 'Working Hours Restricted' : 'Academic Events Restricted',
+          category: 'Schedule & Calendar',
+          size: 'md' as const,
+          content: (
+            <AccessDeniedView
+              variant="drawer"
+              title={
+                isWorkingHours
+                  ? 'Working Hours Modification Restricted'
+                  : 'Academic Event Modification Restricted'
+              }
+              message="You do not have permission to add or modify this schedule. Please contact your institution administrator."
+              sectionKey={isWorkingHours ? 'calendar_add_working_hours' : 'calendar_add_events'}
+              onClose={closeDrawer}
+            />
+          ),
+        };
+      }
 
       if (mode === 'detail' && foundEvent) {
         return {
@@ -83,18 +116,19 @@ export function useDashboardCalendarSync(defaultCategory: 'WORKING_HOURS' | 'ACA
               event={foundEvent}
               currentDate={targetDate}
               initialDate={targetDate}
-              onEdit={() => {
+              readOnly={!canEditCategory}
+              onEdit={canEditCategory ? () => {
                 openDrawer('schedule', {
                   mode: 'edit',
                   eventId: foundEvent.id,
                   category: foundEvent.category,
                   date: targetDate,
                 });
-              }}
-              onDelete={(deleteInfo: any) => {
+              } : undefined}
+              onDelete={canEditCategory ? (deleteInfo: any) => {
                 handleDeleteEvent(deleteInfo || foundEvent.id);
                 closeDrawer();
-              }}
+              } : undefined}
               onClose={closeDrawer}
             />
           ),
@@ -122,7 +156,7 @@ export function useDashboardCalendarSync(defaultCategory: 'WORKING_HOURS' | 'ACA
         ),
       };
     },
-    [events, defaultCategory, handleSaveEvent, handleDeleteEvent, openDrawer, closeDrawer]
+    [events, defaultCategory, canAddWorkingHours, canAddEvents, handleSaveEvent, handleDeleteEvent, openDrawer, closeDrawer]
   );
 
   // Universal Drawer Registration for Weekly Holidays
