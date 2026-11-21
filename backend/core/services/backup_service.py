@@ -136,12 +136,14 @@ class EnterpriseBackupService:
                 except Exception as err:
                     logger.warning(f"[BackupService] Audit log snapshot skipped: {err}")
 
-            # --- 2. Try PostgreSQL Native pg_dump (if available) ---
+            # --- 2. Try PostgreSQL Native pg_dump (if direct connection & tool available) ---
             db_engine = settings.DATABASES["default"].get("ENGINE", "")
             db_url = os.getenv("DATABASE_URL", "")
             pg_dump_success = False
 
-            if "postgresql" in db_engine or "postgres" in db_url:
+            # Note: Port 6543 is PgBouncer transaction mode which rejects pg_dump session locks.
+            # Avoid pg_dump on transaction poolers to eliminate timeouts and prevent duplicate egress.
+            if ("postgresql" in db_engine or "postgres" in db_url) and ":6543" not in db_url:
                 sql_dump_path = temp_dir / "database_schema_and_data.sql"
                 try:
                     if db_url and shutil.which("pg_dump"):
@@ -164,6 +166,8 @@ class EnterpriseBackupService:
                             logger.warning(f"[BackupService] pg_dump exited with code {res.returncode}")
                 except Exception as e:
                     logger.warning(f"[BackupService] Native pg_dump skipped: {e}")
+            elif ":6543" in db_url:
+                logger.info("[BackupService] Supabase Transaction Pooler (port 6543) detected. Using pure Django ORM JSON dump to conserve egress and guarantee transaction integrity.")
 
             # --- 3. Package Media Assets (Avatars, Documents, Custom Templates) ---
             media_files_count = 0

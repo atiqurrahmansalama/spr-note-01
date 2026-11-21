@@ -1,9 +1,9 @@
-name: 3-Tier Enterprise Database & Media Hourly Backup
+name: 3-Tier Enterprise Database & Media Daily Backup
 
 on:
   schedule:
-    # Trigger automatically every hour at minute 0
-    - cron: '0 * * * *'
+    # Trigger automatically once daily at 02:00 UTC (08:00 AM BD time)
+    - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
       destination:
@@ -18,7 +18,7 @@ on:
           - 'cloudflare_r2'
 
 jobs:
-  hourly_full_backup:
+  daily_full_backup:
     name: Generate 100% Full System Archive & Cloud Sync
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -34,6 +34,7 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
+          cache-dependency-path: 'backend/requirements.txt'
 
       - name: Install System PostgreSQL Client Tools
         run: |
@@ -54,7 +55,7 @@ jobs:
         run: |
           if [ -z "${DATABASE_URL}" ]; then
             echo "::error::CRITICAL: GitHub Secret 'DATABASE_URL' is missing! Please configure DATABASE_URL in Repository Settings -> Secrets and variables -> Actions."
-            echo "::error::Hourly backup requires live connection to cloud PostgreSQL database to generate 100% full archive."
+            echo "::error::Daily backup requires live connection to cloud PostgreSQL database to generate 100% full archive."
             exit 1
           fi
           echo "DATABASE_URL secret is detected. Verifying PostgreSQL connectivity..."
@@ -63,12 +64,13 @@ jobs:
           url = os.environ.get('DATABASE_URL')
           try:
               cfg = dj_database_url.parse(url)
+              port_val = int(cfg.get('PORT') or 5432)
               conn = psycopg2.connect(
                   dbname=cfg['NAME'],
                   user=cfg['USER'],
                   password=cfg['PASSWORD'],
                   host=cfg['HOST'],
-                  port=cfg['PORT'],
+                  port=port_val,
                   sslmode='require',
                   connect_timeout=15
               )
@@ -114,11 +116,11 @@ jobs:
           path: |
             backend/${{ steps.archive_info.outputs.archive_path }}
             backend/${{ steps.archive_info.outputs.sha256_path }}
-          retention-days: 90
+          retention-days: 30
           compression-level: 0
 
       - name: Tier 1 - Sync to Cloudflare R2 / AWS S3 (If Configured)
-        if: env.R2_ACCESS_KEY != ''
+        if: ${{ secrets.R2_ACCESS_KEY != '' }}
         env:
           R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
           R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
@@ -137,6 +139,6 @@ jobs:
           archive_path = "backend/${{ steps.archive_info.outputs.archive_path }}"
           archive_name = "${{ steps.archive_info.outputs.archive_name }}"
           print(f"Uploading {archive_name} to R2 bucket...")
-          s3.upload_file(archive_path, os.environ['R2_BUCKET_NAME'], f"hourly/{archive_name}")
+          s3.upload_file(archive_path, os.environ['R2_BUCKET_NAME'], f"daily/{archive_name}")
           print("R2 Cloud Sync Completed Successfully.")
           EOF
