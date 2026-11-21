@@ -23,7 +23,9 @@ export function getStudentClassDetails(
   s: StudentRecord,
   classesMap: Map<string, any>,
   sectionsByClassMap: Map<string, any[]>,
-  groupsByClassMap: Map<string, any[]>
+  groupsByClassMap: Map<string, any[]>,
+  hasInstitutionGroups: boolean = true,
+  groupsList: any[] = []
 ): StudentClassDetails {
   const classId = String(
     s.student_class_id ||
@@ -52,11 +54,17 @@ export function getStudentClassDetails(
     (classObj && typeof classObj.section_count === "number" && classObj.section_count > 0)
   );
 
+  // Institution has groups check: false if the institution has 0 groups in system
+  const institutionHasGroups = Boolean(
+    hasInstitutionGroups && (groupsList.length > 0 || groupsByClassMap.size > 0)
+  );
+
   // Check if class has groups configured (must have active groups created or positive count)
   const classGroupsList = resolvedClassId ? groupsByClassMap.get(resolvedClassId) || [] : [];
   const classHasGroups = Boolean(
-    classGroupsList.length > 0 ||
-    (classObj && typeof classObj.group_count === "number" && classObj.group_count > 0)
+    institutionHasGroups &&
+    (classGroupsList.length > 0 ||
+      (classObj && typeof classObj.group_count === "number" && classObj.group_count > 0))
   );
 
   // Student's assigned section
@@ -75,6 +83,18 @@ export function getStudentClassDetails(
     ""
   ).trim();
 
+  // Guard against dirty legacy data where className or sectionName was dumped into group_name
+  if (
+    assignedGroup &&
+    (assignedGroup.toLowerCase() === className.toLowerCase() ||
+      assignedGroup.toLowerCase() === assignedSection.toLowerCase())
+  ) {
+    const hasGroupFk = Boolean(s.student_group_id || s.student_group);
+    if (!hasGroupFk || !institutionHasGroups) {
+      assignedGroup = "";
+    }
+  }
+
   // If section and group names are identical (e.g. legacy dirty seed data where section name was copied into group_name)
   if (assignedSection && assignedGroup && assignedSection.toLowerCase() === assignedGroup.toLowerCase()) {
     const hasSectionFk = Boolean(s.section_id || s.section || s.student_section);
@@ -90,6 +110,21 @@ export function getStudentClassDetails(
     }
   }
 
+  // CRITICAL RULE: If the institution does NOT have groups configured, NEVER show any group info!
+  if (!institutionHasGroups) {
+    assignedGroup = "";
+  } else if (!classHasGroups) {
+    // If the institution has groups, but this specific class has NO groups configured:
+    // Only accept assignedGroup if it actually matches a registered group in the institution
+    const matchesRealGroup = groupsList.some((g: any) =>
+      (g.id && (String(g.id) === String(s.student_group_id) || String(g.id) === String(s.student_group))) ||
+      (g.name && g.name.toLowerCase().trim() === assignedGroup.toLowerCase().trim())
+    );
+    if (!matchesRealGroup) {
+      assignedGroup = "";
+    }
+  }
+
   const parts: SectionGroupItem[] = [];
 
   // Section Part
@@ -99,7 +134,7 @@ export function getStudentClassDetails(
         label: assignedSection.toLowerCase().startsWith("sec") ? assignedSection : `Section: ${assignedSection}`,
         isUnassigned: false,
       });
-    } else {
+    } else if (classHasSections) {
       parts.push({
         label: "No Section Assigned",
         isUnassigned: true,
@@ -107,8 +142,8 @@ export function getStudentClassDetails(
     }
   }
 
-  // Group Part
-  if (classHasGroups || assignedGroup) {
+  // Group Part: only show if institution actually uses groups
+  if (institutionHasGroups && (classHasGroups || assignedGroup)) {
     if (assignedGroup) {
       parts.push({
         label:
@@ -117,7 +152,7 @@ export function getStudentClassDetails(
             : `Group: ${assignedGroup}`,
         isUnassigned: false,
       });
-    } else {
+    } else if (classHasGroups) {
       parts.push({
         label: "No Group Assigned",
         isUnassigned: true,
@@ -271,7 +306,9 @@ export function useStudentTableColumns({
             s,
             classesMap,
             sectionsByClassMap,
-            groupsByClassMap
+            groupsByClassMap,
+            groups.length > 0,
+            groups
           );
 
           return (

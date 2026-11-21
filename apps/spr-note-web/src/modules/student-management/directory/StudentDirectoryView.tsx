@@ -11,17 +11,21 @@ import {
   BookOpenIcon,
   CheckCircleIcon,
   TransferIcon,
+  SearchIcon,
+  TableIcon,
+  Squares2X2Icon,
+  RefreshIcon,
 } from "../../../components/ui/Icons";
 import DataTable from "../../../components/ui/DataTable";
 import DataCardGrid from "../../../components/ui/DataCardGrid";
 import CustomSelect from "../../../components/ui/CustomSelect";
-import DataViewToolbar from "../../../components/ui/DataViewToolbar";
+import CustomInput from "../../../components/ui/CustomInput";
+import FilterBox from "../../../components/ui/FilterBox";
 import Pagination from "../../../components/ui/Pagination";
 import SelectionActionBar from "../../../components/ui/SelectionActionBar";
 import { ConfirmModal } from "../../../components/ui/Modal";
 import { DepartmentSelect, ClassSelect, SectionSelect } from "../../../components/selectors";
 import MetricsGrid from "../../../components/ui/MetricsGrid";
-import PageHeader from "../../../components/ui/PageHeader";
 import { PageContainer } from "../../../components/layout";
 import StudentTransferModal from "./StudentTransferModal";
 import { StudentCard, StudentBulkModal } from "./components";
@@ -311,32 +315,29 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
 
   return (
     <PageContainer>
-      {/* 1. Page Header */}
-      <PageHeader
-        icon={StudentIcon}
-        title="Student Roster"
-        subtitle="Directory of enrolled students, academic classes, sections, guardian contacts, and status"
-      />
-
-      {/* 2. Metrics Cards */}
+      {/* 1. Metrics Cards (Enterprise Standard with sub-labels & container responsiveness) */}
       <MetricsGrid
+        cols={isSectionEnabled("quran_hifz_tracker") ? 4 : 3}
         items={[
           {
             label: "Total Students",
             value: metrics.total_students || students.length,
             icon: StudentIcon,
-            color: "sky",
+            subLabel: `${filteredStudents.length} matching view`,
+            color: "default",
           },
           {
             label: "Active Students",
             value: metrics.active_students,
             icon: CheckCircleIcon,
+            subLabel: "Enrolled & regular",
             color: "emerald",
           },
           {
             label: "New Admissions",
             value: metrics.new_admissions_this_month,
             icon: PlusIcon,
+            subLabel: "Admitted this month",
             color: "purple",
           },
           ...(isSectionEnabled("quran_hifz_tracker")
@@ -345,6 +346,7 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
                   label: "Avg Juz Completed",
                   value: `${metrics.avg_juz_completed} Juz`,
                   icon: BookOpenIcon,
+                  subLabel: "Quran memorization",
                   color: "accent",
                 },
               ]
@@ -352,28 +354,57 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
         ]}
       />
 
-      {/* 3. Search & 6 Primary Filter Controls (SEARCH, DEPARTMENT, CLASS, SECTION, STATUS, ACADEMIC YEAR) */}
-      <DataViewToolbar
-        searchLabel="Search"
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchPlaceholder="Search student, roll, ID..."
-        stackedSwitcher={true}
-        filterGridClassName="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3"
-        searchSpanClassName="col-span-1"
-        viewMode={displayMode}
-        onToggleViewMode={handleToggleDisplayMode}
-        loading={loading}
-        filteredCount={filteredStudents.length}
-        totalCount={students.length}
-        itemLabel="students"
+      {/* 2. Enterprise FilterBox: 3 Controls on Primary Row (Search, Department, Class); Remainder Hidden in Secondary Row */}
+      <FilterBox
+        storageKey="spr_students_filterbox_expanded"
+        collapsible={true}
+        defaultExpanded={false}
         hasActiveFilters={hasActiveFilters}
-        activeFilterCount={activeFilterCount}
         onResetFilters={resetAllFilters}
-        customFilters={
-          <>
-            {/* 1. DEPARTMENT Filter */}
-            <div className="col-span-1">
+        activeFilterCount={activeFilterCount}
+        moreLabel="More Filters"
+        hideMoreLabel="Hide Filters"
+        scopeItems={[
+          ...(sectionFilter !== "ALL"
+            ? [
+                {
+                  label: "Section",
+                  value:
+                    availableSections.find((s) => String(s.id) === String(sectionFilter))?.name ||
+                    sectionFilter,
+                },
+              ]
+            : []),
+          ...(statusFilter !== "ALL" ? [{ label: "Status", value: statusFilter }] : []),
+          ...(academicYearFilter !== "ALL"
+            ? [
+                {
+                  label: "Year",
+                  value:
+                    academicYearOptions.find((y) => y.value === academicYearFilter)?.label ||
+                    academicYearFilter,
+                },
+              ]
+            : []),
+        ]}
+        primaryRow={
+          <div className="grid grid-cols-1 @[540px]:grid-cols-3 gap-3 items-end">
+            {/* Control 1: Search */}
+            <div className="min-w-0">
+              <CustomInput
+                label="Search"
+                size="md"
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search student, roll, ID..."
+                icon={SearchIcon}
+                clearable={Boolean(searchQuery)}
+                onClear={() => setSearchQuery("")}
+              />
+            </div>
+
+            {/* Control 2: Department */}
+            <div className="min-w-0">
               <DepartmentSelect
                 label="Department"
                 size="md"
@@ -386,8 +417,8 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
               />
             </div>
 
-            {/* 2. CLASS Filter (Cascaded by Department) */}
-            <div className="col-span-1">
+            {/* Control 3: Class (Cascaded by Department) */}
+            <div className="min-w-0">
               <ClassSelect
                 label="Class"
                 size="md"
@@ -400,9 +431,12 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
                 icon={ClassIcon}
               />
             </div>
-
-            {/* 3. SECTION Filter (Cascaded by Class) */}
-            <div className="col-span-1">
+          </div>
+        }
+        secondaryRow={
+          <div className="grid grid-cols-1 @[540px]:grid-cols-3 gap-3 items-end">
+            {/* Hidden 1: Section (Cascaded by Class) */}
+            <div className="min-w-0">
               <SectionSelect
                 label="Section"
                 size="md"
@@ -417,8 +451,8 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
               />
             </div>
 
-            {/* 4. STATUS Filter */}
-            <div className="col-span-1">
+            {/* Hidden 2: Status */}
+            <div className="min-w-0">
               <CustomSelect
                 label="Status"
                 size="md"
@@ -434,8 +468,8 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
               />
             </div>
 
-            {/* 5. ACADEMIC YEAR Filter */}
-            <div className="col-span-1">
+            {/* Hidden 3: Academic Year */}
+            <div className="min-w-0">
               <CustomSelect
                 label="Academic Year"
                 size="md"
@@ -448,9 +482,64 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
                 placeholder="All Academic Years"
               />
             </div>
-          </>
+          </div>
         }
-      />
+      >
+        {({ moreButton }) => (
+          <div className="flex flex-col @[640px]:flex-row @[640px]:items-center justify-between gap-3 pt-3 border-t theme-border">
+            {/* Left: Matching record count + More/Hide toggle */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold theme-text-secondary">
+                Showing <strong className="theme-text-primary font-bold font-mono">{filteredStudents.length}</strong> of{" "}
+                <strong className="theme-text-primary font-bold font-mono">{students.length}</strong> students
+              </span>
+              {moreButton}
+            </div>
+
+            {/* Right: Table/Card View Switcher & Action Buttons */}
+            <div className="flex items-center gap-2">
+              {/* Display Mode Switcher */}
+              <div className="inline-flex items-center p-1 rounded-xl theme-bg-app border-0">
+                <button
+                  type="button"
+                  onClick={() => handleToggleDisplayMode("table")}
+                  className={`p-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border-0 ${
+                    displayMode === "table"
+                      ? "theme-bg-surface theme-text-primary shadow-xs"
+                      : "theme-text-secondary hover:theme-text-primary"
+                  }`}
+                  title="Table View"
+                >
+                  <TableIcon className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleDisplayMode("grid")}
+                  className={`p-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border-0 ${
+                    displayMode === "grid"
+                      ? "theme-bg-surface theme-text-primary shadow-xs"
+                      : "theme-text-secondary hover:theme-text-primary"
+                  }`}
+                  title="Card Grid"
+                >
+                  <Squares2X2Icon className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Quick Refresh */}
+              <button
+                type="button"
+                onClick={refreshData}
+                disabled={loading}
+                className="p-2 rounded-xl theme-bg-app hover:theme-bg-elevated/40 theme-text-secondary hover:theme-text-primary transition-all cursor-pointer border-0 shadow-xs"
+                title="Refresh Roster"
+              >
+                <RefreshIcon className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+          </div>
+        )}
+      </FilterBox>
 
       {/* 4. Google Drive-Style Selection Action Bar for Selected Students */}
       {selectedIds.length > 0 && (
@@ -538,6 +627,8 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
                 classesMap={classesMap}
                 sectionsByClassMap={sectionsByClassMap}
                 groupsByClassMap={groupsByClassMap}
+                hasInstitutionGroups={groups.length > 0}
+                groups={groups}
               />
             )}
             isLoading={loading}

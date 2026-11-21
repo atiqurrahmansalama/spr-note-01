@@ -12,6 +12,8 @@ interface StudentCardProps {
   classesMap?: Map<string, any>;
   sectionsByClassMap?: Map<string, any[]>;
   groupsByClassMap?: Map<string, any[]>;
+  hasInstitutionGroups?: boolean;
+  groups?: any[];
 }
 
 export default function StudentCard({
@@ -22,6 +24,8 @@ export default function StudentCard({
   classesMap = new Map(),
   sectionsByClassMap = new Map(),
   groupsByClassMap = new Map(),
+  hasInstitutionGroups,
+  groups = [],
 }: StudentCardProps) {
   const studentId =
     s.student_id_card_number ||
@@ -33,7 +37,9 @@ export default function StudentCard({
     s,
     classesMap,
     sectionsByClassMap,
-    groupsByClassMap
+    groupsByClassMap,
+    hasInstitutionGroups ?? (groups.length > 0 || groupsByClassMap.size > 0),
+    groups
   );
 
   return (

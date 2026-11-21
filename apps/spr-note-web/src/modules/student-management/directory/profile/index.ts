@@ -1,0 +1,11 @@
+export * from './types';
+export * from './utils';
+export { default as StudentProfileHero } from './StudentProfileHero';
+export { default as StudentProfileKPIs } from './StudentProfileKPIs';
+export { default as StudentPersonalTab } from './tabs/StudentPersonalTab';
+export { default as StudentQuranTab } from './tabs/StudentQuranTab';
+export { default as StudentDocumentsTab } from './tabs/StudentDocumentsTab';
+export { default as StudentTimelineTab } from './tabs/StudentTimelineTab';
+export { default as StudentQrModal } from './modals/StudentQrModal';
+export { default as DocumentPreviewModal } from './modals/DocumentPreviewModal';
+export { default as DocumentRenameModal } from './modals/DocumentRenameModal';

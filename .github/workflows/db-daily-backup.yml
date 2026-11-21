@@ -88,8 +88,9 @@ jobs:
           USE_SQLITE: 'False'
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DJANGO_SETTINGS_MODULE: 'core.settings'
-          SECRET_KEY: ${{ secrets.SECRET_KEY || 'github-actions-backup-runner-secure-key-99' }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
         run: |
+          export SECRET_KEY="${SECRET_KEY:-github-actions-backup-runner-secure-key-99}"
           mkdir -p backups
           python manage.py backup_full_system --output-dir=backups
 
@@ -120,16 +121,20 @@ jobs:
           compression-level: 0
 
       - name: Tier 1 - Sync to Cloudflare R2 / AWS S3 (If Configured)
-        if: ${{ secrets.R2_ACCESS_KEY != '' }}
         env:
           R2_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY }}
           R2_SECRET_KEY: ${{ secrets.R2_SECRET_KEY }}
           R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME || 'spr-enterprise-backups' }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
         run: |
+          if [ -z "${R2_ACCESS_KEY}" ] || [ -z "${R2_SECRET_KEY}" ] || [ -z "${R2_ENDPOINT_URL}" ]; then
+            echo "Cloudflare R2 / S3 secrets not configured. Skipping remote off-site cloud sync."
+            exit 0
+          fi
           pip install boto3
           python - <<EOF
           import os, boto3
+          bucket = os.environ.get('R2_BUCKET_NAME') or 'spr-enterprise-backups'
           s3 = boto3.client(
               's3',
               endpoint_url=os.environ['R2_ENDPOINT_URL'],
@@ -138,7 +143,7 @@ jobs:
           )
           archive_path = "backend/${{ steps.archive_info.outputs.archive_path }}"
           archive_name = "${{ steps.archive_info.outputs.archive_name }}"
-          print(f"Uploading {archive_name} to R2 bucket...")
-          s3.upload_file(archive_path, os.environ['R2_BUCKET_NAME'], f"daily/{archive_name}")
+          print(f"Uploading {archive_name} to R2 bucket {bucket}...")
+          s3.upload_file(archive_path, bucket, f"daily/{archive_name}")
           print("R2 Cloud Sync Completed Successfully.")
           EOF
