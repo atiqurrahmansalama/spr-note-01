@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchWithAuth } from '../../../utils/authService';
 import { useToast } from '../../../context/ToastContext';
 import { useFeatureControl } from '../../../context/FeatureControlContext';
+import { useRightSidebar, useDrawerRegistration } from '../../../context/RightSidebarContext';
 import { PageContainer } from '../../../components/layout';
+import AccessDeniedView from '../../../components/common/AccessDeniedView';
 import TabSwitcher from '../../../components/ui/TabSwitcher';
 import {
   StudentIcon,
@@ -13,13 +15,12 @@ import {
   RefreshIcon,
   ChevronLeftIcon,
 } from '../../../components/ui/Icons';
-import StudentTransferModal from './StudentTransferModal';
+import { StudentTransferDrawer } from './components';
 import {
   StudentFullProfile,
   StudentVaultDocument,
   getDocUrl,
   StudentProfileHero,
-  StudentProfileKPIs,
   StudentPersonalTab,
   StudentQuranTab,
   StudentDocumentsTab,
@@ -34,6 +35,11 @@ export const StudentProfileHubView: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { isSectionEnabled } = useFeatureControl();
+  const { openDrawer, closeDrawer } = useRightSidebar();
+
+  const canViewProfile = isSectionEnabled('student_roster_view_profile');
+  const canEditStudent = isSectionEnabled('student_roster_edit_student');
+  const canTransferStudent = isSectionEnabled('student_roster_academic_transfer');
 
   const [student, setStudent] = useState<StudentFullProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -45,7 +51,6 @@ export const StudentProfileHubView: React.FC = () => {
 
   // Modals state
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
-  const [isTransferModalOpen, setIsTransferModalOpen] = useState<boolean>(false);
   const [previewDoc, setPreviewDoc] = useState<StudentVaultDocument | null>(null);
   const [renameDocTarget, setRenameDocTarget] = useState<StudentVaultDocument | null>(null);
   const [newDocTitle, setNewDocTitle] = useState<string>('');
@@ -236,6 +241,113 @@ export const StudentProfileHubView: React.FC = () => {
     }
   };
 
+  // Drawer registration for student academic transfer
+  useDrawerRegistration(
+    'student-transfer',
+    (params: any) => {
+      const studentId =
+        params?.studentId ||
+        params?.id ||
+        (params?.get ? params.get('studentId') || params.get('id') : null);
+
+      const targetStudent =
+        params?.student ||
+        (studentId && student && String(student.id) === String(studentId)
+          ? student
+          : student);
+
+      if (!targetStudent) return null;
+
+      if (!canTransferStudent) {
+        return {
+          title: 'Academic Transfer Restricted',
+          subtitle: `${targetStudent.name_en || targetStudent.name || ''}`,
+          category: 'Student Directory',
+          size: 'md' as const,
+          content: (
+            <AccessDeniedView
+              variant="drawer"
+              sectionKey="student_roster_academic_transfer"
+              title="Academic Transfer Restricted"
+              message="Student academic and section transfers have been disabled by your institution administrator."
+              onClose={closeDrawer}
+            />
+          ),
+        };
+      }
+
+      return {
+        title: 'Academic Transfer & Reassignment',
+        subtitle: `${targetStudent.name_en || targetStudent.name || ''} (${targetStudent.student_id_card_number || targetStudent.uniq_id || targetStudent.id})`,
+        category: 'Student Directory',
+        size: 'md' as const,
+        content: (
+          <StudentTransferDrawer
+            key={`transfer-${targetStudent.id}`}
+            student={targetStudent}
+            studentIds={[targetStudent.id]}
+            selectedStudents={[targetStudent]}
+            onClose={closeDrawer}
+            onSuccess={() => {
+              closeDrawer();
+              loadStudentProfile(false);
+            }}
+          />
+        ),
+      };
+    },
+    [student, canTransferStudent, closeDrawer, loadStudentProfile]
+  );
+
+  // Granular profile tab permissions controlled via Feature & Module Control
+  // Declared at top level unconditionally before any conditional returns (React Rules of Hooks)
+  const isQuranTabEnabled =
+    isSectionEnabled('student_profile_quran_progress') &&
+    (student?.department_type === 'HIFZ' ? isSectionEnabled('quran_hifz_tracker') : true);
+  const isPersonalTabEnabled = isSectionEnabled('student_profile_personal_family');
+  const isDocumentsTabEnabled = isSectionEnabled('student_profile_document_vault');
+  const isTimelineTabEnabled = isSectionEnabled('student_profile_lifecycle_timeline');
+
+  const tabs = useMemo(() => [
+    ...(isQuranTabEnabled
+      ? [{ id: 'quran', label: 'Quran & Progress', icon: BookOpenIcon }]
+      : []),
+    ...(isPersonalTabEnabled
+      ? [{ id: 'personal', label: 'Personal & Family', icon: StudentIcon }]
+      : []),
+    ...(isDocumentsTabEnabled
+      ? [
+          {
+            id: 'documents',
+            label: 'Document Vault',
+            badge: student?.documents?.length || 0,
+            icon: TagIcon,
+          },
+        ]
+      : []),
+    ...(isTimelineTabEnabled
+      ? [{ id: 'timeline', label: 'Lifecycle Timeline', icon: HistoryIcon }]
+      : []),
+  ], [isQuranTabEnabled, isPersonalTabEnabled, isDocumentsTabEnabled, isTimelineTabEnabled, student?.documents?.length]);
+
+  // Synchronize active tab when tab permissions change (Unconditional top-level hook)
+  useEffect(() => {
+    if (tabs.length > 0 && !tabs.some((t) => t.id === activeTab)) {
+      setActiveTab(tabs[0].id);
+    }
+  }, [tabs, activeTab]);
+
+  // If viewing student profile hubs is disabled by feature control, block access
+  if (!canViewProfile) {
+    return (
+      <AccessDeniedView
+        sectionKey="student_roster_view_profile"
+        title="Student Profile Access Restricted"
+        message="Viewing full student profile hubs has been disabled by your institution administrator. Contact your administrator if you require access."
+      />
+    );
+  }
+
   if (loading) {
     return (
       <PageContainer maxWidth="6xl">
@@ -265,23 +377,6 @@ export const StudentProfileHubView: React.FC = () => {
     );
   }
 
-  const isHifzDepartment =
-    student.department_type === 'HIFZ' && isSectionEnabled('quran_hifz_tracker');
-
-  const tabs = [
-    ...(isHifzDepartment
-      ? [{ id: 'quran', label: 'Quran & Progress', icon: BookOpenIcon }]
-      : []),
-    { id: 'personal', label: 'Personal & Family', icon: StudentIcon },
-    {
-      id: 'documents',
-      label: 'Document Vault',
-      badge: student.documents?.length || 0,
-      icon: TagIcon,
-    },
-    { id: 'timeline', label: 'Lifecycle Timeline', icon: HistoryIcon },
-  ];
-
   return (
     <PageContainer maxWidth="6xl">
       <div className="space-y-6">
@@ -289,50 +384,60 @@ export const StudentProfileHubView: React.FC = () => {
         <StudentProfileHero
           student={student}
           uploadingPhoto={uploadingPhoto}
+          canEditStudent={canEditStudent}
+          canTransferStudent={canTransferStudent}
           onPhotoUpload={handleProfilePhotoUpload}
           onOpenQrModal={() => setIsQrModalOpen(true)}
-          onOpenTransferModal={() => setIsTransferModalOpen(true)}
+          onOpenTransferModal={() => openDrawer('student-transfer', { studentId: student.id, student })}
         />
 
-        {/* 2. Key Metrics Row */}
-        <StudentProfileKPIs student={student} isHifz={isHifzDepartment} />
+        {/* 2. Reusable Enterprise Tab Switcher & Panels */}
+        {tabs.length > 0 ? (
+          <>
+            <TabSwitcher
+              tabs={tabs}
+              activeTab={activeTab}
+              onChange={handleTabChange}
+            />
 
-        {/* 3. Reusable Enterprise Tab Switcher */}
-        <TabSwitcher
-          tabs={tabs}
-          activeTab={activeTab}
-          onChange={handleTabChange}
-        />
+            {/* 3. Tab Panels */}
+            {isQuranTabEnabled && activeTab === 'quran' && (
+              <StudentQuranTab student={student} />
+            )}
 
-        {/* 4. Tab Panels */}
-        {isHifzDepartment && activeTab === 'quran' && (
-          <StudentQuranTab student={student} />
+            {isPersonalTabEnabled && activeTab === 'personal' && (
+              <StudentPersonalTab student={student} />
+            )}
+
+            {isDocumentsTabEnabled && activeTab === 'documents' && (
+              <StudentDocumentsTab
+                student={student}
+                uploading={uploadingDoc}
+                onUploadFile={handleUploadDocument}
+                onPreviewDoc={(doc) => setPreviewDoc(doc)}
+                onDownloadDoc={handleDownloadFile}
+                onRenameDoc={(doc) => {
+                  setRenameDocTarget(doc);
+                  setNewDocTitle(doc.title || '');
+                }}
+                onDeleteDoc={handleDeleteDocument}
+              />
+            )}
+
+            {isTimelineTabEnabled && activeTab === 'timeline' && (
+              <StudentTimelineTab student={student} />
+            )}
+          </>
+        ) : (
+          <div className="p-8 text-center rounded-3xl theme-bg-surface border-0 shadow-xs space-y-2">
+            <h3 className="text-sm font-bold theme-text-primary">Profile Details Restricted</h3>
+            <p className="text-xs theme-text-secondary">
+              All profile tabs have been disabled by your institution administrator.
+            </p>
+          </div>
         )}
 
-        {activeTab === 'personal' && (
-          <StudentPersonalTab student={student} />
-        )}
-
-        {activeTab === 'documents' && (
-          <StudentDocumentsTab
-            student={student}
-            uploading={uploadingDoc}
-            onUploadFile={handleUploadDocument}
-            onPreviewDoc={(doc) => setPreviewDoc(doc)}
-            onDownloadDoc={handleDownloadFile}
-            onRenameDoc={(doc) => {
-              setRenameDocTarget(doc);
-              setNewDocTitle(doc.title || '');
-            }}
-            onDeleteDoc={handleDeleteDocument}
-          />
-        )}
-
-        {activeTab === 'timeline' && (
-          <StudentTimelineTab student={student} />
-        )}
-
-        {/* 5. Modals */}
+        {/* 4. Modals */}
         <StudentQrModal
           isOpen={isQrModalOpen}
           student={student}
@@ -358,20 +463,6 @@ export const StudentProfileHubView: React.FC = () => {
           onSubmit={handleRenameDocument}
           loading={isRenamingDoc}
         />
-
-        {isTransferModalOpen && (
-          <StudentTransferModal
-            isOpen={isTransferModalOpen}
-            student={student}
-            studentIds={[student.id]}
-            selectedStudents={[student]}
-            onClose={() => setIsTransferModalOpen(false)}
-            onSuccess={() => {
-              setIsTransferModalOpen(false);
-              loadStudentProfile(false);
-            }}
-          />
-        )}
       </div>
     </PageContainer>
   );

@@ -1110,18 +1110,8 @@ export default function ReusableCalendar({
                     e.stopPropagation();
                     handleToggle();
                   }}
-                  className="p-1 rounded-lg hover:theme-bg-elevated theme-text-secondary hover:theme-text-primary transition cursor-pointer border-0 bg-transparent flex items-center justify-center"
+                  className="p-1 rounded-lg hover:theme-bg-elevated theme-text-secondary transition cursor-pointer border-0 bg-transparent flex items-center justify-center"
                   title="Toggle Calendar Picker"
-                >
-                  <CalendarIcon className="w-3.5 h-3.5 theme-accent" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleToggle();
-                  }}
-                  className="p-0.5 rounded hover:theme-bg-elevated theme-text-secondary transition cursor-pointer border-0 bg-transparent flex items-center justify-center"
                 >
                   <ChevronIcon isOpen={isOpen} className="w-3.5 h-3.5" />
                 </button>

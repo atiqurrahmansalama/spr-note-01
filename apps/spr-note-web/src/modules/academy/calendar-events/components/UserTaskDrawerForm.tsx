@@ -1,12 +1,14 @@
 /**
  * User Task Drawer Form (Right Sidebar Slide-over)
  * ==================================================
- * Allows creating and editing user-specific tasks, due dates, priorities,
- * subtask checklists, and personal color tags.
+ * Allows viewing task details in read-only mode by default,
+ * and transitioning to edit mode upon clicking the 'Edit Task' button.
+ * Supports task creation, editing, due dates, priorities, subtask checklists,
+ * and personal color tags.
  * Reuses enterprise DrawerContainer, DrawerSection, DrawerFooter, and project design tokens.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   DrawerContainer,
   DrawerSection,
@@ -15,6 +17,7 @@ import {
 import CustomInput from '../../../../components/ui/CustomInput';
 import CustomSelect from '../../../../components/ui/CustomSelect';
 import CustomButton from '../../../../components/ui/CustomButton';
+import ReusableCalendar from '../../../../components/common/ReusableCalendar';
 import {
   CheckCircleIcon,
   ClockIcon,
@@ -23,25 +26,54 @@ import {
   PlusIcon,
   TrashIcon,
   SaveIcon,
+  EditIcon,
 } from '../../../../components/ui/Icons';
-import { EventColorPickerDropdown, InlineTimePicker } from './TimeScheduleDrawerForm';
+import {
+  EVENT_COLORS,
+  resolveCanonicalEventColor,
+} from '../constants/eventColors';
+import {
+  EventColorPickerDropdown,
+  InlineTimePicker,
+} from './TimeScheduleDrawerForm';
 import { useCalendarTranslation } from '../locales';
 import type { UserPersonalTask, TaskPriority, TaskStatus, TaskSubItem } from '../types';
 
 export interface UserTaskDrawerFormProps {
   task?: UserPersonalTask | null;
   initialDate?: string;
+  initialEditMode?: boolean;
   onSave: (taskData: Partial<UserPersonalTask>) => void;
+  onQuickUpdate?: (taskData: Partial<UserPersonalTask>) => void;
   onCancel?: () => void;
   onDelete?: (taskId: string) => void;
 }
 
-const PRIORITY_OPTIONS = [
+function formatTime12(timeStr?: string): string {
+  if (!timeStr) return '';
+  const parts = String(timeStr).split(':');
+  let h = parseInt(parts[0], 10);
+  const m = String(parts[1] || '00').padStart(2, '0');
+  if (isNaN(h)) return timeStr;
+  const ampm = h >= 12 ? 'pm' : 'am';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${m}${ampm}`;
+}
+
+const PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = [
   { value: 'LOW', label: 'Low Priority' },
   { value: 'MEDIUM', label: 'Medium Priority' },
   { value: 'HIGH', label: 'High Priority' },
   { value: 'URGENT', label: 'Urgent Priority' },
 ];
+
+const PRIORITY_STYLE_MAP: Record<TaskPriority, { label: string; badge: string }> = {
+  LOW: { label: 'Low Priority', badge: 'theme-bg-app theme-text-secondary' },
+  MEDIUM: { label: 'Medium Priority', badge: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
+  HIGH: { label: 'High Priority', badge: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' },
+  URGENT: { label: 'Urgent Priority', badge: 'bg-rose-500/15 text-rose-600 dark:text-rose-400' },
+};
 
 const CATEGORY_OPTIONS = [
   { value: 'General', label: 'General' },
@@ -55,12 +87,19 @@ const CATEGORY_OPTIONS = [
 export function UserTaskDrawerForm({
   task,
   initialDate,
+  initialEditMode,
   onSave,
+  onQuickUpdate,
   onCancel,
   onDelete,
 }: UserTaskDrawerFormProps) {
   const { t } = useCalendarTranslation();
 
+  // If task exists, start in read-only detail view by default; otherwise start in edit/create mode
+  const [isEditing, setIsEditing] = useState<boolean>(initialEditMode ?? !task);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState<boolean>(false);
+
+  // Form State
   const [title, setTitle] = useState(task?.title || '');
   const [description, setDescription] = useState(task?.description || '');
   const [dueDate, setDueDate] = useState(
@@ -75,6 +114,14 @@ export function UserTaskDrawerForm({
   const [subtasks, setSubtasks] = useState<TaskSubItem[]>(task?.subtasks || []);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [error, setError] = useState('');
+
+  // Resolved Visual Styling
+  const canonicalColorId = resolveCanonicalEventColor(color, 'blueberry');
+  const colorStyle = useMemo(() => {
+    return EVENT_COLORS.find((c) => c.id === canonicalColorId) || EVENT_COLORS[0];
+  }, [canonicalColorId]);
+
+  const priorityStyle = PRIORITY_STYLE_MAP[priority] || PRIORITY_STYLE_MAP.MEDIUM;
 
   const handleAddSubtask = () => {
     if (!newSubtaskTitle.trim()) return;
@@ -91,6 +138,30 @@ export function UserTaskDrawerForm({
     setSubtasks(
       subtasks.map((st) => (st.id === stId ? { ...st, completed: !st.completed } : st))
     );
+  };
+
+  const handleToggleSubtaskInDetail = (stId: string) => {
+    const updatedSubtasks = subtasks.map((st) =>
+      st.id === stId ? { ...st, completed: !st.completed } : st
+    );
+    setSubtasks(updatedSubtasks);
+    if (task && onQuickUpdate) {
+      onQuickUpdate({
+        id: task.id,
+        subtasks: updatedSubtasks,
+      });
+    }
+  };
+
+  const handleToggleStatusInDetail = () => {
+    const nextStatus: TaskStatus = status === 'COMPLETED' ? 'PENDING' : 'COMPLETED';
+    setStatus(nextStatus);
+    if (task && onQuickUpdate) {
+      onQuickUpdate({
+        id: task.id,
+        status: nextStatus,
+      });
+    }
   };
 
   const handleRemoveSubtask = (stId: string) => {
@@ -120,6 +191,243 @@ export function UserTaskDrawerForm({
     });
   };
 
+  // ═════════════════════════════════════════════════════════════════════════════
+  // MODE 1: READ-ONLY TASK DETAILS VIEW (Non-editable initial state for existing tasks)
+  // ═════════════════════════════════════════════════════════════════════════════
+  if (!isEditing && task) {
+    const completedSubtasksCount = subtasks.filter((st) => st.completed).length;
+
+    return (
+      <DrawerContainer padding="none" spacing="normal">
+        <div className="space-y-6 pt-2 pb-6 @container">
+          {/* Top Hero Summary Surface */}
+          <div className="p-4 sm:p-5 rounded-3xl theme-bg-surface border-0 shadow-xs space-y-3.5">
+            <div className="flex items-start gap-3.5">
+              <div
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${colorStyle.style.bg} border-0 shadow-xs`}
+              >
+                <CheckCircleIcon className={`w-5 h-5 ${colorStyle.style.text}`} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3
+                    className={`text-base font-bold theme-text-primary leading-snug break-words ${
+                      status === 'COMPLETED' ? 'line-through opacity-70' : ''
+                    }`}
+                  >
+                    {title}
+                  </h3>
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: colorStyle.hex }}
+                  />
+                </div>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  {/* Status Badge (Click to toggle complete / pending) */}
+                  <button
+                    type="button"
+                    onClick={handleToggleStatusInDetail}
+                    title={status === 'COMPLETED' ? t('markAsPending', 'Mark as Pending') : t('markAsCompleted', 'Mark as Completed')}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-lg border-0 cursor-pointer shadow-2xs hover:opacity-85 active:scale-95 transition-all ${
+                      status === 'COMPLETED'
+                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400'
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                        status === 'COMPLETED' ? 'bg-emerald-500' : 'bg-indigo-500'
+                      }`}
+                    />
+                    <span>
+                      {status === 'COMPLETED'
+                        ? t('completedTasks', 'Completed')
+                        : t('pendingTasks', 'Pending')}
+                    </span>
+                  </button>
+
+                  {/* Priority Badge */}
+                  <span
+                    className={`inline-flex px-2.5 py-0.5 text-[11px] font-semibold rounded-lg border-0 ${priorityStyle.badge}`}
+                  >
+                    {priorityStyle.label}
+                  </span>
+
+                  {/* Category Badge */}
+                  <span className="inline-flex px-2.5 py-0.5 text-[11px] font-medium rounded-lg theme-bg-app border-0 theme-text-secondary">
+                    {category}
+                  </span>
+
+                  {/* Pinned Badge */}
+                  {isPinned && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-bold theme-bg-accent-soft theme-accent border-0">
+                      <span>{t('pinTask', 'Pinned')}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Description Card */}
+            {description && (
+              <div className="p-3.5 rounded-2xl theme-bg-app border-0 text-xs theme-text-secondary leading-relaxed whitespace-pre-wrap">
+                {description}
+              </div>
+            )}
+          </div>
+
+          {/* Schedule & Timing Details Section */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 pb-1">
+              <ClockIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
+              <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
+                {t('scheduleAndTiming', 'Schedule & Timing')}
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-2.5 text-xs">
+              {/* Due Date */}
+              <div className="flex items-center justify-between px-3.5 py-3 rounded-2xl theme-bg-surface border-0 shadow-xs">
+                <span className="theme-text-secondary font-medium">{t('dueDate', 'Due Date')}</span>
+                <span className="font-mono font-bold theme-text-primary">
+                  {dueDate || t('notSpecified', 'Not Specified')}
+                </span>
+              </div>
+
+              {/* Due Time */}
+              <div className="flex items-center justify-between px-3.5 py-3 rounded-2xl theme-bg-surface border-0 shadow-xs">
+                <span className="theme-text-secondary font-medium">{t('dueTime', 'Due Time')}</span>
+                <span className="font-mono font-bold theme-text-primary">
+                  {dueTime ? formatTime12(dueTime) : t('notSpecified', 'Not Specified')}
+                </span>
+              </div>
+
+              {/* Category */}
+              <div className="flex items-center justify-between px-3.5 py-3 rounded-2xl theme-bg-surface border-0 shadow-xs">
+                <span className="theme-text-secondary font-medium">{t('category', 'Category')}</span>
+                <span className="font-semibold theme-text-primary">{category}</span>
+              </div>
+
+              {/* Priority */}
+              <div className="flex items-center justify-between px-3.5 py-3 rounded-2xl theme-bg-surface border-0 shadow-xs">
+                <span className="theme-text-secondary font-medium">{t('priority', 'Priority')}</span>
+                <span className="font-semibold theme-text-primary">{priorityStyle.label}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Checklist / Subtasks (if any) */}
+          {subtasks.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2 pb-1">
+                <div className="flex items-center gap-2">
+                  <ChecklistIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider theme-text-secondary">
+                    {t('checklist', 'Checklist & Subtasks')} ({completedSubtasksCount}/{subtasks.length})
+                  </h4>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                {subtasks.map((st) => (
+                  <div
+                    key={st.id}
+                    onClick={() => handleToggleSubtaskInDetail(st.id)}
+                    className="flex items-center gap-2.5 p-3 rounded-2xl theme-bg-surface hover:theme-bg-elevated/40 transition-colors border-0 cursor-pointer shadow-2xs select-none"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={st.completed}
+                      readOnly
+                      className="w-4 h-4 rounded text-indigo-600 focus:ring-0 border-0 cursor-pointer pointer-events-none"
+                    />
+                    <span
+                      className={`text-xs font-medium truncate ${
+                        st.completed
+                          ? 'line-through opacity-60 theme-text-secondary'
+                          : 'theme-text-primary'
+                      }`}
+                    >
+                      {st.title}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Inline Delete Confirmation or Action Buttons */}
+          {isConfirmingDelete ? (
+            <div className="p-4 rounded-3xl bg-rose-500/10 dark:bg-rose-950/30 border-0 space-y-3 animate-fade-in shadow-xs">
+              <div className="flex items-center gap-2">
+                <TrashIcon className="w-4 h-4 theme-danger shrink-0" />
+                <h4 className="text-xs font-bold theme-text-primary">
+                  {t('confirmDeleteTask', 'Delete this task?')}
+                </h4>
+              </div>
+              <p className="text-xs theme-text-secondary leading-relaxed">
+                {title}
+              </p>
+              <div className="flex items-center justify-end gap-2 pt-1 border-0">
+                <CustomButton
+                  type="button"
+                  variant="surface"
+                  size="sm"
+                  onClick={() => setIsConfirmingDelete(false)}
+                >
+                  {t('cancel', 'Cancel')}
+                </CustomButton>
+                <CustomButton
+                  type="button"
+                  variant="danger-solid"
+                  size="sm"
+                  icon={TrashIcon}
+                  onClick={() => {
+                    if (onDelete && task) {
+                      onDelete(task.id);
+                    }
+                  }}
+                >
+                  {t('delete', 'Delete')}
+                </CustomButton>
+              </div>
+            </div>
+          ) : (
+            /* Action Buttons Bar */
+            <div className="pt-2 border-0 flex items-center justify-between gap-2.5 flex-wrap">
+              {onDelete && task && (
+                <CustomButton
+                  type="button"
+                  variant="danger"
+                  size="md"
+                  icon={TrashIcon}
+                  onClick={() => setIsConfirmingDelete(true)}
+                >
+                  {t('delete', 'Delete')}
+                </CustomButton>
+              )}
+
+              <div className="flex items-center gap-2 ml-auto">
+                <CustomButton
+                  type="button"
+                  variant="primary"
+                  size="md"
+                  icon={EditIcon}
+                  onClick={() => setIsEditing(true)}
+                >
+                  {t('editTask', 'Edit Task')}
+                </CustomButton>
+              </div>
+            </div>
+          )}
+        </div>
+      </DrawerContainer>
+    );
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════════
+  // MODE 2: EDITABLE TASK FORM (Active when editing existing task or creating new task)
+  // ═════════════════════════════════════════════════════════════════════════════
   return (
     <DrawerContainer padding="none" spacing="normal">
       <form onSubmit={handleSubmit} className="space-y-6 pt-2 pb-6 @container">
@@ -189,11 +497,10 @@ export function UserTaskDrawerForm({
         >
           <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3">
             <div>
-              <CustomInput
-                type="date"
+              <ReusableCalendar
                 label={t('dueDate', 'Due Date')}
-                value={dueDate}
-                onChange={(val) => setDueDate(val)}
+                selectedDate={dueDate}
+                onSelectDate={(newDate) => setDueDate(newDate)}
               />
             </div>
 
@@ -322,8 +629,6 @@ export function UserTaskDrawerForm({
 
         {/* Reusable Drawer Footer */}
         <DrawerFooter
-          onCancel={onCancel}
-          cancelLabel={t('cancel', 'Cancel')}
           saveLabel={task ? t('updateTask', 'Update Task') : t('createTask', 'Create Task')}
           saveIcon={SaveIcon}
           onSubmit={handleSubmit}

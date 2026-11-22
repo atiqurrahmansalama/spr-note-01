@@ -211,8 +211,8 @@ export default function App(): React.ReactElement {
                 <Route path="/group-roster" element={<Navigate to="/academy/classes-groups?tab=groups" replace />} />
                 <Route path="/short-admission" element={<Navigate to="/admission" replace />} />
                 <Route path="/admission/short" element={<Navigate to="/admission" replace />} />
-                <Route path="/admission" element={<FeatureGuard sectionKey={["student_admission", "student_quick_admission", "student_roster"]}><StudentAdmissionView /></FeatureGuard>} />
-                <Route path="/students/:id/profile" element={<FeatureGuard sectionKey="student_roster"><StudentProfileHubView /></FeatureGuard>} />
+                <Route path="/admission" element={<FeatureGuard sectionKey={["student_admission", "student_quick_admission"]} matchMode="any"><StudentAdmissionView /></FeatureGuard>} />
+                <Route path="/students/:id/profile" element={<FeatureGuard sectionKey={["student_roster", "student_roster_view_profile"]} matchMode="all"><StudentProfileHubView /></FeatureGuard>} />
                 <Route path="/sessions-comments" element={<FeatureGuard sectionKey="report_sessions_comments"><SessionManager /></FeatureGuard>} />
                 <Route path="/report-sessions" element={<FeatureGuard sectionKey="report_sessions_comments"><SessionManager /></FeatureGuard>} />
                 <Route path="/study-sessions" element={<FeatureGuard sectionKey="report_sessions_comments"><SessionManager /></FeatureGuard>} />

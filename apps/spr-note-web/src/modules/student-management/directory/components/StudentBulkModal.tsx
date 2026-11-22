@@ -55,33 +55,21 @@ export default function StudentBulkModal({
       <div className="space-y-4 text-left">
         <div>
           <CustomSelect
-            label="Select Action"
-            value={actionType}
-            onChange={(val: string) => onActionTypeChange(val as BulkActionType)}
+            label="Target Status"
+            value={statusInput}
+            onChange={onStatusInputChange}
             options={[
-              { value: "change_status", label: "Change Status" },
-              { value: "bulk_delete", label: "Bulk Delete Students" },
+              { value: "Active", label: "Active (Enrolled)" },
+              { value: "Alumni", label: "Alumni (Graduated)" },
+              { value: "Transferred", label: "Transferred (TC Issued)" },
+              { value: "Suspended", label: "Suspended (Temporary)" },
+              { value: "Expelled", label: "Expelled (Dismissed)" },
+              { value: "Dropped Out", label: "Dropped Out" },
+              { value: "On Leave", label: "On Long Leave" },
             ]}
-            placeholder="Select Action..."
+            placeholder="Select Target Status..."
           />
         </div>
-
-        {actionType === "change_status" && (
-          <div>
-            <CustomSelect
-              label="Target Status"
-              value={statusInput}
-              onChange={onStatusInputChange}
-              options={[
-                { value: "Active", label: "Active" },
-                { value: "Inactive", label: "Inactive" },
-                { value: "Alumni", label: "Alumni" },
-                { value: "Tc", label: "Transfer Certificate (TC)" },
-              ]}
-              placeholder="Select Status..."
-            />
-          </div>
-        )}
       </div>
     </Modal>
   );

@@ -50,11 +50,9 @@ export const AccessDeniedView: React.FC<AccessDeniedViewProps> = ({
       } flex items-center justify-center select-none ${className}`}
     >
       <div
-        className={`max-w-md w-full theme-bg-surface ${
-          isDrawer ? 'border-0 shadow-xs rounded-3xl' : 'border theme-border rounded-2xl shadow-xl'
-        } p-6 sm:p-8 text-center space-y-5 animate-fade-in`}
+        className="max-w-md w-full theme-bg-surface border-0 rounded-3xl shadow-xs p-6 sm:p-8 text-center space-y-5 animate-fade-in"
       >
-        <div className="mx-auto w-14 h-14 rounded-2xl theme-bg-accent-soft border border-current/20 flex items-center justify-center theme-accent shadow-xs">
+        <div className="mx-auto w-14 h-14 rounded-2xl theme-bg-accent-soft border-0 flex items-center justify-center theme-accent shadow-xs">
           <LockClosedIcon className="w-7 h-7" />
         </div>
 
@@ -68,8 +66,8 @@ export const AccessDeniedView: React.FC<AccessDeniedViewProps> = ({
         </div>
 
         {displayKey && (
-          <div className="inline-block px-2.5 py-1 rounded-md theme-bg-sub border theme-border text-[11px] font-mono theme-text-secondary opacity-80">
-            <span className="opacity-60 uppercase mr-1 text-[10px]">Scope:</span>
+          <div className="inline-block px-3 py-1.5 rounded-xl theme-bg-app border-0 shadow-xs text-[11px] font-mono theme-text-secondary opacity-80">
+            <span className="opacity-60 uppercase mr-1 text-[10px] font-bold">Scope:</span>
             <span>{displayKey}</span>
           </div>
         )}

@@ -283,6 +283,49 @@ export function useStudentDirectoryData(onTenantReset?: () => void) {
     };
   }, [activeTenantId]);
 
+  const handleUpdateStudentStatus = async (
+    id: string | number,
+    newStatus: string,
+    reason?: string,
+    effectiveDate?: string
+  ) => {
+    try {
+      const payload: Record<string, any> = {
+        status: newStatus,
+      };
+      if (reason) payload.status_remarks = reason;
+      if (effectiveDate) payload.status_date = effectiveDate;
+
+      const res = await fetchWithAuth(`/api/v1/students/${id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        showToast("Student status updated successfully.", "success");
+        // Update local cache for instant offline reactivity
+        const cacheKey = `spr_students_cache_${activeTenantId}`;
+        const cached = readJSON(cacheKey, []);
+        const updated = cached.map((s: any) =>
+          String(s.id) === String(id) ? { ...s, ...payload } : s
+        );
+        writeJSON(cacheKey, updated);
+        studentStore.update?.(String(id), payload);
+        window.dispatchEvent(new CustomEvent("spr_students_updated"));
+        refreshData();
+        return true;
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || "Failed to update student status.", "error");
+        return false;
+      }
+    } catch {
+      showToast("Failed to update student status.", "error");
+      return false;
+    }
+  };
+
   const handleDeleteSingle = async (id: string | number, studentName?: string) => {
     try {
       const res = await fetchWithAuth(`/api/v1/students/${id}/`, {
@@ -363,6 +406,7 @@ export function useStudentDirectoryData(onTenantReset?: () => void) {
     loading,
     metrics,
     refreshData,
+    handleUpdateStudentStatus,
     handleDeleteSingle,
     handleBulkAction,
   };

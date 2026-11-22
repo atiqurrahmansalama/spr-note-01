@@ -1,20 +1,19 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useFeatureControl } from "../../../context/FeatureControlContext";
+import { useRightSidebar, useDrawerRegistration } from "../../../context/RightSidebarContext";
 import {
   StudentIcon,
   ClassIcon,
   SectionIcon,
   DepartmentIcon,
   PlusIcon,
-  TrashIcon,
   BookOpenIcon,
   CheckCircleIcon,
   TransferIcon,
   SearchIcon,
-  TableIcon,
-  Squares2X2Icon,
   RefreshIcon,
+  ShieldIcon,
 } from "../../../components/ui/Icons";
 import DataTable from "../../../components/ui/DataTable";
 import DataCardGrid from "../../../components/ui/DataCardGrid";
@@ -23,12 +22,18 @@ import CustomInput from "../../../components/ui/CustomInput";
 import FilterBox from "../../../components/ui/FilterBox";
 import Pagination from "../../../components/ui/Pagination";
 import SelectionActionBar from "../../../components/ui/SelectionActionBar";
-import { ConfirmModal } from "../../../components/ui/Modal";
 import { DepartmentSelect, ClassSelect, SectionSelect } from "../../../components/selectors";
 import MetricsGrid from "../../../components/ui/MetricsGrid";
+import ViewModeToggle from "../../../components/ui/ViewModeToggle";
+import IconButton from "../../../components/ui/IconButton";
 import { PageContainer } from "../../../components/layout";
-import StudentTransferModal from "./StudentTransferModal";
-import { StudentCard, StudentBulkModal } from "./components";
+import AccessDeniedView from "../../../components/common/AccessDeniedView";
+import {
+  StudentCard,
+  StudentBulkModal,
+  StudentStatusTransitionDrawer,
+  StudentTransferDrawer,
+} from "./components";
 import { useStudentDirectoryData, useStudentFilters, useStudentTableColumns } from "./hooks";
 import { StudentDirectoryViewProps, StudentRecord, BulkActionType } from "./types";
 
@@ -38,6 +43,12 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
   const highlightParam = searchParams.get("highlight");
   const [activeHighlightId, setActiveHighlightId] = useState<string | null>(highlightParam);
   const { isSectionEnabled } = useFeatureControl();
+  const { openDrawer, closeDrawer } = useRightSidebar();
+
+  // Granular feature permissions
+  const canViewProfile = isSectionEnabled("student_roster_view_profile");
+  const canEditStudent = isSectionEnabled("student_roster_edit_student");
+  const canTransferStudent = isSectionEnabled("student_roster_academic_transfer");
 
   // Selection & UI state
   const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
@@ -64,12 +75,6 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
   const [bulkActionType, setBulkActionType] = useState<BulkActionType>("change_status");
   const [bulkStatusInput, setBulkStatusInput] = useState<string>("Active");
   const [showBulkModal, setShowBulkModal] = useState<boolean>(false);
-  const [isBulkTransferModalOpen, setIsBulkTransferModalOpen] = useState<boolean>(false);
-  const [transferringStudent, setTransferringStudent] = useState<StudentRecord | null>(null);
-
-  // Single deletion modal state
-  const [studentToDelete, setStudentToDelete] = useState<StudentRecord | null>(null);
-  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   // 1. Data hook
   const {
@@ -82,7 +87,7 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
     loading,
     metrics,
     refreshData,
-    handleDeleteSingle,
+    handleUpdateStudentStatus,
     handleBulkAction,
   } = useStudentDirectoryData();
 
@@ -200,18 +205,165 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
     return map;
   }, [groups]);
 
+  // Drawer registration for student lifecycle status transition
+  useDrawerRegistration(
+    "student-status",
+    (params: any) => {
+      const studentId =
+        params?.studentId ||
+        params?.id ||
+        (params?.get ? params.get("studentId") || params.get("id") : null);
+
+      const student =
+        params?.student ||
+        (studentId ? students.find((s) => String(s.id) === String(studentId)) : null);
+
+      if (!student) return null;
+
+      if (!canEditStudent) {
+        return {
+          title: "Status Update Restricted",
+          subtitle: `${student.name_en || student.name || ""} (${student.student_id_card_number || student.uniq_id || student.id})`,
+          category: "Student Directory",
+          size: "md" as const,
+          content: (
+            <AccessDeniedView
+              variant="drawer"
+              sectionKey="student_roster_edit_student"
+              title="Status Update Restricted"
+              message="Editing student profiles and updating lifecycle status has been disabled by your institution administrator."
+              onClose={closeDrawer}
+            />
+          ),
+        };
+      }
+
+      return {
+        title: "Student Lifecycle Status",
+        subtitle: `${student.name_en || student.name || ""} (${student.student_id_card_number || student.uniq_id || student.id})`,
+        category: "Student Directory",
+        size: "md" as const,
+        content: (
+          <StudentStatusTransitionDrawer
+            key={`status-${student.id}`}
+            student={student}
+            onClose={closeDrawer}
+            onSuccess={() => {
+              closeDrawer();
+              refreshData();
+            }}
+            onUpdateStatus={handleUpdateStudentStatus}
+          />
+        ),
+      };
+    },
+    [students, canEditStudent, closeDrawer, refreshData, handleUpdateStudentStatus]
+  );
+
+  // Drawer registration for student academic placement and transfer
+  useDrawerRegistration(
+    "student-transfer",
+    (params: any) => {
+      const isBulk = Boolean(
+        params?.isBulk ||
+        (params?.get ? params.get("isBulk") === "true" || params.get("bulk") === "true" : false)
+      );
+
+      const studentId =
+        params?.studentId ||
+        params?.id ||
+        (params?.get ? params.get("studentId") || params.get("id") : null);
+
+      const targetStudent =
+        params?.student ||
+        (studentId ? students.find((s) => String(s.id) === String(studentId)) : null);
+
+      let targetIds: (string | number)[] = [];
+      if (Array.isArray(params?.studentIds) && params.studentIds.length > 0) {
+        targetIds = params.studentIds;
+      } else if (params?.get && (params.get("studentIds") || params.get("ids"))) {
+        const rawIds = params.get("studentIds") || params.get("ids");
+        targetIds = rawIds.split(",").map((s: string) => s.trim()).filter(Boolean);
+      } else if (targetStudent) {
+        targetIds = [targetStudent.id];
+      } else if (isBulk) {
+        targetIds = selectedIds;
+      }
+
+      const targetStudents =
+        params?.selectedStudents ||
+        (targetStudent
+          ? [targetStudent]
+          : students.filter((s: any) => targetIds.map(String).includes(String(s.id))));
+
+      if (!canTransferStudent) {
+        return {
+          title: "Academic Transfer Restricted",
+          subtitle: isBulk
+            ? `${targetIds.length} Students Selected`
+            : targetStudent?.name_en || targetStudent?.name || "",
+          category: "Student Directory",
+          size: "md" as const,
+          content: (
+            <AccessDeniedView
+              variant="drawer"
+              sectionKey="student_roster_academic_transfer"
+              title="Academic Transfer Restricted"
+              message="Student academic and section transfers have been disabled by your institution administrator."
+              onClose={closeDrawer}
+            />
+          ),
+        };
+      }
+
+      if (!targetStudent && (!targetIds || targetIds.length === 0)) return null;
+
+      const title = isBulk
+        ? `Bulk Academic Transfer (${targetIds.length})`
+        : "Academic Transfer & Reassignment";
+      const subtitle = isBulk
+        ? `${targetIds.length} students selected for batch class/section migration`
+        : `${targetStudent?.name_en || targetStudent?.name || ""} (${targetStudent?.student_id_card_number || targetStudent?.uniq_id || targetStudent?.id})`;
+
+      return {
+        title,
+        subtitle,
+        category: "Student Directory",
+        size: "md" as const,
+        content: (
+          <StudentTransferDrawer
+            key={`transfer-${isBulk ? targetIds.join("-") : targetStudent?.id}`}
+            student={targetStudent}
+            studentIds={targetIds}
+            selectedStudents={targetStudents}
+            isBulk={isBulk}
+            onClose={closeDrawer}
+            onSuccess={() => {
+              closeDrawer();
+              setSelectedIds([]);
+              refreshData();
+            }}
+          />
+        ),
+      };
+    },
+    [students, selectedIds, canTransferStudent, closeDrawer, refreshData]
+  );
+
   // Columns & Action Menus hook
   const { tableColumns, getActionMenuItems } = useStudentTableColumns({
     classes,
     groups,
     sections,
+    canViewProfile,
+    canEditStudent,
+    canTransferStudent,
     onNavigateProfile: (id) => navigate(`/students/${id}/profile`),
     onEditStudent: (student) => navigate(`/admission?edit=${student.id}`),
-    onTransferStudent: (student) => setTransferringStudent(student),
-    onDeleteStudent: (id, name) => {
-      const found = students.find((s) => String(s.id) === String(id));
-      setStudentToDelete(found || ({ id, name_en: name } as any));
-    },
+    onTransferStudent: (student) =>
+      openDrawer("student-transfer", { studentId: student.id, student }),
+    onUpdateStatus: (student) =>
+      openDrawer("student-status", { studentId: student.id, student }),
   });
 
   // Synchronize active highlight from URL param and automatically clear after 2.4 seconds
@@ -299,17 +451,6 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
     if (success) {
       setShowBulkModal(false);
       setSelectedIds([]);
-    }
-  };
-
-  const handleConfirmSingleDelete = async () => {
-    if (!studentToDelete) return;
-    setIsDeleting(true);
-    try {
-      await handleDeleteSingle(studentToDelete.id, studentToDelete.name_en || studentToDelete.name);
-    } finally {
-      setIsDeleting(false);
-      setStudentToDelete(null);
     }
   };
 
@@ -496,46 +637,27 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
               {moreButton}
             </div>
 
-            {/* Right: Table/Card View Switcher & Action Buttons */}
+            {/* Right: Table/Card View Switcher & Action Buttons (Aligned with Staff Roster & DataViewToolbar) */}
             <div className="flex items-center gap-2">
-              {/* Display Mode Switcher */}
-              <div className="inline-flex items-center p-1 rounded-xl theme-bg-app border-0">
-                <button
-                  type="button"
-                  onClick={() => handleToggleDisplayMode("table")}
-                  className={`p-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border-0 ${
-                    displayMode === "table"
-                      ? "theme-bg-surface theme-text-primary shadow-xs"
-                      : "theme-text-secondary hover:theme-text-primary"
-                  }`}
-                  title="Table View"
-                >
-                  <TableIcon className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleToggleDisplayMode("grid")}
-                  className={`p-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border-0 ${
-                    displayMode === "grid"
-                      ? "theme-bg-surface theme-text-primary shadow-xs"
-                      : "theme-text-secondary hover:theme-text-primary"
-                  }`}
-                  title="Card Grid"
-                >
-                  <Squares2X2Icon className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Quick Refresh */}
-              <button
-                type="button"
-                onClick={refreshData}
+              {/* Quick Refresh (Project Standard Reusable IconButton) */}
+              <IconButton
+                icon={RefreshIcon}
+                size="md"
+                variant="sub"
+                loading={loading}
                 disabled={loading}
-                className="p-2 rounded-xl theme-bg-app hover:theme-bg-elevated/40 theme-text-secondary hover:theme-text-primary transition-all cursor-pointer border-0 shadow-xs"
+                onClick={refreshData}
                 title="Refresh Roster"
-              >
-                <RefreshIcon className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-              </button>
+                ariaLabel="Refresh Roster"
+              />
+
+              {/* View Mode Switcher (Project Standard Reusable ViewModeToggle as used in Staff Roster) */}
+              <ViewModeToggle
+                viewMode={displayMode}
+                onChange={handleToggleDisplayMode}
+                tableLabel="Table View"
+                cardsLabel="Card Grid"
+              />
             </div>
           </div>
         )}
@@ -557,36 +679,40 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
           }}
           onClearSelection={() => setSelectedIds([])}
           actions={[
-            {
-              id: "transfer",
-              label: `Academic Transfer (${selectedIds.length})`,
-              shortLabel: "Transfer",
-              icon: TransferIcon,
-              variant: "sub",
-              onClick: () => setIsBulkTransferModalOpen(true),
-            },
-            {
-              id: "status",
-              label: `Change Status (${selectedIds.length})`,
-              shortLabel: "Status",
-              icon: CheckCircleIcon,
-              variant: "sub",
-              onClick: () => {
-                setBulkActionType("change_status");
-                setShowBulkModal(true);
-              },
-            },
-            {
-              id: "delete",
-              label: `Delete (${selectedIds.length})`,
-              shortLabel: "Delete",
-              icon: TrashIcon,
-              variant: "danger",
-              onClick: () => {
-                setBulkActionType("bulk_delete");
-                setShowBulkModal(true);
-              },
-            },
+            ...(canTransferStudent
+              ? [
+                  {
+                    id: "transfer",
+                    label: `Academic Transfer (${selectedIds.length})`,
+                    shortLabel: "Transfer",
+                    icon: TransferIcon,
+                    variant: "sub" as const,
+                    onClick: () =>
+                      openDrawer("student-transfer", {
+                        studentIds: selectedIds,
+                        isBulk: true,
+                        selectedStudents: students.filter((s: any) =>
+                          selectedIds.includes(s.id)
+                        ),
+                      }),
+                  },
+                ]
+              : []),
+            ...(canEditStudent
+              ? [
+                  {
+                    id: "status",
+                    label: `Change Status (${selectedIds.length})`,
+                    shortLabel: "Status",
+                    icon: CheckCircleIcon,
+                    variant: "sub" as const,
+                    onClick: () => {
+                      setBulkActionType("change_status");
+                      setShowBulkModal(true);
+                    },
+                  },
+                ]
+              : []),
           ]}
         />
       )}
@@ -612,7 +738,7 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
                 ? "No student records match your active filter criteria."
                 : "No students registered in this academy roster."
             }
-            onRowClick={(s: StudentRecord) => navigate(`/students/${s.id}/profile`)}
+            onRowClick={(s: StudentRecord) => canViewProfile && navigate(`/students/${s.id}/profile`)}
           />
         ) : (
           <DataCardGrid
@@ -622,7 +748,7 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
                 key={s.id}
                 student={s}
                 isHighlighted={Boolean(activeHighlightId && String(s.id) === String(activeHighlightId))}
-                onNavigateProfile={(id) => navigate(`/students/${id}/profile`)}
+                onNavigateProfile={(id) => canViewProfile && navigate(`/students/${id}/profile`)}
                 actionMenuItems={getActionMenuItems(s)}
                 classesMap={classesMap}
                 sectionsByClassMap={sectionsByClassMap}
@@ -669,43 +795,6 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
         onStatusInputChange={setBulkStatusInput}
         onSubmit={onExecuteBulkAction}
       />
-
-      {/* 8. Single Student Deletion ConfirmModal (Zero browser window.confirm) */}
-      <ConfirmModal
-        isOpen={Boolean(studentToDelete)}
-        title="Delete Student Record"
-        subtitle={`Are you sure you want to delete student "${studentToDelete?.name_en || studentToDelete?.name || ""}"? This action cannot be undone.`}
-        confirmText={isDeleting ? "Deleting..." : "Delete Student"}
-        cancelText="Cancel"
-        confirmVariant="danger"
-        confirmLoading={isDeleting}
-        onClose={() => setStudentToDelete(null)}
-        onConfirm={handleConfirmSingleDelete}
-      />
-
-      {/* 9. Student Transfer Modal (Single & Bulk) */}
-      {(isBulkTransferModalOpen || Boolean(transferringStudent)) && (
-        <StudentTransferModal
-          isOpen={isBulkTransferModalOpen || Boolean(transferringStudent)}
-          student={transferringStudent}
-          studentIds={transferringStudent ? [transferringStudent.id] : selectedIds}
-          selectedStudents={
-            transferringStudent
-              ? [transferringStudent]
-              : students.filter((s: any) => selectedIds.includes(s.id))
-          }
-          onClose={() => {
-            setIsBulkTransferModalOpen(false);
-            setTransferringStudent(null);
-          }}
-          onSuccess={() => {
-            setIsBulkTransferModalOpen(false);
-            setTransferringStudent(null);
-            setSelectedIds([]);
-            refreshData();
-          }}
-        />
-      )}
     </PageContainer>
   );
 }

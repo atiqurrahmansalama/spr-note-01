@@ -1,7 +1,8 @@
 import React from 'react';
 import CustomInput from './CustomInput';
-import { TableIcon, Squares2X2Icon, RefreshIcon, CloseIcon } from './Icons';
+import { RefreshIcon, CloseIcon } from './Icons';
 import IconButton from './IconButton';
+import ViewModeToggle from './ViewModeToggle';
 
 export interface DataViewToolbarProps {
   searchLabel?: string | null;
@@ -111,24 +112,12 @@ export default function DataViewToolbar({
 
       {/* Single Toggle Button for Cards / Table View */}
       {hasViewToggle && (
-        <button
-          type="button"
-          onClick={handleToggle}
-          className="px-3.5 py-2.5 rounded-2xl text-xs font-semibold theme-bg-tile border-0 hover:theme-bg-elevated/75 theme-text-secondary hover:theme-text-primary transition flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0 select-none"
-          title={viewMode === 'grid' ? 'Switch to Table View' : 'Switch to Cards View'}
-        >
-          {viewMode === 'grid' ? (
-            <>
-              <TableIcon className="w-3.5 h-3.5 theme-accent shrink-0" />
-              <span>{tableLabel}</span>
-            </>
-          ) : (
-            <>
-              <Squares2X2Icon className="w-3.5 h-3.5 theme-accent shrink-0" />
-              <span>{cardsLabel}</span>
-            </>
-          )}
-        </button>
+        <ViewModeToggle
+          viewMode={viewMode}
+          onChange={handleModeChange}
+          tableLabel={tableLabel}
+          cardsLabel={cardsLabel}
+        />
       )}
     </div>
   );

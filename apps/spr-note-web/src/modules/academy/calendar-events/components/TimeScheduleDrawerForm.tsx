@@ -72,6 +72,8 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
   const popoverRef = useRef(null);
+  const hoursScrollRef = useRef(null);
+  const minutesScrollRef = useRef(null);
   const selectedHourRef = useRef(null);
   const selectedMinuteRef = useRef(null);
   const [coords, setCoords] = useState(null);
@@ -102,7 +104,7 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const popoverWidth = 230;
-    const popoverHeight = 220;
+    const popoverHeight = 250;
 
     let left = rect.left;
     if (left + popoverWidth > window.innerWidth - 12) {
@@ -118,22 +120,67 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
     setCoords({ top, left });
   }, []);
 
+  const hoursList = useMemo(() => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], []);
+  const minutesList = useMemo(() => Array.from({ length: 60 }, (_, i) => i), []);
+
+  // 3x repeating sets for infinite cyclic scrolling
+  const repeatedHours = useMemo(() => [...hoursList, ...hoursList, ...hoursList], [hoursList]);
+  const repeatedMinutes = useMemo(() => [...minutesList, ...minutesList, ...minutesList], [minutesList]);
+
+  // Center middle set on open
   useEffect(() => {
     if (isOpen) {
       updatePosition();
       const handleScrollOrResize = () => updatePosition();
       window.addEventListener("resize", handleScrollOrResize);
       window.addEventListener("scroll", handleScrollOrResize, true);
+
       setTimeout(() => {
-        selectedHourRef.current?.scrollIntoView?.({ block: "center", behavior: "smooth" });
-        selectedMinuteRef.current?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+        const hEl = hoursScrollRef.current;
+        if (hEl) {
+          const singleSetHeight = hEl.scrollHeight / 3;
+          const targetIndex = hoursList.indexOf(selHour);
+          const itemHeight = singleSetHeight / 12;
+          hEl.scrollTop = singleSetHeight + (targetIndex * itemHeight) - (hEl.clientHeight / 2) + (itemHeight / 2);
+        }
+        const mEl = minutesScrollRef.current;
+        if (mEl) {
+          const singleSetHeight = mEl.scrollHeight / 3;
+          const targetIndex = minutesList.indexOf(selMinute);
+          const itemHeight = singleSetHeight / 60;
+          mEl.scrollTop = singleSetHeight + (targetIndex * itemHeight) - (mEl.clientHeight / 2) + (itemHeight / 2);
+        }
       }, 50);
+
       return () => {
         window.removeEventListener("resize", handleScrollOrResize);
         window.removeEventListener("scroll", handleScrollOrResize, true);
       };
     }
-  }, [isOpen, updatePosition]);
+  }, [isOpen, updatePosition, selHour, selMinute, hoursList, minutesList]);
+
+  // Infinite cyclic scroll handlers
+  const handleHoursScroll = () => {
+    const el = hoursScrollRef.current;
+    if (!el) return;
+    const singleSetHeight = el.scrollHeight / 3;
+    if (el.scrollTop < singleSetHeight * 0.25) {
+      el.scrollTop += singleSetHeight;
+    } else if (el.scrollTop > singleSetHeight * 1.75) {
+      el.scrollTop -= singleSetHeight;
+    }
+  };
+
+  const handleMinutesScroll = () => {
+    const el = minutesScrollRef.current;
+    if (!el) return;
+    const singleSetHeight = el.scrollHeight / 3;
+    if (el.scrollTop < singleSetHeight * 0.25) {
+      el.scrollTop += singleSetHeight;
+    } else if (el.scrollTop > singleSetHeight * 1.75) {
+      el.scrollTop -= singleSetHeight;
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -158,10 +205,6 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
     onChange(`${hh}:${mm}`);
   };
 
-  const hoursList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-  // Complete 0-59 minutes list: all numbers available
-  const minutesList = Array.from({ length: 60 }, (_, i) => i);
-
   return (
     <div ref={containerRef} className="relative flex-1">
       {label && (
@@ -172,7 +215,7 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs sm:text-sm font-semibold rounded-2xl border-0 theme-bg-surface hover:theme-bg-elevated/50 transition focus:outline-none cursor-pointer shadow-xs"
+        className="w-full h-[46px] min-h-[46px] flex items-center justify-between px-3.5 py-2.5 text-xs sm:text-sm font-semibold rounded-2xl border-0 theme-bg-surface hover:theme-bg-elevated/50 transition focus:outline-none cursor-pointer shadow-xs"
       >
         <span className={value ? "font-medium font-mono theme-text-primary" : "theme-text-secondary"}>
           {value ? formatTime12(value) : placeholder}
@@ -198,14 +241,18 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
             <span className="w-12 text-center">Period</span>
           </div>
           <div className="flex gap-1.5 h-44">
-            {/* Hours Column */}
-            <div className="flex-1 overflow-y-auto scrollbar-none space-y-0.5">
-              {hoursList.map((h) => {
+            {/* Hours Column (Infinite Cyclic Scroll) */}
+            <div
+              ref={hoursScrollRef}
+              onScroll={handleHoursScroll}
+              className="flex-1 overflow-y-auto scrollbar-none space-y-0.5"
+            >
+              {repeatedHours.map((h, idx) => {
                 const isSel = selHour === h;
                 return (
                   <button
-                    key={h}
-                    ref={isSel ? selectedHourRef : null}
+                    key={`hr-${h}-${idx}`}
+                    ref={isSel && idx >= 12 && idx < 24 ? selectedHourRef : null}
                     type="button"
                     onClick={() => {
                       setSelHour(h);
@@ -223,14 +270,18 @@ export function InlineTimePicker({ value, onChange, label, placeholder = "Choose
               })}
             </div>
 
-            {/* Minutes Column (Complete 0-59 numbers) */}
-            <div className="flex-1 overflow-y-auto scrollbar-none px-0.5 space-y-0.5 border-0">
-              {minutesList.map((m) => {
+            {/* Minutes Column (Infinite Cyclic Scroll) */}
+            <div
+              ref={minutesScrollRef}
+              onScroll={handleMinutesScroll}
+              className="flex-1 overflow-y-auto scrollbar-none px-0.5 space-y-0.5 border-0"
+            >
+              {repeatedMinutes.map((m, idx) => {
                 const isSel = selMinute === m;
                 return (
                   <button
-                    key={m}
-                    ref={isSel ? selectedMinuteRef : null}
+                    key={`min-${m}-${idx}`}
+                    ref={isSel && idx >= 60 && idx < 120 ? selectedMinuteRef : null}
                     type="button"
                     onClick={() => {
                       setSelMinute(m);
@@ -692,10 +743,17 @@ export default function TimeScheduleDrawerForm({
   const [impactScopes, setImpactScopes] = useState(() => calendarImpactScopesStore.getScopes(activeTenantId));
   const [availableRoles, setAvailableRoles] = useState(() => {
     try {
-      const saved = localStorage.getItem("spr_local_roles_v1");
+      const key = activeTenantId ? `spr_local_roles_${activeTenantId}_v1` : "spr_local_roles_v1";
+      const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter((r) => {
+            const code = String(r.code || "").toUpperCase();
+            const name = String(r.name || "").toLowerCase();
+            return !code.includes("SUPER") && !name.includes("super") && !r.is_superadmin;
+          });
+        }
       }
     } catch {
       // ignore
@@ -728,15 +786,32 @@ export default function TimeScheduleDrawerForm({
 
     const fetchRoles = async () => {
       try {
-        let res = await fetchWithAuth("/api/v1/roles/");
-        if (!res.ok) res = await fetchWithAuth("/api/roles/");
+        const tenantQuery = activeTenantId ? `?tenant_id=${encodeURIComponent(activeTenantId)}` : "";
+        let res = await fetchWithAuth(`/api/v1/roles/${tenantQuery}`);
+        if (!res.ok) res = await fetchWithAuth(`/api/roles/${tenantQuery}`);
         if (res.ok) {
           const data = await res.json();
           const list = Array.isArray(data) ? data : data.results || [];
           if (isMounted && list.length > 0) {
-            setAvailableRoles(list);
-            localStorage.setItem("spr_local_roles_v1", JSON.stringify(list));
-            return;
+            // Strict Tenant Scoping & Exclusion of Super Admin (Tenant Isolation)
+            const filtered = list.filter((r: any) => {
+              const code = String(r.code || "").toUpperCase();
+              const name = String(r.name || "").toLowerCase();
+              if (code.includes("SUPER") || name.includes("super") || r.is_superadmin) {
+                return false;
+              }
+              if (r.tenant_id && activeTenantId && String(r.tenant_id) !== String(activeTenantId)) {
+                return false;
+              }
+              return true;
+            });
+
+            if (filtered.length > 0) {
+              setAvailableRoles(filtered);
+              const key = activeTenantId ? `spr_local_roles_${activeTenantId}_v1` : "spr_local_roles_v1";
+              localStorage.setItem(key, JSON.stringify(filtered));
+              return;
+            }
           }
         }
       } catch {
@@ -762,7 +837,7 @@ export default function TimeScheduleDrawerForm({
     return (impactScopes || []).filter((s) => s.is_active !== false);
   }, [impactScopes]);
 
-  // Dynamic Audience Options based on actual user roles in the institution
+  // Dynamic Audience Options based strictly on the active academy's roles (Zero Super Admin)
   const audienceOptions = useMemo(() => {
     const opts = [
       { value: "ALL", label: "All Roles" },
@@ -770,6 +845,14 @@ export default function TimeScheduleDrawerForm({
     availableRoles.forEach((r) => {
       const code = r.code || r.name;
       const rawName = r.name || r.code;
+      const upperCode = String(code || "").toUpperCase();
+      const lowerName = String(rawName || "").toLowerCase();
+
+      // Zero-Trust Security: Ensure Super Admin is never exposed
+      if (upperCode.includes("SUPER") || lowerName.includes("super") || r.is_superadmin) {
+        return;
+      }
+
       if (code && !opts.some((o) => o.value === code)) {
         // Clean role name without any bracket data (e.g. "Student (STUDENT)" -> "Student")
         const cleanName = String(rawName).replace(/\s*\([^)]*\)/g, "").trim() || code;
@@ -882,7 +965,7 @@ export default function TimeScheduleDrawerForm({
       startTime: "09:00",
       endTime: "12:30",
       timezone: calendarSettings.getTimezone ? calendarSettings.getTimezone() : "UTC",
-      repeats: defaultCategory === "WORKING_HOURS",
+      repeats: false,
       repeatDays: [0, 1, 2, 3, 4],
       frequency: "WEEKLY",
       until: "ONGOING",
@@ -980,7 +1063,7 @@ export default function TimeScheduleDrawerForm({
         category: "WORKING_HOURS",
         type: "WORKING_HOURS",
         color: resolveCanonicalEventColor(ws.color, "blueberry"),
-        repeats: true,
+        repeats: false,
         description: ws.description || "",
       }));
 
@@ -993,7 +1076,7 @@ export default function TimeScheduleDrawerForm({
           category: "WORKING_HOURS",
           type: "WORKING_HOURS",
           color: resolveCanonicalEventColor(formData.color, "blueberry"),
-          repeats: true,
+          repeats: false,
           description: "",
         });
       }

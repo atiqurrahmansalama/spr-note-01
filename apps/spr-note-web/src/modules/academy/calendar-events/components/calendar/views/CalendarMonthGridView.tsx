@@ -23,6 +23,8 @@ interface CalendarMonthGridViewProps {
   canAdd?: boolean;
   onOpenAddDrawer: (dateStr: string) => void;
   onOpenEventDetail: (evt: CalendarEvent, dateStr?: string) => void;
+  onOpenTaskDetail?: (task: UserPersonalTask, dateStr: string) => void;
+  onOpenDayTasks?: (dateStr: string, tasks: UserPersonalTask[]) => void;
 }
 
 export const CalendarMonthGridView: React.FC<CalendarMonthGridViewProps> = ({
@@ -44,7 +46,28 @@ export const CalendarMonthGridView: React.FC<CalendarMonthGridViewProps> = ({
   onSetDisplayMode,
   onOpenAddDrawer,
   onOpenEventDetail,
+  onOpenTaskDetail,
+  onOpenDayTasks,
 }) => {
+  const handleTaskClick = (
+    e: React.MouseEvent,
+    tasks: UserPersonalTask[],
+    dateStr: string,
+    dayNum: number
+  ) => {
+    e.stopPropagation();
+    onSelectDay(dayNum);
+    if (tasks.length === 1 && onOpenTaskDetail) {
+      onOpenTaskDetail(tasks[0], dateStr);
+    } else if (tasks.length > 1 && onOpenDayTasks) {
+      onOpenDayTasks(dateStr, tasks);
+    } else if (tasks.length > 0 && onOpenTaskDetail) {
+      onOpenTaskDetail(tasks[0], dateStr);
+    } else {
+      onSetDisplayMode('timeline');
+    }
+  };
+
   return (
     <div className={`flex flex-col w-full min-w-0 ${embeddedSurface ? 'p-0 pb-4' : 'p-2 sm:p-3 pb-5 sm:pb-6'}`}>
       {/* Weekday Header Columns (SUN to SAT) */}
@@ -148,18 +171,14 @@ export const CalendarMonthGridView: React.FC<CalendarMonthGridViewProps> = ({
                         <div className="hidden @[480px]:block flex-1 min-h-[44px] @xl:min-h-[66px] pointer-events-none" />
                       )}
 
-                      {/* Personal Tasks Count Badge: Pinned to bottom (mt-auto) */}
+                      {/* ─── 1. Wide Container (>=480px): Standard Task Pill at bottom ─── */}
                       {cellTasks.length > 0 && (
-                        <div className="mt-auto pb-0.5 w-full flex items-center justify-center shrink-0 z-20 pointer-events-auto">
+                        <div className="hidden @[480px]:flex mt-auto pb-0.5 w-full items-center justify-center shrink-0 z-20 pointer-events-auto">
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onSelectDay(cell.dayNum);
-                              onSetDisplayMode('timeline');
-                            }}
-                            className="px-1.5 py-0.5 rounded-full text-[9px] @sm:text-[9.5px] font-mono font-semibold bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/25 transition-all flex items-center gap-1 shadow-2xs border-0"
-                            title={`${cellTasks.length} task(s). Click to view in Timeline.`}
+                            onClick={(e) => handleTaskClick(e, cellTasks, cell.dateStr, cell.dayNum)}
+                            className="px-1.5 py-0.5 rounded-full text-[9px] @sm:text-[9.5px] font-mono font-semibold bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/25 transition-all flex items-center gap-1 shadow-2xs border-0 cursor-pointer"
+                            title={`${cellTasks.length} task(s). Click to view details in sidebar.`}
                           >
                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
                             <span>
@@ -169,13 +188,38 @@ export const CalendarMonthGridView: React.FC<CalendarMonthGridViewProps> = ({
                         </div>
                       )}
 
-                      {/* Narrow Container (<480px): When without tasks, small event dot at bottom */}
-                      {cellTasks.length === 0 && dayEvents.length > 0 && topStyle && (
-                        <div className="flex @[480px]:hidden items-center justify-center mt-auto pb-0.5 shrink-0 pointer-events-auto">
-                          <span
-                            className={`w-1 h-1 rounded-full shrink-0 ${topStyle.dot} shadow-none`}
-                            title={`${dayEvents.length} schedule item(s)`}
-                          />
+                      {/* Narrow Container (<480px): Unified Event & Task Badges (Max 2 Badges, Identical Small Size) */}
+                      {(dayEvents.length > 0 || cellTasks.length > 0) && (
+                        <div className="flex @[480px]:hidden items-center justify-center gap-1 mt-auto pb-0.5 shrink-0 z-20 pointer-events-auto">
+                          {/* Badge 1: Event or Shift (Small Dot w-1.5 h-1.5) */}
+                          {dayEvents.length > 0 && topStyle && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectDay(cell.dayNum);
+                                if (dayEvents.length === 1 && onOpenEventDetail) {
+                                  onOpenEventDetail(dayEvents[0], cell.dateStr);
+                                } else {
+                                  onSetDisplayMode('timeline');
+                                }
+                              }}
+                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${topStyle.dot} border-0 p-0 cursor-pointer shadow-none hover:scale-125 transition-transform`}
+                              title={`${dayEvents.length} event/shift item(s). Click to view.`}
+                              aria-label={`${dayEvents.length} event/shift item(s)`}
+                            />
+                          )}
+
+                          {/* Badge 2: Task (Identical Small Dot w-1.5 h-1.5) */}
+                          {cellTasks.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleTaskClick(e, cellTasks, cell.dateStr, cell.dayNum)}
+                              className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0 border-0 p-0 cursor-pointer shadow-none hover:scale-125 transition-transform"
+                              title={`${cellTasks.length} task(s). Click to view task details in sidebar.`}
+                              aria-label={`${cellTasks.length} task(s)`}
+                            />
+                          )}
                         </div>
                       )}
                     </div>

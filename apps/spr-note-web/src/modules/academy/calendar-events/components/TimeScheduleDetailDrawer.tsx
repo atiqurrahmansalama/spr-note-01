@@ -295,16 +295,6 @@ export const TimeScheduleDetailDrawer: React.FC<TimeScheduleDetailDrawerProps> =
             )}
 
             <div className="flex items-center gap-2 ml-auto">
-              {onClose && (
-                <CustomButton
-                  type="button"
-                  variant="surface"
-                  size="md"
-                  onClick={onClose}
-                >
-                  {t('close', 'Close')}
-                </CustomButton>
-              )}
               {!readOnly && onEdit && (
                 <CustomButton
                   type="button"

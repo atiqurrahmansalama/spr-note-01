@@ -8,6 +8,7 @@ export interface FeatureGuardProps {
   children: ReactNode;
   fallback?: ReactNode;
   showAccessDenied?: boolean;
+  matchMode?: 'all' | 'any';
 }
 
 /**
@@ -17,18 +18,24 @@ export interface FeatureGuardProps {
  * Checks permissions/sections from FeatureControlContext and wraps enabled
  * components in the project's standard ErrorBoundary.
  * Displays AccessDeniedView when access is restricted and no custom fallback is supplied.
+ * 
+ * matchMode defaults to 'all' so composite permissions (e.g. ['student_roster', 'student_roster_view_profile'])
+ * strictly require every prerequisite permission to be active.
  */
 export const FeatureGuard: React.FC<FeatureGuardProps> = ({
   sectionKey,
   children,
   fallback,
   showAccessDenied = true,
+  matchMode = 'all',
 }) => {
   const { isSectionEnabled, loading } = useFeatureControl();
   if (loading) return null;
 
   const isEnabled = Array.isArray(sectionKey)
-    ? sectionKey.some((k) => isSectionEnabled(k))
+    ? matchMode === 'any'
+      ? sectionKey.some((k) => isSectionEnabled(k))
+      : sectionKey.every((k) => isSectionEnabled(k))
     : isSectionEnabled(sectionKey);
 
   if (!isEnabled) {

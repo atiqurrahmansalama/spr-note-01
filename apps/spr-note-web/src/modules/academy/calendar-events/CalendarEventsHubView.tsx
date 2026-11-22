@@ -10,6 +10,7 @@ import {
   TimeScheduleDrawerForm,
   TimeScheduleDetailDrawer,
   UserTaskDrawerForm,
+  DayTasksDrawerContent,
   MyTasksHubView,
 } from './components';
 import { masterCalendarStore, calendarSettings } from '../../../utils/localStore';
@@ -333,12 +334,26 @@ export default function CalendarEventsHubView() {
         };
       }
 
-      const targetTask = params?.task || null;
-      const targetDate = params?.date || new Date().toISOString().split('T')[0];
+      const taskId = params?.get ? params.get('taskId') : params?.taskId;
+      const targetDate = (params?.get ? params.get('date') : params?.date) || new Date().toISOString().split('T')[0];
+      const returnTo = params?.get ? params.get('returnTo') : params?.returnTo;
+      let targetTask: UserPersonalTask | null = null;
+      if (taskId) {
+        const allTasks = userTaskStore.getTasks(activeTenantId, userId);
+        targetTask = allTasks.find((t) => String(t.id) === String(taskId)) || null;
+      } else if (params?.task && typeof params.task === 'object') {
+        targetTask = params.task;
+      }
+
+      const handleReturnToDayTasks = () => {
+        openDrawer('day-tasks', { date: targetDate });
+      };
+
       return {
-        title: targetTask ? t('updateTask', 'Update Task') : t('createTask', 'Create Task'),
+        title: targetTask ? t('taskDetails', 'Task Details') : t('createTask', 'Create Task'),
         category: t('personalTasks', 'Personal Tasks & To-Do'),
         size: 'md' as const,
+        onBack: returnTo === 'day-tasks' ? handleReturnToDayTasks : undefined,
         content: (
           <UserTaskDrawerForm
             key={`task-form-${targetTask?.id || 'new'}-${targetDate}`}
@@ -352,19 +367,59 @@ export default function CalendarEventsHubView() {
                   : t('taskCreated', 'Task created successfully!'),
                 'success'
               );
-              closeDrawer();
+              if (returnTo === 'day-tasks') {
+                handleReturnToDayTasks();
+              } else {
+                closeDrawer();
+              }
+            }}
+            onQuickUpdate={(updated) => {
+              userTaskStore.saveTask(activeTenantId, userId, updated);
             }}
             onDelete={(taskId) => {
               userTaskStore.deleteTask(activeTenantId, userId, taskId);
               showToast(t('taskDeleted', 'Task removed successfully.'), 'info');
-              closeDrawer();
+              if (returnTo === 'day-tasks') {
+                handleReturnToDayTasks();
+              } else {
+                closeDrawer();
+              }
             }}
-            onCancel={closeDrawer}
+            onCancel={returnTo === 'day-tasks' ? handleReturnToDayTasks : closeDrawer}
           />
         ),
       };
     },
-    [isMyTasksEnabled, canAddTasks, activeTenantId, userId, closeDrawer, showToast, t]
+    [isMyTasksEnabled, canAddTasks, activeTenantId, userId, openDrawer, closeDrawer, showToast, t]
+  );
+
+  // Universal Drawer Registration for Day Tasks List
+  useDrawerRegistration(
+    'day-tasks',
+    (params: any) => {
+      const targetDate = (params?.get ? params.get('date') : params?.date) || new Date().toISOString().split('T')[0];
+      const targetTasks: UserPersonalTask[] = params?.tasks || userTaskStore.getTasksForDate(activeTenantId, userId, targetDate);
+
+      return {
+        title: `${t('personalTasks', 'Personal Tasks')}`,
+        category: t('personalTasks', 'Personal Tasks & To-Do'),
+        size: 'md' as const,
+        content: (
+          <DayTasksDrawerContent
+            dateStr={targetDate}
+            initialTasks={targetTasks}
+            onEditTask={(task) => {
+              openDrawer('user-task', { taskId: task.id, date: targetDate, returnTo: 'day-tasks' });
+            }}
+            onAddTask={() => {
+              openDrawer('user-task', { date: targetDate, returnTo: 'day-tasks' });
+            }}
+            onClose={closeDrawer}
+          />
+        ),
+      };
+    },
+    [openDrawer, closeDrawer, activeTenantId, userId, t]
   );
 
   // Open Right Sidebar for adding new personal task

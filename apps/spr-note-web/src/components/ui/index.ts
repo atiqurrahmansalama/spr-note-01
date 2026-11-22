@@ -68,5 +68,9 @@ export { default as NavigationBackButton, NavigationBackButton as NamedNavigatio
 export type { NavigationBackButtonProps, NavigationHistoryCustomItem } from './NavigationBackButton';
 export { default as FloatingActionDock } from './FloatingActionDock';
 export type { FloatingActionDockProps } from './FloatingActionDock';
+export { default as ViewModeToggle, ViewModeToggle as NamedViewModeToggle } from './ViewModeToggle';
+export type { ViewModeToggleProps } from './ViewModeToggle';
+export { default as DataViewToolbar } from './DataViewToolbar';
+export type { DataViewToolbarProps } from './DataViewToolbar';
 export * from './Icons';
 

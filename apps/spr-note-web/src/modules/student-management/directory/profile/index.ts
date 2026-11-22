@@ -1,7 +1,6 @@
 export * from './types';
 export * from './utils';
 export { default as StudentProfileHero } from './StudentProfileHero';
-export { default as StudentProfileKPIs } from './StudentProfileKPIs';
 export { default as StudentPersonalTab } from './tabs/StudentPersonalTab';
 export { default as StudentQuranTab } from './tabs/StudentQuranTab';
 export { default as StudentDocumentsTab } from './tabs/StudentDocumentsTab';

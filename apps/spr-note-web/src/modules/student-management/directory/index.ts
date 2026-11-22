@@ -5,6 +5,6 @@ export * from "./hooks";
 export * from "./components";
 export * from "./profile";
 export { default as StudentProfileHubView } from "./StudentProfileHubView";
-export { default as StudentTransferModal } from "./StudentTransferModal";
-export * from "./StudentTransferModal";
+export { default as StudentTransferDrawer } from "./components/StudentTransferDrawer";
+export * from "./components/StudentTransferDrawer";
 export { default } from "./StudentDirectoryView";

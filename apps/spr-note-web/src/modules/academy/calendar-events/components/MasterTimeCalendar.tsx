@@ -5,7 +5,7 @@ import { useFeatureControl } from '../../../../context/FeatureControlContext';
 import { calendarSettings } from '../../../../utils/localStore';
 import { useUserTasks } from '../tasks/useUserTasks';
 import { EVENT_COLOR_MAP, type EventColorStyle } from '../constants/eventColors';
-import type { CalendarEvent, CalendarDisplayMode } from '../types';
+import type { CalendarEvent, CalendarDisplayMode, UserPersonalTask } from '../types';
 
 import {
   type MasterTimeCalendarProps,
@@ -227,6 +227,20 @@ export default function MasterTimeCalendar({
     });
   }, [openDrawer, selectedDateStr]);
 
+  const handleOpenTaskDetail = useCallback((task: UserPersonalTask, dateStr = '') => {
+    openDrawer('user-task', {
+      taskId: task.id,
+      date: dateStr || task.dueDate || selectedDateStr,
+    });
+  }, [openDrawer, selectedDateStr]);
+
+  const handleOpenDayTasks = useCallback((dateStr: string, tasks: UserPersonalTask[]) => {
+    openDrawer('day-tasks', {
+      date: dateStr,
+      tasks,
+    });
+  }, [openDrawer]);
+
   const selectedDayTasks = useMemo(() => {
     return getTasksForDate(selectedDateStr);
   }, [getTasksForDate, selectedDateStr]);
@@ -287,6 +301,8 @@ export default function MasterTimeCalendar({
             onSetDisplayMode={handleSetDisplayMode}
             onOpenAddDrawer={handleOpenAddDrawer}
             onOpenEventDetail={handleOpenEventDetail}
+            onOpenTaskDetail={handleOpenTaskDetail}
+            onOpenDayTasks={handleOpenDayTasks}
           />
         )}
 

@@ -271,8 +271,9 @@ class ControlPanelSectionTreeView(APIView):
         has_switch_map = {item["key"]: item.get("has_switch", True) for item in FEATURE_REGISTRY}
         db_keys = set(AppSection.objects.values_list('section_key', flat=True))
         needs_dashboard_parent_upgrade = AppSection.objects.filter(section_key='nav_dashboard', is_parent=False).exists()
+        needs_student_roster_parent_upgrade = AppSection.objects.filter(section_key='student_roster', is_parent=False).exists()
         needs_standalone_parent_upgrade = not AppSection.objects.filter(section_key='system_standalone_modules').exists()
-        if not registry_keys.issubset(db_keys) or not AppSectionCategory.objects.exists() or needs_dashboard_parent_upgrade or needs_standalone_parent_upgrade:
+        if not registry_keys.issubset(db_keys) or not AppSectionCategory.objects.exists() or needs_dashboard_parent_upgrade or needs_student_roster_parent_upgrade or needs_standalone_parent_upgrade:
             sync_feature_registry_to_db()
 
         user_obj = None

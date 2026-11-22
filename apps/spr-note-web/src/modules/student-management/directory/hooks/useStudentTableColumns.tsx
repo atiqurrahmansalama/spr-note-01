@@ -4,7 +4,7 @@ import {
   SearchIcon,
   EditIcon,
   TransferIcon,
-  TrashIcon,
+  ShieldIcon,
   WhatsAppIcon,
 } from "../../../../components/ui/Icons";
 import { StudentRecord } from "../types";
@@ -170,20 +170,26 @@ interface UseStudentTableColumnsOptions {
   classes?: any[];
   groups?: any[];
   sections?: any[];
+  canViewProfile?: boolean;
+  canEditStudent?: boolean;
+  canTransferStudent?: boolean;
   onNavigateProfile: (id: string | number) => void;
   onEditStudent?: (student: StudentRecord) => void;
   onTransferStudent: (student: StudentRecord) => void;
-  onDeleteStudent: (id: string | number, name?: string) => void;
+  onUpdateStatus: (student: StudentRecord) => void;
 }
 
 export function useStudentTableColumns({
   classes = [],
   groups = [],
   sections = [],
+  canViewProfile = true,
+  canEditStudent = true,
+  canTransferStudent = true,
   onNavigateProfile,
   onEditStudent,
   onTransferStudent,
-  onDeleteStudent,
+  onUpdateStatus,
 }: UseStudentTableColumnsOptions) {
   // Build fast indexed maps for classes, sections, and groups
   const classesMap = useMemo(() => {
@@ -230,31 +236,56 @@ export function useStudentTableColumns({
   }, [groups]);
 
   const getActionMenuItems = useMemo(
-    () => (s: StudentRecord) => [
-      {
-        label: "View Profile",
-        icon: SearchIcon,
-        onClick: () => onNavigateProfile(s.id),
-      },
-      {
-        label: "Edit Student",
-        icon: EditIcon,
-        onClick: () => (onEditStudent ? onEditStudent(s) : onNavigateProfile(s.id)),
-      },
-      {
-        label: "Academic Transfer",
-        icon: TransferIcon,
-        onClick: () => onTransferStudent(s),
-      },
-      { divider: true },
-      {
-        label: "Delete Record",
-        icon: TrashIcon,
-        danger: true,
-        onClick: () => onDeleteStudent(s.id, s.name_en || s.name),
-      },
-    ],
-    [onNavigateProfile, onEditStudent, onTransferStudent, onDeleteStudent]
+    () => (s: StudentRecord) => {
+      const items: any[] = [];
+
+      if (canViewProfile) {
+        items.push({
+          label: "View Profile",
+          icon: SearchIcon,
+          onClick: () => onNavigateProfile(s.id),
+        });
+      }
+
+      if (canEditStudent) {
+        items.push({
+          label: "Edit Student",
+          icon: EditIcon,
+          onClick: () => (onEditStudent ? onEditStudent(s) : onNavigateProfile(s.id)),
+        });
+      }
+
+      if (canTransferStudent) {
+        items.push({
+          label: "Academic Transfer",
+          icon: TransferIcon,
+          onClick: () => onTransferStudent(s),
+        });
+      }
+
+      if (canEditStudent) {
+        if (items.length > 0) {
+          items.push({ divider: true });
+        }
+
+        items.push({
+          label: "Update Status",
+          icon: ShieldIcon,
+          onClick: () => onUpdateStatus(s),
+        });
+      }
+
+      return items;
+    },
+    [
+      canViewProfile,
+      canEditStudent,
+      canTransferStudent,
+      onNavigateProfile,
+      onEditStudent,
+      onTransferStudent,
+      onUpdateStatus,
+    ]
   );
 
   const tableColumns = useMemo(

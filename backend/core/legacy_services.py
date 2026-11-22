@@ -421,32 +421,25 @@ def get_resolved_feature_flags_for_user(user=None, preview_role=None, preview_te
             is_super_admin = True
 
     from .feature_registry import FEATURE_REGISTRY
+
+    # Registry defaults for any keys not yet configured in DB or denied by unconfigured fallback
+    for item in FEATURE_REGISTRY:
+        key = item["key"]
+        default_val = item.get("default_enabled", True)
+        if key not in flags or origins.get(key) == "FALLBACK_DENY":
+            flags[key] = default_val
+            origins[key] = "REGISTRY_DEFAULT" if default_val else "FALLBACK_DENY"
+
     if is_super_admin:
-        # Keep Super Admin bypass on navigation, modules, and API controls so access to system settings is never lost,
-        # while allowing dashboard_widget_* UI cards to honor explicit Feature & Module Control toggles.
+        # Super Admin has absolute master access across the entire platform.
+        # No feature or module is ever hidden from the Super Admin interface.
         for item in FEATURE_REGISTRY:
-            key = item["key"]
-            if key.startswith("dashboard_widget_"):
-                if origins.get(key) == "PARENT_DISABLED (nav_dashboard)":
-                    flags[key] = True
-                    origins[key] = "SUPER_ADMIN_BYPASS"
-                elif key not in flags:
-                    flags[key] = item.get("default_enabled", True)
-                    origins[key] = "REGISTRY_DEFAULT"
-            else:
-                flags[key] = True
-                origins[key] = "SUPER_ADMIN_BYPASS"
+            flags[item["key"]] = True
+            origins[item["key"]] = "SUPER_ADMIN_BYPASS"
         for k in list(flags.keys()):
-            if not str(k).startswith("dashboard_widget_"):
-                flags[k] = True
-    else:
-        for item in FEATURE_REGISTRY:
-            key = item["key"]
-            default_val = item.get("default_enabled", True)
-            # Only apply registry default when missing from DB or unconfigured fallback-deny; never override explicit GLOBAL=False
-            if key not in flags or origins.get(key) == "FALLBACK_DENY":
-                flags[key] = default_val
-                origins[key] = "REGISTRY_DEFAULT" if default_val else "FALLBACK_DENY"
+            flags[k] = True
+            if origins.get(k) != "SUPER_ADMIN_BYPASS":
+                origins[k] = "SUPER_ADMIN_BYPASS"
 
     return flags, origins
 

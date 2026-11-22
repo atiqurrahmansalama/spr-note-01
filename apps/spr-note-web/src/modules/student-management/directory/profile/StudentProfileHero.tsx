@@ -5,7 +5,6 @@ import {
   ClassIcon,
   PhoneIcon,
   WhatsAppIcon,
-  PrintIcon,
   TransferIcon,
   QrCodeIcon,
   EditIcon,
@@ -21,6 +20,8 @@ import { getDocUrl } from './utils';
 export interface StudentProfileHeroProps {
   student: StudentFullProfile;
   uploadingPhoto?: boolean;
+  canEditStudent?: boolean;
+  canTransferStudent?: boolean;
   onPhotoUpload?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onOpenQrModal?: () => void;
   onOpenTransferModal?: () => void;
@@ -29,6 +30,8 @@ export interface StudentProfileHeroProps {
 export const StudentProfileHero: React.FC<StudentProfileHeroProps> = ({
   student,
   uploadingPhoto = false,
+  canEditStudent = true,
+  canTransferStudent = true,
   onPhotoUpload,
   onOpenQrModal,
   onOpenTransferModal,
@@ -57,30 +60,21 @@ export const StudentProfileHero: React.FC<StudentProfileHeroProps> = ({
       icon: QrCodeIcon,
       onClick: () => onOpenQrModal?.(),
     },
-    {
-      label: 'Print ID Card',
-      icon: PrintIcon,
-      onClick: () => window.print(),
-    },
-    {
-      label: 'Edit Student Profile',
-      icon: EditIcon,
-      onClick: () => navigate(`/admission?edit=${student.id}`),
-    },
-    {
-      label: 'Transfer Class / Group',
-      icon: TransferIcon,
-      onClick: () => onOpenTransferModal?.(),
-    },
-    ...(guardianPhone
+    ...(canEditStudent
       ? [
           {
-            label: 'Contact Guardian',
-            icon: WhatsAppIcon,
-            onClick: () => {
-              const num = guardianPhone.replace(/[^\d]/g, '');
-              window.open(`https://wa.me/${num}`, '_blank');
-            },
+            label: 'Edit Student Profile',
+            icon: EditIcon,
+            onClick: () => navigate(`/admission?edit=${student.id}`),
+          },
+        ]
+      : []),
+    ...(canTransferStudent
+      ? [
+          {
+            label: 'Transfer Class / Group',
+            icon: TransferIcon,
+            onClick: () => onOpenTransferModal?.(),
           },
         ]
       : []),

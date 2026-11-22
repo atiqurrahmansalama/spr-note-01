@@ -107,6 +107,38 @@ function getUrlParams() {
   return new URLSearchParams(window.location.search);
 }
 
+/**
+ * Helper to build an enriched parameters object combining URL search params with in-memory parameters.
+ * Provides both direct property access (e.g. params.student, params.studentId, params.isBulk)
+ * and URLSearchParams interface (.get(), .has()) for backward compatibility.
+ */
+function createEnrichedDrawerParams(urlParams, inMemoryParams = {}) {
+  const safeInMemory = (typeof inMemoryParams === 'object' && inMemoryParams !== null) ? inMemoryParams : {};
+  const enriched = { ...safeInMemory };
+
+  if (urlParams && typeof urlParams.forEach === 'function') {
+    urlParams.forEach((value, key) => {
+      if (enriched[key] === undefined) {
+        enriched[key] = value;
+      }
+    });
+  }
+
+  enriched.get = (key) => {
+    if (safeInMemory[key] !== undefined && safeInMemory[key] !== null) {
+      return typeof safeInMemory[key] === 'object' ? JSON.stringify(safeInMemory[key]) : String(safeInMemory[key]);
+    }
+    return urlParams ? urlParams.get(key) : null;
+  };
+
+  enriched.has = (key) => {
+    if (safeInMemory[key] !== undefined) return true;
+    return urlParams ? urlParams.has(key) : false;
+  };
+
+  return enriched;
+}
+
 const RightSidebarContext = createContext({
   isRightSidebarOpen: false,
   rightSidebarConfig: null,
@@ -249,7 +281,11 @@ export function RightSidebarProvider({ children }) {
         params.set('drawer', drawerKey);
         Object.entries(queryParams).forEach(([k, v]) => {
           if (v !== undefined && v !== null && v !== '') {
-            params.set(k, String(v));
+            if (typeof v !== 'object' && typeof v !== 'function') {
+              params.set(k, String(v));
+            } else if (Array.isArray(v) && v.every((x) => typeof x === 'string' || typeof x === 'number')) {
+              params.set(k, v.join(','));
+            }
           } else {
             params.delete(k);
           }
@@ -260,7 +296,7 @@ export function RightSidebarProvider({ children }) {
     const renderer = drawerRegistry.get(drawerKey);
     if (renderer) {
       const currentParams = getUrlParams();
-      const paramsToPass = syncUrl ? currentParams : new URLSearchParams(queryParams);
+      const paramsToPass = createEnrichedDrawerParams(currentParams, queryParams);
       const config = renderer(paramsToPass);
       if (config) {
         openRightSidebar({
@@ -421,7 +457,7 @@ export function useDrawerRegistration(drawerKey, rendererFn, dependencies = []) 
           });
           return;
         }
-        const config = rendererRef.current(currentParams);
+        const config = rendererRef.current(createEnrichedDrawerParams(currentParams));
         if (config) {
           openRightSidebar({
             ...config,
@@ -447,7 +483,7 @@ export function useDrawerRegistration(drawerKey, rendererFn, dependencies = []) 
       if (isUpdatingRef.current) return;
       const currentParams = getUrlParams();
       if (drawerKey === 'notifications' && !currentParams.get('id')) return;
-      const config = rendererRef.current ? rendererRef.current(currentParams) : null;
+      const config = rendererRef.current ? rendererRef.current(createEnrichedDrawerParams(currentParams)) : null;
       if (config) {
         isUpdatingRef.current = true;
         openRightSidebar({

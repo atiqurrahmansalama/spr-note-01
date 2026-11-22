@@ -111,6 +111,13 @@ export const HARD_DEFAULTS: Record<string, boolean> = {
   // 5. Student
   nav_student_management: true,
   student_roster: true,
+  student_roster_view_profile: true,
+  student_profile_quran_progress: true,
+  student_profile_personal_family: true,
+  student_profile_document_vault: true,
+  student_profile_lifecycle_timeline: true,
+  student_roster_edit_student: true,
+  student_roster_academic_transfer: true,
   residential_attendance: true,
   student_admission: true,
 

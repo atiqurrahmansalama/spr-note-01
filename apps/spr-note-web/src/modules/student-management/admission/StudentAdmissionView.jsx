@@ -38,6 +38,7 @@ import {
 } from '../../../api/admissions';
 import { getApprovalSummary } from '../../../api/approvals';
 import { ApprovalQueuePanel } from '../../approvals/components/ApprovalQueuePanel';
+import AccessDeniedView from '../../../components/common/AccessDeniedView';
 
 export default function StudentAdmissionView() {
   const { showToast } = useToast();
@@ -50,6 +51,7 @@ export default function StudentAdmissionView() {
   // Dynamic feature checks with graceful fallback
   const isQuickEnabled = isSectionEnabled('student_quick_admission');
   const isFullEnabled = isSectionEnabled('student_admission');
+  const canEditStudent = isSectionEnabled('student_roster_edit_student');
 
   // If neither is explicitly enabled (or both are), both remain accessible for admin/roster editing
   const canUseQuick = isQuickEnabled || (!isQuickEnabled && !isFullEnabled);
@@ -57,6 +59,17 @@ export default function StudentAdmissionView() {
 
   const editId = searchParams.get('edit') || searchParams.get('student_id') || searchParams.get('id');
   const rawUrlTab = searchParams.get('tab');
+
+  // If navigating directly to edit a student while edit permission is disabled, block and show standard AccessDeniedView
+  if (editId && !canEditStudent) {
+    return (
+      <AccessDeniedView
+        sectionKey="student_roster_edit_student"
+        title="Student Edit Access Restricted"
+        message="Editing student profiles has been disabled by your institution administrator. If you need to make changes to student profiles, contact your administrator."
+      />
+    );
+  }
 
   // Pending approvals counter for badge
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);

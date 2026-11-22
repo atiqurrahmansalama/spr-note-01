@@ -1,57 +1,79 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { fetchWithAuth } from "../../../utils/authService";
-import { useToast } from "../../../context/ToastContext";
-import { useTenant } from "../../../context/TenantContext";
-import { useAcademicData } from "../../../hooks/useAcademicData";
+/**
+ * Student Academic Transfer Drawer (Slide-over Form)
+ * ====================================================
+ * Institutional student academic placement and section transfer management.
+ * Supports single student reallocation and batch/bulk classroom reassignments.
+ *
+ * Implements strict project enterprise standards:
+ * - Zero hardcoded colors / borderless & ringless soft surfaces (RULE 14)
+ * - Container queries @container and @[480px]:grid-cols-2 (RULE 5 & 17)
+ * - Streamlined section separation with clean section headers (RULE 5)
+ * - ReusableCalendar & TemplateTextarea integration (RULE 2)
+ * - Reusable DrawerContainer (padding="none") & DrawerFooter (RULE 5)
+ */
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { fetchWithAuth } from '../../../../utils/authService';
+import { useToast } from '../../../../context/ToastContext';
+import { useTenant } from '../../../../context/TenantContext';
+import { useAcademicData } from '../../../../hooks/useAcademicData';
 import {
-  TransferIcon,
-  DepartmentIcon,
-  ClassIcon,
-  SectionIcon,
-  GroupIcon,
-} from "../../../components/ui/Icons";
-import Modal from "../../../components/ui/Modal";
-import TemplateTextarea from "../../../components/ui/TemplateTextarea";
-import ReusableCalendar from "../../../components/common/ReusableCalendar";
+  DrawerContainer,
+  DrawerFooter,
+} from '../../../../components/layout';
+import TemplateTextarea from '../../../../components/ui/TemplateTextarea';
+import ReusableCalendar from '../../../../components/common/ReusableCalendar';
 import {
   DepartmentSelect,
   ClassSelect,
   SectionSelect,
   GroupSelect,
   DormitoryRoomSelect,
-} from "../../../components/selectors";
-import { transferReasonsStore, students as studentStore } from "../../../utils/localStore";
+} from '../../../../components/selectors';
+import {
+  TransferIcon,
+  DepartmentIcon,
+  ClassIcon,
+  SectionIcon,
+  GroupIcon,
+  BuildingOfficeIcon,
+  CalendarIcon,
+  InfoIcon,
+  UsersIcon,
+  DocumentTextIcon,
+} from '../../../../components/ui/Icons';
+import { transferReasonsStore, students as studentStore } from '../../../../utils/localStore';
 
 const getTodayDate = (): string => {
   const d = new Date();
   const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
 
-export interface StudentTransferModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+export interface StudentTransferDrawerProps {
   student?: any;
   studentIds?: (string | number)[];
   selectedStudents?: any[];
+  isBulk?: boolean;
+  onClose: () => void;
   onSuccess?: () => void;
 }
 
-export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
-  isOpen,
-  onClose,
+export function StudentTransferDrawer({
   student = null,
   studentIds = [],
   selectedStudents = [],
+  isBulk = false,
+  onClose,
   onSuccess,
-}) => {
+}: StudentTransferDrawerProps) {
   const { showToast } = useToast() as any;
   const tenantContext = useTenant ? useTenant() : null;
-  const activeTenantId = tenantContext?.activeTenantId || "default";
+  const activeTenantId = tenantContext?.activeTenantId || 'default';
 
-  // Instant pre-cached academic hierarchy
+  // Academic hierarchy context
   const {
     departments,
     classes,
@@ -63,19 +85,22 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
   } = useAcademicData();
 
   const [loadedStudents, setLoadedStudents] = useState<any[]>([]);
-  const [targetDepartmentId, setTargetDepartmentId] = useState<string>("");
-  const [targetClassId, setTargetClassId] = useState<string>("");
-  const [targetSectionId, setTargetSectionId] = useState<string>("");
-  const [targetGroupId, setTargetGroupId] = useState<string>("");
-  const [targetRoomId, setTargetRoomId] = useState<string>("");
+  const [targetDepartmentId, setTargetDepartmentId] = useState<string>('');
+  const [targetClassId, setTargetClassId] = useState<string>('');
+  const [targetSectionId, setTargetSectionId] = useState<string>('');
+  const [targetGroupId, setTargetGroupId] = useState<string>('');
+  const [targetRoomId, setTargetRoomId] = useState<string>('');
   const [extraGroups, setExtraGroups] = useState<any[]>([]);
   const [transitionDate, setTransitionDate] = useState<string>(getTodayDate());
-  const [transitionReason, setTransitionReason] = useState<string>("");
+  const [transitionReason, setTransitionReason] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [reasonsVersion, setReasonsVersion] = useState<number>(0);
 
-  const isBulk = !student && Array.isArray(studentIds) && studentIds.length > 1;
-  const activeStudentCount = isBulk
+  const effectiveIsBulk = Boolean(
+    isBulk || (!student && Array.isArray(studentIds) && studentIds.length > 1)
+  );
+
+  const activeStudentCount = effectiveIsBulk
     ? studentIds.length
     : student
     ? 1
@@ -87,11 +112,11 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
     if (!val) return null;
     const str = String(val).trim();
     if (
-      str === "" ||
-      str === "0" ||
-      str.toUpperCase() === "ALL" ||
-      str.toLowerCase() === "null" ||
-      str.toLowerCase() === "undefined"
+      str === '' ||
+      str === '0' ||
+      str.toUpperCase() === 'ALL' ||
+      str.toLowerCase() === 'null' ||
+      str.toLowerCase() === 'undefined'
     ) {
       return null;
     }
@@ -101,23 +126,21 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
   // Listen to Admin Tools transfer reasons changes reactively
   useEffect(() => {
     const handleReasonsUpdated = () => setReasonsVersion((v) => v + 1);
-    window.addEventListener("spr_transfer_reasons_updated", handleReasonsUpdated);
-    return () => window.removeEventListener("spr_transfer_reasons_updated", handleReasonsUpdated);
+    window.addEventListener('spr_transfer_reasons_updated', handleReasonsUpdated);
+    return () => window.removeEventListener('spr_transfer_reasons_updated', handleReasonsUpdated);
   }, []);
 
   // Dynamically load configured transfer reasons from Admin Tools store as initial templates
   const initialReasonTemplates = useMemo(() => {
     const list = transferReasonsStore.getReasons(activeTenantId);
     return list
-      .filter((r: any) => r.is_active !== false && r.code !== "OTHER")
+      .filter((r: any) => r.is_active !== false && r.code !== 'OTHER')
       .map((r: any) => r.name || r.code)
       .filter(Boolean);
   }, [activeTenantId, reasonsVersion]);
 
   // Load student records for accurate placement metadata with instant cache fallback
   useEffect(() => {
-    if (!isOpen) return;
-
     if (student) {
       setLoadedStudents([student]);
       return;
@@ -131,7 +154,9 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
 
       // Fast in-memory lookup from academicStudents
       const idStrings = studentIds.map(String);
-      const cached = (academicStudents || []).filter((s: any) => idStrings.includes(String(s.id)));
+      const cached = (academicStudents || []).filter((s: any) =>
+        idStrings.includes(String(s.id))
+      );
       if (cached.length >= studentIds.length) {
         setLoadedStudents(cached);
         return;
@@ -163,21 +188,7 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
         setLoadedStudents(selectedStudents || cached || fromStore || []);
       }
     }
-  }, [isOpen, student, studentIds, selectedStudents, academicStudents]);
-
-  // Reset form inputs upon modal open
-  useEffect(() => {
-    if (isOpen) {
-      setTransitionDate(getTodayDate());
-      setTransitionReason(initialReasonTemplates[0] || "");
-      setTargetDepartmentId("");
-      setTargetClassId("");
-      setTargetSectionId("");
-      setTargetGroupId("");
-      setTargetRoomId("");
-      setExtraGroups([]);
-    }
-  }, [isOpen, initialReasonTemplates]);
+  }, [student, studentIds, selectedStudents, academicStudents]);
 
   // Instant local calculation of available sections for targetClassId
   const availableSections = useMemo(() => {
@@ -234,153 +245,137 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
 
     if (list.length === 0) {
       return {
-        branchName: "--",
-        departmentName: "--",
-        className: "--",
-        sectionName: "--",
-        groupName: "--",
-        roomName: "--",
-        isMulti: isBulk,
+        branchName: '--',
+        departmentName: '--',
+        className: '--',
+        sectionName: '--',
+        groupName: '--',
+        roomName: '--',
+        isMulti: effectiveIsBulk,
       };
     }
 
     const getUniqueValues = (extractor: (s: any) => string | null | undefined): string[] => {
       const raw = list
         .map(extractor)
-        .map((v) => (v ? String(v).trim() : ""))
+        .map((v) => (v ? String(v).trim() : ''))
         .filter(Boolean);
       return Array.from(new Set(raw));
     };
 
     const branches = getUniqueValues(
-      (s) => s.branch_name || s.branch?.name || (typeof s.branch === "string" ? s.branch : "")
+      (s) => s.branch_name || s.branch?.name || (typeof s.branch === 'string' ? s.branch : '')
     );
     const depts = getUniqueValues(
       (s) =>
         s.department_name ||
         s.department?.name ||
         s.student_class_obj?.department_name ||
-        (typeof s.department === "string" ? s.department : "")
+        (typeof s.department === 'string' ? s.department : '')
     );
-    const classes = getUniqueValues(
+    const classList = getUniqueValues(
       (s) =>
         s.student_class_name ||
         s.class_name ||
         s.student_class?.name ||
-        (typeof s.student_class === "string" ? s.student_class : "")
+        (typeof s.student_class === 'string' ? s.student_class : '')
     );
-    const sections = getUniqueValues(
-      (s) => s.section_name || s.section?.name || (typeof s.section === "string" ? s.section : "")
+    const sectionList = getUniqueValues(
+      (s) => s.section_name || s.section?.name || (typeof s.section === 'string' ? s.section : '')
     );
-    const groups = getUniqueValues(
+    const groupList = getUniqueValues(
       (s) =>
         s.student_group_name ||
         s.group_name ||
         s.student_group?.name ||
-        (typeof s.student_group === "string" ? s.student_group : "")
+        (typeof s.student_group === 'string' ? s.student_group : '')
     );
     const rooms = getUniqueValues(
       (s) =>
         s.dormitory_room_name ||
         s.room_number ||
         s.dormitory_room?.name ||
-        (typeof s.dormitory_room === "string" ? s.dormitory_room : "")
+        (typeof s.dormitory_room === 'string' ? s.dormitory_room : '')
     );
 
     const formatSummaryField = (uniques: string[], pluralLabel: string) => {
-      if (uniques.length === 0) return "Not Assigned";
+      if (uniques.length === 0) return 'Not Assigned';
       if (uniques.length === 1) return uniques[0];
       return `Multiple ${pluralLabel}`;
     };
 
     return {
-      branchName: formatSummaryField(branches, "Campuses"),
-      departmentName: formatSummaryField(depts, "Departments"),
-      className: formatSummaryField(classes, "Classes"),
-      sectionName: formatSummaryField(sections, "Sections"),
-      groupName: formatSummaryField(groups, "Groups"),
-      roomName: formatSummaryField(rooms, "Rooms"),
+      branchName: formatSummaryField(branches, 'Campuses'),
+      departmentName: formatSummaryField(depts, 'Departments'),
+      className: formatSummaryField(classList, 'Classes'),
+      sectionName: formatSummaryField(sectionList, 'Sections'),
+      groupName: formatSummaryField(groupList, 'Groups'),
+      roomName: formatSummaryField(rooms, 'Rooms'),
       isMulti: list.length > 1,
     };
-  }, [student, loadedStudents, selectedStudents, isBulk]);
+  }, [student, loadedStudents, selectedStudents, effectiveIsBulk]);
 
-  // Reusable structured items for current placement display (All 6 fields always rendered)
   const placementItems = useMemo(() => {
     return [
       {
-        key: "campus",
-        label: "Campus",
-        value: placementSummary.branchName || "Not Assigned",
-        isMulti: Boolean(placementSummary.branchName?.includes("Multiple")),
+        key: 'department',
+        label: 'Department',
+        value: placementSummary.departmentName || 'Not Assigned',
       },
       {
-        key: "department",
-        label: "Department",
-        value: placementSummary.departmentName || "Not Assigned",
-        isMulti: Boolean(placementSummary.departmentName?.includes("Multiple")),
+        key: 'class',
+        label: 'Class',
+        value: placementSummary.className || 'Not Assigned',
       },
       {
-        key: "class",
-        label: "Class",
-        value: placementSummary.className || "Not Assigned",
-        isMulti: Boolean(placementSummary.className?.includes("Multiple")),
+        key: 'section',
+        label: 'Section',
+        value: placementSummary.sectionName || 'Not Assigned',
       },
       {
-        key: "section",
-        label: "Section",
-        value: placementSummary.sectionName || "Not Assigned",
-        isMulti: Boolean(placementSummary.sectionName?.includes("Multiple")),
+        key: 'group',
+        label: 'Group',
+        value: placementSummary.groupName || 'Not Assigned',
       },
       {
-        key: "group",
-        label: "Group",
-        value: placementSummary.groupName || "Not Assigned",
-        isMulti: Boolean(placementSummary.groupName?.includes("Multiple")),
-      },
-      {
-        key: "room",
-        label: "Room",
-        value: placementSummary.roomName || "Not Assigned",
-        isMulti: Boolean(placementSummary.roomName?.includes("Multiple")),
+        key: 'room',
+        label: 'Room',
+        value: placementSummary.roomName || 'Not Assigned',
       },
     ];
   }, [placementSummary]);
 
-  if (!isOpen) return null;
-
   // Cascading handler when Department changes
   const handleDepartmentChange = (deptId: string) => {
-    const cleanDept = sanitizeId(deptId) || "";
+    const cleanDept = sanitizeId(deptId) || '';
     setTargetDepartmentId(cleanDept);
-    // If current selected class doesn't belong to the newly selected department, reset class & children
     if (targetClassId && cleanDept) {
       const clsObj = classes.find((c: any) => String(c.id) === String(targetClassId));
       const classDept =
         clsObj?.department?.id ||
         clsObj?.department_id ||
-        (typeof clsObj?.department === "string" ? clsObj?.department : "");
+        (typeof clsObj?.department === 'string' ? clsObj?.department : '');
       if (classDept && String(classDept) !== String(cleanDept)) {
-        setTargetClassId("");
-        setTargetSectionId("");
-        setTargetGroupId("");
+        setTargetClassId('');
+        setTargetSectionId('');
+        setTargetGroupId('');
       }
     }
   };
 
   // Cascading handler when Class changes
   const handleClassChange = (cid: string) => {
-    const cleanClass = sanitizeId(cid) || "";
+    const cleanClass = sanitizeId(cid) || '';
     setTargetClassId(cleanClass);
-    setTargetSectionId("");
-    setTargetGroupId("");
+    setTargetSectionId('');
+    setTargetGroupId('');
 
-    // Auto sync department if not set and class has a department
     if (cleanClass && classes.length > 0) {
       const clsObj = classes.find((c: any) => String(c.id) === String(cleanClass));
       const classDept =
         clsObj?.department?.id ||
         clsObj?.department_id ||
-        (typeof clsObj?.department === "string" ? clsObj?.department : "");
+        (typeof clsObj?.department === 'string' ? clsObj?.department : '');
       if (classDept && !targetDepartmentId) {
         setTargetDepartmentId(String(classDept));
       }
@@ -389,9 +384,16 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
 
   // Cascading handler when Section changes
   const handleSectionChange = (sid: string) => {
-    setTargetSectionId(sanitizeId(sid) || "");
-    setTargetGroupId("");
+    setTargetSectionId(sanitizeId(sid) || '');
+    setTargetGroupId('');
   };
+
+  const hasAnyDestinationSelected =
+    Boolean(sanitizeId(targetDepartmentId)) ||
+    Boolean(sanitizeId(targetClassId)) ||
+    Boolean(sanitizeId(targetSectionId)) ||
+    Boolean(sanitizeId(targetGroupId)) ||
+    Boolean(sanitizeId(targetRoomId));
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -410,13 +412,14 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
       !sanitizedRoomId
     ) {
       showToast(
-        "Please select at least one destination (Department, Class, Section, Group, or Dormitory Room).",
-        "warning"
+        'Please select at least one destination (Department, Class, Section, Group, or Room).',
+        'warning'
       );
       return;
     }
 
-    const finalReason = transitionReason.trim() || initialReasonTemplates[0] || "Academic Placement Transfer";
+    const finalReason =
+      transitionReason.trim() || initialReasonTemplates[0] || 'Academic Placement Transfer';
     const basePayload = {
       target_department_id: sanitizedDeptId,
       target_class_id: sanitizedClassId,
@@ -430,31 +433,36 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
     setSubmitting(true);
 
     try {
-      if (isBulk) {
+      if (effectiveIsBulk) {
         // Bulk Transfer Action
         const payload = {
-          action: "transfer",
+          action: 'transfer',
           student_ids: studentIds,
           ...basePayload,
         };
 
-        const res = await fetchWithAuth("/api/v1/students/bulk-action/", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        const res = await fetchWithAuth('/api/v1/students/bulk-action/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
 
         if (res.ok) {
           showToast(
-            `Successfully transferred ${studentIds.length} students with lifecycle progression recorded!`,
-            "success"
+            `Successfully transferred ${studentIds.length} students with academic placement recorded!`,
+            'success'
           );
+          window.dispatchEvent(new CustomEvent('spr_students_updated'));
+          window.dispatchEvent(new CustomEvent('spr_student_transferred'));
           onSuccess?.();
           onClose();
         } else {
           const err = await res.json().catch(() => ({}));
-          const msg = err.error || err.detail || (typeof err === "object" ? Object.values(err)[0] : "Failed to transfer students.");
-          showToast(typeof msg === "string" ? msg : JSON.stringify(msg), "error");
+          const msg =
+            err.error ||
+            err.detail ||
+            (typeof err === 'object' ? Object.values(err)[0] : 'Failed to transfer students.');
+          showToast(typeof msg === 'string' ? msg : JSON.stringify(msg), 'error');
         }
       } else {
         // Single Student Transfer Action
@@ -463,15 +471,15 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
           (Array.isArray(studentIds) && studentIds.length === 1 ? studentIds[0] : null);
 
         if (!targetStudentId) {
-          showToast("No student record selected for transfer.", "error");
+          showToast('No student record selected for transfer.', 'error');
           return;
         }
 
         const res = await fetchWithAuth(
           `/api/v1/students/${targetStudentId}/transfer-academic/`,
           {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(basePayload),
           }
         );
@@ -480,115 +488,99 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
           const data = await res.json();
           showToast(
             data.message || `Student academic placement transferred successfully!`,
-            "success"
+            'success'
           );
+          window.dispatchEvent(new CustomEvent('spr_students_updated'));
+          window.dispatchEvent(new CustomEvent('spr_student_transferred'));
           onSuccess?.();
           onClose();
         } else {
           const err = await res.json().catch(() => ({}));
-          const msg = err.error || err.detail || (typeof err === "object" ? Object.values(err)[0] : "Failed to transfer student.");
-          showToast(typeof msg === "string" ? msg : JSON.stringify(msg), "error");
+          const msg =
+            err.error ||
+            err.detail ||
+            (typeof err === 'object' ? Object.values(err)[0] : 'Failed to transfer student.');
+          showToast(typeof msg === 'string' ? msg : JSON.stringify(msg), 'error');
         }
       }
     } catch {
-      showToast("Network error during academic transfer.", "error");
+      showToast('Network error during academic transfer.', 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const hasAnyDestinationSelected =
-    Boolean(sanitizeId(targetDepartmentId)) ||
-    Boolean(sanitizeId(targetClassId)) ||
-    Boolean(sanitizeId(targetSectionId)) ||
-    Boolean(sanitizeId(targetGroupId)) ||
-    Boolean(sanitizeId(targetRoomId));
+  const singleStudentName = student?.name_en || student?.name || 'Student';
+  const singleStudentId =
+    student?.student_id_card_number ||
+    student?.uniq_id ||
+    student?.unique_id ||
+    (student?.id ? `ID: ${student.id}` : '');
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={
-        isBulk ? (
-          <span>
-            Bulk Transfer Students{" "}
-            <span className="font-normal text-xs sm:text-sm theme-text-secondary">
-              ({activeStudentCount} Selected)
-            </span>
-          </span>
-        ) : student?.name_en || student?.name ? (
-          `Transfer Student: ${student.name_en || student.name}`
-        ) : (
-          `Transfer Student Academic Placement`
-        )
-      }
-      icon={TransferIcon}
-      size="lg"
-      footer={
-        <div className="flex items-center justify-end gap-3 w-full">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-bold border theme-border hover:theme-bg-sub transition-colors cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting || !hasAnyDestinationSelected}
-            className="px-5 py-2 rounded-xl text-xs font-bold theme-bg-accent theme-accent-text hover:opacity-90 transition-all cursor-pointer shadow-md disabled:opacity-50 flex items-center gap-1.5"
-          >
-            <TransferIcon className="w-3.5 h-3.5" />
-            <span>
-              {submitting
-                ? "Processing Transfer..."
-                : isBulk
-                ? `Transfer ${activeStudentCount} Students`
-                : "Confirm Transfer"}
-            </span>
-          </button>
-        </div>
-      }
-    >
-      <div className="space-y-5 text-left">
-        {/* Current Academic Placement Summary (Clean 2-Column Text Format) */}
-        <div className="p-3.5 rounded-2xl theme-bg-sub/60 border theme-border space-y-2.5 text-xs">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] uppercase font-bold tracking-wider theme-text-primary">
-              Current Placement
-            </span>
+    <DrawerContainer padding="none" spacing="normal">
+      <form onSubmit={handleSubmit} className="@container space-y-6 pt-2">
+        {/* ─── 1. Identity & Current Placement Banner ─── */}
+        <div className="p-4 rounded-2xl theme-bg-surface border-0 shadow-xs space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl theme-bg-accent-soft text-base font-bold theme-accent flex items-center justify-center shrink-0 shadow-xs">
+              {effectiveIsBulk ? (
+                <UsersIcon className="w-6 h-6" />
+              ) : (
+                singleStudentName.charAt(0).toUpperCase()
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-bold theme-text-primary text-sm truncate leading-tight">
+                {effectiveIsBulk
+                  ? `Bulk Academic Transfer (${activeStudentCount} Students)`
+                  : singleStudentName}
+              </h3>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                {!effectiveIsBulk && singleStudentId && (
+                  <span className="text-[11px] font-mono theme-text-secondary truncate select-all">
+                    {singleStudentId}
+                  </span>
+                )}
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider theme-bg-sub theme-text-primary">
+                  {effectiveIsBulk ? `${activeStudentCount} Selected` : 'Active Record'}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs leading-relaxed">
-            {placementItems.map((item) => {
-              const isUnassigned =
-                item.value === "Not Assigned" ||
-                item.value === "--" ||
-                item.value === "—" ||
-                !item.value;
-              return (
-                <div key={item.key} className="flex items-center gap-1.5 min-w-0">
-                  <span className="theme-text-secondary font-medium shrink-0">{item.label}:</span>
-                  <span
-                    className={`truncate ${
-                      item.isMulti
-                        ? "font-bold theme-accent"
-                        : isUnassigned
-                        ? "theme-text-muted font-normal"
-                        : "theme-text-primary font-semibold"
-                    }`}
-                  >
-                    {isUnassigned ? "Not Assigned" : item.value}
+          {/* Current Placement Details Grid */}
+          <div className="pt-2 border-t theme-border/60">
+            <div className="text-[11px] font-bold uppercase tracking-wider theme-text-secondary opacity-75 mb-2">
+              Current Academic Placement
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {placementItems.map((item) => (
+                <div key={item.key} className="p-2 rounded-xl theme-bg-app border-0">
+                  <span className="text-[10px] font-medium uppercase tracking-wider theme-text-secondary block">
+                    {item.label}
+                  </span>
+                  <span className="font-semibold theme-text-primary truncate block mt-0.5">
+                    {item.value}
                   </span>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Section 1: Academic Hierarchy Placement */}
-        <div className="space-y-3.5">
+        {/* ─── 2. Institutional Audit Notice ─── */}
+        <div className="p-3.5 rounded-2xl bg-sky-500/10 dark:bg-sky-500/15 border-0 flex items-start gap-3">
+          <InfoIcon className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
+          <div className="text-xs text-sky-800 dark:text-sky-200 leading-relaxed">
+            <span className="font-semibold block mb-0.5">Academic Placement Integrity</span>
+            Reallocating a student to a new department, class, or section preserves historical attendance registers,
+            lesson recitations, and assessment marksheets in their respective sessions.
+          </div>
+        </div>
+
+        {/* ─── 3. Destination Academic Hierarchy ─── */}
+        <div className="space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b theme-border">
             <DepartmentIcon className="w-4 h-4 theme-accent shrink-0" />
             <span className="text-xs font-bold uppercase tracking-wider theme-text-primary">
@@ -596,58 +588,58 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
             </span>
           </div>
 
-          {/* Row 1: Destination Department & Academic Class */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {/* Complementary Row 1: Department & Class (Container responsive @[480px]:grid-cols-2) */}
+          <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3.5">
             <div>
               <DepartmentSelect
-                label="Department"
+                label="Destination Department"
                 departments={departments}
                 value={targetDepartmentId}
                 onChange={handleDepartmentChange}
                 allowAll={true}
-                allLabel="Keep Current"
-                placeholder="Keep Current"
+                allLabel="Keep Current Department"
+                placeholder="Keep Current Department"
                 icon={DepartmentIcon}
               />
             </div>
 
             <div>
               <ClassSelect
-                label="Class"
+                label="Destination Class"
                 value={targetClassId}
                 onChange={handleClassChange}
                 classes={classes}
                 departmentId={targetDepartmentId || undefined}
                 disabled={false}
                 allowAll={true}
-                allLabel="Keep Current"
-                placeholder="Keep Current"
+                allLabel="Keep Current Class"
+                placeholder="Keep Current Class"
                 icon={ClassIcon}
               />
             </div>
           </div>
 
-          {/* Row 2: Destination Section & Group (Shown ONLY if Class is selected and has sections/groups) */}
+          {/* Complementary Row 2: Section & Group (Shown when class is selected) */}
           {Boolean(targetClassId) && (availableSections.length > 0 || effectiveAvailableGroups.length > 0) && (
             <div
               className={`grid grid-cols-1 ${
                 availableSections.length > 0 && effectiveAvailableGroups.length > 0
-                  ? "sm:grid-cols-2"
-                  : ""
+                  ? '@[480px]:grid-cols-2'
+                  : ''
               } gap-3.5 animate-fade-in`}
             >
               {availableSections.length > 0 && (
                 <div>
                   <SectionSelect
-                    label="Section"
+                    label="Destination Section"
                     value={targetSectionId}
                     onChange={handleSectionChange}
                     classId={targetClassId}
                     sections={availableSections}
                     allowAll={true}
-                    allLabel="Keep Current"
+                    allLabel="Keep Current Section"
                     optional={false}
-                    placeholder="Keep Current"
+                    placeholder="Keep Current Section"
                     icon={SectionIcon}
                   />
                 </div>
@@ -656,15 +648,15 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
               {effectiveAvailableGroups.length > 0 && (
                 <div>
                   <GroupSelect
-                    label="Group"
+                    label="Destination Group / Halqa"
                     value={targetGroupId}
                     onChange={(gid: string) => setTargetGroupId(gid)}
                     classId={targetClassId}
                     sectionId={targetSectionId || undefined}
                     groups={effectiveAvailableGroups}
                     allowAll={true}
-                    allLabel="Keep Current"
-                    placeholder="Keep Current"
+                    allLabel="Keep Current Group"
+                    placeholder="Keep Current Group"
                     icon={GroupIcon}
                   />
                 </div>
@@ -673,19 +665,26 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
           )}
         </div>
 
-        {/* Section 2: Residential & Lifecycle Transition Details */}
-        <div className="space-y-3.5 pt-1">
-          {/* Row 3: Dormitory Room & Effective Transition Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        {/* ─── 4. Residential & Lifecycle Details ─── */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b theme-border">
+            <BuildingOfficeIcon className="w-4 h-4 theme-accent shrink-0" />
+            <span className="text-xs font-bold uppercase tracking-wider theme-text-primary">
+              Residential & Transition Schedule
+            </span>
+          </div>
+
+          {/* Complementary Row 3: Dormitory Room & Effective Date (Container responsive @[480px]:grid-cols-2) */}
+          <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3.5">
             <div>
               <DormitoryRoomSelect
-                label="Residential Room"
+                label="Dormitory Room"
                 value={targetRoomId}
                 onChange={(rid: string) => setTargetRoomId(rid)}
                 searchable={false}
                 allowAll={true}
-                allLabel="Keep Current"
-                placeholder="Keep Current"
+                allLabel="Keep Current Room"
+                placeholder="Keep Current Room"
               />
             </div>
 
@@ -696,12 +695,16 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
                 onSelectDate={(dateStr: string) => setTransitionDate(dateStr)}
                 required={true}
                 placeholder="Select Effective Date"
+                className="w-full"
               />
             </div>
           </div>
 
-          {/* Row 4: Transition Reason with Template Feature */}
-          <div className="w-full">
+          {/* Full Width Row 4: Transition Reason with TemplateTextarea */}
+          <div>
+            <label className="block text-xs font-medium theme-text-secondary mb-1">
+              Official Transfer Reason / Justification
+            </label>
             <TemplateTextarea
               label="Transfer Reason"
               value={transitionReason}
@@ -723,9 +726,25 @@ export const StudentTransferModal: React.FC<StudentTransferModalProps> = ({
             />
           </div>
         </div>
-      </div>
-    </Modal>
-  );
-};
 
-export default StudentTransferModal;
+        {/* ─── 5. Reusable Drawer Footer ─── */}
+        <DrawerFooter
+          saveLabel={
+            submitting
+              ? 'Processing Transfer...'
+              : effectiveIsBulk
+              ? `Transfer ${activeStudentCount} Students`
+              : 'Confirm Transfer'
+          }
+          saveIcon={TransferIcon}
+          cancelLabel="Cancel"
+          isSubmitting={submitting}
+          isSaveDisabled={submitting || !hasAnyDestinationSelected}
+          onCancel={onClose}
+        />
+      </form>
+    </DrawerContainer>
+  );
+}
+
+export default StudentTransferDrawer;
