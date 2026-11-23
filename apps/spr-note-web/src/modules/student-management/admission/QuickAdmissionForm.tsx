@@ -660,10 +660,10 @@ export default function QuickAdmissionForm({
     <div className="w-full max-w-4xl mx-auto animate-fade-in text-left font-sans">
       <form
         onSubmit={handleSubmit}
-        className="theme-bg-surface rounded-2xl sm:rounded-3xl p-6 sm:p-8 border theme-border shadow-xs space-y-6"
+        className="theme-bg-surface rounded-3xl p-6 sm:p-8 border-0 shadow-xs space-y-6"
       >
         {/* Form Header & Auto-Save Badge */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b theme-border">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-black/[0.04] dark:border-white/[0.06]">
           <div>
             <h2 className="text-base sm:text-lg font-bold theme-text-primary tracking-tight">
               {isEditing ? "Edit Student Profile" : "Quick Admission"}
@@ -752,8 +752,8 @@ export default function QuickAdmissionForm({
           />
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-3 pt-5 border-t theme-border">
+        {/* Action Buttons (Cancel on the far left, Submit on the far right) */}
+        <div className="flex items-center justify-between gap-3 pt-5 border-t border-black/[0.04] dark:border-white/[0.06]">
           <CustomButton
             type="button"
             variant="secondary"
@@ -761,15 +761,17 @@ export default function QuickAdmissionForm({
           >
             Cancel
           </CustomButton>
-          <CustomButton
-            type="submit"
-            variant="primary"
-            loading={isSubmitting}
-            loadingText={isEditing ? "Updating Profile..." : "Completing Admission..."}
-            icon={CheckCircleIcon}
-          >
-            {isEditing ? "Update Profile" : "Save & Return to Classroom"}
-          </CustomButton>
+          <div className="flex items-center gap-3">
+            <CustomButton
+              type="submit"
+              variant="primary"
+              loading={isSubmitting}
+              loadingText={isEditing ? "Updating Profile..." : "Completing Admission..."}
+              icon={CheckCircleIcon}
+            >
+              {isEditing ? "Update Profile" : "Save & Return to Classroom"}
+            </CustomButton>
+          </div>
         </div>
       </form>
     </div>

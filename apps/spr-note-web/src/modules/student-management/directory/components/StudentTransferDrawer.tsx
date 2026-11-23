@@ -19,6 +19,7 @@ import { useTenant } from '../../../../context/TenantContext';
 import { useAcademicData } from '../../../../hooks/useAcademicData';
 import {
   DrawerContainer,
+  DrawerSection,
   DrawerFooter,
 } from '../../../../components/layout';
 import TemplateTextarea from '../../../../components/ui/TemplateTextarea';
@@ -97,7 +98,7 @@ export function StudentTransferDrawer({
   const [reasonsVersion, setReasonsVersion] = useState<number>(0);
 
   const effectiveIsBulk = Boolean(
-    isBulk || (!student && Array.isArray(studentIds) && studentIds.length > 1)
+    !student && (isBulk || (Array.isArray(studentIds) && studentIds.length > 1))
   );
 
   const activeStudentCount = effectiveIsBulk
@@ -550,13 +551,13 @@ export function StudentTransferDrawer({
           </div>
 
           {/* Current Placement Details Grid */}
-          <div className="pt-2 border-t theme-border/60">
-            <div className="text-[11px] font-bold uppercase tracking-wider theme-text-secondary opacity-75 mb-2">
+          <div className="pt-2.5 border-t border-black/[0.04] dark:border-white/[0.06]">
+            <div className="text-[11px] font-bold uppercase tracking-wider theme-text-secondary opacity-70 mb-2">
               Current Academic Placement
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               {placementItems.map((item) => (
-                <div key={item.key} className="p-2 rounded-xl theme-bg-app border-0">
+                <div key={item.key} className="p-2.5 rounded-2xl theme-bg-app border-0 shadow-2xs">
                   <span className="text-[10px] font-medium uppercase tracking-wider theme-text-secondary block">
                     {item.label}
                   </span>
@@ -569,25 +570,24 @@ export function StudentTransferDrawer({
           </div>
         </div>
 
-        {/* ─── 2. Institutional Audit Notice ─── */}
-        <div className="p-3.5 rounded-2xl bg-sky-500/10 dark:bg-sky-500/15 border-0 flex items-start gap-3">
-          <InfoIcon className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
-          <div className="text-xs text-sky-800 dark:text-sky-200 leading-relaxed">
-            <span className="font-semibold block mb-0.5">Academic Placement Integrity</span>
-            Reallocating a student to a new department, class, or section preserves historical attendance registers,
-            lesson recitations, and assessment marksheets in their respective sessions.
+        {/* ─── 2. Institutional Audit Notice (Theme Soft Surface) ─── */}
+        <div className="p-4 rounded-3xl theme-bg-accent-soft border-0 flex items-start gap-3 shadow-2xs">
+          <InfoIcon className="w-4 h-4 theme-accent shrink-0 mt-0.5" />
+          <div className="text-xs leading-relaxed space-y-0.5">
+            <span className="font-bold block theme-text-primary">Academic Placement Integrity</span>
+            <span className="theme-text-secondary">
+              Reallocating a student to a new department, class, or section preserves historical attendance registers,
+              lesson recitations, and assessment marksheets in their respective sessions.
+            </span>
           </div>
         </div>
 
         {/* ─── 3. Destination Academic Hierarchy ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b theme-border">
-            <DepartmentIcon className="w-4 h-4 theme-accent shrink-0" />
-            <span className="text-xs font-bold uppercase tracking-wider theme-text-primary">
-              Destination Academic Hierarchy
-            </span>
-          </div>
-
+        <DrawerSection
+          title="Destination Academic Hierarchy"
+          icon={DepartmentIcon}
+          className="pt-2"
+        >
           {/* Complementary Row 1: Department & Class (Container responsive @[480px]:grid-cols-2) */}
           <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3.5">
             <div>
@@ -663,17 +663,14 @@ export function StudentTransferDrawer({
               )}
             </div>
           )}
-        </div>
+        </DrawerSection>
 
         {/* ─── 4. Residential & Lifecycle Details ─── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b theme-border">
-            <BuildingOfficeIcon className="w-4 h-4 theme-accent shrink-0" />
-            <span className="text-xs font-bold uppercase tracking-wider theme-text-primary">
-              Residential & Transition Schedule
-            </span>
-          </div>
-
+        <DrawerSection
+          title="Residential & Transition Schedule"
+          icon={BuildingOfficeIcon}
+          className="pt-2"
+        >
           {/* Complementary Row 3: Dormitory Room & Effective Date (Container responsive @[480px]:grid-cols-2) */}
           <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3.5">
             <div>
@@ -702,9 +699,6 @@ export function StudentTransferDrawer({
 
           {/* Full Width Row 4: Transition Reason with TemplateTextarea */}
           <div>
-            <label className="block text-xs font-medium theme-text-secondary mb-1">
-              Official Transfer Reason / Justification
-            </label>
             <TemplateTextarea
               label="Transfer Reason"
               value={transitionReason}
@@ -725,23 +719,25 @@ export function StudentTransferDrawer({
               showDelete={true}
             />
           </div>
-        </div>
+        </DrawerSection>
 
-        {/* ─── 5. Reusable Drawer Footer ─── */}
-        <DrawerFooter
-          saveLabel={
-            submitting
-              ? 'Processing Transfer...'
-              : effectiveIsBulk
-              ? `Transfer ${activeStudentCount} Students`
-              : 'Confirm Transfer'
-          }
-          saveIcon={TransferIcon}
-          cancelLabel="Cancel"
-          isSubmitting={submitting}
-          isSaveDisabled={submitting || !hasAnyDestinationSelected}
-          onCancel={onClose}
-        />
+        {/* ─── 5. Reusable Drawer Footer with bottom spacing ─── */}
+        <div className="pt-2 pb-8">
+          <DrawerFooter
+            saveLabel={
+              submitting
+                ? 'Processing Transfer...'
+                : effectiveIsBulk
+                ? `Transfer ${activeStudentCount} Students`
+                : 'Confirm Transfer'
+            }
+            saveIcon={TransferIcon}
+            cancelLabel="Cancel"
+            isSubmitting={submitting}
+            isSaveDisabled={submitting || !hasAnyDestinationSelected}
+            onCancel={onClose}
+          />
+        </div>
       </form>
     </DrawerContainer>
   );

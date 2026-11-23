@@ -14,6 +14,31 @@ export type CalendarDisplayMode = 'grid' | 'timeline' | 'list';
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'DEFERRED';
 
+export type DutyCategory = 'GENERAL' | 'ACADEMIC' | 'EXAMINATION' | 'ADMINISTRATIVE' | 'FACILITIES';
+
+export interface InstitutionalDuty {
+  id: string;
+  institution?: string;
+  title: string;
+  description?: string;
+  due_date?: string;
+  due_time?: string;
+  priority: 'HIGH' | 'MEDIUM' | 'LOW';
+  priority_display?: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+  status_display?: string;
+  category: DutyCategory | string;
+  category_display?: string;
+  assigned_to?: string | number | null;
+  assigned_to_name?: string;
+  created_by?: string | number | null;
+  created_by_name?: string;
+  is_completed: boolean;
+  completed_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface TaskSubItem {
   id: string;
   title: string;

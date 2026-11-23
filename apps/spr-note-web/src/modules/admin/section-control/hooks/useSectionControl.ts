@@ -32,7 +32,10 @@ export function useSectionControl() {
   const [dbRoles, setDbRoles] = useState<RoleOption[]>(() => {
     try {
       const saved = localStorage.getItem('spr_local_roles_v1');
-      return saved ? JSON.parse(saved) : [];
+      const parsed: RoleOption[] = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed)
+        ? parsed.filter((r) => r.code?.toUpperCase() !== 'SUPER_ADMIN')
+        : [];
     } catch {
       return [];
     }
@@ -40,8 +43,9 @@ export function useSectionControl() {
 
   const selectedRole = useMemo(() => {
     const roleParam = searchParams.get('role');
-    if (roleParam) return roleParam;
-    if (dbRoles.length > 0) return dbRoles[0].code;
+    if (roleParam && roleParam.toUpperCase() !== 'SUPER_ADMIN') return roleParam;
+    const nonSuperRoles = dbRoles.filter((r) => r.code?.toUpperCase() !== 'SUPER_ADMIN');
+    if (nonSuperRoles.length > 0) return nonSuperRoles[0].code;
     return '';
   }, [searchParams, dbRoles]);
 
@@ -264,7 +268,8 @@ export function useSectionControl() {
           const res = await fetchWithAuth(path);
           if (res.ok && isMounted) {
             const data = await res.json();
-            const list: RoleOption[] = Array.isArray(data) ? data : data.results || [];
+            const rawList: RoleOption[] = Array.isArray(data) ? data : data.results || [];
+            const list: RoleOption[] = rawList.filter((r) => r.code?.toUpperCase() !== 'SUPER_ADMIN');
             if (list.length > 0) {
               setDbRoles(list);
               try {

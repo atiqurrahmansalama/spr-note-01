@@ -44,6 +44,8 @@ export interface ProgressTrendsChartProps {
   onHorizonChange?: (horizon: any) => void;
   accuracyRate?: number;
   extraMenuItems?: any[];
+  title?: string;
+  subtitle?: string;
 }
 
 /**
@@ -71,6 +73,8 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
   onViewModeChange,
   className = "",
   extraMenuItems = [],
+  title,
+  subtitle,
 }) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
@@ -307,8 +311,8 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
 
   return (
     <TrendChart
-      title="Recitation Trends"
-      subtitle="Chronological progress driven by date criteria"
+      title={title || "Daily Recitation Progress & Trends"}
+      subtitle={subtitle || "Chronological progress driven by date criteria"}
       emptyMessage="No recitation reports found matching the selected date criteria."
       emptyIcon={BookOpenIcon}
       dataPoints={trendPoints}
@@ -323,7 +327,7 @@ export const ProgressTrendsChart: React.FC<ProgressTrendsChartProps> = ({
       kpiItems={kpiItems as any}
       footerFields={footerFields as any}
       exportFilename="recitation_trends"
-      exportTitle="Recitation Trends"
+      exportTitle={title || "Daily Recitation Progress & Trends"}
       extraMenuItems={extraMenuItems}
       className={className}
     />

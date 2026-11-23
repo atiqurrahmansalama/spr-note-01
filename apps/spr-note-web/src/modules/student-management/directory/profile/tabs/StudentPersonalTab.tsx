@@ -9,6 +9,7 @@ import {
 import { StudentFullProfile, StudentAddressDetail } from '../types';
 import { calculateAge } from '../utils';
 import { getBranchDisplayName } from '../../../../../utils/localStore';
+import { formatDisplayDate } from '../../../../../utils/dateUtils';
 
 export interface StudentPersonalTabProps {
   student: StudentFullProfile;
@@ -170,10 +171,11 @@ export const StudentPersonalTab: React.FC<StudentPersonalTabProps> = ({ student 
               Admission Date
             </span>
             <p className="font-mono font-medium theme-text-primary text-sm sm:text-base">
-              {student.admission_date ||
-                student.academic_detail?.admission_date ||
-                student.details?.admission_date ||
-                '—'}
+              {formatDisplayDate(
+                student.admission_date ||
+                  student.academic_detail?.admission_date ||
+                  student.details?.admission_date
+              )}
             </p>
           </div>
 

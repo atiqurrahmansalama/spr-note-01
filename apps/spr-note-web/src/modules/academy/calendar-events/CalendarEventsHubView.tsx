@@ -10,10 +10,12 @@ import {
   TimeScheduleDrawerForm,
   TimeScheduleDetailDrawer,
   UserTaskDrawerForm,
+  OfficialDutyDrawerForm,
   DayTasksDrawerContent,
   MyTasksHubView,
 } from './components';
 import { masterCalendarStore, calendarSettings } from '../../../utils/localStore';
+import { fetchWithAuth } from '../../../utils/authService';
 import { userTaskStore } from './tasks/userTaskStore';
 import { useTenant } from '../../../context/TenantContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -46,10 +48,16 @@ export default function CalendarEventsHubView() {
   const isWorkingHoursEnabled = isSectionEnabled('calendar_tab_working_hours') && isSectionEnabled('calendar_view_working_hours');
   const isEventsEnabled = isSectionEnabled('calendar_tab_events') && isSectionEnabled('calendar_view_events');
   const isAgendaEnabled = isSectionEnabled('calendar_tab_agenda');
-  const isMyTasksEnabled = isSectionEnabled('calendar_tab_personal_tasks') && isSectionEnabled('calendar_view_personal_tasks');
+  const isTasksTabEnabled = isSectionEnabled('calendar_tab_personal_tasks');
+  const canViewPersonalTasks = isTasksTabEnabled && isSectionEnabled('calendar_view_personal_tasks');
+  const canAddPersonalTasks = canViewPersonalTasks && isSectionEnabled('calendar_add_personal_tasks');
+  const canViewOfficialDuties = isTasksTabEnabled && isSectionEnabled('calendar_view_official_duties');
+  const canManageOfficialDuties = canViewOfficialDuties && isSectionEnabled('calendar_manage_official_duties');
+
+  const isMyTasksEnabled = isTasksTabEnabled && (canViewPersonalTasks || canViewOfficialDuties);
   const canAddWorkingHours = isWorkingHoursEnabled && isSectionEnabled('calendar_add_working_hours');
   const canAddEvents = isEventsEnabled && isSectionEnabled('calendar_add_events');
-  const canAddTasks = isMyTasksEnabled && isSectionEnabled('calendar_add_personal_tasks');
+  const canAddTasks = canAddPersonalTasks || canManageOfficialDuties;
 
   const visibleTabs: CalendarTabItem[] = useMemo(() => {
     const list: CalendarTabItem[] = [];
@@ -63,7 +71,7 @@ export default function CalendarEventsHubView() {
       list.push({ id: 'AGENDA', label: t('agenda', 'Agenda'), icon: ChecklistIcon });
     }
     if (isMyTasksEnabled) {
-      list.push({ id: 'MY_TASKS', label: t('myTasks', 'My Tasks'), icon: CheckCircleIcon });
+      list.push({ id: 'MY_TASKS', label: t('tasksAndDuties', 'Tasks & Duties'), icon: CheckCircleIcon });
     }
     return list;
   }, [isWorkingHoursEnabled, isEventsEnabled, isAgendaEnabled, isMyTasksEnabled, t]);
@@ -309,7 +317,7 @@ export default function CalendarEventsHubView() {
     [activeTenantId, t]
   );
 
-  // Universal Drawer Registration for User Task Form
+  // Universal Drawer Registration for User Personal Task Form
   useDrawerRegistration(
     'user-task',
     (params: any) => {
@@ -335,14 +343,17 @@ export default function CalendarEventsHubView() {
       }
 
       const taskId = params?.get ? params.get('taskId') : params?.taskId;
-      const targetDate = (params?.get ? params.get('date') : params?.date) || new Date().toISOString().split('T')[0];
+      const targetDate =
+        (params?.get ? params.get('date') : params?.date) ||
+        new Date().toISOString().split('T')[0];
       const returnTo = params?.get ? params.get('returnTo') : params?.returnTo;
+
       let targetTask: UserPersonalTask | null = null;
-      if (taskId) {
+      if (params?.task && typeof params.task === 'object' && params.task.id) {
+        targetTask = params.task;
+      } else if (taskId) {
         const allTasks = userTaskStore.getTasks(activeTenantId, userId);
         targetTask = allTasks.find((t) => String(t.id) === String(taskId)) || null;
-      } else if (params?.task && typeof params.task === 'object') {
-        targetTask = params.task;
       }
 
       const handleReturnToDayTasks = () => {
@@ -376,8 +387,8 @@ export default function CalendarEventsHubView() {
             onQuickUpdate={(updated) => {
               userTaskStore.saveTask(activeTenantId, userId, updated);
             }}
-            onDelete={(taskId) => {
-              userTaskStore.deleteTask(activeTenantId, userId, taskId);
+            onDelete={(deletedId) => {
+              userTaskStore.deleteTask(activeTenantId, userId, deletedId);
               showToast(t('taskDeleted', 'Task removed successfully.'), 'info');
               if (returnTo === 'day-tasks') {
                 handleReturnToDayTasks();
@@ -391,6 +402,134 @@ export default function CalendarEventsHubView() {
       };
     },
     [isMyTasksEnabled, canAddTasks, activeTenantId, userId, openDrawer, closeDrawer, showToast, t]
+  );
+
+  // Universal Drawer Registration for Official Institutional Duty Form
+  useDrawerRegistration(
+    'official-duty',
+    (params: any) => {
+      // Zero-Trust Security Guard: Block official duties if duty viewing/management is disabled
+      if (!isTasksTabEnabled || (!canViewOfficialDuties && !canManageOfficialDuties)) {
+        return {
+          title: t('tasksRestricted', 'Duty Access Restricted'),
+          category: t('officialDuties', 'Official Duties'),
+          size: 'md' as const,
+          content: (
+            <AccessDeniedView
+              variant="drawer"
+              title={t('tasksLockedTitle', 'Duty Access Restricted')}
+              message={t(
+                'tasksLockedDesc',
+                'You do not have permission to view or manage official duties. Please contact your institution administrator.'
+              )}
+              sectionKey={['calendar_tab_personal_tasks', 'calendar_view_official_duties']}
+              onClose={closeDrawer}
+            />
+          ),
+        };
+      }
+
+      const targetDate =
+        (params?.get ? params.get('date') : params?.date) ||
+        new Date().toISOString().split('T')[0];
+
+      let targetDuty: any = null;
+      if (params?.duty && typeof params.duty === 'object' && params.duty.id) {
+        targetDuty = params.duty;
+      }
+
+      const isExisting = Boolean(targetDuty?.id);
+
+      if (!isExisting && !canManageOfficialDuties) {
+        return {
+          title: t('tasksRestricted', 'Duty Assignment Restricted'),
+          category: t('officialDuties', 'Official Duties'),
+          size: 'md' as const,
+          content: (
+            <AccessDeniedView
+              variant="drawer"
+              title={t('tasksLockedTitle', 'Duty Assignment Restricted')}
+              message={t(
+                'tasksLockedDesc',
+                'You do not have permission to assign new official duties. Please contact your institution administrator.'
+              )}
+              sectionKey={['calendar_tab_personal_tasks', 'calendar_manage_official_duties']}
+              onClose={closeDrawer}
+            />
+          ),
+        };
+      }
+
+      return {
+        title: isExisting ? t('officialDutyDetails', 'Duty Details') : t('assignDuty', 'Assign Duty'),
+        category: t('officialDuties', 'Official Duties'),
+        size: 'md' as const,
+        content: (
+          <OfficialDutyDrawerForm
+            key={`duty-form-${targetDuty?.id || 'new'}-${targetDate}`}
+            duty={targetDuty}
+            initialDate={targetDate}
+            canEdit={canManageOfficialDuties}
+            onSave={async (savedDuty) => {
+              try {
+                const isEdit = Boolean(savedDuty.id);
+                const url = isEdit
+                  ? `/api/v1/institutional-tasks/${savedDuty.id}/`
+                  : '/api/v1/institutional-tasks/';
+                const method = isEdit ? 'PATCH' : 'POST';
+                const res = await fetchWithAuth(url, {
+                  method,
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(savedDuty),
+                });
+                if (res.ok) {
+                  showToast(
+                    isEdit
+                      ? 'Official duty updated successfully!'
+                      : 'Official duty assigned successfully!',
+                    'success'
+                  );
+                  window.dispatchEvent(new CustomEvent('spr_institutional_duties_updated'));
+                  closeDrawer();
+                } else {
+                  showToast('Failed to save official duty.', 'error');
+                }
+              } catch {
+                showToast('Error saving official duty.', 'error');
+              }
+            }}
+            onQuickUpdate={async (updated) => {
+              try {
+                await fetchWithAuth(`/api/v1/institutional-tasks/${updated.id}/`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(updated),
+                });
+                window.dispatchEvent(new CustomEvent('spr_institutional_duties_updated'));
+              } catch {}
+            }}
+            onDelete={async (deletedId) => {
+              try {
+                const res = await fetchWithAuth(`/api/v1/institutional-tasks/${deletedId}/`, {
+                  method: 'DELETE',
+                });
+                if (res.ok) {
+                  showToast('Official duty removed successfully.', 'info');
+                  window.dispatchEvent(new CustomEvent('spr_institutional_duties_updated'));
+                  closeDrawer();
+                } else {
+                  showToast('Failed to delete official duty.', 'error');
+                }
+              } catch {
+                showToast('Error deleting duty.', 'error');
+              }
+            }}
+            onCancel={closeDrawer}
+          />
+        ),
+      };
+    },
+    [isMyTasksEnabled, canAddTasks, closeDrawer, showToast, t]
   );
 
   // Universal Drawer Registration for Day Tasks List
@@ -426,8 +565,19 @@ export default function CalendarEventsHubView() {
   const handleOpenUserTaskDrawer = useCallback(
     (task?: UserPersonalTask | null, date?: string) => {
       openDrawer('user-task', {
-        task,
-        date: date || new Date().toISOString().split('T')[0],
+        task: task?.id ? task : null,
+        date: date || task?.dueDate || new Date().toISOString().split('T')[0],
+      });
+    },
+    [openDrawer]
+  );
+
+  // Open Right Sidebar for official duty assignment or detail view
+  const handleOpenOfficialDutyDrawer = useCallback(
+    (duty?: any | null, date?: string) => {
+      openDrawer('official-duty', {
+        duty: duty?.id ? duty : null,
+        date: date || duty?.due_date || new Date().toISOString().split('T')[0],
       });
     },
     [openDrawer]
@@ -534,7 +684,15 @@ export default function CalendarEventsHubView() {
         {/* ─── 3. Reusable Master Calendar Engine or Dedicated My Tasks View ─── */}
         <div className={`w-full min-w-0 ${activeTab === 'MY_TASKS' ? 'flex-1 flex flex-col min-h-[calc(100vh-220px)]' : 'min-h-0 pb-16 sm:pb-24'}`}>
           {activeTab === 'MY_TASKS' ? (
-            <MyTasksHubView onOpenTaskDrawer={handleOpenUserTaskDrawer} canAddTasks={canAddTasks} />
+            <MyTasksHubView
+              onOpenTaskDrawer={handleOpenUserTaskDrawer}
+              onOpenDutyDrawer={handleOpenOfficialDutyDrawer}
+              canAddTasks={canAddTasks}
+              canViewPersonalTasks={canViewPersonalTasks}
+              canAddPersonalTasks={canAddPersonalTasks}
+              canViewOfficialDuties={canViewOfficialDuties}
+              canManageOfficialDuties={canManageOfficialDuties}
+            />
           ) : (
             <MasterTimeCalendar
               events={events}

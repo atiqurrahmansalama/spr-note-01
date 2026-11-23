@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PageContainer } from '@/components/layout';
+import Pagination from '@/components/ui/Pagination';
 import {
   StaffRosterHeader,
   StaffRosterToolbar,
@@ -45,6 +46,21 @@ export const TeacherStaffRosterView: React.FC = () => {
     activeFilterCount,
   } = useStaffFilter({ staffList, ranksList, departments });
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  // Reset page when filter criteria change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, roleFilter, rankFilter, deptFilter, statusFilter]);
+
+  // Paginated data subset
+  const paginatedStaff = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredStaff.slice(start, start + pageSize);
+  }, [filteredStaff, currentPage, pageSize]);
+
   // Modals for In-Page Class & Duty Assignments (Zero Right Sidebar Required)
   const [selectedTeacherForClasses, setSelectedTeacherForClasses] = useState<StaffMember | null>(null);
   const [selectedStaffForDuties, setSelectedStaffForDuties] = useState<StaffMember | null>(null);
@@ -86,7 +102,7 @@ export const TeacherStaffRosterView: React.FC = () => {
       {/* 3. Main Roster Content (Table View vs Responsive Card Grid) */}
       {displayMode === 'table' ? (
         <StaffRosterTable
-          data={filteredStaff}
+          data={paginatedStaff}
           ranksList={ranksList}
           isLoading={loading}
           onOpenClassesModal={(teacher) => setSelectedTeacherForClasses(teacher)}
@@ -95,12 +111,29 @@ export const TeacherStaffRosterView: React.FC = () => {
         />
       ) : (
         <StaffRosterCardGrid
-          data={filteredStaff}
+          data={paginatedStaff}
           ranksList={ranksList}
           isLoading={loading}
           onOpenClassesModal={(teacher) => setSelectedTeacherForClasses(teacher)}
           onOpenDutiesModal={(staff) => setSelectedStaffForDuties(staff)}
           onDeleteStaff={handleDeleteStaff}
+        />
+      )}
+
+      {/* Bottom Pagination Controls */}
+      {!loading && filteredStaff.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredStaff.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50, 100]}
+          itemLabel="staff members"
+          className="mt-5"
         />
       )}
 

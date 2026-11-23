@@ -209,6 +209,34 @@ export const userTaskStore = {
     return updated;
   },
 
+  setTaskStatus(
+    tenantId?: string,
+    userId?: string,
+    taskId?: string,
+    newStatus?: TaskStatus
+  ): UserPersonalTask | null {
+    if (!taskId || !newStatus) return null;
+    const key = getStorageKey(tenantId, userId);
+    const existing = this.getTasks(tenantId, userId);
+    const target = existing.find((t) => t.id === taskId);
+    if (!target) return null;
+
+    const updated: UserPersonalTask = {
+      ...target,
+      status: newStatus,
+      completedAt: newStatus === 'COMPLETED' ? new Date().toISOString() : undefined,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const updatedList = existing.map((t) => (t.id === taskId ? updated : t));
+    try {
+      localStorage.setItem(key, JSON.stringify(updatedList));
+    } catch {}
+
+    notify();
+    return updated;
+  },
+
   deleteTask(tenantId?: string, userId?: string, taskId?: string): boolean {
     if (!taskId) return false;
     const key = getStorageKey(tenantId, userId);

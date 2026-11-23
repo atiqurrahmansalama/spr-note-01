@@ -102,11 +102,13 @@ export const SectionTargetBar: React.FC<SectionTargetBarProps> = ({
   const activeUserName = currentUser?.name || currentUser?.first_name;
 
   const roleList: Array<{ id: string; label: string; name?: string }> = useMemo(() => {
-    return dbRoles.map((r) => ({
-      id: r.code,
-      label: r.code,
-      name: r.name,
-    }));
+    return dbRoles
+      .filter((r) => r.code?.toUpperCase() !== 'SUPER_ADMIN')
+      .map((r) => ({
+        id: r.code,
+        label: r.code,
+        name: r.name,
+      }));
   }, [dbRoles]);
 
   const academyOptions = useMemo(() => {

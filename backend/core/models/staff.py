@@ -454,3 +454,40 @@ class StaffOnboardingToken(models.Model):
     def __str__(self):
         return f"Staff Onboarding Token: {self.title} ({self.token})"
 
+
+class StaffDocument(models.Model):
+    DOC_TYPE_CHOICES = (
+        ('NID_CARD', 'National ID Card'),
+        ('RESUME', 'Resume / CV'),
+        ('EDUCATIONAL_CERTIFICATE', 'Educational Certificate'),
+        ('APPOINTMENT_LETTER', 'Appointment Letter'),
+        ('CONTRACT', 'Employment Contract'),
+        ('EXPERIENCE_CERTIFICATE', 'Experience Certificate'),
+        ('OTHER', 'Other Document'),
+    )
+    staff = models.ForeignKey(
+        'core.StaffProfile',
+        related_name='documents',
+        on_delete=models.CASCADE
+    )
+    doc_type = models.CharField(max_length=30, choices=DOC_TYPE_CHOICES, default='OTHER')
+    file = models.FileField(upload_to='staff/documents/')
+    title = models.CharField(max_length=255, blank=True, null=True)
+    created_by = models.ForeignKey(
+        'core.User',
+        on_delete=models.CASCADE,
+        related_name='created_staff_documents',
+        null=True,
+        blank=True
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+        verbose_name = "Staff Document"
+        verbose_name_plural = "Staff Documents"
+
+    def __str__(self):
+        return f"{self.title or self.get_doc_type_display()} for {self.staff.employee_id}"
+
+

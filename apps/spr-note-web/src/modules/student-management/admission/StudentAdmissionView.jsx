@@ -21,9 +21,10 @@ import {
   CloseIcon,
   ChecklistIcon,
 } from '../../../components/ui/Icons';
-import PageHeader from '../../../components/ui/PageHeader';
 import TabSwitcher from '../../../components/ui/TabSwitcher';
 import CustomButton from '../../../components/ui/CustomButton';
+import EmptyState from '../../../components/ui/EmptyState';
+import { IconButton } from '../../../components/ui/IconButton';
 import { PageContainer } from '../../../components/layout';
 import { useRightSidebar, useDrawerRegistration } from '../../../context/RightSidebarContext';
 import { useToast } from '../../../context/ToastContext';
@@ -48,28 +49,21 @@ export default function StudentAdmissionView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // Dynamic feature checks with graceful fallback
-  const isQuickEnabled = isSectionEnabled('student_quick_admission');
-  const isFullEnabled = isSectionEnabled('student_admission');
+  // Dynamic feature checks with granular section controls
+  const isAdmissionModuleEnabled = isSectionEnabled('student_admission') && isSectionEnabled('nav_student_management');
+  const isQuickEnabled = isSectionEnabled('student_admission_quick') && isSectionEnabled('student_quick_admission');
+  const isFullEnabled = isSectionEnabled('student_admission_full');
+  const isOnlineQrEnabled = isSectionEnabled('student_admission_online_qr');
+  const isApprovalsEnabled = isSectionEnabled('student_admission_pending_approvals');
   const canEditStudent = isSectionEnabled('student_roster_edit_student');
 
-  // If neither is explicitly enabled (or both are), both remain accessible for admin/roster editing
-  const canUseQuick = isQuickEnabled || (!isQuickEnabled && !isFullEnabled);
-  const canUseFull = isFullEnabled || (!isQuickEnabled && !isFullEnabled);
+  const canUseQuick = isQuickEnabled;
+  const canUseFull = isFullEnabled;
+  const canUseOnlineQr = isOnlineQrEnabled;
+  const canUseApprovals = isApprovalsEnabled;
 
   const editId = searchParams.get('edit') || searchParams.get('student_id') || searchParams.get('id');
   const rawUrlTab = searchParams.get('tab');
-
-  // If navigating directly to edit a student while edit permission is disabled, block and show standard AccessDeniedView
-  if (editId && !canEditStudent) {
-    return (
-      <AccessDeniedView
-        sectionKey="student_roster_edit_student"
-        title="Student Edit Access Restricted"
-        message="Editing student profiles has been disabled by your institution administrator. If you need to make changes to student profiles, contact your administrator."
-      />
-    );
-  }
 
   // Pending approvals counter for badge
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
@@ -90,29 +84,25 @@ export default function StudentAdmissionView() {
 
   // Compute active tab dynamically based on URL and enabled features
   const activeTab = useMemo(() => {
-    if (rawUrlTab === 'approvals') return 'approvals';
-    if (rawUrlTab === 'online_qr') return 'online_qr';
-    if (rawUrlTab === 'quick') {
-      if (canUseQuick) return 'quick';
-      if (canUseFull) return 'direct';
-    }
-    if (rawUrlTab === 'direct') {
-      if (canUseFull) return 'direct';
-      if (canUseQuick) return 'quick';
-    }
-    // No tab specified in URL
+    if (rawUrlTab === 'approvals' && canUseApprovals) return 'approvals';
+    if (rawUrlTab === 'online_qr' && canUseOnlineQr) return 'online_qr';
+    if (rawUrlTab === 'quick' && canUseQuick) return 'quick';
+    if (rawUrlTab === 'direct' && canUseFull) return 'direct';
+
+    // No tab specified in URL or default fallback
     if (editId) {
       if (canUseFull) return 'direct';
       if (canUseQuick) return 'quick';
-      return 'direct';
     }
-    // Normal registration mode
+
     if (canUseQuick) return 'quick';
     if (canUseFull) return 'direct';
-    return 'quick';
-  }, [rawUrlTab, editId, canUseQuick, canUseFull]);
+    if (canUseOnlineQr) return 'online_qr';
+    if (canUseApprovals) return 'approvals';
+    return '';
+  }, [rawUrlTab, editId, canUseQuick, canUseFull, canUseOnlineQr, canUseApprovals]);
 
-  // Tab list dynamically filtered
+  // Tab list dynamically filtered by active feature permissions
   const tabsList = useMemo(() => {
     const list = [];
     if (canUseQuick) {
@@ -121,14 +111,19 @@ export default function StudentAdmissionView() {
     if (canUseFull) {
       list.push({ id: 'direct', label: 'Full Admission Wizard', icon: AcademicCapIcon });
     }
-    list.push({ id: 'online_qr', label: 'Online QR & Link Admission', icon: QrCodeIcon });
-    list.push({
-      id: 'approvals',
-      label: pendingApprovalsCount > 0 ? `Pending Approvals (${pendingApprovalsCount})` : 'Pending Approvals',
-      icon: ChecklistIcon,
-    });
+    if (canUseOnlineQr) {
+      list.push({ id: 'online_qr', label: 'Online QR & Link Admission', icon: QrCodeIcon });
+    }
+    if (canUseApprovals) {
+      list.push({
+        id: 'approvals',
+        label: pendingApprovalsCount > 0 ? `Pending Approvals (${pendingApprovalsCount})` : 'Pending Approvals',
+        icon: ChecklistIcon,
+      });
+    }
     return list;
-  }, [canUseQuick, canUseFull, pendingApprovalsCount]);
+  }, [canUseQuick, canUseFull, canUseOnlineQr, canUseApprovals, pendingApprovalsCount]);
+
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [admittedStudent, setAdmittedStudent] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
@@ -498,23 +493,79 @@ export default function StudentAdmissionView() {
     }
   };
 
+  // Access control guards (Evaluated strictly AFTER all React hooks have executed unconditionally)
+  if (!isAdmissionModuleEnabled) {
+    return (
+      <AccessDeniedView
+        sectionKey="student_admission"
+        title="Student Admission Restricted"
+        message="Student Admission & Registration has been disabled by your institution administrator."
+      />
+    );
+  }
+
+  if (editId && !canEditStudent) {
+    return (
+      <AccessDeniedView
+        sectionKey="student_roster_edit_student"
+        title="Student Edit Access Restricted"
+        message="Editing student profiles has been disabled by your institution administrator. If you need to make changes to student profiles, contact your administrator."
+      />
+    );
+  }
+
+  if (!canUseQuick && !canUseFull && !canUseOnlineQr && !canUseApprovals) {
+    return (
+      <AccessDeniedView
+        sectionKey="student_admission"
+        title="All Admission Channels Restricted"
+        message="All student admission channels (Quick, Full Wizard, Online QR, and Approvals) have been disabled by your institution administrator."
+      />
+    );
+  }
+
+  if (rawUrlTab === 'quick' && !canUseQuick) {
+    return (
+      <AccessDeniedView
+        sectionKey="student_admission_quick"
+        title="Quick Admission Restricted"
+        message="Quick Student Admission has been disabled by your institution administrator."
+      />
+    );
+  }
+
+  if (rawUrlTab === 'direct' && !canUseFull) {
+    return (
+      <AccessDeniedView
+        sectionKey="student_admission_full"
+        title="Full Admission Wizard Restricted"
+        message="The Full Admission Wizard has been disabled by your institution administrator."
+      />
+    );
+  }
+
+  if (rawUrlTab === 'online_qr' && !canUseOnlineQr) {
+    return (
+      <AccessDeniedView
+        sectionKey="student_admission_online_qr"
+        title="Online QR & Link Admission Restricted"
+        message="Online QR Code and public link admission channels have been disabled by your institution administrator."
+      />
+    );
+  }
+
+  if (rawUrlTab === 'approvals' && !canUseApprovals) {
+    return (
+      <AccessDeniedView
+        sectionKey="student_admission_pending_approvals"
+        title="Admission Approvals Restricted"
+        message="Student admission approvals queue has been disabled by your institution administrator."
+      />
+    );
+  }
+
   return (
     <PageContainer>
-      {/* 1. Standard Page Header */}
-      <PageHeader
-        icon={editingStudent && activeTab !== 'online_qr' ? EditIcon : AcademicCapIcon}
-        title={
-          editingStudent && activeTab !== 'online_qr'
-            ? `Edit Student: ${editingStudent.name_en || editingStudent.name}`
-            : "Student Admission & Registration"
-        }
-        subtitle={
-          editingStudent && activeTab !== 'online_qr'
-            ? `Updating institutional profile and enrollment records for ${editingStudent.name_en || editingStudent.name}`
-            : "Enroll new students directly or generate online QR codes and public links for remote registration."
-        }
-      />
-
       {/* Edit Mode Notice Banner */}
       {editingStudent && activeTab !== 'online_qr' && (
         <div className="flex items-center justify-between gap-3 p-3.5 rounded-2xl theme-bg-accent-soft border theme-border shadow-2xs">
@@ -646,54 +697,48 @@ export default function StudentAdmissionView() {
         </div>
       )}
 
-      {/* TAB 2: Online QR & Link Admission Management */}
+      {/* TAB 3: Online QR & Link Admission Management */}
       {activeTab === 'online_qr' && (
         <div className="space-y-6 animate-fade-in">
           {loadingTokens ? (
-            <div className="p-12 rounded-3xl theme-bg-surface border theme-border flex flex-col items-center justify-center gap-3 text-center">
+            <div className="p-12 rounded-3xl theme-bg-surface border-0 shadow-xs flex flex-col items-center justify-center gap-3 text-center">
               <div className="w-8 h-8 rounded-full border-2 border-t-transparent theme-accent animate-spin" />
               <p className="text-xs theme-text-secondary font-medium">Loading admission campaigns...</p>
             </div>
           ) : tokens.length === 0 ? (
-            <div className="p-10 sm:p-14 rounded-3xl theme-bg-surface border theme-border flex flex-col items-center justify-center text-center space-y-4">
-              <div className="w-14 h-14 rounded-2xl theme-bg-accent-soft border theme-border flex items-center justify-center theme-accent shadow-inner shrink-0">
-                <QrCodeIcon className="w-7 h-7" />
-              </div>
-              <div className="max-w-md space-y-1">
-                <h3 className="text-base font-extrabold theme-text-primary">No Admission QR Links Generated</h3>
-                <p className="text-xs theme-text-secondary leading-relaxed">
-                  Create shareable online admission links and downloadable QR codes for applicants and guardians to register remotely.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleOpenCreateDrawer}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl theme-bg-accent font-bold text-xs theme-text-on-accent hover:opacity-90 transition cursor-pointer shadow-sm"
-              >
-                <PlusIcon className="w-4 h-4" />
-                <span>Generate First Admission QR Link</span>
-              </button>
-            </div>
+            <EmptyState
+              icon={QrCodeIcon}
+              iconVariant="accent"
+              title="No Admission QR Links Generated"
+              description="Create shareable online admission links and downloadable QR codes for applicants and guardians to register remotely."
+              action={{
+                label: "Generate First Admission QR Link",
+                icon: PlusIcon,
+                onClick: handleOpenCreateDrawer,
+                variant: "primary",
+              }}
+              variant="card"
+              className="border-0 rounded-3xl"
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {tokens.map((tokenItem) => {
-                const publicUrl = `${window.location.origin}/apply?token=${tokenItem.token}`;
                 return (
                   <div
                     key={tokenItem.id}
-                    className="p-5 sm:p-6 rounded-3xl theme-bg-surface border theme-border shadow-xs flex flex-col justify-between space-y-4 hover:border-accent transition"
+                    className="p-5 sm:p-6 rounded-3xl theme-bg-surface border-0 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition"
                   >
                     {/* Top Row: Title & Status */}
                     <div>
                       <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase theme-bg-accent-soft theme-accent border theme-border">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase theme-bg-accent-soft theme-accent border-0">
                           {tokenItem.session_year}
                         </span>
                         <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border-0 ${
                             tokenItem.is_active
-                              ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                              : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                              : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
                           }`}
                         >
                           {tokenItem.is_active ? 'Active' : 'Paused'}
@@ -709,7 +754,7 @@ export default function StudentAdmissionView() {
                     </div>
 
                     {/* Middle Metrics */}
-                    <div className="p-3.5 rounded-2xl theme-bg-sub border theme-border grid grid-cols-2 gap-2 text-center">
+                    <div className="p-3.5 rounded-2xl theme-bg-app border-0 grid grid-cols-2 gap-2 text-center">
                       <div>
                         <p className="text-[10px] theme-text-secondary uppercase font-bold">Applications</p>
                         <p className="text-base font-black theme-accent">{tokenItem.applied_count || 0}</p>
@@ -723,45 +768,48 @@ export default function StudentAdmissionView() {
                     </div>
 
                     {/* Token Code Display */}
-                    <div className="p-2.5 rounded-xl theme-bg-sub border theme-border flex items-center justify-between text-xs font-mono theme-text-secondary">
-                      <span>{tokenItem.token}</span>
-                      <button
-                        type="button"
+                    <div className="p-2.5 rounded-xl theme-bg-app border-0 flex items-center justify-between text-xs font-mono theme-text-secondary">
+                      <span className="truncate mr-2">{tokenItem.token}</span>
+                      <IconButton
+                        icon={CopyIcon}
+                        size="xs"
+                        variant="ghost"
                         onClick={() => handleCopyLink(tokenItem)}
                         title="Copy Link"
-                        className="p-1 rounded-lg hover:theme-bg-elevated theme-text-primary transition cursor-pointer"
-                      >
-                        <CopyIcon className="w-3.5 h-3.5" />
-                      </button>
+                        ariaLabel="Copy Link"
+                      />
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t theme-border">
-                      <button
+                    <div className="grid grid-cols-2 gap-2 pt-3 border-t border-black/[0.04] dark:border-white/[0.06]">
+                      <CustomButton
                         type="button"
+                        size="xs"
+                        variant="primary"
+                        icon={QrCodeIcon}
                         onClick={() => setSelectedTokenForQR(tokenItem)}
-                        className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl theme-bg-accent font-bold text-xs theme-text-on-accent hover:opacity-90 transition cursor-pointer shadow-xs"
                       >
-                        <QrCodeIcon className="w-3.5 h-3.5" />
-                        <span>View QR Card</span>
-                      </button>
+                        View QR Card
+                      </CustomButton>
 
-                      <div className="flex items-center gap-1">
-                        <button
+                      <div className="flex items-center gap-1.5">
+                        <CustomButton
                           type="button"
+                          size="xs"
+                          variant="sub"
                           onClick={() => handleToggleActive(tokenItem)}
-                          className="flex-1 py-2 px-2 rounded-xl border theme-border theme-bg-sub hover:theme-bg-elevated text-[11px] font-bold theme-text-secondary hover:theme-text-primary transition cursor-pointer text-center"
+                          className="flex-1"
                         >
                           {tokenItem.is_active ? 'Pause' : 'Resume'}
-                        </button>
-                        <button
-                          type="button"
+                        </CustomButton>
+                        <IconButton
+                          icon={TrashIcon}
+                          size="sm"
+                          variant="danger-soft"
                           onClick={() => handleDeleteToken(tokenItem)}
-                          className="p-2 rounded-xl border theme-border theme-bg-sub hover:bg-rose-500/10 text-rose-500 transition cursor-pointer"
                           title="Delete Campaign"
-                        >
-                          <TrashIcon className="w-3.5 h-3.5" />
-                        </button>
+                          ariaLabel="Delete Campaign"
+                        />
                       </div>
                     </div>
                   </div>

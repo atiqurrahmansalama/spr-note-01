@@ -264,11 +264,6 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
   useDrawerRegistration(
     "student-transfer",
     (params: any) => {
-      const isBulk = Boolean(
-        params?.isBulk ||
-        (params?.get ? params.get("isBulk") === "true" || params.get("bulk") === "true" : false)
-      );
-
       const studentId =
         params?.studentId ||
         params?.id ||
@@ -278,10 +273,26 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
         params?.student ||
         (studentId ? students.find((s) => String(s.id) === String(studentId)) : null);
 
+      // Explicit single transfer if targetStudent or studentId is provided and isBulk is not strictly true
+      const isSingleMode = Boolean(
+        (targetStudent || studentId) &&
+        params?.isBulk !== true &&
+        (!params?.get || (params.get("isBulk") !== "true" && params.get("bulk") !== "true"))
+      );
+
+      const isBulk = isSingleMode
+        ? false
+        : Boolean(
+            params?.isBulk ||
+            (params?.get ? params.get("isBulk") === "true" || params.get("bulk") === "true" : false)
+          );
+
       let targetIds: (string | number)[] = [];
-      if (Array.isArray(params?.studentIds) && params.studentIds.length > 0) {
+      if (isSingleMode && targetStudent) {
+        targetIds = [targetStudent.id];
+      } else if (Array.isArray(params?.studentIds) && params.studentIds.length > 0 && !isSingleMode) {
         targetIds = params.studentIds;
-      } else if (params?.get && (params.get("studentIds") || params.get("ids"))) {
+      } else if (params?.get && (params.get("studentIds") || params.get("ids")) && !isSingleMode) {
         const rawIds = params.get("studentIds") || params.get("ids");
         targetIds = rawIds.split(",").map((s: string) => s.trim()).filter(Boolean);
       } else if (targetStudent) {
@@ -291,10 +302,12 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
       }
 
       const targetStudents =
-        params?.selectedStudents ||
-        (targetStudent
+        isSingleMode && targetStudent
           ? [targetStudent]
-          : students.filter((s: any) => targetIds.map(String).includes(String(s.id))));
+          : params?.selectedStudents ||
+            (targetStudent
+              ? [targetStudent]
+              : students.filter((s: any) => targetIds.map(String).includes(String(s.id))));
 
       if (!canTransferStudent) {
         return {
@@ -361,7 +374,7 @@ export default function StudentDirectoryView({}: StudentDirectoryViewProps) {
     onNavigateProfile: (id) => navigate(`/students/${id}/profile`),
     onEditStudent: (student) => navigate(`/admission?edit=${student.id}`),
     onTransferStudent: (student) =>
-      openDrawer("student-transfer", { studentId: student.id, student }),
+      openDrawer("student-transfer", { studentId: student.id, student, isBulk: false, studentIds: [student.id] }),
     onUpdateStatus: (student) =>
       openDrawer("student-status", { studentId: student.id, student }),
   });

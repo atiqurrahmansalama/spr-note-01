@@ -202,6 +202,47 @@ class StaffProfileViewSet(viewsets.ModelViewSet):
             "on_leave_today": on_leave_today
         }, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'], url_path='upload-document')
+    def upload_document(self, request, pk=None):
+        staff = self.get_object()
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'No file was provided for upload.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        doc_type = request.data.get('doc_type', 'OTHER')
+        title = request.data.get('title') or file.name
+
+        from core.models.staff import StaffDocument
+        from core.serializers.staff import StaffDocumentSerializer
+        doc = StaffDocument.objects.create(
+            staff=staff,
+            file=file,
+            title=title,
+            doc_type=doc_type,
+            created_by=request.user
+        )
+        return Response(StaffDocumentSerializer(doc).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['patch', 'delete'], url_path=r'documents/(?P<doc_id>[^/.]+)')
+    def manage_document(self, request, pk=None, doc_id=None):
+        staff = self.get_object()
+        from core.models.staff import StaffDocument
+        from core.serializers.staff import StaffDocumentSerializer
+        try:
+            doc = StaffDocument.objects.get(staff=staff, id=doc_id)
+        except StaffDocument.DoesNotExist:
+            return Response({'error': 'Document not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.method == 'DELETE':
+            doc.delete()
+            return Response({'status': 'deleted', 'message': 'Document deleted successfully.'}, status=status.HTTP_200_OK)
+
+        new_title = request.data.get('title')
+        if new_title:
+            doc.title = new_title.strip()
+            doc.save(update_fields=['title'])
+        return Response(StaffDocumentSerializer(doc).data, status=status.HTTP_200_OK)
+
 
 class TeacherAssignmentViewSet(viewsets.ModelViewSet):
     queryset = TeacherAssignment.objects.filter(is_active=True).select_related(

@@ -132,15 +132,15 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
   "/student-management/departments": { title: "Department", category: "Academy" },
   "/student-management/classes": { title: "Class", category: "Academy" },
   "/student-management/groups": { title: "Group", category: "Academy" },
-  "/students": { title: "Student Roster", category: "Student" },
-  "/groups-students": { title: "Student Roster", category: "Student" },
-  "/student-roster": { title: "Student Roster", category: "Student" },
-  "/staff/roster": { title: "Teacher & Staff Roster", category: "Staff Management" },
+  "/students": { title: "Student Directory", category: "Student" },
+  "/groups-students": { title: "Student Directory", category: "Student" },
+  "/student-roster": { title: "Student Directory", category: "Student" },
+  "/staff/roster": { title: "Staff Directory", category: "Staff Management" },
   "/staff/teacher-attendance": { title: "Teacher Class Attendance", category: "Staff Management" },
   "/staff/attendance": { title: "Staff Daily Attendance", category: "Staff Management" },
   "/staff/daily-attendance": { title: "Staff Daily Attendance", category: "Staff Management" },
   "/staff/onboarding": { title: "Staff Onboarding", category: "Staff Management" },
-  "/staff": { title: "Teacher & Staff Roster", category: "Staff Management" },
+  "/staff": { title: "Staff Directory", category: "Staff Management" },
   "/print-studio": { title: "DocLab Studio", category: "DocLab" },
   "/finance": { title: "Finance & Accounts", category: "Finance" },
   "/finance/overview": { title: "Finance Overview", category: "Finance" },
@@ -377,9 +377,9 @@ export function resolveRouteMeta(pathname: string, search: string = ""): RouteMe
     meta = { title: "Classes & Sections", subCategory: "Classes & Groups", category: "Academy" };
   } else if (!meta) {
     if (/^\/students\/[^/]+/.test(currentPath)) {
-      meta = { title: "Student Profile", subCategory: "Student Roster", category: "Student" };
+      meta = { title: "Student Profile", subCategory: "Student Directory", category: "Student" };
     } else if (/^\/staff\/[^/]+/.test(currentPath)) {
-      meta = { title: "Staff Profile", subCategory: "Teacher & Staff Roster", category: "Staff Management" };
+      meta = { title: "Staff Profile", subCategory: "Staff Directory", category: "Staff Management" };
     } else {
       meta = { title: "Navigation View", category: "Navigation" };
     }

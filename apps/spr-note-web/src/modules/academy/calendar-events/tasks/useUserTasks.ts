@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTenant } from '../../../../context/TenantContext';
 import { useAuth } from '../../../../context/AuthContext';
 import { userTaskStore } from './userTaskStore';
-import type { UserPersonalTask } from '../types';
+import type { UserPersonalTask, TaskStatus } from '../types';
 
 export function useUserTasks() {
   const { activeTenantId } = useTenant();
@@ -44,6 +44,13 @@ export function useUserTasks() {
     [activeTenantId, userId]
   );
 
+  const setTaskStatus = useCallback(
+    (taskId: string, status: TaskStatus) => {
+      return userTaskStore.setTaskStatus(activeTenantId, userId, taskId, status);
+    },
+    [activeTenantId, userId]
+  );
+
   const deleteTask = useCallback(
     (taskId: string) => {
       return userTaskStore.deleteTask(activeTenantId, userId, taskId);
@@ -74,6 +81,7 @@ export function useUserTasks() {
     metrics,
     saveTask,
     toggleTaskStatus,
+    setTaskStatus,
     deleteTask,
     toggleSubtask,
     getTasksForDate,

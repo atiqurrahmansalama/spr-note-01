@@ -228,6 +228,7 @@ router.register(r'staff', StaffProfileViewSet, basename='staff-profile')
 # Enterprise Attendance, Calendar & Task Ecosystem Routers
 router.register(r'calendar/events', CalendarEventViewSet, basename='calendar-events')
 router.register(r'calendar/tasks', InstitutionalTaskViewSet, basename='calendar-tasks')
+router.register(r'institutional-tasks', InstitutionalTaskViewSet, basename='institutional-tasks')
 router.register(r'attendance/slots', AttendanceSlotViewSet, basename='attendance-slots')
 router.register(r'attendance/period-slots', DynamicPeriodSlotViewSet, basename='attendance-period-slots')
 router.register(r'attendance/routines', TeacherRoutineScheduleViewSet, basename='attendance-routines')

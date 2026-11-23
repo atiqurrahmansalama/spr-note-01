@@ -35,6 +35,7 @@ export default function MasterTimeCalendar({
   isHijriEnabled: propIsHijriEnabled = undefined,
   displayMode: propDisplayMode,
   initialDisplayMode,
+  hideControlBar = false,
   hideCategorySelector = false,
   hideSearch = false,
   hideViewModeToggle = false,
@@ -248,29 +249,31 @@ export default function MasterTimeCalendar({
   return (
     <div className={`flex flex-col w-full min-w-0 @container ${className}`}>
       {/* ─── 1. Control Bar Toolbar ─── */}
-      <CalendarControlBar
-        viewMode={viewMode}
-        displayMode={displayMode}
-        viewYear={viewYear}
-        viewMonth={viewMonth}
-        hijriMonthHeader={hijriMonthHeader}
-        isHijriEnabled={isHijriEnabled}
-        shouldShowTodayButton={shouldShowTodayButton}
-        showPersonalTasks={showPersonalTasks}
-        showPersonalTasksToggle={isMyTasksSectionEnabled}
-        searchQuery={searchQuery}
-        filteredEventsCount={filteredEvents.length}
-        embeddedSurface={embeddedSurface}
-        hideViewModeToggle={hideViewModeToggle}
-        hideSearch={hideSearch}
-        actionMenuItems={actionMenuItems}
-        onPrevMonth={handlePrevMonth}
-        onNextMonth={handleNextMonth}
-        onJumpToday={handleJumpToday}
-        onSetDisplayMode={handleSetDisplayMode}
-        onTogglePersonalTasks={() => setShowPersonalTasks((prev) => !prev)}
-        onSearchChange={setSearchQuery}
-      />
+      {!hideControlBar && (
+        <CalendarControlBar
+          viewMode={viewMode}
+          displayMode={displayMode}
+          viewYear={viewYear}
+          viewMonth={viewMonth}
+          hijriMonthHeader={hijriMonthHeader}
+          isHijriEnabled={isHijriEnabled}
+          shouldShowTodayButton={shouldShowTodayButton}
+          showPersonalTasks={showPersonalTasks}
+          showPersonalTasksToggle={isMyTasksSectionEnabled}
+          searchQuery={searchQuery}
+          filteredEventsCount={filteredEvents.length}
+          embeddedSurface={embeddedSurface}
+          hideViewModeToggle={hideViewModeToggle}
+          hideSearch={hideSearch}
+          actionMenuItems={actionMenuItems}
+          onPrevMonth={handlePrevMonth}
+          onNextMonth={handleNextMonth}
+          onJumpToday={handleJumpToday}
+          onSetDisplayMode={handleSetDisplayMode}
+          onTogglePersonalTasks={() => setShowPersonalTasks((prev) => !prev)}
+          onSearchChange={setSearchQuery}
+        />
+      )}
 
       {/* ─── 2. Calendar Main Content Area ─── */}
       <div

@@ -5,7 +5,7 @@ export const navigation = {
   admission: 'القبول والتسجيل',
   sessionsComments: 'الجلسات والملاحظات',
   staffManagement: 'إدارة الكادر',
-  staffRoster: 'قائمة الموظفين',
+  staffRoster: 'دليل الموظفين',
   teacherAttendance: 'حضور المعلمين',
   staffDailyAttendance: 'الحضور اليومي للموظفين',
   staffOnboarding: 'انضمام الموظفين',

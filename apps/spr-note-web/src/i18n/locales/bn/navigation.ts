@@ -5,7 +5,7 @@ export const navigation = {
   admission: 'ভর্তি প্রক্রিয়া',
   sessionsComments: 'সেশন ও মন্তব্য',
   staffManagement: 'স্টাফ ম্যানেজমেন্ট',
-  staffRoster: 'স্টাফ তালিকা',
+  staffRoster: 'স্টাফ ডিরেক্টরি',
   teacherAttendance: 'শিক্ষক উপস্থিতি',
   staffDailyAttendance: 'দৈনিক স্টাফ উপস্থিতি',
   staffOnboarding: 'স্টাফ অন্তর্ভুক্তি',

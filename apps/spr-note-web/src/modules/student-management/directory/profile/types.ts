@@ -13,6 +13,7 @@ export interface StudentTimelineRecord {
   id: string | number;
   title?: string;
   action?: string;
+  module?: string;
   description?: string;
   created_at?: string;
   timestamp?: string;
@@ -22,6 +23,7 @@ export interface StudentTimelineRecord {
   class_name?: string;
   section_name?: string;
   group_name?: string;
+  icon?: React.ComponentType<{ className?: string }>;
   [key: string]: any;
 }
 

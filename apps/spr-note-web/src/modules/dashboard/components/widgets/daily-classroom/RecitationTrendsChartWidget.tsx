@@ -11,6 +11,8 @@ import type { ActionMenuItem } from '../../../../../components/ui/ActionMenu';
 export interface RecitationTrendsChartWidgetProps {
   reports?: any[];
   defaultMetric?: MetricType;
+  title?: string;
+  subtitle?: string;
   className?: string;
 }
 
@@ -23,6 +25,8 @@ export interface RecitationTrendsChartWidgetProps {
 export default function RecitationTrendsChartWidget({
   reports: propReports,
   defaultMetric = 'combined',
+  title = 'Daily Recitation Progress & Trends',
+  subtitle = '7-Day chronological recitation performance, volume & accuracy',
   className = '',
 }: RecitationTrendsChartWidgetProps) {
   const navigate = useNavigate();
@@ -65,6 +69,8 @@ export default function RecitationTrendsChartWidget({
         maxMetricValue={analytics.maxMetricValue}
         totalReports={analytics.totalReports}
         extraMenuItems={extraMenuItems}
+        title={title}
+        subtitle={subtitle}
         className="h-full flex-1"
       />
     </div>

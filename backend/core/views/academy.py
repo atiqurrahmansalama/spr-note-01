@@ -653,6 +653,16 @@ class InstitutionalTaskViewSet(viewsets.ModelViewSet):
         if category and category != 'ALL':
             base_qs = base_qs.filter(category=category.upper())
 
+        assigned_to = self.request.query_params.get('assigned_to')
+        is_admin_user = user.is_superuser or getattr(user, 'user_type', '').upper() in ['SUPER_ADMIN', 'ADMIN']
+        if assigned_to:
+            if assigned_to == 'me':
+                base_qs = base_qs.filter(assigned_to=user)
+            elif assigned_to != 'ALL':
+                base_qs = base_qs.filter(assigned_to_id=assigned_to)
+        elif not is_admin_user:
+            base_qs = base_qs.filter(Q(assigned_to=user) | Q(assigned_to__isnull=True))
+
         return base_qs.order_by('is_completed', 'due_date', '-created_at')
 
     def perform_create(self, serializer):

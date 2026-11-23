@@ -10,6 +10,7 @@ import {
 } from '../../../../../components/ui/Icons';
 import ActionMenu from '../../../../../components/ui/ActionMenu';
 import { StudentFullProfile, StudentVaultDocument } from '../types';
+import { formatDisplayDate } from '../../../../../utils/dateUtils';
 import {
   getDocUrl,
   getDocExtension,
@@ -194,7 +195,7 @@ export const StudentDocumentsTab: React.FC<StudentDocumentsTabProps> = ({
                           {doc.uploaded_at && (
                             <>
                               <span>•</span>
-                              <span>{doc.uploaded_at.split('T')[0]}</span>
+                              <span>{formatDisplayDate(doc.uploaded_at)}</span>
                             </>
                           )}
                         </div>

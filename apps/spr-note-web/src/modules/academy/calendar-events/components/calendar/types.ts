@@ -40,6 +40,7 @@ export interface MasterTimeCalendarProps {
   viewMode?: 'month' | 'list';
   displayMode?: CalendarDisplayMode;
   initialDisplayMode?: CalendarDisplayMode;
+  hideControlBar?: boolean;
   hideCategorySelector?: boolean;
   hideSearch?: boolean;
   hideViewModeToggle?: boolean;

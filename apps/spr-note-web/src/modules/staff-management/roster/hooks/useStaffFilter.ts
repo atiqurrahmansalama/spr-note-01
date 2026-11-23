@@ -105,7 +105,7 @@ export function useStaffFilter({ staffList, ranksList, departments }: UseStaffFi
       { value: 'ALL', label: 'All Ranks / Designations' },
       ...ranksList.map((r) => ({
         value: r.name,
-        label: `[Rank ${r.order}] ${r.name_bn ? `${r.name_bn} (${r.name})` : r.name}`,
+        label: `[Rank ${r.order}] ${r.name}`,
       })),
     ],
     [ranksList]

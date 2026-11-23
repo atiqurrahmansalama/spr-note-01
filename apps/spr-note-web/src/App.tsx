@@ -190,7 +190,8 @@ export default function App(): React.ReactElement {
                 <Route path="/staff/onboarding" element={<FeatureGuard sectionKey="staff_onboarding"><StaffOnboardingView /></FeatureGuard>} />
                 <Route path="/staff-onboarding" element={<Navigate to="/staff/onboarding" replace />} />
                 <Route path="/staff" element={<Navigate to="/staff/roster" replace />} />
-                <Route path="/staff/:id" element={<FeatureGuard sectionKey="staff_roster"><StaffProfileDetailView /></FeatureGuard>} />
+                <Route path="/staff/:id" element={<FeatureGuard sectionKey={["staff_roster", "staff_roster_view_profile"]} matchMode="any"><StaffProfileDetailView /></FeatureGuard>} />
+                <Route path="/staff/:id/profile" element={<FeatureGuard sectionKey={["staff_roster", "staff_roster_view_profile"]} matchMode="any"><StaffProfileDetailView /></FeatureGuard>} />
                 <Route path="/print-studio" element={<FeatureGuard sectionKey="nav_print_studio"><Suspense fallback={<RouteLoadingFallback title="Loading DocLab Studio..." subtitle="Preparing workspace and layout engine..." />}><PrintStudioHubView /></Suspense></FeatureGuard>} />
                 
                 {/* Student Attendance Multi-Dimensional Routes */}

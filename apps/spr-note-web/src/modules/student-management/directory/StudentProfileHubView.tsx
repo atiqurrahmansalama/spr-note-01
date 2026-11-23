@@ -45,8 +45,7 @@ export const StudentProfileHubView: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>('personal');
 
-  // Photo & Document Upload States
-  const [uploadingPhoto, setUploadingPhoto] = useState<boolean>(false);
+  // Document Upload State
   const [uploadingDoc, setUploadingDoc] = useState<boolean>(false);
 
   // Modals state
@@ -127,34 +126,6 @@ export const StudentProfileHubView: React.FC = () => {
       console.warn('Direct blob download failed, opening in new tab', e);
     }
     window.open(url, '_blank');
-  };
-
-  // Upload student photo
-  const handleProfilePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !id) return;
-
-    const formData = new FormData();
-    formData.append('photo', file);
-
-    setUploadingPhoto(true);
-    try {
-      const res = await fetchWithAuth(`/api/v1/students/${id}/`, {
-        method: 'PATCH',
-        body: formData,
-      });
-
-      if (res.ok) {
-        showToast('Profile photo updated successfully!', 'success');
-        loadStudentProfile(false);
-      } else {
-        showToast('Failed to update profile photo.', 'error');
-      }
-    } catch {
-      showToast('Network error uploading photo.', 'error');
-    } finally {
-      setUploadingPhoto(false);
-    }
   };
 
   // Upload document to vault
@@ -313,7 +284,7 @@ export const StudentProfileHubView: React.FC = () => {
       ? [{ id: 'quran', label: 'Quran & Progress', icon: BookOpenIcon }]
       : []),
     ...(isPersonalTabEnabled
-      ? [{ id: 'personal', label: 'Personal & Family', icon: StudentIcon }]
+      ? [{ id: 'personal', label: 'Personal Information', icon: StudentIcon }]
       : []),
     ...(isDocumentsTabEnabled
       ? [
@@ -383,10 +354,8 @@ export const StudentProfileHubView: React.FC = () => {
         {/* 1. Hero Profile Card (Borderless Soft-Surface Standard) */}
         <StudentProfileHero
           student={student}
-          uploadingPhoto={uploadingPhoto}
           canEditStudent={canEditStudent}
           canTransferStudent={canTransferStudent}
-          onPhotoUpload={handleProfilePhotoUpload}
           onOpenQrModal={() => setIsQrModalOpen(true)}
           onOpenTransferModal={() => openDrawer('student-transfer', { studentId: student.id, student })}
         />

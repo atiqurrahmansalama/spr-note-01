@@ -48,12 +48,21 @@ export interface GeneralDetail {
 export interface StaffMember {
   id: string;
   user?: number | string | null;
-  user_name?: string;
+  name?: string;
   name_en?: string;
+  name_bn?: string;
+  user_name?: string;
   bangla_name?: string;
   phone_number?: string;
+  user_phone?: string;
   email?: string;
+  user_email?: string;
   avatar?: string;
+  avatar_url?: string;
+  user_avatar?: string;
+  photo?: string;
+  documents?: any[];
+  timeline?: any[];
   institution?: number | string;
   employee_id: string;
   staff_type: StaffType;
@@ -145,6 +154,8 @@ export interface StaffAttendanceRecord {
   date: string;
   in_time?: string | null;
   out_time?: string | null;
+  check_in_time?: string | null;
+  check_out_time?: string | null;
   status: StaffAttendanceStatus | string;
   device_ip?: string;
   source?: string;

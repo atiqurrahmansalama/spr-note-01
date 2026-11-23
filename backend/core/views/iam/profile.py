@@ -108,6 +108,8 @@ class UserProfileView(APIView):
             'is_staff': getattr(user, 'is_staff', False) or bool(staff_profile),
             'is_superuser': user.is_superuser,
             'avatar_url': user.avatar_url or "",
+            'avatar': user.avatar_url or "",
+            'photo': user.avatar_url or "",
             'assigned_group': user.assigned_group or "",
             'is_email_verified': user.is_email_verified,
             'is_2fa_enabled': getattr(user, 'is_2fa_enabled', False),

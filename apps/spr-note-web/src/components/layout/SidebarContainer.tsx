@@ -275,7 +275,7 @@ function createMenuItems(dashboardRoleSlug: string): SidebarMenuItem[] {
       hasSub: true,
       key: "nav_student_management",
       subItems: [
-        { id: "Student Roster", name: "Student Roster", i18nKey: "studentDirectory", path: "/students", matchPaths: ["/students", "/student-roster", "/groups-students"], Icon: StudentIcon, key: "student_roster" },
+        { id: "Student Directory", name: "Student Directory", i18nKey: "studentDirectory", path: "/students", matchPaths: ["/students", "/student-roster", "/groups-students"], Icon: StudentIcon, key: "student_roster" },
         { id: "Residential Attendance", name: "Residential Attendance", i18nKey: "residentialAttendance", path: "/attendance/students/residential", matchPaths: ["/attendance/students/residential"], Icon: TimerIcon, key: "residential_attendance" },
         { id: "Admission", name: "Admission", i18nKey: "admission", path: "/admission", matchPaths: ["/admission", "/short-admission", "/admission/short"], Icon: AdmissionIcon, key: "student_admission" },
       ]
@@ -288,7 +288,7 @@ function createMenuItems(dashboardRoleSlug: string): SidebarMenuItem[] {
       hasSub: true,
       key: "nav_staff_management",
       subItems: [
-        { id: "Teacher & Staff Roster", name: "Teacher & Staff Roster", i18nKey: "staffRoster", path: "/staff/roster", matchPaths: ["/staff/roster"], Icon: TeacherIcon, key: "staff_roster" },
+        { id: "Staff Directory", name: "Staff Directory", i18nKey: "staffRoster", path: "/staff/roster", matchPaths: ["/staff/roster", "/staff"], Icon: TeacherIcon, key: "staff_roster" },
         { id: "Teacher Class Attendance", name: "Teacher Class Attendance", i18nKey: "teacherAttendance", path: "/staff/teacher-attendance", matchPaths: ["/staff/teacher-attendance"], Icon: ClassIcon, key: "teacher_class_attendance" },
         { id: "Staff Daily Attendance", name: "Staff Daily Attendance", i18nKey: "staffDailyAttendance", path: "/staff/attendance", matchPaths: ["/staff/attendance"], Icon: DutyIcon, key: "staff_daily_attendance" },
         { id: "Staff Onboarding", name: "Staff Onboarding", i18nKey: "staffOnboarding", path: "/staff/onboarding", matchPaths: ["/staff/onboarding"], Icon: AdmissionIcon, key: "staff_onboarding" },

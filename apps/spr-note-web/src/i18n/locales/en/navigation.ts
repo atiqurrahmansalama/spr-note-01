@@ -5,7 +5,7 @@ export const navigation = {
   admission: 'Admission',
   sessionsComments: 'Sessions & Comments',
   staffManagement: 'Staff Management',
-  staffRoster: 'Staff Roster',
+  staffRoster: 'Staff Directory',
   teacherAttendance: 'Teacher Attendance',
   staffDailyAttendance: 'Staff Daily Attendance',
   staffOnboarding: 'Staff Onboarding',

@@ -5,7 +5,7 @@ export const navigation = {
   admission: 'داخلہ',
   sessionsComments: 'سیشنز اور ریمارکس',
   staffManagement: 'سٹاف مینجمنٹ',
-  staffRoster: 'سٹاف لسٹ',
+  staffRoster: 'سٹاف ڈائرکٹری',
   teacherAttendance: 'اساتذہ حاضری',
   staffDailyAttendance: 'روزانہ سٹاف حاضری',
   staffOnboarding: 'سٹاف شمولیت',

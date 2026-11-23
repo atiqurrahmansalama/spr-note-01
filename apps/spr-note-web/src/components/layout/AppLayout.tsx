@@ -477,7 +477,7 @@ export default function AppLayout() {
                     category={rightSidebarConfig?.category || "Action Panel"}
                     size={rightSidebarConfig?.size || "md"}
                     width={undefined}
-                    onClose={closeRightSidebar}
+                    onClose={() => closeRightSidebar(false)}
                     onBack={rightSidebarConfig?.onBack}
                     headerRight={rightSidebarConfig?.headerRight}
                     footer={rightSidebarConfig?.footer}
@@ -520,7 +520,7 @@ export default function AppLayout() {
                   category={rightSidebarConfig?.category || "Action Panel"}
                   size={rightSidebarConfig?.size || "md"}
                   width={drawerWidth}
-                  onClose={closeRightSidebar}
+                  onClose={() => closeRightSidebar(false)}
                   onBack={rightSidebarConfig?.onBack}
                   headerRight={rightSidebarConfig?.headerRight}
                   footer={rightSidebarConfig?.footer}

@@ -262,24 +262,41 @@ class IsStaffSelfOrAdmin(BasePermission):
         if not request.user or not request.user.is_authenticated:
             return False
 
-        # Super Admin / Staff Admin bypass
-        if request.user.is_superuser or getattr(request.user, 'user_type', '').upper() in ['SUPER_ADMIN', 'ADMIN']:
-            if getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN' or request.user.is_superuser:
+        # Super Admin / Superuser bypass
+        if request.user.is_superuser or getattr(request.user, 'user_type', '').upper() == 'SUPER_ADMIN':
+            return True
+
+        user_inst = getattr(request.user, 'institution_id', None)
+        if not user_inst and hasattr(request.user, 'staff_profile') and request.user.staff_profile:
+            user_inst = request.user.staff_profile.institution_id
+
+        obj_inst = getattr(obj, 'institution_id', None)
+        if not obj_inst and hasattr(obj, 'staff') and obj.staff:
+            obj_inst = getattr(obj.staff, 'institution_id', None)
+        if not obj_inst and hasattr(obj, 'teacher') and obj.teacher:
+            obj_inst = getattr(obj.teacher, 'institution_id', None)
+
+        # Allow safe GET/HEAD/OPTIONS requests for colleagues within the same institution
+        if request.method in SAFE_METHODS:
+            if user_inst and obj_inst and str(user_inst) == str(obj_inst):
                 return True
-            user_inst = getattr(request.user, 'institution_id', None)
-            obj_inst = getattr(obj, 'institution_id', None)
-            if not obj_inst and hasattr(obj, 'staff'):
-                obj_inst = getattr(obj.staff, 'institution_id', None)
-            if not obj_inst and hasattr(obj, 'teacher'):
-                obj_inst = getattr(obj.teacher, 'institution_id', None)
+            if hasattr(obj, 'user') and obj.user == request.user:
+                return True
+            if hasattr(obj, 'staff') and getattr(obj.staff, 'user', None) == request.user:
+                return True
+            if hasattr(obj, 'teacher') and getattr(obj.teacher, 'user', None) == request.user:
+                return True
+
+        # Mutation operations (POST, PUT, PATCH, DELETE) require Admin or Self
+        if getattr(request.user, 'user_type', '').upper() in ['ADMIN', 'DIRECTOR', 'HEADMASTER', 'PRINCIPAL']:
             return bool(user_inst and obj_inst and str(user_inst) == str(obj_inst))
 
-        # Check self match
+        # Check self match for mutations
         if hasattr(obj, 'user') and obj.user == request.user:
             return True
-        if hasattr(obj, 'staff') and obj.staff.user == request.user:
+        if hasattr(obj, 'staff') and getattr(obj.staff, 'user', None) == request.user:
             return True
-        if hasattr(obj, 'teacher') and obj.teacher.user == request.user:
+        if hasattr(obj, 'teacher') and getattr(obj.teacher, 'user', None) == request.user:
             return True
 
         return False

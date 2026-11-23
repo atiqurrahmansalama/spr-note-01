@@ -211,7 +211,7 @@ export default function RightSidebarPanel({
               icon={CloseIcon}
               size="sm"
               variant="sub"
-              onClick={onClose}
+              onClick={() => onClose && onClose()}
               ariaLabel="Close Panel"
               title="Close Panel (Esc)"
               className="hover:!text-rose-400 dark:hover:!text-rose-400/90 hover:!border-rose-400/20 hover:!bg-rose-500/[0.08] active:!bg-rose-500/[0.14]"

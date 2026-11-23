@@ -8,7 +8,7 @@ export const WIDGET_SOURCE_PREREQUISITES: Record<string, { label: string; sectio
   dashboard_widget_working_hours: { label: 'Working Hours', sectionKey: 'calendar_tab_working_hours' },
   dashboard_widget_academic_events: { label: 'Academic Events', sectionKey: 'calendar_tab_events' },
   dashboard_widget_agenda_schedule: { label: 'Agenda', sectionKey: 'calendar_tab_agenda' },
-  dashboard_widget_personal_tasks: { label: 'My Tasks', sectionKey: 'calendar_tab_personal_tasks' },
+  dashboard_widget_personal_tasks: { label: 'Tasks & Duties', sectionKey: 'calendar_tab_personal_tasks' },
   dashboard_widget_timetable_schedule: { label: 'Period Slots', sectionKey: 'class_period_slots' },
   dashboard_widget_attendance_pulse: { label: 'Attendance', sectionKey: 'monthly_attendance_matrix' },
   dashboard_widget_recitation_kpis: { label: 'Daily Classroom', sectionKey: 'progress_management' },

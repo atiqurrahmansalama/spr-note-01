@@ -13,6 +13,7 @@ import {
 import DataCardGrid from '@/components/ui/DataCardGrid';
 import ActionMenu from '@/components/ui/ActionMenu';
 import { useStaffTranslation } from '../../locales';
+import { formatEnglishDesignation } from '../utils/designationUtils';
 import type { StaffMember, StaffRankItem } from '../../types';
 
 interface StaffRosterCardGridProps {
@@ -60,19 +61,6 @@ export const StaffRosterCardGrid: React.FC<StaffRosterCardGridProps> = ({
       icon: DutyIcon,
       onClick: () => onOpenDutiesModal(s),
     },
-    ...(s.phone_number || s.emergency_contact
-      ? [
-          {
-            label: t('whatsappMessage', 'WhatsApp Message'),
-            icon: WhatsAppIcon,
-            onClick: () => {
-              const phoneStr = s.phone_number || s.emergency_contact || '';
-              const num = phoneStr.replace(/[^\d]/g, '');
-              window.open(`https://wa.me/${num}`, '_blank');
-            },
-          },
-        ]
-      : []),
     { divider: true },
     {
       label: t('deleteRecord', 'Delete Record'),
@@ -94,10 +82,9 @@ export const StaffRosterCardGrid: React.FC<StaffRosterCardGridProps> = ({
         const initial = staffName ? staffName.charAt(0).toUpperCase() : 'S';
         const phone = s.phone_number || s.emergency_contact;
         const assignCount = s.assignments_count || 0;
-        const matchedRank = ranksList.find(
-          (r) => r.name === s.designation || r.name_bn === s.designation || r.code === s.designation
-        );
-        const designationTitle = matchedRank?.name || s.designation || 'Staff';
+        const designationTitle = formatEnglishDesignation(s.designation, ranksList);
+
+        const avatarSrc = s.avatar || s.user_avatar || s.avatar_url || (s as any).photo;
 
         return (
           <div
@@ -109,9 +96,9 @@ export const StaffRosterCardGrid: React.FC<StaffRosterCardGridProps> = ({
             <div className="flex items-start justify-between gap-3 border-0">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-2xl theme-bg-accent-soft text-xs font-bold theme-accent flex items-center justify-center shrink-0 border-0 shadow-xs">
-                  {s.avatar ? (
+                  {avatarSrc ? (
                     <img
-                      src={s.avatar}
+                      src={avatarSrc}
                       alt={staffName}
                       className="w-full h-full object-cover rounded-2xl"
                     />

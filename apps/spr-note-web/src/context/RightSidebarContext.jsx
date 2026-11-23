@@ -66,6 +66,9 @@ export function saveDrawerWidthToStorage(drawerKey, width) {
 // Global registry for drawer renderers
 const drawerRegistry = new Map();
 
+// Global active drawer ref accessible synchronously across hooks
+const activeDrawerRef = { current: null };
+
 /**
  * Helper to update URL search parameters without triggering a hard page refresh
  */
@@ -75,7 +78,12 @@ function updateUrlParams(updater, notifyRouter = false) {
     const prevHref = window.location.href;
     const url = new URL(prevHref);
     updater(url.searchParams);
-    const nextHref = url.toString();
+    
+    // Construct clean URL: if no search parameters remain, strip the '?' entirely
+    const searchStr = url.searchParams.toString();
+    const cleanSearch = searchStr ? `?${searchStr}` : '';
+    const nextHref = `${url.origin}${url.pathname}${cleanSearch}${url.hash || ''}`;
+    
     window.history.replaceState(window.history.state || {}, '', nextHref);
     if (notifyRouter && nextHref !== prevHref) {
       window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
@@ -173,12 +181,24 @@ export function RightSidebarProvider({ children }) {
   const configRef = useRef(null);
   configRef.current = rightSidebarConfig;
 
-  const closeRightSidebar = useCallback((skipUrlClean = false) => {
+  const closeRightSidebar = useCallback((optionsOrSkip = false) => {
     const prevConfig = configRef.current;
+    // Strictly require boolean true to skip URL cleaning; ignore React synthetic mouse events or non-boolean truthy values
+    const skipUrlClean = optionsOrSkip === true;
+
+    activeDrawerRef.current = null;
     configRef.current = null;
     setRightSidebarConfig(null);
 
     if (!skipUrlClean) {
+      if (typeof window !== 'undefined' && window.history.state?.sprDrawer) {
+        try {
+          const nextState = { ...(window.history.state || {}) };
+          delete nextState.sprDrawer;
+          window.history.replaceState(nextState, '', window.location.href);
+        } catch {}
+      }
+
       updateUrlParams((params) => {
         const drawerKeysToRemove = [
           'drawer',
@@ -193,6 +213,9 @@ export function RightSidebarProvider({ children }) {
           'classId',
           'type',
           'studentId',
+          'student_id',
+          'transferId',
+          'transfer_id',
           'bookId',
           'bookName',
           'subjectName',
@@ -200,17 +223,15 @@ export function RightSidebarProvider({ children }) {
           'startUnit',
           'endUnit',
           'slotId',
+          'isBulk',
+          'bulk',
+          'studentIds',
+          'student_ids',
+          'ids',
+          'selectedIds',
         ];
         drawerKeysToRemove.forEach((key) => params.delete(key));
       }, true);
-
-      if (typeof window !== 'undefined' && window.history.state?.sprDrawer) {
-        try {
-          const nextState = { ...(window.history.state || {}) };
-          delete nextState.sprDrawer;
-          window.history.replaceState(nextState, '', window.location.href);
-        } catch {}
-      }
     }
 
     if (prevConfig?.onClose) {
@@ -228,6 +249,8 @@ export function RightSidebarProvider({ children }) {
       return;
     }
     const { title, content, size = 'md', width, onClose, ownerId, drawerKey, syncUrl = true, ...restConfig } = config;
+
+    activeDrawerRef.current = drawerKey || 'open';
 
     // Retrieve per-drawer customized saved width from localStorage if available
     const resolvedWidth = getSavedDrawerWidth(drawerKey, width || size || 'md');
@@ -275,7 +298,11 @@ export function RightSidebarProvider({ children }) {
     if (syncUrl) {
       pushUrlParams((params) => {
         // Clear previous drawer-specific params
-        const drawerParamKeys = ['id', 'mode', 'tokenId', 'studentId', 'bookId', 'bookName', 'subjectName', 'lessonTitle', 'startUnit', 'endUnit', 'slotId', 'category', 'eventId', 'date'];
+        const drawerParamKeys = [
+          'id', 'mode', 'tokenId', 'studentId', 'bookId', 'bookName', 'subjectName',
+          'lessonTitle', 'startUnit', 'endUnit', 'slotId', 'category', 'eventId', 'date',
+          'isBulk', 'bulk', 'studentIds', 'ids', 'selectedIds'
+        ];
         drawerParamKeys.forEach((k) => params.delete(k));
 
         params.set('drawer', drawerKey);
@@ -474,27 +501,28 @@ export function useDrawerRegistration(drawerKey, rendererFn, dependencies = []) 
 
   // Update open drawer content when asynchronous dependencies (e.g. classes/teachers) resolve
   // ONLY if this specific drawer is actively open right now
-  const activeDrawerKey = rightSidebarConfig?.drawerKey;
   const isUpdatingRef = useRef(false);
 
   useEffect(() => {
     if (!drawerKey) return;
-    if (activeDrawerKey === drawerKey) {
-      if (isUpdatingRef.current) return;
-      const currentParams = getUrlParams();
-      if (drawerKey === 'notifications' && !currentParams.get('id')) return;
-      const config = rendererRef.current ? rendererRef.current(createEnrichedDrawerParams(currentParams)) : null;
-      if (config) {
-        isUpdatingRef.current = true;
-        openRightSidebar({
-          ...config,
-          drawerKey,
-        });
-        const timer = setTimeout(() => {
-          isUpdatingRef.current = false;
-        }, 100);
-        return () => clearTimeout(timer);
-      }
+    // Guard: Only update if this drawer is actively open right now
+    if (activeDrawerRef.current !== drawerKey) return;
+    if (isUpdatingRef.current) return;
+    const currentParams = getUrlParams();
+    if (drawerKey === 'notifications' && !currentParams.get('id')) return;
+    if (currentParams.get('drawer') !== drawerKey) return;
+
+    const config = rendererRef.current ? rendererRef.current(createEnrichedDrawerParams(currentParams)) : null;
+    if (config) {
+      isUpdatingRef.current = true;
+      openRightSidebar({
+        ...config,
+        drawerKey,
+      });
+      const timer = setTimeout(() => {
+        isUpdatingRef.current = false;
+      }, 100);
+      return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, dependencies);

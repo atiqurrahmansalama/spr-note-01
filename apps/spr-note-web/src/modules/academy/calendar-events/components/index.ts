@@ -4,9 +4,15 @@ export { default as TimeScheduleDrawerForm, EVENT_COLORS } from './TimeScheduleD
 export { default as TimeScheduleDetailDrawer } from './TimeScheduleDetailDrawer';
 export { default as DayAgendaDrawer } from './DayAgendaDrawer';
 export { default as UserTaskDrawerForm } from './UserTaskDrawerForm';
+export { default as OfficialDutyDrawerForm } from './OfficialDutyDrawerForm';
+export { default as UnifiedTaskDutyDrawerForm } from './UnifiedTaskDutyDrawerForm';
+export type { UnifiedTaskDutyDrawerFormProps, TaskDutyDomain } from './UnifiedTaskDutyDrawerForm';
+export { default as CalendarDateTimeSection, InlineTimePicker, UntilWhenPicker } from './common/CalendarDateTimeSection';
+export type { CalendarDateTimeSectionProps, InlineTimePickerProps, UntilWhenPickerProps } from './common/CalendarDateTimeSection';
 export { default as DayTasksDrawerContent } from './DayTasksDrawerContent';
 export type { DayTasksDrawerContentProps } from './DayTasksDrawerContent';
 export { default as MyTasksHubView } from './MyTasksHubView';
+export { default as OfficialDutiesSection } from './OfficialDutiesSection';
 export { default as TaskQuickInputDock } from './TaskQuickInputDock';
 
 // Reusable enterprise presentation components

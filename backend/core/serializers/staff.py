@@ -67,17 +67,45 @@ class GeneralStaffDetailSerializer(serializers.ModelSerializer):
         ]
 
 
+class StaffDocumentSerializer(serializers.ModelSerializer):
+    doc_type_display = serializers.CharField(source='get_doc_type_display', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.name', read_only=True, default='')
+
+    class Meta:
+        from core.models.staff import StaffDocument
+        model = StaffDocument
+        fields = [
+            'id',
+            'doc_type',
+            'doc_type_display',
+            'file',
+            'title',
+            'created_by',
+            'created_by_name',
+            'uploaded_at',
+        ]
+        read_only_fields = ['id', 'uploaded_at', 'created_by']
+
+
 class StaffProfileSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.name', read_only=True, default='')
     bangla_name = serializers.CharField(source='user.name_bn', read_only=True, default='')
     user_phone = serializers.CharField(source='user.phone_number', read_only=True, default='')
     user_email = serializers.CharField(source='user.email', read_only=True, default='')
     user_avatar = serializers.CharField(source='user.avatar_url', read_only=True, default='')
+    avatar = serializers.CharField(source='user.avatar_url', read_only=True, default='')
+    avatar_url = serializers.CharField(source='user.avatar_url', read_only=True, default='')
+    photo = serializers.CharField(source='user.avatar_url', read_only=True, default='')
+    user_role = serializers.CharField(source='user.role.name', read_only=True, default='')
+    user_type = serializers.CharField(source='user.user_type', read_only=True, default='')
+    role = serializers.CharField(source='user.role.name', read_only=True, default='')
     institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
     department_name = serializers.CharField(source='department.name', read_only=True, default='')
     employee_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     teacher_detail = TeacherDetailSerializer(required=False, allow_null=True)
     general_detail = GeneralStaffDetailSerializer(required=False, allow_null=True)
+    documents = StaffDocumentSerializer(many=True, read_only=True)
+    timeline = serializers.SerializerMethodField()
     active_assignments_count = serializers.SerializerMethodField()
     active_duties_count = serializers.SerializerMethodField()
 
@@ -97,12 +125,18 @@ class StaffProfileSerializer(serializers.ModelSerializer):
             'user_phone',
             'user_email',
             'user_avatar',
+            'avatar',
+            'avatar_url',
+            'photo',
             'name',
             'name_bn',
             'phone_number',
             'email',
             'institution',
             'institution_name',
+            'user_role',
+            'user_type',
+            'role',
             'employee_id',
             'staff_type',
             'designation',
@@ -131,12 +165,14 @@ class StaffProfileSerializer(serializers.ModelSerializer):
             'is_deleted',
             'teacher_detail',
             'general_detail',
+            'documents',
+            'timeline',
             'active_assignments_count',
             'active_duties_count',
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['id', 'institution', 'institution_name', 'department_name', 'created_at', 'updated_at', 'active_assignments_count', 'active_duties_count']
+        read_only_fields = ['id', 'institution', 'institution_name', 'department_name', 'created_at', 'updated_at', 'active_assignments_count', 'active_duties_count', 'documents', 'timeline']
 
     @extend_schema_field(OpenApiTypes.INT)
     def get_active_assignments_count(self, obj):
@@ -145,6 +181,72 @@ class StaffProfileSerializer(serializers.ModelSerializer):
     @extend_schema_field(OpenApiTypes.INT)
     def get_active_duties_count(self, obj):
         return obj.duties.filter(is_active=True).count()
+
+    def get_timeline(self, obj):
+        events = []
+        # 1. Appointment / Joining Event
+        if obj.joining_date:
+            events.append({
+                'id': f'joining_{obj.id}',
+                'title': f'Joined as {obj.designation or "Staff"}',
+                'description': f'Officially appointed to {obj.department.name if obj.department else "Institution"} on {obj.joining_date}. Status: {obj.get_employment_status_display()}.',
+                'date': obj.joining_date.isoformat(),
+                'action': 'APPOINTMENT',
+                'category': 'Joining',
+            })
+        elif obj.created_at:
+            events.append({
+                'id': f'joining_{obj.id}',
+                'title': f'Profile Created: {obj.designation or "Staff"}',
+                'description': 'Staff profile registered in institution directory.',
+                'date': obj.created_at.isoformat(),
+                'action': 'APPOINTMENT',
+                'category': 'Joining',
+            })
+
+        # 2. Teaching Assignments
+        for assign in obj.assignments.filter(is_active=True).select_related('assigned_class', 'assigned_group'):
+            class_name = assign.assigned_class.name if assign.assigned_class else 'Class'
+            group_name = f" ({assign.assigned_group.name})" if assign.assigned_group else ""
+            created_dt = assign.created_at.isoformat() if hasattr(assign, 'created_at') and assign.created_at else (obj.joining_date.isoformat() if obj.joining_date else None)
+            events.append({
+                'id': f'assign_{assign.id}',
+                'title': f'Assigned to {class_name}{group_name}',
+                'description': f'Assigned as teacher for {class_name}{group_name} in session {assign.session or "Current"}.',
+                'date': created_dt,
+                'action': 'ASSIGNMENT',
+                'category': 'Class Assignment',
+                'class_name': class_name,
+                'group_name': assign.assigned_group.name if assign.assigned_group else None,
+            })
+
+        # 3. Operational Duties
+        for duty in obj.duties.filter(is_active=True):
+            eff_dt = duty.effective_from.isoformat() if getattr(duty, 'effective_from', None) else (duty.created_at.isoformat() if hasattr(duty, 'created_at') and duty.created_at else None)
+            events.append({
+                'id': f'duty_{duty.id}',
+                'title': f'Duty: {duty.duty_title}',
+                'description': duty.duty_description or f'Assigned operational duty: {duty.get_priority_display() if hasattr(duty, "get_priority_display") else "Normal"} priority.',
+                'date': eff_dt,
+                'action': 'DUTY',
+                'category': 'Operational Duty',
+            })
+
+        # 4. Leave Records
+        for leave in obj.leave_requests.all()[:10]:
+            leave_dt = leave.created_at.isoformat() if hasattr(leave, 'created_at') and leave.created_at else str(leave.start_date)
+            events.append({
+                'id': f'leave_{leave.id}',
+                'title': f'Leave {leave.get_status_display()}: {leave.get_leave_type_display()}',
+                'description': f'Leave from {leave.start_date} to {leave.end_date}. Reason: {leave.reason or "No reason specified"}.',
+                'date': leave_dt,
+                'action': 'LEAVE',
+                'category': 'Leave Record',
+            })
+
+        # Sort chronological descending (latest first)
+        events.sort(key=lambda x: str(x.get('date') or ''), reverse=True)
+        return events
 
     def to_internal_value(self, data):
         data = data.copy() if hasattr(data, 'copy') else dict(data)

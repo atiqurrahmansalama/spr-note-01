@@ -12,6 +12,7 @@ import {
 import DataTable from '@/components/ui/DataTable';
 import ActionMenu from '@/components/ui/ActionMenu';
 import { useStaffTranslation } from '../../locales';
+import { formatEnglishDesignation } from '../utils/designationUtils';
 import type { StaffMember, StaffRankItem } from '../../types';
 
 interface StaffRosterTableProps {
@@ -59,19 +60,6 @@ export const StaffRosterTable: React.FC<StaffRosterTableProps> = ({
       icon: DutyIcon,
       onClick: () => onOpenDutiesModal(s),
     },
-    ...(s.phone_number || s.emergency_contact
-      ? [
-          {
-            label: t('whatsappMessage', 'WhatsApp Message'),
-            icon: WhatsAppIcon,
-            onClick: () => {
-              const phoneStr = s.phone_number || s.emergency_contact || '';
-              const num = phoneStr.replace(/[^\d]/g, '');
-              window.open(`https://wa.me/${num}`, '_blank');
-            },
-          },
-        ]
-      : []),
     { divider: true },
     {
       label: t('deleteRecord', 'Delete Record'),
@@ -90,13 +78,14 @@ export const StaffRosterTable: React.FC<StaffRosterTableProps> = ({
       render: (s: StaffMember) => {
         const staffName = s.user_name || s.name_en || s.employee_id;
         const initial = staffName ? staffName.charAt(0).toUpperCase() : 'S';
+        const avatarSrc = s.avatar || s.user_avatar || s.avatar_url || (s as any).photo;
 
         return (
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-2xl theme-bg-accent-soft text-xs font-bold theme-accent flex items-center justify-center shrink-0 shadow-xs border-0">
-              {s.avatar ? (
+              {avatarSrc ? (
                 <img
-                  src={s.avatar}
+                  src={avatarSrc}
                   alt={staffName}
                   className="w-full h-full object-cover rounded-2xl"
                 />
@@ -127,10 +116,7 @@ export const StaffRosterTable: React.FC<StaffRosterTableProps> = ({
       headerClassName: 'text-left',
       align: 'left',
       render: (s: StaffMember) => {
-        const matchedRank = ranksList.find(
-          (r) => r.name === s.designation || r.name_bn === s.designation || r.code === s.designation
-        );
-        const title = matchedRank?.name || s.designation || 'Staff';
+        const title = formatEnglishDesignation(s.designation, ranksList);
 
         return (
           <span className="text-xs font-semibold theme-text-primary block">{title}</span>
