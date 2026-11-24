@@ -133,8 +133,8 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
     student = serializers.PrimaryKeyRelatedField(
         queryset=Student.objects.all(), required=False, allow_null=True
     )
-    created_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", read_only=True)
-    updated_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
 
     # â”€â”€ Lesson & Book progress metadata â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     lesson_title = serializers.CharField(required=False, allow_blank=True, default='')
@@ -283,28 +283,44 @@ class StudentDailyReportSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_date_time(self, obj):
-        dt = obj.date or obj.created_at
-        return dt.strftime("%Y-%m-%d %I:%M:%S %p") if dt else ""
+        dt = obj.created_at or obj.date
+        if dt:
+            local_dt = timezone.localtime(dt) if timezone.is_aware(dt) else dt
+            return local_dt.strftime("%Y-%m-%d %I:%M:%S %p")
+        return ""
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_report_date(self, obj):
         dt = obj.date or obj.created_at
-        return dt.strftime("%Y-%m-%d") if dt else ""
+        if dt:
+            local_dt = timezone.localtime(dt) if timezone.is_aware(dt) else dt
+            return local_dt.strftime("%Y-%m-%d")
+        return ""
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_generate_date(self, obj):
         dt = obj.created_at or obj.date
-        return dt.strftime("%Y-%m-%d %I:%M:%S %p") if dt else ""
+        if dt:
+            local_dt = timezone.localtime(dt) if timezone.is_aware(dt) else dt
+            return local_dt.strftime("%Y-%m-%d %I:%M:%S %p")
+        return ""
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_formattedDate(self, obj):
         dt = obj.date or obj.created_at
-        return dt.strftime("%b %d, %Y") if dt else ""
+        if dt:
+            local_dt = timezone.localtime(dt) if timezone.is_aware(dt) else dt
+            return local_dt.strftime("%b %d, %Y")
+        return ""
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_formattedTime(self, obj):
-        dt = obj.date or obj.created_at
-        return dt.strftime("%I:%M %p") if dt else ""
+        # Time comes from actual creation timestamp, not date-only recitation date
+        dt = obj.created_at or obj.date
+        if dt:
+            local_dt = timezone.localtime(dt) if timezone.is_aware(dt) else dt
+            return local_dt.strftime("%I:%M %p")
+        return ""
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_teacher_name(self, obj):

@@ -73,7 +73,8 @@ export const QuickAccessDock: React.FC<QuickAccessDockProps> = ({ className = ''
 
   // Automatically record visited page in recents
   useEffect(() => {
-    if (location.pathname && routeMeta && !routeMeta.isDashboard) {
+    const isDashboardRoute = Boolean(routeMeta?.isDashboard) || location.pathname === '/' || location.pathname.startsWith('/dashboard');
+    if (location.pathname && routeMeta && !routeMeta.isDashboard && !isDashboardRoute) {
       quickDeskStore.recordVisitedPage(
         activeTenantId,
         {
@@ -107,7 +108,7 @@ export const QuickAccessDock: React.FC<QuickAccessDockProps> = ({ className = ''
     }
   };
 
-  const isDashboard = location.pathname === '/' || location.pathname === '/dashboard';
+  const isDashboard = Boolean(routeMeta?.isDashboard) || location.pathname === '/' || location.pathname.startsWith('/dashboard');
 
   return (
     <aside

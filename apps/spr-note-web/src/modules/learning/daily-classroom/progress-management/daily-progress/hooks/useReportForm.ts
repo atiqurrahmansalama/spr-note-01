@@ -1781,6 +1781,8 @@ export function useReportForm() {
         comment: comment,
         overall_status: "Completed",
         status: "Completed",
+        created_at: isEditing ? (editingReport.created_at || editingReport.client_created_at || editedAt) : editedAt,
+        client_created_at: isEditing ? (editingReport.client_created_at || editingReport.created_at || editedAt) : editedAt,
         client_updated_at: editedAt,
         ...(isEditing ? { edited_at: editedAt, is_edited: true } : {}),
       };

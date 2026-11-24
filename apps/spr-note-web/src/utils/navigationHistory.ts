@@ -112,6 +112,11 @@ export function recordRouteHistory(cleanPath: string): void {
     const [pathname, search] = cleanPath.split('?');
     const meta = resolveRouteMeta(pathname, search ? `?${search}` : '');
 
+    // Skip recording Dashboard itself in the visited history stack
+    if (meta.isDashboard || pathname === '/' || pathname.startsWith('/dashboard')) {
+      return;
+    }
+
     // If already the top item, just update timestamp
     if (stack.length > 0 && stack[0].path === cleanPath) {
       stack[0].timestamp = Date.now();
@@ -127,7 +132,7 @@ export function recordRouteHistory(cleanPath: string): void {
     stack.unshift({
       path: cleanPath,
       title: meta.title || 'Page',
-      category: meta.category || 'Navigation',
+      category: meta.category || 'General',
       subCategory: meta.subCategory,
       timestamp: Date.now(),
     });

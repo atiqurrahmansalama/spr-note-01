@@ -15,8 +15,8 @@ export interface RouteMeta {
 }
 
 export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
-  "/": { title: "Dashboard", category: "Navigation", isDashboard: true },
-  "/dashboard": { title: "Dashboard", category: "Navigation", isDashboard: true },
+  "/": { title: "Dashboard", category: "Dashboard", isDashboard: true },
+  "/dashboard": { title: "Dashboard", category: "Dashboard", isDashboard: true },
   "/studies": { title: "Lesson Management", category: "Daily Classroom" },
   "/studies/daily-classroom": { title: "Lesson Management", category: "Daily Classroom" },
   "/studies/lesson-management": { title: "Lesson Management", category: "Daily Classroom" },
@@ -236,6 +236,16 @@ export const ROUTE_TITLE_MAP: Record<string, RouteMeta> = {
  */
 export function resolveRouteMeta(pathname: string, search: string = ""): RouteMeta {
   const currentPath = pathname.length > 1 ? pathname.replace(/\/+$/, "").toLowerCase() : pathname;
+
+  // Dedicated match for all Dashboard routes (including role-slug routes like /dashboard/admin, /dashboard/teacher)
+  if (currentPath === "/" || currentPath === "/dashboard" || currentPath.startsWith("/dashboard/")) {
+    return {
+      title: "Dashboard",
+      category: "Dashboard",
+      isDashboard: true,
+    };
+  }
+
   let meta = ROUTE_TITLE_MAP[pathname] || ROUTE_TITLE_MAP[currentPath];
 
   if (
@@ -381,7 +391,12 @@ export function resolveRouteMeta(pathname: string, search: string = ""): RouteMe
     } else if (/^\/staff\/[^/]+/.test(currentPath)) {
       meta = { title: "Staff Profile", subCategory: "Staff Directory", category: "Staff Management" };
     } else {
-      meta = { title: "Navigation View", category: "Navigation" };
+      const segments = currentPath.split("/").filter(Boolean);
+      const lastSeg = segments[segments.length - 1];
+      const fallbackTitle = lastSeg
+        ? lastSeg.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+        : "Overview";
+      meta = { title: fallbackTitle, category: "General" };
     }
   }
 

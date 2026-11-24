@@ -445,7 +445,7 @@ export default function AppLayout() {
             <div className="w-full h-full flex-1 overflow-hidden min-w-0">
               <SidebarScreenBlockView
                 title={routeMeta.title}
-                category={routeMeta.category || "Navigation"}
+                category={routeMeta.category || "General"}
                 subCategory={routeMeta.subCategory}
                 breadcrumbs={routeMeta.breadcrumbs}
                 onBack={handleBlockViewBack}

@@ -71,6 +71,8 @@ export const saveReportLocally = (reportData, options = {}) => {
     ...reportData,
     id: reportData.id || crypto.randomUUID(),
     report_unique_id,
+    created_at: reportData.created_at || reportData.client_created_at || now,
+    client_created_at: reportData.client_created_at || reportData.created_at || now,
     client_updated_at: now,
     grace_expires_at: graceExpiresAt,
     sync_status: initialStatus,

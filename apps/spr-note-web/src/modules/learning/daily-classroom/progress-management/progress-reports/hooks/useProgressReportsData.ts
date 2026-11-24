@@ -109,9 +109,9 @@ export function useProgressReportsData({
 
       // 2. Generated Date / Created At
       const rawGenerateDate =
-        rep.generate_date ||
         rep.created_at ||
         rep.client_created_at ||
+        rep.generate_date ||
         rep.client_updated_at ||
         rep.date_time ||
         rawReportDate;
@@ -152,14 +152,16 @@ export function useProgressReportsData({
 
       // Fallback: If no timestamp-derived time, fallback to provided formattedTime or time property
       if (!formattedGenerateTime) {
-        if (typeof rep.formattedTime === "string" && rep.formattedTime.trim()) {
+        if (typeof rep.formattedTime === "string" && rep.formattedTime.trim() && rep.formattedTime.trim() !== "12:00 AM") {
           formattedGenerateTime = rep.formattedTime.trim();
-        } else if (typeof rep.time === "string" && rep.time.trim()) {
+        } else if (typeof rep.time === "string" && rep.time.trim() && rep.time.trim() !== "12:00 AM") {
           formattedGenerateTime = rep.time.trim();
+        } else if (typeof rep.formattedTime === "string" && rep.formattedTime.trim()) {
+          formattedGenerateTime = rep.formattedTime.trim();
         } else {
           const sourceStr = String(rawGenerateDate || rawReportDate || rep.date || "");
           const timeMatch = sourceStr.match(/(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?)/i);
-          if (timeMatch) {
+          if (timeMatch && timeMatch[1] !== "12:00:00 AM" && timeMatch[1] !== "12:00 AM") {
             formattedGenerateTime = timeMatch[1];
           }
         }

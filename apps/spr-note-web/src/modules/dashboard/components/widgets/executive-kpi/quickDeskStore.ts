@@ -40,7 +40,10 @@ export const quickDeskStore = {
       const raw = localStorage.getItem(key);
       if (!raw) return DEFAULT_PINNED_PAGES;
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : DEFAULT_PINNED_PAGES;
+      if (!Array.isArray(parsed)) return DEFAULT_PINNED_PAGES;
+      return parsed.filter(
+        (p) => p.title !== 'Navigation View' && !normalizeDeskPath(p.path).startsWith('/dashboard') && normalizeDeskPath(p.path) !== '/'
+      );
     } catch {
       return DEFAULT_PINNED_PAGES;
     }
@@ -99,7 +102,16 @@ export const quickDeskStore = {
       const raw = localStorage.getItem(getRecentsStorageKey(tenantId, userId));
       if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((r) => {
+        const norm = normalizeDeskPath(r.path);
+        return (
+          norm !== '/' &&
+          !norm.startsWith('/dashboard') &&
+          r.title !== 'Navigation View' &&
+          r.category !== 'Navigation'
+        );
+      });
     } catch {
       return [];
     }

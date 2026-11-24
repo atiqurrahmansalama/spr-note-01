@@ -290,10 +290,10 @@ export default function RecordReportsCardGrid({
                         report.formattedDate ||
                         "Today"}
                     </span>
-                    {(report.formattedTime || report.date_time) && (
+                    {(report.formattedGenerateTime || report.formattedTime || report.time) && (
                       <>
                         <span className="opacity-40">·</span>
-                        <span>{report.formattedTime || report.date_time}</span>
+                        <span>{report.formattedGenerateTime || report.formattedTime || report.time}</span>
                       </>
                     )}
                   </div>
