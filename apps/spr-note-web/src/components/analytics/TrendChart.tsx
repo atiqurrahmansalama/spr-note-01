@@ -144,7 +144,7 @@ export const TrendChart: React.FC<TrendChartProps> = ({
                   <InfoIcon className="w-3.5 h-3.5 theme-text-secondary opacity-60 shrink-0" />
                 </div>
                 {subtitle && (
-                  <p className="text-[11px] theme-text-secondary truncate hidden lg:block">
+                  <p className="text-[11px] theme-text-secondary truncate hidden xl:block">
                     {subtitle}
                   </p>
                 )}
@@ -160,7 +160,7 @@ export const TrendChart: React.FC<TrendChartProps> = ({
               variant="ghost"
               align="right"
               showChevron={false}
-              title={`Options for ${title}`}
+              title={`${title}`}
               ariaLabel="Chart Options"
             />
           </div>
@@ -194,7 +194,7 @@ export const TrendChart: React.FC<TrendChartProps> = ({
               variant="ghost"
               align="right"
               showChevron={false}
-              title={`Options for ${title}`}
+              title={`${title}`}
               ariaLabel="Chart Options"
             />
           </div>

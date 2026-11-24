@@ -3,6 +3,7 @@ import { fetchWithAuth } from "@/utils/authService";
 import { isOnline } from "@/utils/localStore";
 import { triggerCloudSync, isReportUnsynced, getLocalReports, deleteReportFromSync } from "@/utils/syncEngine";
 import { formatDate } from "@/utils/reportGenerator";
+import { getClassroomEffectiveTimezone } from "@/constants/calendarConstants";
 import { dailyProgressRepository, offlineDB } from "@/offline";
 import { auth as authStore } from "@/utils/localStore";
 import { ReportItem, SyncErrorItem } from "../types";
@@ -75,6 +76,8 @@ export function useProgressReportsData({
   // Normalize a single raw report object into strict typed contract
   const normalizeReport = useCallback(
     (rep: any): ReportItem => {
+      const classroomTz = getClassroomEffectiveTimezone();
+
       // 1. Report Date (Recitation Date)
       const rawReportDate = rep.report_date || rep.date || rep.selectedDate || "";
       let formattedReportDate = "—";
@@ -92,12 +95,12 @@ export function useProgressReportsData({
               : rawReportDate;
           const d = new Date(dateToParse);
           if (!isNaN(d.getTime())) {
-            formattedReportDate = formatDate(d);
+            formattedReportDate = formatDate(d, undefined, classroomTz);
             if (!isoDateOnly) {
               isoDateOnly = d.toISOString().split("T")[0];
             }
           } else {
-            formattedReportDate = formatDate(rawReportDate);
+            formattedReportDate = formatDate(rawReportDate, undefined, classroomTz);
           }
         } catch {
           formattedReportDate = String(rawReportDate);
@@ -113,11 +116,7 @@ export function useProgressReportsData({
         rep.date_time ||
         rawReportDate;
       let formattedGenerateDate = "—";
-      let formattedGenerateTime =
-        (typeof rep.formattedTime === "string" && rep.formattedTime.trim()
-          ? rep.formattedTime.trim()
-          : "") ||
-        (typeof rep.time === "string" && rep.time.trim() ? rep.time.trim() : "");
+      let formattedGenerateTime = "";
 
       if (rawGenerateDate) {
         try {
@@ -126,9 +125,18 @@ export function useProgressReportsData({
             gd = new Date(rawGenerateDate.replace(" ", "T"));
           }
           if (!isNaN(gd.getTime())) {
-            formattedGenerateDate = formatDate(gd);
-            if (!formattedGenerateTime) {
+            formattedGenerateDate = formatDate(gd, undefined, classroomTz);
+
+            // Timezone-Aware: Format time strictly using the configured classroom timezone
+            const hasTimeComponent =
+              typeof rawGenerateDate !== "string" ||
+              rawGenerateDate.includes("T") ||
+              rawGenerateDate.includes(":") ||
+              !/^\d{4}-\d{2}-\d{2}$/.test(rawGenerateDate.trim());
+
+            if (hasTimeComponent) {
               formattedGenerateTime = gd.toLocaleTimeString("en-US", {
+                timeZone: classroomTz,
                 hour: "2-digit",
                 minute: "2-digit",
                 hour12: true,
@@ -142,11 +150,18 @@ export function useProgressReportsData({
         }
       }
 
+      // Fallback: If no timestamp-derived time, fallback to provided formattedTime or time property
       if (!formattedGenerateTime) {
-        const sourceStr = String(rawGenerateDate || rawReportDate || rep.date || "");
-        const timeMatch = sourceStr.match(/(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?)/i);
-        if (timeMatch) {
-          formattedGenerateTime = timeMatch[1];
+        if (typeof rep.formattedTime === "string" && rep.formattedTime.trim()) {
+          formattedGenerateTime = rep.formattedTime.trim();
+        } else if (typeof rep.time === "string" && rep.time.trim()) {
+          formattedGenerateTime = rep.time.trim();
+        } else {
+          const sourceStr = String(rawGenerateDate || rawReportDate || rep.date || "");
+          const timeMatch = sourceStr.match(/(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?)/i);
+          if (timeMatch) {
+            formattedGenerateTime = timeMatch[1];
+          }
         }
       }
 

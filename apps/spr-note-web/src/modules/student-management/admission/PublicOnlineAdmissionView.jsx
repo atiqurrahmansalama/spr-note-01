@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { useToast } from '../../../context/ToastContext';
+import { useTenant } from '../../../context/TenantContext';
 import { auth as authStore } from '../../../utils/localStore';
 import { verifyPublicAdmissionToken } from '../../../api/admissions';
 import FullAdmissionWizard from './FullAdmissionWizard';
@@ -18,6 +19,8 @@ import CustomInput from '../../../components/ui/CustomInput';
 
 export default function PublicOnlineAdmissionView() {
   const { showToast } = useToast();
+  const { tenantSlug } = useParams();
+  const { currentInstitution, institutions } = useTenant();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') || '';
 
@@ -37,29 +40,75 @@ export default function PublicOnlineAdmissionView() {
 
   const [submittedReceipt, setSubmittedReceipt] = useState(null);
 
-  // Load Token Metadata
+  // Load Token Metadata or Direct Institutional Slug
   useEffect(() => {
-    if (!token) {
-      setTokenError('No admission token provided. Please scan a valid admission QR code or use an official link.');
+    if (token) {
+      const verify = async () => {
+        setLoading(true);
+        setTokenError('');
+        try {
+          const meta = await verifyPublicAdmissionToken(token);
+          setTokenMeta(meta);
+        } catch (err) {
+          setTokenError(err.message || 'Invalid or expired admission link.');
+        } finally {
+          setLoading(false);
+        }
+      };
+      verify();
+      return;
+    }
+
+    // Direct institutional public admission URL (/a/:tenantSlug/apply)
+    if (tenantSlug) {
+      const targetInst =
+        (currentInstitution && (currentInstitution.slug?.toLowerCase() === tenantSlug.toLowerCase() || currentInstitution.code?.toLowerCase() === tenantSlug.toLowerCase())
+          ? currentInstitution
+          : null) ||
+        institutions.find(
+          (i) =>
+            (i.slug && i.slug.toLowerCase() === tenantSlug.toLowerCase()) ||
+            (i.code && i.code.toLowerCase() === tenantSlug.toLowerCase()) ||
+            (String(i.id).toLowerCase() === tenantSlug.toLowerCase())
+        );
+
+      if (targetInst) {
+        setTokenMeta({
+          institution_id: targetInst.id,
+          institution_name: targetInst.name,
+          institution_bangla_name: targetInst.bangla_name || targetInst.name_bn,
+          session_year: targetInst.academic_year || '2026-2027',
+          title: 'Direct Online Admission Portal',
+          target_class_name: 'All Academic Classes',
+        });
+        setTokenError('');
+        setLoading(false);
+      } else {
+        setLoading(false);
+        setTokenError(`Academy "${tenantSlug}" could not be resolved. Please verify the URL or contact the administration.`);
+      }
+      return;
+    }
+
+    // Automatic fallback to active or primary institution if accessible
+    const fallbackInst = currentInstitution || (institutions && institutions.length > 0 ? institutions[0] : null);
+    if (fallbackInst) {
+      setTokenMeta({
+        institution_id: fallbackInst.id,
+        institution_name: fallbackInst.name,
+        institution_bangla_name: fallbackInst.bangla_name || fallbackInst.name_bn,
+        session_year: fallbackInst.academic_year || '2026-2027',
+        title: 'Direct Online Admission Portal',
+        target_class_name: 'All Academic Classes',
+      });
+      setTokenError('');
       setLoading(false);
       return;
     }
 
-    const verify = async () => {
-      setLoading(true);
-      setTokenError('');
-      try {
-        const meta = await verifyPublicAdmissionToken(token);
-        setTokenMeta(meta);
-      } catch (err) {
-        setTokenError(err.message || 'Invalid or expired admission link.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    verify();
-  }, [token]);
+    setTokenError('No admission token or academy slug provided. Please scan a valid admission QR code or use an official academy link.');
+    setLoading(false);
+  }, [token, tenantSlug, currentInstitution, institutions]);
 
   // Auth Handler (Login or Quick Registration for Public Applicant)
   const handleAuthSubmit = async (e) => {

@@ -42,7 +42,7 @@ export default function FinanceCollectionWidget({
             <h3 className="text-sm font-bold theme-text-primary leading-tight truncate">
               {title || t('financeOverview', 'Finance & Fee Collection')}
             </h3>
-            <p className="text-[11px] theme-text-secondary mt-0.5 truncate">
+            <p className="hidden xl:block text-[11px] theme-text-secondary mt-0.5 truncate">
               Monthly Rate: <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{formatNumber(finance.collectionRate)}%</span>
             </p>
           </div>

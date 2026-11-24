@@ -35,16 +35,18 @@ export const StaffRosterTable: React.FC<StaffRosterTableProps> = ({
   const navigate = useNavigate();
   const { t } = useStaffTranslation();
 
+  const getStaffProfileUrl = (s: StaffMember) => `/staff/${s.employee_id ? s.employee_id.toLowerCase() : s.id}`;
+
   const getActionMenuItems = (s: StaffMember) => [
     {
       label: t('viewProfile', 'View Profile'),
       icon: SearchIcon,
-      onClick: () => navigate(`/staff/${s.id}`),
+      onClick: () => navigate(getStaffProfileUrl(s)),
     },
     {
       label: t('editProfile', 'Edit Profile'),
       icon: EditIcon,
-      onClick: () => navigate(`/staff/${s.id}`),
+      onClick: () => navigate(getStaffProfileUrl(s)),
     },
     ...(s.staff_type === 'TEACHING'
       ? [
@@ -95,7 +97,7 @@ export const StaffRosterTable: React.FC<StaffRosterTableProps> = ({
             </div>
             <div className="min-w-0">
               <span
-                onClick={() => navigate(`/staff/${s.id}`)}
+                onClick={() => navigate(getStaffProfileUrl(s))}
                 className="font-bold theme-text-primary text-xs sm:text-sm truncate block leading-tight hover:underline cursor-pointer"
               >
                 {staffName}
@@ -232,7 +234,7 @@ export const StaffRosterTable: React.FC<StaffRosterTableProps> = ({
       isLoading={isLoading}
       emptyTitle={t('noStaffFound', 'No Faculty or Staff Found')}
       emptySubMessage={t('noStaffSubmessage', 'No teacher or staff records match your selected filters.')}
-      onRowClick={(s: StaffMember) => navigate(`/staff/${s.id}`)}
+      onRowClick={(s: StaffMember) => navigate(getStaffProfileUrl(s))}
     />
   );
 };

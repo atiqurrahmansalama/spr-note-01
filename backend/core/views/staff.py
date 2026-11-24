@@ -151,6 +151,33 @@ class StaffProfileViewSet(viewsets.ModelViewSet):
         inst = resolve_request_institution(self.request, self.request.user)
         serializer.save(institution=inst)
 
+    def get_object(self):
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        lookup_value = self.kwargs.get(lookup_url_kwarg)
+
+        queryset = self.filter_queryset(self.get_queryset())
+
+        # 1. Attempt lookup by UUID (primary key)
+        try:
+            uuid.UUID(str(lookup_value))
+            return queryset.get(**{self.lookup_field: lookup_value})
+        except (ValueError, AttributeError):
+            pass
+
+        # 2. Attempt lookup by human-readable employee_id (e.g. STF-0012, EMP-1001)
+        try:
+            return queryset.get(employee_id__iexact=str(lookup_value).strip())
+        except StaffProfile.DoesNotExist:
+            pass
+
+        # 3. Attempt lookup by linked user username
+        try:
+            return queryset.get(user__username__iexact=str(lookup_value).strip())
+        except StaffProfile.DoesNotExist:
+            pass
+
+        raise NotFound(f"Staff profile '{lookup_value}' not found.")
+
     def destroy(self, request, *args, **kwargs):
         from core.services import delete_staff_profile_with_cascading
         instance = self.get_object()

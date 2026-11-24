@@ -54,7 +54,7 @@ export default function AgendaScheduleWidget({
               {title}
             </h3>
             {/* Subtitle hidden on very narrow containers (< 480px) for seamless 1-column scalability */}
-            <p className="hidden @[480px]:block text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5 truncate">
+            <p className="hidden xl:block text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5 truncate">
               Day-by-day operational agenda, events & timeline schedule
             </p>
           </div>

@@ -9,7 +9,13 @@ import {
   EditIcon,
   UsersIcon,
   BuildingOfficeIcon,
+  CopyIcon,
 } from '../../../../components/ui/Icons';
+import {
+  getPublicAdmissionUrl,
+  getPublicStaffApplyUrl,
+  getPublicPortalUrl,
+} from '../../../../utils/tenantUrlUtils';
 import DataTable from '../../../../components/ui/DataTable';
 import DataCardGrid from '../../../../components/ui/DataCardGrid';
 import ActionMenu from '../../../../components/ui/ActionMenu';
@@ -287,6 +293,36 @@ export default function InstitutionListView({
         label: 'Edit Academy Profile',
         icon: EditIcon,
         onClick: () => handleOpenEdit(inst),
+      },
+      {
+        divider: true,
+      },
+      {
+        label: 'Copy Public Admission Link',
+        icon: CopyIcon,
+        onClick: () => {
+          const url = getPublicAdmissionUrl(inst);
+          navigator.clipboard.writeText(url);
+          showToast(`Admission link copied: ${url}`, 'success');
+        },
+      },
+      {
+        label: 'Copy Staff Application Link',
+        icon: CopyIcon,
+        onClick: () => {
+          const url = getPublicStaffApplyUrl(inst);
+          navigator.clipboard.writeText(url);
+          showToast(`Staff onboarding link copied: ${url}`, 'success');
+        },
+      },
+      {
+        label: 'Copy Public Academy Portal',
+        icon: CopyIcon,
+        onClick: () => {
+          const url = getPublicPortalUrl(inst);
+          navigator.clipboard.writeText(url);
+          showToast(`Portal link copied: ${url}`, 'success');
+        },
       },
       {
         divider: true,

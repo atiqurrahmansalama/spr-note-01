@@ -15,7 +15,14 @@ import {
   GlobeIcon,
   SparklesIcon,
   DepartmentIcon,
+  CopyIcon,
+  ExternalLinkIcon,
 } from '../../../components/ui/Icons';
+import {
+  getPublicAdmissionUrl,
+  getPublicStaffApplyUrl,
+  getPublicPortalUrl,
+} from '../../../utils/tenantUrlUtils';
 import { getCurrentInstitution, updateCurrentInstitution, getInstitutionCategories } from '../../../api/institutions';
 import { useTenant } from '../../../context/TenantContext';
 import { useToast } from '../../../context/ToastContext';
@@ -528,7 +535,7 @@ export default function AcademyProfileView({
                 {isEditing ? (
                   <CustomInput
                     label="Web Slug / Portal URL"
-                    prefix="app/"
+                    prefix="a/"
                     value={formData.slug}
                     onChange={(val) => handleInputChange('slug', val.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                     placeholder="e.g. darul-quran"
@@ -539,7 +546,7 @@ export default function AcademyProfileView({
                       Web Slug / Portal URL
                     </label>
                     <p className="text-xs sm:text-sm font-semibold theme-accent font-mono">
-                      {formData.slug ? `app/${formData.slug}` : '--'}
+                      {formData.slug ? `/a/${formData.slug}` : '--'}
                     </p>
                   </div>
                 )}
@@ -736,6 +743,135 @@ export default function AcademyProfileView({
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ======================================================== */}
+      {/* 3. PUBLIC INSTITUTIONAL LINKS & PORTAL CARD (Rule 14)    */}
+      {/* ======================================================== */}
+      <div className="theme-bg-surface rounded-3xl p-5 sm:p-6 shadow-xs border-0 space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b theme-border flex-wrap gap-2">
+          <div>
+            <h3 className="text-base font-bold theme-text-primary tracking-tight">
+              Public Academy Links & Portals
+            </h3>
+            <p className="text-xs theme-text-secondary mt-0.5">
+              Unique, tenant-isolated URLs for public student admission, staff onboarding, and academy portal.
+            </p>
+          </div>
+          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[var(--accent-main)]/10 text-[var(--accent-main)]">
+            Canonical URL Engine
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+          {/* Link 1: Public Online Admission */}
+          <div className="p-4 rounded-2xl theme-bg-app border-0 flex flex-col justify-between gap-3">
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold theme-text-primary">Online Admission Link</span>
+                <span className="text-[10px] font-medium theme-text-secondary">Public</span>
+              </div>
+              <p className="text-[11px] font-mono theme-accent break-all mt-1.5 select-all">
+                {getPublicAdmissionUrl(formData)}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-2 border-t theme-border/40">
+              <button
+                type="button"
+                onClick={() => {
+                  const url = getPublicAdmissionUrl(formData);
+                  navigator.clipboard.writeText(url);
+                  showToast('Public admission link copied!', 'success');
+                }}
+                className="flex-1 py-1.5 px-3 rounded-xl theme-bg-surface hover:theme-bg-elevated text-xs font-semibold theme-text-primary flex items-center justify-center gap-1.5 cursor-pointer transition shadow-xs"
+              >
+                <CopyIcon className="w-3.5 h-3.5" />
+                <span>Copy</span>
+              </button>
+              <a
+                href={getPublicAdmissionUrl(formData)}
+                target="_blank"
+                rel="noreferrer"
+                className="p-1.5 rounded-xl theme-bg-surface hover:theme-bg-elevated theme-text-secondary flex items-center justify-center cursor-pointer transition shadow-xs"
+                title="Open in new tab"
+              >
+                <ExternalLinkIcon className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+
+          {/* Link 2: Staff Onboarding Application */}
+          <div className="p-4 rounded-2xl theme-bg-app border-0 flex flex-col justify-between gap-3">
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold theme-text-primary">Staff Application Link</span>
+                <span className="text-[10px] font-medium theme-text-secondary">Ustadh / Staff</span>
+              </div>
+              <p className="text-[11px] font-mono theme-accent break-all mt-1.5 select-all">
+                {getPublicStaffApplyUrl(formData)}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-2 border-t theme-border/40">
+              <button
+                type="button"
+                onClick={() => {
+                  const url = getPublicStaffApplyUrl(formData);
+                  navigator.clipboard.writeText(url);
+                  showToast('Staff application link copied!', 'success');
+                }}
+                className="flex-1 py-1.5 px-3 rounded-xl theme-bg-surface hover:theme-bg-elevated text-xs font-semibold theme-text-primary flex items-center justify-center gap-1.5 cursor-pointer transition shadow-xs"
+              >
+                <CopyIcon className="w-3.5 h-3.5" />
+                <span>Copy</span>
+              </button>
+              <a
+                href={getPublicStaffApplyUrl(formData)}
+                target="_blank"
+                rel="noreferrer"
+                className="p-1.5 rounded-xl theme-bg-surface hover:theme-bg-elevated theme-text-secondary flex items-center justify-center cursor-pointer transition shadow-xs"
+                title="Open in new tab"
+              >
+                <ExternalLinkIcon className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+
+          {/* Link 3: Public Academy Portal */}
+          <div className="p-4 rounded-2xl theme-bg-app border-0 flex flex-col justify-between gap-3">
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold theme-text-primary">Academy Public Portal</span>
+                <span className="text-[10px] font-medium theme-text-secondary">Landing</span>
+              </div>
+              <p className="text-[11px] font-mono theme-accent break-all mt-1.5 select-all">
+                {getPublicPortalUrl(formData)}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-2 border-t theme-border/40">
+              <button
+                type="button"
+                onClick={() => {
+                  const url = getPublicPortalUrl(formData);
+                  navigator.clipboard.writeText(url);
+                  showToast('Academy portal link copied!', 'success');
+                }}
+                className="flex-1 py-1.5 px-3 rounded-xl theme-bg-surface hover:theme-bg-elevated text-xs font-semibold theme-text-primary flex items-center justify-center gap-1.5 cursor-pointer transition shadow-xs"
+              >
+                <CopyIcon className="w-3.5 h-3.5" />
+                <span>Copy</span>
+              </button>
+              <a
+                href={getPublicPortalUrl(formData)}
+                target="_blank"
+                rel="noreferrer"
+                className="p-1.5 rounded-xl theme-bg-surface hover:theme-bg-elevated theme-text-secondary flex items-center justify-center cursor-pointer transition shadow-xs"
+                title="Open in new tab"
+              >
+                <ExternalLinkIcon className="w-3.5 h-3.5" />
+              </a>
             </div>
           </div>
         </div>

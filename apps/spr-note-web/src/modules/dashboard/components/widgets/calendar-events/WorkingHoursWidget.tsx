@@ -93,7 +93,7 @@ export default function WorkingHoursWidget({
               {title}
             </h3>
             {/* Subtitle hidden from mid screen down (< 820px) */}
-            <p className="hidden @[820px]:block text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5 truncate">
+            <p className="hidden xl:block text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5 truncate">
               Operational work shifts, active roster coverage & weekly schedules
             </p>
           </div>

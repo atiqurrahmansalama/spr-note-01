@@ -166,6 +166,19 @@ export default function App(): React.ReactElement {
               <Route path="/staff-onboard" element={<PublicStaffOnboardingView />} />
               <Route path="/staff-apply" element={<PublicStaffOnboardingView />} />
 
+              {/* Multi-Tenant Public Institutional Routes (/a/:tenantSlug/...) */}
+              <Route path="/a/:tenantSlug" element={<LandingPageView />} />
+              <Route path="/a/:tenantSlug/portal" element={<LandingPageView />} />
+              <Route path="/a/:tenantSlug/official-website" element={<LandingPageView />} />
+              <Route path="/a/:tenantSlug/apply" element={<PublicOnlineAdmissionView />} />
+              <Route path="/a/:tenantSlug/admission/apply" element={<PublicOnlineAdmissionView />} />
+              <Route path="/a/:tenantSlug/staff-onboard" element={<PublicStaffOnboardingView />} />
+              <Route path="/a/:tenantSlug/staff-apply" element={<PublicStaffOnboardingView />} />
+              <Route path="/a/:tenantSlug/verify-receipt/:receiptNumber" element={<PublicVerifyReceiptView />} />
+              <Route path="/a/:tenantSlug/verify-report/:report_id" element={<PublicVerifyReportView />} />
+              <Route path="/a/:tenantSlug/join" element={<JoinWithInviteView />} />
+              <Route path="/a/:tenantSlug/login" element={<LoginView />} />
+
               {/* Protected Dashboard Layout with Nested Page Routes */}
               <Route
                 element={

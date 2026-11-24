@@ -440,9 +440,15 @@ export default function StudentGroupedCardGrid({
                                 <span className="font-bold theme-accent truncate text-xs">
                                   {rep.session_name || "General Session"}
                                 </span>
-                                <span className="text-[11px] font-mono theme-text-secondary opacity-80 whitespace-nowrap">
-                                  {rep.formattedReportDate || rep.date || "Today"}
-                                </span>
+                                <div className="flex items-center gap-1.5 text-[11px] font-mono theme-text-secondary opacity-80 whitespace-nowrap">
+                                  <span>{rep.formattedReportDate || rep.date || "Today"}</span>
+                                  {(rep.formattedGenerateTime || rep.formattedTime || rep.time) && (
+                                    <>
+                                      <span className="opacity-40">·</span>
+                                      <span>{rep.formattedGenerateTime || rep.formattedTime || rep.time}</span>
+                                    </>
+                                  )}
+                                </div>
                               </div>
 
                               <div className="flex items-center gap-1.5 shrink-0">

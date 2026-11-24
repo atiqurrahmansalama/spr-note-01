@@ -3,6 +3,21 @@ import { getInstitutions } from '../api/institutions';
 import { useAuth } from './AuthContext';
 import { isUserSuperAdmin, isUserAcademyAdmin } from '../utils/roleUtils';
 
+export function extractTenantSlugFromUrl() {
+  if (typeof window === 'undefined') return '';
+  const pathname = window.location.pathname;
+  const match = pathname.match(/^\/a\/([^/]+)/);
+  if (match && match[1]) {
+    return match[1].toLowerCase();
+  }
+  const searchParams = new URLSearchParams(window.location.search);
+  const qTenant = searchParams.get('academy') || searchParams.get('tenant') || searchParams.get('tenantSlug');
+  if (qTenant) {
+    return qTenant.toLowerCase();
+  }
+  return '';
+}
+
 const TenantContext = createContext(null);
 
 export function TenantProvider({ children }) {
@@ -58,6 +73,27 @@ export function TenantProvider({ children }) {
       const data = await getInstitutions();
       const items = Array.isArray(data) ? data : (data.results || []);
       setInstitutions(items);
+
+      // Priority 0: URL-driven tenant slug (/a/:tenantSlug/... or ?academy=... / ?tenant=...)
+      const urlSlug = extractTenantSlugFromUrl();
+      if (urlSlug) {
+        const foundBySlug = items.find(
+          (i) =>
+            (i.slug && i.slug.toLowerCase() === urlSlug) ||
+            (i.code && i.code.toLowerCase() === urlSlug) ||
+            (String(i.id).toLowerCase() === urlSlug) ||
+            (i.name && i.name.toLowerCase().replace(/\s+/g, '-').includes(urlSlug))
+        );
+        if (foundBySlug) {
+          setCurrentInstitution(foundBySlug);
+          setActiveTenantId(String(foundBySlug.id));
+          try {
+            localStorage.setItem('active_tenant_id', String(foundBySlug.id));
+            localStorage.setItem('spr_active_tenant_id', String(foundBySlug.id));
+          } catch {}
+          return;
+        }
+      }
 
       const savedTenantId =
         localStorage.getItem('active_tenant_id') ||
@@ -160,6 +196,20 @@ export function TenantProvider({ children }) {
     if (targetId) switchInstitution(targetId);
   }, [switchInstitution]);
 
+  const activeTenantSlug = useMemo(() => {
+    return currentInstitution?.slug || currentInstitution?.code?.toLowerCase() || '';
+  }, [currentInstitution]);
+
+  const buildTenantUrl = useCallback(
+    (path) => {
+      const slug = activeTenantSlug || extractTenantSlugFromUrl();
+      if (!slug) return path;
+      const cleanPath = path.startsWith('/') ? path : `/${path}`;
+      return `/a/${slug}${cleanPath}`;
+    },
+    [activeTenantSlug]
+  );
+
   const value = useMemo(
     () => ({
       institutions,
@@ -168,6 +218,8 @@ export function TenantProvider({ children }) {
       currentInstitution,
       activeTenant: currentInstitution,
       activeTenantId: activeTenantId || (currentInstitution?.id ? String(currentInstitution.id) : 'default'),
+      activeTenantSlug,
+      buildTenantUrl,
       isMultiTenantAdmin,
       isAcademyAdmin,
       isTenantAdmin,
@@ -183,6 +235,8 @@ export function TenantProvider({ children }) {
       hasMultipleInstitutions,
       currentInstitution,
       activeTenantId,
+      activeTenantSlug,
+      buildTenantUrl,
       isMultiTenantAdmin,
       isAcademyAdmin,
       isTenantAdmin,

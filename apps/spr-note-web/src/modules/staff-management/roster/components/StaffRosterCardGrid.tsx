@@ -36,16 +36,18 @@ export const StaffRosterCardGrid: React.FC<StaffRosterCardGridProps> = ({
   const navigate = useNavigate();
   const { t } = useStaffTranslation();
 
+  const getStaffProfileUrl = (s: StaffMember) => `/staff/${s.employee_id ? s.employee_id.toLowerCase() : s.id}`;
+
   const getActionMenuItems = (s: StaffMember) => [
     {
       label: t('viewProfile', 'View Profile'),
       icon: SearchIcon,
-      onClick: () => navigate(`/staff/${s.id}`),
+      onClick: () => navigate(getStaffProfileUrl(s)),
     },
     {
       label: t('editProfile', 'Edit Profile'),
       icon: EditIcon,
-      onClick: () => navigate(`/staff/${s.id}`),
+      onClick: () => navigate(getStaffProfileUrl(s)),
     },
     ...(s.staff_type === 'TEACHING'
       ? [
@@ -89,7 +91,7 @@ export const StaffRosterCardGrid: React.FC<StaffRosterCardGridProps> = ({
         return (
           <div
             key={s.id}
-            onClick={() => navigate(`/staff/${s.id}`)}
+            onClick={() => navigate(getStaffProfileUrl(s))}
             className="p-5 rounded-3xl theme-bg-surface shadow-xs hover:shadow-md transition-all cursor-pointer space-y-4 border-0 hover:bg-[var(--accent-main)]/[0.03]"
           >
             {/* Header: Avatar, Name, Action Menu */}

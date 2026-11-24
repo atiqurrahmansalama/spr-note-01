@@ -30,6 +30,7 @@ import { useRightSidebar, useDrawerRegistration } from '../../../context/RightSi
 import { useToast } from '../../../context/ToastContext';
 import { useTenant } from '../../../context/TenantContext';
 import { useFeatureControl } from '../../../context/FeatureControlContext';
+import { getPublicAdmissionUrl } from '../../../utils/tenantUrlUtils';
 import { fetchWithAuth } from '../../../utils/authService';
 import { academicYearsStore, admissionSettingsStore, students as studentStore } from '../../../utils/localStore';
 import {
@@ -44,7 +45,7 @@ import AccessDeniedView from '../../../components/common/AccessDeniedView';
 export default function StudentAdmissionView() {
   const { showToast } = useToast();
   const { openDrawer, closeDrawer } = useRightSidebar();
-  const { activeTenantId } = useTenant();
+  const { activeTenantId, currentInstitution } = useTenant();
   const { isSectionEnabled } = useFeatureControl();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -411,7 +412,7 @@ export default function StudentAdmissionView() {
   };
 
   const handleCopyLink = (tokenItem) => {
-    const url = `${window.location.origin}/apply?token=${tokenItem.token}`;
+    const url = getPublicAdmissionUrl(currentInstitution, tokenItem.token);
     navigator.clipboard.writeText(url);
     showToast('Public admission link copied to clipboard!', 'success');
   };

@@ -54,7 +54,7 @@ export default function AttendancePulseWidget({
             <h3 className="text-sm font-bold theme-text-primary leading-tight truncate">
               {pulseTitle}
             </h3>
-            <p className="text-[11px] theme-text-secondary mt-0.5 truncate">
+            <p className="hidden xl:block text-[11px] theme-text-secondary mt-0.5 truncate">
               {t('totalStudents', 'Total Students')}: <span className="font-mono font-bold theme-text-primary">{formatNumber(total)}</span>
             </p>
           </div>

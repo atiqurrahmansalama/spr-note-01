@@ -387,3 +387,5 @@ export function resolveRouteMeta(pathname: string, search: string = ""): RouteMe
 
   return meta;
 }
+
+export const getRouteMetadata = resolveRouteMeta;

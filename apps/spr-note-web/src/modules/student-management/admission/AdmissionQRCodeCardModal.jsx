@@ -1,11 +1,12 @@
 import React from 'react';
 import QRCodeCardModal from '../../../components/common/QRCodeCardModal';
 import { AcademicCapIcon } from '../../../components/ui/Icons';
+import { getPublicAdmissionUrl } from '../../../utils/tenantUrlUtils';
 
 export default function AdmissionQRCodeCardModal({ isOpen, onClose, tokenData }) {
   if (!isOpen || !tokenData) return null;
 
-  const publicUrl = `${window.location.origin}/apply?token=${tokenData.token}`;
+  const publicUrl = getPublicAdmissionUrl(tokenData, tokenData.token);
   const shareText = `Online Admission is now open for ${tokenData.institution_name || 'our institution'}!\nSession: ${tokenData.session_year}\nApply online here: ${publicUrl}`;
 
   const details = [];

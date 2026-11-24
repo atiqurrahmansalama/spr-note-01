@@ -91,7 +91,7 @@ export default function ApprovalsSummaryWidget({
             <h3 className="text-sm font-bold theme-text-primary leading-tight truncate">
               {title || t('approvalsCenterTitle', 'Approvals Center')}
             </h3>
-            <p className="text-[11px] theme-text-secondary mt-0.5 truncate">
+            <p className="hidden xl:block text-[11px] theme-text-secondary mt-0.5 truncate">
               {t('pendingQueueSub', 'Institutional Review & Decision Queue')}
             </p>
           </div>

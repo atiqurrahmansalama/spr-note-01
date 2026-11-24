@@ -38,7 +38,7 @@ export default function ResidentialOccupancyWidget({
             <h3 className="text-sm font-bold theme-text-primary leading-tight truncate">
               {title || t('residentialOccupancy', 'Residential & Hostel Occupancy')}
             </h3>
-            <p className="text-[11px] theme-text-secondary mt-0.5 truncate">
+            <p className="hidden xl:block text-[11px] theme-text-secondary mt-0.5 truncate">
               Capacity: <span className="font-mono font-bold theme-text-primary">{formatNumber(residential.occupiedBeds)}/{formatNumber(residential.totalBeds)} Beds</span>
             </p>
           </div>

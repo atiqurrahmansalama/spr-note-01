@@ -11,8 +11,9 @@ import NotificationCenterDrawer from "./NotificationCenterDrawer";
 import { useAcademicSession } from "../../context/AcademicSessionContext";
 import { useToast } from "../../context/ToastContext";
 import { useTheme } from "../../context/useTheme";
-import { FloatingUndoRedoDock } from "../common";
+import { QuickAccessDock } from "../common";
 import { setLastActiveRoute } from "../../utils/navigationHistory";
+import { quickDeskStore } from "../../modules/dashboard/components/widgets/executive-kpi/quickDeskStore";
 import AppHeader from "./AppHeader";
 import { ROUTE_TITLE_MAP, resolveRouteMeta, type RouteMeta } from "./routeMeta";
 import {
@@ -229,12 +230,21 @@ export default function AppLayout() {
     setIsProfileOpen,
   });
 
-  // ── Persistent Route Tracking Across App Restarts ───────────────────
+  // ── Persistent Route Tracking Across App Restarts & Quick Desk Recents ──
   useEffect(() => {
     if (location.pathname) {
       setLastActiveRoute(location.pathname + location.search);
+      const meta = resolveRouteMeta(location.pathname, location.search);
+      if (meta && !meta.isDashboard) {
+        quickDeskStore.recordVisitedPage(activeTenantId, {
+          path: location.pathname + (location.search || ''),
+          title: meta.title,
+          category: meta.category,
+          subCategory: meta.subCategory,
+        });
+      }
     }
-  }, [location.pathname, location.search]);
+  }, [location.pathname, location.search, activeTenantId]);
 
   // Close right sidebar drawer when navigating away unless requested by the new route
   const prevPathnameRef = useRef(location.pathname);
@@ -556,8 +566,8 @@ export default function AppLayout() {
         onReloadAndUpdate={triggerWebReload}
       />
 
-      {/* Draggable Floating Undo / Redo Action Dock */}
-      <FloatingUndoRedoDock />
+      {/* Screen-Edge Floating Quick Access & History Dock */}
+      <QuickAccessDock />
     </div>
   );
 }

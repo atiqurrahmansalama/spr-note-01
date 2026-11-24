@@ -45,7 +45,7 @@ export default function AdmissionPipelineWidget({
             <h3 className="text-sm font-bold theme-text-primary leading-tight truncate">
               {title || t('admissionPipeline', 'Admission Application Pipeline')}
             </h3>
-            <p className="text-[11px] theme-text-secondary mt-0.5 truncate">
+            <p className="hidden xl:block text-[11px] theme-text-secondary mt-0.5 truncate">
               Total Applicants: <span className="font-mono font-bold theme-text-primary">{formatNumber(pipeline.totalApplications)}</span>
             </p>
           </div>

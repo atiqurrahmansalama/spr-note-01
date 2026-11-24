@@ -93,16 +93,30 @@ export const StaffProfileHubView: React.FC = () => {
         const data: StaffMember = await getStaffDetail(id);
         setStaff(data);
 
-        // Concurrently fetch assignments, duties, attendance logs, and leaves
+        // Automatically synchronize URL in address bar to human-readable employee_id slug
+        if (data?.employee_id && typeof window !== 'undefined') {
+          const cleanSlug = data.employee_id.toLowerCase();
+          if (id && id.toLowerCase() !== cleanSlug) {
+            const currentSearch = window.location.search || '';
+            window.history.replaceState(
+              window.history.state || {},
+              '',
+              `/staff/${cleanSlug}${currentSearch}`
+            );
+          }
+        }
+
+        // Concurrently fetch assignments, duties, attendance logs, and leaves using canonical ID
+        const staffCanonicalId = data.id || id;
         const [assignRes, dutyRes, attRes, leaveRes] = await Promise.allSettled([
           data.staff_type === 'TEACHING'
-            ? getTeacherAssignments({ teacher: id })
+            ? getTeacherAssignments({ teacher: staffCanonicalId })
             : Promise.resolve([]),
           data.staff_type !== 'TEACHING'
-            ? getStaffDuties({ staff: id })
+            ? getStaffDuties({ staff: staffCanonicalId })
             : Promise.resolve([]),
-          getStaffAttendance({ staff: id }),
-          getLeaveRequests({ staff: id }),
+          getStaffAttendance({ staff: staffCanonicalId }),
+          getLeaveRequests({ staff: staffCanonicalId }),
         ]);
 
         if (assignRes.status === 'fulfilled') {
@@ -150,10 +164,12 @@ export const StaffProfileHubView: React.FC = () => {
     }
   };
 
-  // Drawer handlers
+  // Drawer handlers (with URL synchronization)
   const handleOpenEditDrawer = () => {
     if (!staff) return;
     openRightSidebar({
+      drawerKey: 'edit_staff_profile',
+      syncUrl: true,
       title: `Edit ${staff.user_name || 'Staff'} Profile`,
       subtitle: 'Modify designation, qualifications, credentials, and hierarchy rank',
       width: 'lg',
@@ -178,6 +194,8 @@ export const StaffProfileHubView: React.FC = () => {
 
     if (isTeaching) {
       openRightSidebar({
+        drawerKey: 'teaching_assignments',
+        syncUrl: true,
         title: 'Class & Subject Assignments',
         subtitle: `Manage assigned academic classes and groups for ${staff.user_name || staff.employee_id}`,
         width: 'md',
@@ -194,6 +212,8 @@ export const StaffProfileHubView: React.FC = () => {
       });
     } else {
       openRightSidebar({
+        drawerKey: 'general_duties',
+        syncUrl: true,
         title: 'General & Campus Duties',
         subtitle: `Assign residential, dining, or gate duties for ${staff.user_name || staff.employee_id}`,
         width: 'md',

@@ -13,7 +13,11 @@
  * - "2024-01-15" -> "Jan 15, 2024"
  * - "Enrolled" -> "Enrolled"
  */
-export function formatDisplayDateTime(rawDate?: string | number | Date | null, fallback = '—'): string {
+export function formatDisplayDateTime(
+  rawDate?: string | number | Date | null,
+  fallback = '—',
+  timeZone?: string
+): string {
   if (!rawDate) return fallback;
   if (typeof rawDate === 'string' && isNaN(Date.parse(rawDate))) {
     return rawDate;
@@ -25,6 +29,7 @@ export function formatDisplayDateTime(rawDate?: string | number | Date | null, f
     const isDateOnly = typeof rawDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawDate.trim());
     if (isDateOnly) {
       return new Intl.DateTimeFormat('en-US', {
+        ...(timeZone ? { timeZone } : {}),
         month: 'short',
         day: '2-digit',
         year: 'numeric',
@@ -32,6 +37,7 @@ export function formatDisplayDateTime(rawDate?: string | number | Date | null, f
     }
 
     return new Intl.DateTimeFormat('en-US', {
+      ...(timeZone ? { timeZone } : {}),
       month: 'short',
       day: '2-digit',
       year: 'numeric',
@@ -47,7 +53,11 @@ export function formatDisplayDateTime(rawDate?: string | number | Date | null, f
 /**
  * Formats a raw date or timestamp into a date-only format (e.g. "Oct 05, 2026").
  */
-export function formatDisplayDate(rawDate?: string | number | Date | null, fallback = '—'): string {
+export function formatDisplayDate(
+  rawDate?: string | number | Date | null,
+  fallback = '—',
+  timeZone?: string
+): string {
   if (!rawDate) return fallback;
   if (typeof rawDate === 'string' && isNaN(Date.parse(rawDate))) {
     return rawDate;
@@ -57,6 +67,7 @@ export function formatDisplayDate(rawDate?: string | number | Date | null, fallb
     if (isNaN(d.getTime())) return String(rawDate);
 
     return new Intl.DateTimeFormat('en-US', {
+      ...(timeZone ? { timeZone } : {}),
       month: 'short',
       day: '2-digit',
       year: 'numeric',

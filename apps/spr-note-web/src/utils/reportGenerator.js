@@ -1,24 +1,53 @@
 import { calendarSettings, copyReportSettings } from "./localStore";
+import { getClassroomEffectiveTimezone } from "../constants/calendarConstants";
 
 /**
- * Helper to format date based on date format settings
+ * Helper to format date based on date format settings and classroom timezone
  */
-export function formatDate(selectedDate, customFormat) {
+export function formatDate(selectedDate, customFormat, customTimezone) {
   const format = customFormat || copyReportSettings.getDateFormat() || calendarSettings.getDateFormat();
   const d = selectedDate ? new Date(selectedDate) : new Date();
   if (isNaN(d.getTime())) {
     return String(selectedDate);
   }
 
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
+  // If selectedDate is a pure date string (e.g. "2026-11-24"), don't shift timezone
+  const isDateOnly = typeof selectedDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(selectedDate.trim());
+  const tz = !isDateOnly ? (customTimezone || getClassroomEffectiveTimezone()) : undefined;
+
+  let day, month, year, monthIdx;
+
+  if (tz) {
+    try {
+      const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+      const parts = formatter.formatToParts(d);
+      year = parts.find((p) => p.type === "year")?.value || String(d.getFullYear());
+      month = parts.find((p) => p.type === "month")?.value || String(d.getMonth() + 1).padStart(2, "0");
+      day = parts.find((p) => p.type === "day")?.value || String(d.getDate()).padStart(2, "0");
+      monthIdx = parseInt(month, 10) - 1;
+    } catch {
+      day = String(d.getDate()).padStart(2, "0");
+      month = String(d.getMonth() + 1).padStart(2, "0");
+      year = d.getFullYear();
+      monthIdx = d.getMonth();
+    }
+  } else {
+    day = String(d.getDate()).padStart(2, "0");
+    month = String(d.getMonth() + 1).padStart(2, "0");
+    year = d.getFullYear();
+    monthIdx = d.getMonth();
+  }
 
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const fullMonthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   
-  const mmm = monthNames[d.getMonth()];
-  const mmmm = fullMonthNames[d.getMonth()];
+  const mmm = monthNames[monthIdx] || "";
+  const mmmm = fullMonthNames[monthIdx] || "";
 
   switch (format) {
     case "MM/DD/YYYY": return `${month}/${day}/${year}`;

@@ -3,6 +3,7 @@ import { ExpandedCell } from "@/components/ui/DataTable";
 import ActionMenu from "@/components/ui/ActionMenu";
 import { EditIcon, TrashIcon } from "@/components/ui/Icons";
 import { auth as authStore } from "@/utils/localStore";
+import { getClassroomEffectiveTimezone } from "@/constants/calendarConstants";
 import { ReportItem } from "../types";
 import { getReportMenuItems } from "./ReportContextMenu";
 import { isBookReport, isReportEdited } from "../utils/studentMetaResolver";
@@ -153,6 +154,7 @@ export function RecordReportExpandedFooter({
               <span className="theme-text-secondary font-mono font-normal opacity-80">
                 ·{" "}
                 {new Date((report.edited_at || report.edit_time) as string).toLocaleString("en-US", {
+                  timeZone: getClassroomEffectiveTimezone(),
                   month: "short",
                   day: "numeric",
                   year: "numeric",

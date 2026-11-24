@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { useTenant } from '@/context/TenantContext';
 import { useTranslation } from '@/i18n/useTranslation';
 import { auth as authStore } from '@/utils/localStore';
 import { verifyPublicStaffToken } from '@/api/staffOnboarding';
@@ -66,6 +67,8 @@ export const PublicStaffOnboardingView: React.FC = () => {
   );
 
   const [searchParams] = useSearchParams();
+  const { tenantSlug } = useParams<{ tenantSlug?: string }>();
+  const { currentInstitution, institutions } = useTenant();
   const token = searchParams.get('token') || '';
 
   const [loading, setLoading] = useState(true);
@@ -108,69 +111,114 @@ export const PublicStaffOnboardingView: React.FC = () => {
     [activeUser]
   );
 
-  // Load & verify public invitation token metadata
+  // Load & verify public invitation token metadata or institutional slug
   useEffect(() => {
-    if (!token) {
-      setTokenError(
-        tp(
-          'noTokenError',
-          'No onboarding token provided. Please scan a valid QR code or use an official invitation link.'
-        )
-      );
+    if (token) {
+      let isCancelled = false;
+      const verify = async () => {
+        setLoading(true);
+        setTokenError('');
+        try {
+          const meta = await verifyPublicStaffToken(token);
+          if (!isCancelled) {
+            setTokenMeta(meta);
+            if (meta?.candidate_application) {
+              const app = meta.candidate_application;
+              if (app.lifecycle_level === 2 || app.lifecycle_level === 3) {
+                setSubmittedReceipt({
+                  status: app.status.toLowerCase(),
+                  approval_status: app.status,
+                  tracking_code: app.tracking_code,
+                  staff: app.staff,
+                  lifecycle_level: app.lifecycle_level,
+                });
+              } else if (app.lifecycle_level === 4) {
+                setSubmittedReceipt({
+                  status: 'rejected',
+                  approval_status: 'REJECTED',
+                  tracking_code: app.tracking_code,
+                  rejection_reason: app.rejection_reason,
+                  lifecycle_level: 4,
+                });
+              } else {
+                setSubmittedReceipt(null);
+              }
+            }
+          }
+        } catch (err: any) {
+          if (!isCancelled) {
+            setTokenError(
+              err?.message ||
+                tp('invalidTokenFallback', 'Invalid or expired staff invitation link.')
+            );
+          }
+        } finally {
+          if (!isCancelled) {
+            setLoading(false);
+          }
+        }
+      };
+
+      verify();
+      return () => {
+        isCancelled = true;
+      };
+    }
+
+    if (tenantSlug) {
+      const targetInst =
+        (currentInstitution &&
+        (currentInstitution.slug?.toLowerCase() === tenantSlug.toLowerCase() ||
+          currentInstitution.code?.toLowerCase() === tenantSlug.toLowerCase())
+          ? currentInstitution
+          : null) ||
+        institutions.find(
+          (i: any) =>
+            (i.slug && i.slug.toLowerCase() === tenantSlug.toLowerCase()) ||
+            (i.code && i.code.toLowerCase() === tenantSlug.toLowerCase()) ||
+            (String(i.id).toLowerCase() === tenantSlug.toLowerCase())
+        );
+
+      if (targetInst) {
+        setTokenMeta({
+          institution_id: targetInst.id,
+          institution_name: targetInst.name,
+          institution_bangla_name: targetInst.bangla_name || targetInst.name_bn,
+          target_designation_name: 'Teaching Faculty & Institutional Staff',
+        });
+        setTokenError('');
+        setLoading(false);
+      } else {
+        setLoading(false);
+        setTokenError(
+          tp('academyNotFound', `Academy "${tenantSlug}" could not be resolved. Please verify the link.`)
+        );
+      }
+      return;
+    }
+
+    // Automatic fallback to active or primary institution if accessible
+    const fallbackInst = currentInstitution || (institutions && institutions.length > 0 ? institutions[0] : null);
+    if (fallbackInst) {
+      setTokenMeta({
+        institution_id: fallbackInst.id,
+        institution_name: fallbackInst.name,
+        institution_bangla_name: fallbackInst.bangla_name || fallbackInst.name_bn,
+        target_designation_name: 'Teaching Faculty & Institutional Staff',
+      });
+      setTokenError('');
       setLoading(false);
       return;
     }
 
-    let isCancelled = false;
-    const verify = async () => {
-      setLoading(true);
-      setTokenError('');
-      try {
-        const meta = await verifyPublicStaffToken(token);
-        if (!isCancelled) {
-          setTokenMeta(meta);
-          if (meta?.candidate_application) {
-            const app = meta.candidate_application;
-            if (app.lifecycle_level === 2 || app.lifecycle_level === 3) {
-              setSubmittedReceipt({
-                status: app.status.toLowerCase(),
-                approval_status: app.status,
-                tracking_code: app.tracking_code,
-                staff: app.staff,
-                lifecycle_level: app.lifecycle_level,
-              });
-            } else if (app.lifecycle_level === 4) {
-              setSubmittedReceipt({
-                status: 'rejected',
-                approval_status: 'REJECTED',
-                tracking_code: app.tracking_code,
-                rejection_reason: app.rejection_reason,
-                lifecycle_level: 4,
-              });
-            } else {
-              setSubmittedReceipt(null);
-            }
-          }
-        }
-      } catch (err: any) {
-        if (!isCancelled) {
-          setTokenError(
-            err?.message ||
-              tp('invalidTokenFallback', 'Invalid or expired staff invitation link.')
-          );
-        }
-      } finally {
-        if (!isCancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    verify();
-    return () => {
-      isCancelled = true;
-    };
-  }, [token, isAuthenticated, tp]);
+    setTokenError(
+      tp(
+        'noTokenError',
+        'No onboarding token or academy link provided. Please scan a valid QR code or use an official invitation link.'
+      )
+    );
+    setLoading(false);
+  }, [token, tenantSlug, currentInstitution, institutions, isAuthenticated, tp]);
 
   // Deferred validation errors (shown strictly after blur or failed submit)
   const nameError =

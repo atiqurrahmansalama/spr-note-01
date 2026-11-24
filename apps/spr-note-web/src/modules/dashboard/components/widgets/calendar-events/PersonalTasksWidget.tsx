@@ -65,7 +65,7 @@ export default function PersonalTasksWidget({
             <h3 className="text-xs @sm:text-sm font-bold theme-text-primary leading-tight truncate">
               {title}
             </h3>
-            <p className="hidden @[820px]:block text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5 truncate">
+            <p className="hidden xl:block text-[10px] @sm:text-[11px] theme-text-secondary mt-0.5 truncate">
               {pendingTasks.length} pending milestone{pendingTasks.length === 1 ? '' : 's'}
               {completedCount > 0 ? ` (${completedCount} completed)` : ''}
             </p>

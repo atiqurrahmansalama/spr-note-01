@@ -22,4 +22,6 @@ export { default as QRCodeCardModal } from './QRCodeCardModal';
 export type { QRCodeCardModalProps } from './QRCodeCardModal';
 export { default as FloatingUndoRedoDock, FloatingUndoRedoDock as NamedFloatingUndoRedoDock } from './FloatingUndoRedoDock';
 export type { FloatingUndoRedoDockProps } from './FloatingUndoRedoDock';
+export { default as QuickAccessDock, QuickAccessDock as NamedQuickAccessDock } from './QuickAccessDock';
+export type { QuickAccessDockProps } from './QuickAccessDock';
 export * from './TimetableMatrixGrid';

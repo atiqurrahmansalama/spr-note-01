@@ -8,6 +8,7 @@ import {
   RoleInviteMetrics,
 } from '../types';
 import { useUserTranslation } from './useUserTranslation';
+import { getPublicJoinUrl } from '@/utils/tenantUrlUtils';
 
 const STORAGE_KEY_INVITES_VIEW_MODE = 'spr_role_invites_view_mode';
 
@@ -159,10 +160,9 @@ export const useRoleInvites = (onRefresh?: () => void) => {
     };
   }, [invites]);
 
-  // 6. Join URL Generator
+  // 6. Join URL Generator (Multi-Tenant Canonical Slug)
   const getJoinUrl = useCallback((token: string) => {
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/join?token=${token}`;
+    return getPublicJoinUrl(null, token);
   }, []);
 
   // 7. Copy Link to Clipboard
