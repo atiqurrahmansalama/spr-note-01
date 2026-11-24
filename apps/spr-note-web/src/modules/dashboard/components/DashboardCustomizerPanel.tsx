@@ -9,7 +9,7 @@ import {
 } from '../widgetRegistry';
 import { MODULE_CATEGORIES } from '../widgetCategories';
 import DashboardWidgetCardItem from './DashboardWidgetCardItem';
-import DrawerContainer from '../../../components/layout/DrawerContainer';
+import DrawerContainer, { DrawerSection } from '../../../components/layout/DrawerContainer';
 import CustomButton from '../../../components/ui/CustomButton';
 import CustomCheckbox from '../../../components/ui/CustomCheckbox';
 import { useRoleManagement } from '../../admin/role-management/hooks/useRoleManagement';
@@ -236,7 +236,7 @@ export default function DashboardCustomizerPanel({
       padding="none"
       className="space-y-6 pt-2 pb-16 @container text-left rtl:text-right"
       footer={
-        <div className="w-full flex flex-col gap-3 pt-3 border-t theme-border">
+        <div className="w-full flex flex-col gap-3 pt-3 border-0">
           {/* Canonical CustomCheckbox for Super Admin Default Layout Save */}
           {isSuperAdmin && (
             <div className="px-0.5">
@@ -328,37 +328,31 @@ export default function DashboardCustomizerPanel({
             const ModuleIcon = moduleCat.icon;
 
             return (
-              <div key={moduleCat.id} className="space-y-3">
-                {/* Canonical Streamlined Section Header */}
-                <div className="flex items-center gap-2 pb-2 border-b theme-border">
-                  <ModuleIcon className="w-4 h-4 theme-accent shrink-0" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary truncate">
-                    {moduleCat.title}
-                  </h4>
-                </div>
-
+              <DrawerSection
+                key={moduleCat.id}
+                title={moduleCat.title}
+                icon={ModuleIcon}
+                className="first:pt-0 pt-4"
+              >
                 {/* Render Clean Widget Cards List */}
                 <div className="space-y-2.5">
                   {eligibleModuleWidgets.map(renderWidgetCard)}
                 </div>
-              </div>
+              </DrawerSection>
             );
           })}
 
           {/* Safeguard: Uncategorized Widgets Section */}
           {uncategorizedWidgets.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 pb-2 border-b theme-border">
-                <SparklesIcon className="w-4 h-4 theme-accent shrink-0" />
-                <h4 className="text-xs font-bold uppercase tracking-wider theme-text-primary truncate">
-                  Additional Widgets
-                </h4>
-              </div>
-
+            <DrawerSection
+              title="Additional Widgets"
+              icon={SparklesIcon}
+              className="pt-4"
+            >
               <div className="space-y-2.5">
                 {uncategorizedWidgets.map(renderWidgetCard)}
               </div>
-            </div>
+            </DrawerSection>
           )}
         </div>
       )}

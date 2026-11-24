@@ -6,7 +6,6 @@ import {
   ROLE_KPI_CARDS_CATALOG,
   type KpiCardCatalogItem,
 } from '../widgetRegistry';
-import { AVAILABLE_APP_SHORTCUTS } from './widgets';
 import CustomCheckbox from '../../../components/ui/CustomCheckbox';
 import SegmentedSwitch from '../../../components/ui/SegmentedSwitch';
 import { useFeatureControl } from '../../../context/FeatureControlContext';
@@ -25,7 +24,6 @@ import {
 
 export const CONFIGURABLE_WIDGET_IDS = new Set([
   'kpi_metrics',
-  'quick_actions',
   'working_hours',
   'academic_events',
 ]);
@@ -96,12 +94,8 @@ export default function DashboardWidgetCardItem({
 
   return (
     <div
-      className={`rounded-2xl border theme-border theme-bg-surface transition-all duration-150 overflow-hidden ${
-        isFeatureBlocked ? 'opacity-70 bg-opacity-40' : ''
-      } ${
-        isCardExpanded
-          ? 'border-[var(--accent-main)]/50 shadow-md ring-1 ring-[var(--accent-main)]/20'
-          : 'shadow-xs hover:border-[var(--accent-main)]/30'
+      className={`rounded-2xl border-0 ring-0 theme-bg-surface transition-all duration-150 overflow-hidden shadow-xs ${
+        isFeatureBlocked ? 'opacity-60' : ''
       }`}
     >
       {/* Card Header Row */}
@@ -117,27 +111,18 @@ export default function DashboardWidgetCardItem({
         className={`p-3.5 flex items-center justify-between gap-3 select-none transition-colors ${
           isFeatureBlocked || disabled
             ? 'cursor-not-allowed'
-            : 'cursor-pointer hover:theme-bg-sub/40'
+            : 'cursor-pointer hover:theme-bg-elevated/30'
         }`}
       >
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="min-w-0 flex-1">
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="shrink-0 flex items-center"
+            className={`text-xs truncate transition-colors ${
+              checked
+                ? 'font-bold theme-text-primary'
+                : 'font-medium theme-text-secondary'
+            }`}
           >
-            <CustomCheckbox
-              checked={checked}
-              indeterminate={indeterminate}
-              onChange={() => !isFeatureBlocked && !disabled && onToggle()}
-              disabled={isFeatureBlocked || disabled}
-              size="sm"
-            />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="text-xs font-bold theme-text-primary truncate flex items-center gap-2">
-              <span>{widgetDef.title}</span>
-            </div>
+            {widgetDef.title}
           </div>
         </div>
 
@@ -163,23 +148,55 @@ export default function DashboardWidgetCardItem({
           </div>
         )}
 
-        {/* Expand/Collapse Chevron Indicator */}
-        {hasConfigurableDetails && onToggleExpand && (
-          <div className="flex items-center gap-1 shrink-0">
-            <div
-              className={`p-1 rounded-lg theme-text-secondary transition-transform duration-200 ${
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Single-line Switch */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={checked}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isFeatureBlocked && !disabled) {
+                onToggle();
+              }
+            }}
+            disabled={isFeatureBlocked || disabled}
+            className={`relative inline-flex h-5 w-9 shrink-0 items-center px-0.5 cursor-pointer rounded-full border-0 transition-colors duration-200 ease-in-out focus:outline-none ${
+              isFeatureBlocked || disabled ? 'opacity-40 cursor-not-allowed' : ''
+            } ${
+              checked ? 'theme-bg-accent' : 'bg-black/15 dark:bg-white/15'
+            }`}
+            title={checked ? 'Disable Widget' : 'Enable Widget'}
+          >
+            <span
+              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                checked ? 'translate-x-4 rtl:-translate-x-4' : 'translate-x-0'
+              }`}
+            />
+          </button>
+
+          {/* Expand/Collapse Chevron Indicator for Configurable Widgets */}
+          {hasConfigurableDetails && onToggleExpand && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleExpand();
+              }}
+              className={`p-1 rounded-lg theme-text-secondary hover:theme-text-primary transition-transform duration-200 cursor-pointer ${
                 isCardExpanded ? 'rotate-180' : ''
               }`}
+              title={isCardExpanded ? 'Collapse' : 'Configure Sub-settings'}
             >
               <ChevronIcon className="w-3.5 h-3.5" />
-            </div>
-          </div>
-        )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Accordion Expanded Settings Body */}
       {hasConfigurableDetails && isCardExpanded && (
-        <div className="px-4 pb-4 pt-2 border-t theme-border space-y-3.5 animate-fade-in">
+        <div className="px-4 pb-4 pt-2 border-0 theme-bg-app/40 space-y-3.5 animate-fade-in">
           {/* 1. KPI Metrics & Executive Counters */}
           {widgetDef.id === 'kpi_metrics' && (() => {
             // Strictly filter by Feature & Module Control: unpermitted cards must never show in customizer
@@ -203,9 +220,9 @@ export default function DashboardWidgetCardItem({
 
             return (
               <div className="space-y-3 pt-1">
-                <div className="flex items-center justify-between pb-1 border-b theme-border">
+                <div className="flex items-center justify-between pb-1 border-0">
                   <div className="text-xs font-bold theme-text-primary flex items-center gap-1.5">
-                    <SparklesIcon className="w-3.5 h-3.5 theme-accent" />
+                    <SparklesIcon className="w-3.5 h-3.5 theme-text-secondary" />
                     <span>Included Executive KPI Cards</span>
                   </div>
                   <span className="text-[10px] theme-text-secondary font-mono">
@@ -218,17 +235,16 @@ export default function DashboardWidgetCardItem({
                     No executive KPI cards are enabled for this role under Feature &amp; Module Control.
                   </div>
                 ) : (
-                  <div className="space-y-3.5 pr-1">
+                  <div className="space-y-3 pr-1">
                     {Array.from(moduleGroups.entries()).map(([modTitle, items]) => {
                       if (items.length === 0) return null;
 
                       return (
                         <div key={modTitle} className="space-y-1.5">
                           {moduleGroups.size > 1 && (
-                            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--accent-main)] pt-2 pb-1 border-b theme-border select-none">
-                              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-main)]" />
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider theme-text-secondary pt-2 pb-1 border-0 select-none">
                               <span>{modTitle}</span>
-                              <span className="ml-auto text-[9px] font-mono theme-text-secondary font-semibold">
+                              <span className="ml-auto text-[9px] font-mono theme-text-secondary/70 font-semibold">
                                 {items.length} {items.length === 1 ? 'card' : 'cards'}
                               </span>
                             </div>
@@ -265,79 +281,12 @@ export default function DashboardWidgetCardItem({
             );
           })()}
 
-          {/* 2. Quick Actions Shortcuts */}
-          {widgetDef.id === 'quick_actions' && (
-            <div className="space-y-3 pt-1">
-              <div className="flex items-center justify-between pb-1 border-b theme-border">
-                <div className="text-xs font-bold theme-text-primary flex items-center gap-1.5">
-                  <SparklesIcon className="w-3.5 h-3.5 theme-accent" />
-                  <span>Included Quick Action Shortcuts</span>
-                </div>
-                <span className="text-[10px] theme-text-secondary">
-                  {(
-                    settings.selectedActionIds ||
-                    AVAILABLE_APP_SHORTCUTS.slice(0, 4).map((i) => i.id)
-                  ).length}{' '}
-                  Selected
-                </span>
-              </div>
-
-              <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1">
-                {AVAILABLE_APP_SHORTCUTS.map((action) => {
-                  const isShortcutBlocked =
-                    action.requiredFeatureKey && !isFeatureEnabled(action.requiredFeatureKey);
-                  if (!isSuperAdmin && isShortcutBlocked) return null;
-
-                  const selectedIds =
-                    settings.selectedActionIds ||
-                    AVAILABLE_APP_SHORTCUTS.slice(0, 4).map((i) => i.id);
-                  const isChecked = selectedIds.includes(action.id) && !isShortcutBlocked;
-
-                  return (
-                    <div
-                      key={action.id}
-                      className="py-1 flex items-center justify-between gap-2"
-                    >
-                      <CustomCheckbox
-                        checked={isChecked}
-                        onChange={(actionChecked: boolean) => {
-                          if (isShortcutBlocked || !onUpdateSettings) return;
-                          const nextIds = actionChecked
-                            ? [...selectedIds, action.id]
-                            : selectedIds.filter((id: string) => id !== action.id);
-                          onUpdateSettings({ selectedActionIds: nextIds });
-                        }}
-                        disabled={isShortcutBlocked || disabled}
-                        label={
-                          <div className="min-w-0">
-                            <div className="text-xs font-bold theme-text-primary leading-tight flex items-center gap-1.5">
-                              <span>{action.title}</span>
-                              {isShortcutBlocked && (
-                                <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">
-                                  (Disabled in System)
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[10px] theme-text-secondary truncate mt-0.5">
-                              {action.category} • {action.path}
-                            </div>
-                          </div>
-                        }
-                        size="sm"
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* 4. Working Hours & Shifts */}
+          {/* 2. Working Hours & Shifts */}
           {widgetDef.id === 'working_hours' && (
             <div className="space-y-3 pt-1 text-xs">
-              <div className="font-bold theme-text-primary flex items-center justify-between pb-1 border-b theme-border">
+              <div className="font-bold theme-text-primary flex items-center justify-between pb-1 border-0">
                 <div className="flex items-center gap-1.5">
-                  <ClockIcon className="w-3.5 h-3.5 theme-accent" />
+                  <ClockIcon className="w-3.5 h-3.5 theme-text-secondary" />
                   <span>Display View Mode</span>
                 </div>
                 <span className="text-[10px] font-mono theme-text-secondary capitalize">
@@ -361,10 +310,10 @@ export default function DashboardWidgetCardItem({
               </div>
 
               {/* Personal Tasks Visibility Control */}
-              <div className="pt-2 border-t theme-border flex items-center justify-between gap-2">
+              <div className="pt-2 border-0 flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="text-xs font-bold theme-text-primary flex items-center gap-1.5">
-                    <CheckCircleIcon className="w-3.5 h-3.5 theme-accent" />
+                    <CheckCircleIcon className="w-3.5 h-3.5 theme-text-secondary" />
                     <span>Personal Tasks</span>
                   </div>
                   <p className="text-[10px] theme-text-secondary mt-0.5">
@@ -383,12 +332,12 @@ export default function DashboardWidgetCardItem({
             </div>
           )}
 
-          {/* 6. Academic Events & Milestones */}
+          {/* 3. Academic Events & Milestones */}
           {widgetDef.id === 'academic_events' && (
             <div className="space-y-3 pt-1 text-xs">
-              <div className="font-bold theme-text-primary flex items-center justify-between pb-1 border-b theme-border">
+              <div className="font-bold theme-text-primary flex items-center justify-between pb-1 border-0">
                 <div className="flex items-center gap-1.5">
-                  <CalendarIcon className="w-3.5 h-3.5 theme-accent" />
+                  <CalendarIcon className="w-3.5 h-3.5 theme-text-secondary" />
                   <span>Display View Mode</span>
                 </div>
                 <span className="text-[10px] font-mono theme-text-secondary capitalize">
@@ -412,10 +361,10 @@ export default function DashboardWidgetCardItem({
               </div>
 
               {/* Personal Tasks Visibility Control */}
-              <div className="pt-2 border-t theme-border flex items-center justify-between gap-2">
+              <div className="pt-2 border-0 flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="text-xs font-bold theme-text-primary flex items-center gap-1.5">
-                    <CheckCircleIcon className="w-3.5 h-3.5 theme-accent" />
+                    <CheckCircleIcon className="w-3.5 h-3.5 theme-text-secondary" />
                     <span>Personal Tasks</span>
                   </div>
                   <p className="text-[10px] theme-text-secondary mt-0.5">

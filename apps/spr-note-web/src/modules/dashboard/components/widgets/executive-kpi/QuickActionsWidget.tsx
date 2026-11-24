@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../../../../../i18n';
-import type { DashboardQuickAction } from '../../../types';
 import { useQuickCommandDesk } from './useQuickCommandDesk';
 import IconButton from '../../../../../components/ui/IconButton';
 import {
@@ -21,66 +20,7 @@ import {
   DotsVerticalIcon,
 } from '../../../../../components/ui/Icons';
 
-import { ROUTE_TITLE_MAP } from '../../../../../components/layout/routeMeta';
-
-export interface AppShortcutItem {
-  id: string;
-  title: string;
-  description: string;
-  path: string;
-  category: string;
-  color: 'accent' | 'emerald' | 'purple' | 'amber' | 'rose' | 'sky';
-  icon: React.ComponentType<{ className?: string }>;
-  requiredFeatureKey?: string;
-}
-
-const CANONICAL_SHORTCUT_SPECS: Array<{
-  path: string;
-  color: AppShortcutItem['color'];
-  featureKey?: string;
-}> = [
-  { path: '/studies/daily-progress', color: 'purple', featureKey: 'progress_management' },
-  { path: '/studies/progress-reports', color: 'accent', featureKey: 'progress_management' },
-  { path: '/studies/progress-analytics', color: 'sky', featureKey: 'progress_management' },
-  { path: '/attendance/students/monthly-matrix', color: 'emerald', featureKey: 'student_class_attendance' },
-  { path: '/academy/periods', color: 'amber', featureKey: 'class_period_slots' },
-  { path: '/academy/calendar-events', color: 'rose', featureKey: 'academy_calendar_events' },
-  { path: '/students', color: 'accent', featureKey: 'student_roster' },
-  { path: '/admission', color: 'emerald', featureKey: 'student_admission' },
-  { path: '/staff/roster', color: 'sky', featureKey: 'staff_roster' },
-  { path: '/academy/campus-profile', color: 'amber', featureKey: 'campus_profile' },
-  { path: '/academy/classes-groups', color: 'purple', featureKey: 'student_classes' },
-];
-
-/**
- * Dynamically generated from canonical Route Metadata Registry (ROUTE_TITLE_MAP).
- * Eliminates all hardcoded titles, categories, and descriptions.
- */
-export const AVAILABLE_APP_SHORTCUTS: AppShortcutItem[] = CANONICAL_SHORTCUT_SPECS.map((spec) => {
-  const meta = ROUTE_TITLE_MAP[spec.path] || {
-    title: spec.path,
-    category: 'General',
-  };
-  const id = spec.path.replace(/^\//, '').replace(/[/\\-]/g, '_');
-  const description = meta.subCategory
-    ? `${meta.category} • ${meta.subCategory}`
-    : meta.category;
-
-  return {
-    id,
-    title: meta.title,
-    description,
-    path: spec.path,
-    category: meta.category,
-    color: spec.color,
-    icon: getShortcutIcon(spec.path),
-    requiredFeatureKey: spec.featureKey,
-  };
-});
-
 export interface QuickActionsWidgetProps {
-  actions?: DashboardQuickAction[];
-  selectedActionIds?: string[];
   title?: string;
   className?: string;
 }
@@ -168,7 +108,7 @@ export default function QuickActionsWidget({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [isMenuOpen]);
 
-  // Filter out any page that is already pinned from the Recently Visited Pages list
+  // Exclude pinned pages from the Recently Visited Pages list
   const unpinnedRecentPages = useMemo(() => {
     return recentPages.filter((r) => !isPinned(r.path));
   }, [recentPages, isPinned]);
@@ -193,7 +133,7 @@ export default function QuickActionsWidget({
           </div>
         </div>
 
-        {/* 3-Dot Options Menu (Reused Project IconButton, Ghost Variant - Transparent by default, subtle on hover) */}
+        {/* 3-Dot Options Menu (Ghost Variant: transparent by default, subtle on hover) */}
         <div ref={menuRef} className="relative shrink-0">
           <IconButton
             icon={DotsVerticalIcon}
@@ -228,7 +168,7 @@ export default function QuickActionsWidget({
         </div>
       </div>
 
-      {/* 2. SECTION 1: PINNED SHORTCUTS (Badge removed) */}
+      {/* 2. SECTION 1: PINNED SHORTCUTS */}
       <div className="space-y-2.5">
         <div className="flex items-center gap-1.5">
           <PinIcon className="w-3.5 h-3.5 theme-accent" />
@@ -293,7 +233,7 @@ export default function QuickActionsWidget({
         )}
       </div>
 
-      {/* 3. SECTION 2: RECENTLY VISITED PAGES (Subtle soft divider line, excludes pinned pages, badge removed) */}
+      {/* 3. SECTION 2: RECENTLY VISITED PAGES */}
       <div className="space-y-2.5 pt-2.5 border-t border-black/[0.04] dark:border-white/[0.04]">
         <div className="flex items-center gap-1.5">
           <ClockIcon className="w-3.5 h-3.5 theme-accent" />
@@ -305,6 +245,9 @@ export default function QuickActionsWidget({
         {unpinnedRecentPages.length === 0 ? (
           <div className="py-4 text-center text-xs theme-text-secondary theme-bg-app rounded-2xl p-3 shadow-2xs space-y-1">
             <p className="font-semibold theme-text-primary">No Recent Pages Tracked Yet</p>
+            <p className="text-[11px] max-w-sm mx-auto">
+              As you navigate across students, classes, and reports, your recently visited unpinned pages will appear here.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 @[480px]:grid-cols-2 @[820px]:grid-cols-3 @[1100px]:grid-cols-4 gap-2">

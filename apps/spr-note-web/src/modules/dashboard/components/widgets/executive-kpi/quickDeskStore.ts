@@ -1,5 +1,4 @@
 import type { PinnedPageItem, RecentPageItem } from './quickDeskTypes';
-import { ROUTE_TITLE_MAP } from '../../../../../components/layout/routeMeta';
 
 export const QUICK_DESK_UPDATE_EVENT = 'spr_quick_desk_updated';
 
@@ -24,29 +23,8 @@ function getRecentsStorageKey(tenantId?: string, userId?: string): string {
   return `spr_quick_desk_recents_${safeTenant}_${safeUser}`;
 }
 
-const DEFAULT_PINNED_SPECS: Array<{ path: string; color: PinnedPageItem['color']; iconName: string }> = [
-  { path: '/studies/daily-progress', color: 'purple', iconName: 'BookOpen' },
-  { path: '/studies/progress-reports', color: 'accent', iconName: 'Sparkles' },
-  { path: '/students', color: 'emerald', iconName: 'Student' },
-  { path: '/staff/roster', color: 'sky', iconName: 'Teacher' },
-];
-
-/**
- * Dynamically generated default pinned pages based on canonical ROUTE_TITLE_MAP.
- */
-const DEFAULT_PINNED_PAGES: PinnedPageItem[] = DEFAULT_PINNED_SPECS.map((spec) => {
-  const meta = ROUTE_TITLE_MAP[spec.path] || { title: spec.path, category: 'General' };
-  return {
-    id: `pin-${spec.path.replace(/^\//, '').replace(/[/\\-]/g, '_')}`,
-    path: spec.path,
-    title: meta.title,
-    category: meta.category,
-    subCategory: meta.subCategory,
-    color: spec.color,
-    iconName: spec.iconName,
-    pinnedAt: new Date().toISOString(),
-  };
-});
+// Zero hardcoded defaults: Users start with an empty clean desk and dynamically pin pages they have permission for.
+const DEFAULT_PINNED_PAGES: PinnedPageItem[] = [];
 
 function broadcastDeskUpdate(): void {
   if (typeof window !== 'undefined') {
@@ -60,10 +38,7 @@ export const quickDeskStore = {
     try {
       const key = getPinnedStorageKey(tenantId, userId);
       const raw = localStorage.getItem(key);
-      if (raw === null) {
-        localStorage.setItem(key, JSON.stringify(DEFAULT_PINNED_PAGES));
-        return DEFAULT_PINNED_PAGES;
-      }
+      if (!raw) return DEFAULT_PINNED_PAGES;
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) ? parsed : DEFAULT_PINNED_PAGES;
     } catch {
