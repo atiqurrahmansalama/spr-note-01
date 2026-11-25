@@ -12,7 +12,7 @@ import { useAcademicSession } from "../../context/AcademicSessionContext";
 import { useToast } from "../../context/ToastContext";
 import { useTheme } from "../../context/useTheme";
 import { QuickAccessDock } from "../common";
-import { setLastActiveRoute } from "../../utils/navigationHistory";
+import { setLastActiveRoute, getRouteHistoryStack } from "../../utils/navigationHistory";
 import { quickDeskStore } from "../../modules/dashboard/components/widgets/executive-kpi/quickDeskStore";
 import AppHeader from "./AppHeader";
 import { ROUTE_TITLE_MAP, resolveRouteMeta, type RouteMeta } from "./routeMeta";
@@ -339,7 +339,7 @@ export default function AppLayout() {
     const path = window.location.pathname;
     const search = new URLSearchParams(window.location.search);
 
-    // 1. If inside any sub-section or content tab of Institution Settings, return to the main settings menu first
+    // 1. If on mobile (<768px) and inside any sub-section or content tab of Institution Settings, return to the main settings menu first
     const isInstitutionSettingsSubPath =
       path.startsWith("/institution-settings/") ||
       path.startsWith("/admin-tools/") ||
@@ -352,12 +352,12 @@ export default function AppLayout() {
         path === "/sp-management") &&
       Boolean(search.get("tab") || search.get("section"));
 
-    if (isInstitutionSettingsSubPath || isInstitutionSettingsQuery) {
-      navigate("/institution-settings");
+    if (isMobile && (isInstitutionSettingsSubPath || isInstitutionSettingsQuery)) {
+      navigate("/institution-settings", { replace: true });
       return;
     }
 
-    // 2. If inside any sub-section or content tab of Preferences, return to the main preferences menu first
+    // 2. If on mobile (<768px) and inside any sub-section or content tab of Preferences, return to the main preferences menu first
     const isPreferencesSubPath =
       path.startsWith("/preferences/") ||
       path.startsWith("/personalize/");
@@ -365,12 +365,53 @@ export default function AppLayout() {
       (path === "/preferences" || path === "/personalize") &&
       Boolean(search.get("tab") || search.get("section"));
 
-    if (isPreferencesSubPath || isPreferencesQuery) {
-      navigate("/preferences");
+    if (isMobile && (isPreferencesSubPath || isPreferencesQuery)) {
+      navigate("/preferences", { replace: true });
       return;
     }
 
-    // 3. If on direct standalone classroom settings routes, navigate back to Institution Settings
+    // 3. For Institution Settings & Preferences on Desktop (or on Mobile when already on the root menu),
+    // safely navigate back to the previous application module / page
+    const isSettingsDomain =
+      path.startsWith("/institution-settings") ||
+      path.startsWith("/admin-tools") ||
+      path.startsWith("/developer-tools") ||
+      path.startsWith("/sp-management") ||
+      path.startsWith("/preferences") ||
+      path.startsWith("/personalize");
+
+    if (isSettingsDomain) {
+      // Find the most recent non-settings route from the session history stack
+      const stack = getRouteHistoryStack();
+      const prevAppRoute = stack.find((item) => {
+        if (!item || !item.path) return false;
+        const p = item.path.split("?")[0];
+        return (
+          !p.startsWith("/institution-settings") &&
+          !p.startsWith("/admin-tools") &&
+          !p.startsWith("/developer-tools") &&
+          !p.startsWith("/sp-management") &&
+          !p.startsWith("/preferences") &&
+          !p.startsWith("/personalize") &&
+          p !== path
+        );
+      });
+
+      if (prevAppRoute && prevAppRoute.path) {
+        navigate(prevAppRoute.path);
+        return;
+      }
+
+      if (typeof window !== "undefined" && window.history.length > 1) {
+        navigate(-1);
+        return;
+      }
+
+      navigate("/dashboard");
+      return;
+    }
+
+    // 4. If on direct standalone classroom settings routes, navigate back to Institution Settings
     if (
       path === "/classroom-date-timezone" ||
       path === "/classroom-timezone" ||
@@ -393,7 +434,7 @@ export default function AppLayout() {
       return;
     }
 
-    // 4. Default standard back navigation with fallback to /dashboard
+    // 5. Default standard back navigation with fallback to /dashboard
     if (typeof window !== "undefined" && window.history.length > 1) {
       navigate(-1);
     } else {

@@ -407,9 +407,9 @@ export function UntilWhenPicker({
             type="button"
             onClick={handleSelectOngoing}
             className="text-[10px] theme-accent hover:underline font-semibold cursor-pointer uppercase tracking-wider"
-            title={t('resetToOngoing', 'Reset to Ongoing')}
+            title={t('resetToOngoing', 'Reset')}
           >
-            {t('resetToOngoing', 'Reset to Ongoing')}
+            {t('resetToOngoing', 'Reset')}
           </button>
         )}
       </div>
@@ -496,7 +496,7 @@ export function UntilWhenPicker({
               onClick={handleSelectOngoing}
               className="text-xs font-semibold theme-text-secondary hover:theme-text-primary cursor-pointer"
             >
-              {t('resetToOngoing', 'Reset to Ongoing')}
+              {t('resetToOngoing', 'Reset')}
             </button>
             <CustomButton
               type="button"

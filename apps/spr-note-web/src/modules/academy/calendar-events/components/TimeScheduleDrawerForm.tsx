@@ -563,17 +563,17 @@ export default function TimeScheduleDrawerForm({
       {
         value: "THIS_EVENT",
         label: `This day only (${effectiveTargetDate})`,
-        description: "Applies only to this specific occurrence. Other days remain untouched.",
+        description: "",
       },
       {
         value: "THIS_AND_FOLLOWING",
         label: `This and all following days (from ${effectiveTargetDate})`,
-        description: "Preserves earlier historical records and applies modifications to future dates.",
+        description: "",
       },
       {
         value: "ALL_EVENTS",
         label: "Entire recurring schedule series",
-        description: "Applies changes to all past, present, and future recurring dates in this schedule.",
+        description: "",
       },
     ];
   }, [effectiveTargetDate]);
@@ -639,7 +639,7 @@ export default function TimeScheduleDrawerForm({
 
   const isWorkingHours = formData.category === "WORKING_HOURS";
   const scheduleOrEventLabel = isWorkingHours
-    ? t("workingSchedule", "Working Schedule / Shift")
+    ? t("workingSchedule", "Working Schedule")
     : t("academicEvent", "Academic Event");
 
   return (
@@ -655,13 +655,13 @@ export default function TimeScheduleDrawerForm({
           <div>
             {isWorkingHours ? (
               <TemplateTextarea
-                label={t("workingSchedule", "Working Schedule / Shift")}
+                label={t("workingSchedule", "Working Schedule")}
                 value={formData.title}
                 onChange={(val: string) => {
                   setValidationErrors((prev) => ({ ...prev, title: undefined }));
                   setFormData((prev) => ({ ...prev, title: val }));
                 }}
-                placeholder={t("enterWorkingSchedule", "Enter working schedule / shift title or select template...")}
+                placeholder={t("enterWorkingSchedule", "Enter working schedule title or select template...")}
                 rows={2}
                 category="WORKING_HOURS"
                 namespace="working_schedules"
@@ -716,7 +716,7 @@ export default function TimeScheduleDrawerForm({
           <div className="grid grid-cols-1 @[480px]:grid-cols-2 gap-3">
             <div>
               <CustomSelect
-                label={t("targetAudience", "Target Audience (Roles)")}
+                label={t("targetAudience", "Audience")}
                 multiple={true}
                 value={formData.audience}
                 onChange={(val) => setFormData({ ...formData, audience: val })}

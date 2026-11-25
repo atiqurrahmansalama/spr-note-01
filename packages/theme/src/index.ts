@@ -5,6 +5,8 @@ export interface ThemePalette {
   accentColor: string;
   darkPreview: string;
   lightPreview: string;
+  darkTokens?: Record<string, string>;
+  lightTokens?: Record<string, string>;
 }
 
 export interface ThemeMode {

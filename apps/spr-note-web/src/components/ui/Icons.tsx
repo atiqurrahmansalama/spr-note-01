@@ -167,6 +167,14 @@ return (
   );
 }
 
+export function ArrowsUpDownIcon({ className = "w-4 h-4", ...props }: IconProps) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={className} {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
+    </svg>
+  );
+}
+
 export function RefreshIcon({ className = "w-4 h-4", ...props }: IconProps) {
 return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" {...props}>

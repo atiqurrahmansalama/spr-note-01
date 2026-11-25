@@ -607,6 +607,7 @@ export function getSavedLayout(tenantId: string, role: DashboardRole, userId?: s
       return {
         ...item,
         colSpan,
+        height: typeof item.height === 'number' && item.height > 0 ? item.height : undefined,
         settings: item.settings || {},
       };
     });

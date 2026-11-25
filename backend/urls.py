@@ -50,6 +50,7 @@ def frontend_spa_fallback(request, path=''):
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/v1/universe/', include('apps.our_little_universe.urls')),
     path('', include('core.urls')),
     re_path(r'^media/(?P<path>.*)$', serve_media_file),
     re_path(r'^(?P<path>.*)$', frontend_spa_fallback),

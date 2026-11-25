@@ -169,7 +169,7 @@ export const getDynamicPriorityRankOptions = (events = [], currentEventId = null
     const isBottom = i === totalRanks && totalRanks > 1;
 
     let label = `Rank ${i}`;
-    if (isTop) label += " (Highest Priority / Top Precedence)";
+    if (isTop) label += " (Highest Priority)";
     else if (isBottom) label += " (Lowest Priority)";
 
     let description = existingAtRank

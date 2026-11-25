@@ -155,10 +155,10 @@ export const InstitutionSettingsHubView: React.FC = () => {
     (sectionId: string | null) => {
       setActiveSection(sectionId);
       if (!sectionId) {
-        navigate(basePath);
+        navigate(basePath, { replace: true });
         return;
       }
-      navigate(`${basePath}/${sectionId}`);
+      navigate(`${basePath}/${sectionId}`, { replace: true });
     },
     [basePath, navigate]
   );

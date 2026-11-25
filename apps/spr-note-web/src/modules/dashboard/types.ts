@@ -175,6 +175,8 @@ export interface DashboardLayoutItem {
   widgetId: string;
   order: number;
   colSpan: WidgetColSpan;
+  height?: number;
+  rowSpan?: number;
   isVisible: boolean;
   settings?: Record<string, any>;
 }

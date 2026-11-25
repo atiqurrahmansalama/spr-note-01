@@ -102,34 +102,45 @@ html[data-mode="light"] {
 }
 
 /* Common Theme Utility Classes */
-.theme-bg-app {
-  background-color: var(--bg-app);
-}
+.theme-bg-app { background-color: var(--bg-app); }
+.theme-bg-surface { background-color: var(--bg-surface); }
+.theme-bg-sub { background-color: var(--bg-surface-sub); }
+.theme-bg-elevated { background-color: var(--bg-elevated); }
+.theme-bg-accent { background-color: var(--accent-main); }
+.theme-bg-accent-soft { background-color: var(--accent-soft); }
+.theme-bg-danger { background-color: var(--color-danger); color: #ffffff; }
+.theme-bg-danger-soft { background-color: var(--danger-soft); }
+.theme-bg-success { background-color: var(--color-success); color: #ffffff; }
+.theme-bg-success-soft { background-color: var(--color-success-soft); }
+.theme-bg-warning-soft { background-color: var(--color-warning-soft); }
 
-.theme-bg-surface {
-  background-color: var(--bg-surface);
-}
+.theme-bg-surface\/85 { background-color: color-mix(in srgb, var(--bg-surface) 85%, transparent); }
+.theme-bg-surface\/90 { background-color: color-mix(in srgb, var(--bg-surface) 90%, transparent); }
+.theme-bg-elevated\/40 { background-color: color-mix(in srgb, var(--bg-elevated) 40%, transparent); }
+.theme-bg-elevated\/60 { background-color: color-mix(in srgb, var(--bg-elevated) 60%, transparent); }
+.hover\:theme-bg-elevated\/40:hover { background-color: color-mix(in srgb, var(--bg-elevated) 40%, transparent); }
+.hover\:theme-bg-elevated\/60:hover { background-color: color-mix(in srgb, var(--bg-elevated) 60%, transparent); }
+.focus-within\:theme-bg-elevated\/40:focus-within { background-color: color-mix(in srgb, var(--bg-elevated) 40%, transparent); }
 
-.theme-bg-elevated {
-  background-color: var(--bg-elevated);
-}
+.theme-text-primary { color: var(--text-primary); }
+.theme-text-secondary { color: var(--text-secondary); }
+.theme-text-muted { color: color-mix(in srgb, var(--text-secondary) 75%, transparent); }
+.theme-accent { color: var(--accent-main); }
+.theme-accent-text { color: var(--accent-text); }
+.theme-danger { color: var(--danger-text); }
+.theme-success { color: var(--color-success-text); }
+.theme-warning { color: var(--color-warning-text); }
 
-.theme-text-primary {
-  color: var(--text-primary);
-}
+.theme-border { border-color: var(--border-color); }
+.theme-border-danger { border-color: var(--color-danger-border); }
+.theme-border-success { border-color: var(--color-success-border); }
+.theme-border-warning { border-color: var(--color-warning-border); }
 
-.theme-text-secondary {
-  color: var(--text-secondary);
-}
-
-.theme-accent {
-  color: var(--accent-main);
-}
-
-.theme-accent-text {
-  color: var(--accent-text);
-}
-
-.theme-bg-accent {
-  background-color: var(--accent-main);
+/* Prevent browser autofill from overriding dark/light theme input backgrounds */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text-primary);
+  -webkit-box-shadow: 0 0 0 1000px transparent inset;
+  transition: background-color 5000s ease-in-out 0s;
 }

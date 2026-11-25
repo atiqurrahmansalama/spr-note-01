@@ -12,6 +12,7 @@ import {
   ArrowUpIcon, 
   ArrowDownIcon,
   Squares2X2Icon,
+  ArrowsUpDownIcon,
   ShieldCheckIcon
 } from '../../../components/ui/Icons';
 
@@ -87,20 +88,31 @@ export default function DashboardGridEngine({
   const [dragOverWidgetId, setDragOverWidgetId] = useState<string | null>(null);
 
   // Active border-drag resizing state
-  const [resizing, setResizing] = useState<{
+  type ResizeMode = 'HORIZONTAL' | 'VERTICAL' | 'BOTH';
+
+  interface ResizingState {
     widgetId: string;
+    mode: ResizeMode;
     startX: number;
+    startY: number;
     startSpan: WidgetColSpan;
     previewSpan: WidgetColSpan;
     minSpan: WidgetColSpan;
     maxSpan: WidgetColSpan;
-  } | null>(null);
+    startHeight: number;
+    previewHeight: number | null;
+  }
 
-  // Interactive border drag resize initiator
+  // Active drag resizing state (supports horizontal width, vertical height, or diagonal corner)
+  const [resizing, setResizing] = useState<ResizingState | null>(null);
+
+  // Interactive drag resize initiator (Width, Height, or Diagonal)
   const handleResizeStart = (
     e: React.MouseEvent,
     widgetId: string,
+    mode: ResizeMode,
     currentSpan: WidgetColSpan,
+    currentHeight: number | undefined,
     minSpan: WidgetColSpan = 1,
     maxSpan: WidgetColSpan = 4
   ) => {
@@ -108,47 +120,85 @@ export default function DashboardGridEngine({
     e.stopPropagation();
 
     const startX = e.clientX;
+    const startY = e.clientY;
     const startSpan = currentSpan;
+
+    // Detect actual rendered height if custom height is not already set
+    let initialHeight = currentHeight;
+    if (!initialHeight) {
+      const el = document.getElementById(`dashboard-widget-${widgetId}`);
+      initialHeight = el ? Math.round(el.getBoundingClientRect().height) : 380;
+    }
 
     setResizing({
       widgetId,
+      mode,
       startX,
+      startY,
       startSpan,
       previewSpan: startSpan,
       minSpan,
       maxSpan,
+      startHeight: initialHeight,
+      previewHeight: initialHeight,
     });
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!gridRef.current) return;
-      const gridWidth = gridRef.current.clientWidth || 1200;
-      const oneColWidth = gridWidth / 4;
-      const diffX = moveEvent.clientX - startX;
-      const deltaCols = Math.round(diffX / oneColWidth);
-      const nextSpan = Math.max(minSpan, Math.min(maxSpan, startSpan + deltaCols)) as WidgetColSpan;
+      let nextSpan = startSpan;
+      let nextHeight: number | null = initialHeight ?? null;
 
-      setResizing((prev) => (prev ? { ...prev, previewSpan: nextSpan } : null));
+      if (mode === 'HORIZONTAL' || mode === 'BOTH') {
+        if (gridRef.current) {
+          const gridWidth = gridRef.current.clientWidth || 1200;
+          const oneColWidth = gridWidth / 4;
+          const diffX = moveEvent.clientX - startX;
+          const deltaCols = Math.round(diffX / oneColWidth);
+          nextSpan = Math.max(minSpan, Math.min(maxSpan, startSpan + deltaCols)) as WidgetColSpan;
+        }
+      }
+
+      if (mode === 'VERTICAL' || mode === 'BOTH') {
+        const diffY = moveEvent.clientY - startY;
+        const rawHeight = (initialHeight || 380) + diffY;
+        // Clamp height between 220px and 850px, snapped to 10px increments
+        nextHeight = Math.max(220, Math.min(850, Math.round(rawHeight / 10) * 10));
+      }
+
+      setResizing((prev) => (prev ? { ...prev, previewSpan: nextSpan, previewHeight: nextHeight } : null));
     };
 
     const handleMouseUp = (upEvent: MouseEvent) => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
 
-      if (!gridRef.current) {
-        setResizing(null);
-        return;
+      let finalSpan = startSpan;
+      let finalHeight: number | undefined = currentHeight;
+
+      if (mode === 'HORIZONTAL' || mode === 'BOTH') {
+        if (gridRef.current) {
+          const gridWidth = gridRef.current.clientWidth || 1200;
+          const oneColWidth = gridWidth / 4;
+          const diffX = upEvent.clientX - startX;
+          const deltaCols = Math.round(diffX / oneColWidth);
+          finalSpan = Math.max(minSpan, Math.min(maxSpan, startSpan + deltaCols)) as WidgetColSpan;
+        }
       }
 
-      const gridWidth = gridRef.current.clientWidth || 1200;
-      const oneColWidth = gridWidth / 4;
-      const diffX = upEvent.clientX - startX;
-      const deltaCols = Math.round(diffX / oneColWidth);
-      const finalSpan = Math.max(minSpan, Math.min(maxSpan, startSpan + deltaCols)) as WidgetColSpan;
+      if (mode === 'VERTICAL' || mode === 'BOTH') {
+        const diffY = upEvent.clientY - startY;
+        const rawHeight = (initialHeight || 380) + diffY;
+        finalHeight = Math.max(220, Math.min(850, Math.round(rawHeight / 10) * 10));
+      }
 
       onUpdateItems(
-        items.map((item) =>
-          item.widgetId === widgetId ? { ...item, colSpan: finalSpan } : item
-        )
+        items.map((item) => {
+          if (item.widgetId !== widgetId) return item;
+          return {
+            ...item,
+            colSpan: mode === 'HORIZONTAL' || mode === 'BOTH' ? finalSpan : item.colSpan,
+            height: mode === 'VERTICAL' || mode === 'BOTH' ? finalHeight : item.height,
+          };
+        })
       );
 
       setResizing(null);
@@ -250,6 +300,34 @@ export default function DashboardGridEngine({
       if (nextSpan < minSpan) nextSpan = minSpan;
       if (nextSpan > maxSpan) nextSpan = minSpan;
       return { ...item, colSpan: nextSpan as WidgetColSpan };
+    });
+    onUpdateItems(updated);
+  };
+
+  // Height Presets: Auto (natural content height), Compact (280px), Medium (400px), Tall (560px)
+  const HEIGHT_PRESETS: Array<{ label: string; value?: number }> = [
+    { label: 'Auto', value: undefined },
+    { label: 'Compact', value: 280 },
+    { label: 'Medium', value: 400 },
+    { label: 'Tall', value: 560 },
+  ];
+
+  // Cycle height preset: Auto -> Compact -> Medium -> Tall -> Auto
+  const handleCycleHeight = (widgetId: string) => {
+    const updated = items.map((item) => {
+      if (item.widgetId !== widgetId) return item;
+      const currentH = item.height;
+      let nextIdx = 0;
+      if (currentH === undefined) {
+        nextIdx = 1; // Compact (280px)
+      } else if (currentH <= 320) {
+        nextIdx = 2; // Medium (400px)
+      } else if (currentH <= 460) {
+        nextIdx = 3; // Tall (560px)
+      } else {
+        nextIdx = 0; // Auto
+      }
+      return { ...item, height: HEIGHT_PRESETS[nextIdx].value };
     });
     onUpdateItems(updated);
   };
@@ -364,6 +442,9 @@ export default function DashboardGridEngine({
           const currentSpan = isResizingThis
             ? resizing.previewSpan
             : layoutItem.colSpan || widgetDef.defaultColSpan;
+          const effectiveHeight = isResizingThis && resizing.mode !== 'HORIZONTAL'
+            ? resizing.previewHeight || undefined
+            : layoutItem.height;
 
           return (
             <div
@@ -375,6 +456,7 @@ export default function DashboardGridEngine({
               onDragOver={(e) => handleDragOver(e, layoutItem.widgetId)}
               onDragEnd={handleDragEnd}
               onDrop={(e) => handleDrop(e, layoutItem.widgetId)}
+              style={effectiveHeight ? { height: `${effectiveHeight}px` } : undefined}
               className={`${getColSpanClass(currentSpan)} min-w-0 h-full flex flex-col transition-all duration-150 relative group/card ${
                 isDraggingThis ? 'opacity-40 scale-[0.98]' : 'opacity-100'
               } ${isDragOverThis ? 'bg-[var(--accent-main)]/10 rounded-3xl' : ''} ${
@@ -388,7 +470,9 @@ export default function DashboardGridEngine({
                     handleResizeStart(
                       e,
                       layoutItem.widgetId,
+                      'HORIZONTAL',
                       currentSpan,
+                      layoutItem.height,
                       widgetDef.minColSpan || 1,
                       widgetDef.maxColSpan || 4
                     )
@@ -397,6 +481,48 @@ export default function DashboardGridEngine({
                   title="Click and drag border horizontally to resize columns (1 to 4)"
                 >
                   <div className="w-1.5 h-10 rounded-full theme-bg-surface shadow-md group-hover/resize:theme-bg-accent group-hover/resize:h-14 transition-all" />
+                </div>
+              )}
+
+              {/* Bottom Border Interactive Drag Handle (Drag to resize height up/down) */}
+              {isEditMode && (
+                <div
+                  onMouseDown={(e) =>
+                    handleResizeStart(
+                      e,
+                      layoutItem.widgetId,
+                      'VERTICAL',
+                      currentSpan,
+                      layoutItem.height,
+                      widgetDef.minColSpan || 1,
+                      widgetDef.maxColSpan || 4
+                    )
+                  }
+                  className="absolute left-0 -bottom-2 w-full h-4 cursor-row-resize z-30 flex items-center justify-center group/resize-bottom select-none"
+                  title="Click and drag bottom border vertically to resize height"
+                >
+                  <div className="h-1.5 w-16 rounded-full theme-bg-surface shadow-md group-hover/resize-bottom:theme-bg-accent group-hover/resize-bottom:w-24 transition-all" />
+                </div>
+              )}
+
+              {/* Bottom-Right Corner Diagonal Drag Handle (Drag to resize width and height simultaneously) */}
+              {isEditMode && (
+                <div
+                  onMouseDown={(e) =>
+                    handleResizeStart(
+                      e,
+                      layoutItem.widgetId,
+                      'BOTH',
+                      currentSpan,
+                      layoutItem.height,
+                      widgetDef.minColSpan || 1,
+                      widgetDef.maxColSpan || 4
+                    )
+                  }
+                  className="absolute -right-2.5 -bottom-2.5 w-6 h-6 cursor-se-resize z-40 flex items-center justify-center group/resize-corner select-none"
+                  title="Click and drag corner diagonally to resize width and height simultaneously"
+                >
+                  <div className="w-3 h-3 rounded-full theme-bg-surface shadow-md border-2 border-[var(--accent-main)]/70 group-hover/resize-corner:scale-125 group-hover/resize-corner:theme-bg-accent transition-all" />
                 </div>
               )}
 
@@ -409,8 +535,8 @@ export default function DashboardGridEngine({
                     <span className="text-xs font-bold theme-text-primary truncate">
                       {widgetDef.title}
                     </span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded theme-bg-sub theme-text-secondary shrink-0">
-                      {currentSpan}/4 Cols
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded theme-bg-sub theme-text-secondary shrink-0">
+                      {currentSpan}/4 Cols • {effectiveHeight ? `${effectiveHeight}px` : 'Auto H'}
                     </span>
                   </div>
 
@@ -431,6 +557,17 @@ export default function DashboardGridEngine({
                     >
                       <Squares2X2Icon className="w-3 h-3 theme-accent" />
                       <span>{currentSpan === 4 ? 'Full' : `${currentSpan}-Col`}</span>
+                    </button>
+
+                    {/* Height Switcher */}
+                    <button
+                      type="button"
+                      onClick={() => handleCycleHeight(layoutItem.widgetId)}
+                      className="px-2 py-1 rounded-lg text-[10px] font-bold theme-bg-sub hover:theme-bg-elevated theme-text-primary transition-all cursor-pointer flex items-center gap-1 border-0"
+                      title="Toggle Height Preset (Auto, Compact 280px, Medium 400px, Tall 560px)"
+                    >
+                      <ArrowsUpDownIcon className="w-3 h-3 theme-accent" />
+                      <span>{effectiveHeight ? (effectiveHeight <= 320 ? 'Compact' : effectiveHeight <= 460 ? 'Medium' : 'Tall') : 'Auto H'}</span>
                     </button>
 
                     {/* Step Up / Down */}
@@ -471,8 +608,12 @@ export default function DashboardGridEngine({
                 </div>
               )}
 
-              {/* Widget Body (Dimmed if hidden in edit mode, full height stretch, naturally top-aligned) */}
-              <div className={`h-full flex-1 flex flex-col justify-start ${isHidden && isEditMode ? 'opacity-40 filter grayscale-[50%]' : ''}`}>
+              {/* Widget Body (Dimmed if hidden in edit mode, full height stretch, scrollable when height is constrained) */}
+              <div
+                className={`h-full flex-1 flex flex-col justify-start min-h-0 ${
+                  effectiveHeight ? 'overflow-y-auto' : ''
+                } ${isHidden && isEditMode ? 'opacity-40 filter grayscale-[50%]' : ''}`}
+              >
                 <WidgetErrorBoundary widgetTitle={widgetDef.title}>
                   <DeferredWidgetMount
                     isImmediate={index < 3 || isEditMode}

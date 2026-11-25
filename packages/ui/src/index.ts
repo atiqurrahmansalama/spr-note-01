@@ -1,6 +1,8 @@
 export { default as CustomButton } from './CustomButton';
 export { default as CustomInput } from './CustomInput';
 export type { CustomInputProps } from './CustomInput';
+export { default as PortalInputField } from './PortalInputField';
+export type { PortalInputFieldProps } from './PortalInputField';
 export { default as CustomSelect } from './CustomSelect';
 export type { CustomSelectProps, SelectOption } from './CustomSelect';
 export { default as CustomCheckbox } from './CustomCheckbox';
@@ -66,10 +68,24 @@ export { default as FilterBox } from './FilterBox';
 export type { FilterBoxProps, FilterBoxScopeItem, FilterBoxRenderProps } from './FilterBox';
 export { default as FloatingActionDock } from './FloatingActionDock';
 export type { FloatingActionDockProps } from './FloatingActionDock';
+export { AppSidebar } from './AppSidebar';
+export type { AppSidebarItem, AppSidebarMode, AppSidebarProps, AppSidebarSubItem } from './AppSidebar';
+export { RightSidebarPanel } from './RightSidebarPanel';
+export type { RightSidebarPanelProps } from './RightSidebarPanel';
+export { DrawerBanner, DrawerContainer, DrawerFooter, DrawerSection } from './DrawerContainer';
+export type {
+  DrawerBannerProps,
+  DrawerContainerProps,
+  DrawerFooterProps,
+  DrawerSectionProps,
+} from './DrawerContainer';
+export { ErrorBoundary } from './ErrorBoundary';
 export * from './Icons';
 export * from './context/ToastContext';
+export * from './context/AppThemeProvider';
 export * from './context/UndoRedoContext';
 export * from './context/useUndoRedo';
+export * from './context/RightSidebarContext';
 export * from './hooks';
 export * from './i18n';
 

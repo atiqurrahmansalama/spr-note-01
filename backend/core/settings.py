@@ -62,6 +62,7 @@ INSTALLED_APPS += [
 
     # Internal apps
     "core",
+    "apps.our_little_universe",
 ]
 
 MIDDLEWARE = [
@@ -141,6 +142,37 @@ else:
             },
         }
     }
+
+# Dedicated Isolated Database for Our Little Universe (`modules.our_little_universe`)
+UNIVERSE_USE_SQLITE = os.getenv("UNIVERSE_USE_SQLITE", os.getenv("USE_SQLITE", "False")).lower() in ("true", "1", "t")
+UNIVERSE_DATABASE_URL = os.getenv("UNIVERSE_DATABASE_URL", "").strip()
+if UNIVERSE_DATABASE_URL and "pooler.supabase.com" in UNIVERSE_DATABASE_URL and ":5432" in UNIVERSE_DATABASE_URL:
+    UNIVERSE_DATABASE_URL = UNIVERSE_DATABASE_URL.replace(":5432", ":6543")
+
+_effective_universe_pg_url = UNIVERSE_DATABASE_URL or (DATABASE_URL if not UNIVERSE_USE_SQLITE else "")
+if _effective_universe_pg_url and not UNIVERSE_USE_SQLITE:
+    _universe_is_pooler = "pooler" in _effective_universe_pg_url or ":6543" in _effective_universe_pg_url
+    DATABASES["universe"] = dj_database_url.parse(
+        _effective_universe_pg_url,
+        conn_max_age=0 if _universe_is_pooler else DB_CONN_MAX_AGE,
+        conn_health_checks=True,
+        ssl_require=DB_SSL_REQUIRE,
+    )
+    if _universe_is_pooler:
+        DATABASES["universe"]["DISABLE_SERVER_SIDE_CURSORS"] = True
+else:
+    DATABASES["universe"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "universe_db.sqlite3",
+        "OPTIONS": {
+            "timeout": 60,
+            "transaction_mode": "IMMEDIATE",
+        },
+    }
+
+DATABASE_ROUTERS = [
+    "apps.our_little_universe.core.db_router.UniverseDatabaseRouter",
+]
 
 
 # REST Framework Configurations
@@ -317,9 +349,11 @@ CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", "False").lower() in
 _default_cors_origins = [
     "http://localhost:5173",
     "http://localhost:5174",
+    "http://localhost:5175",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175",
     "http://127.0.0.1:3000",
     "https://spr-note-01.pages.dev",
     "https://spr-note.vercel.app",
@@ -349,9 +383,11 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.onrender.com",
     "http://localhost:5173",
     "http://localhost:5174",
+    "http://localhost:5175",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175",
     "http://127.0.0.1:3000",
 ]
 
